@@ -253,6 +253,11 @@ export async function commitSparcProductionRuleAction(params: {
     },
   });
   const counts = sparcEvaluationCounts(result.evaluations);
+  // Continuous observations with no authored effect must not erase the last
+  // instructional message or trigger an unnecessary renderer update.
+  if (params.sparcResult.eventType === 'simulation-observation' && counts.firingCount === 0 && writtenHistoryCount === 0) {
+    return { classifications: [], messages: [], sparcNodeValues: {} };
+  }
   clientConsole(2, '[SPARC][ProductionRules] committed action', {
     pageKey: sparcDisplay.pageKey,
     tdfId,

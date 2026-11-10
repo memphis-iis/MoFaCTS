@@ -18,6 +18,44 @@ function fixture() {
     return { entries, requests, removed, reads, service: createMoveLibraryService({ store, embeddingModel: 'fixture', videoReuseStatus: async videos => new Map(videos.map(video => [video.segmentId, true])), verifyFigure: async () => { } }) };
 }
 describe('Client-selected instructional persistence', () => {
+    it('ignores descriptive metadata differences but retains them on stored records', async () => {
+        const f = fixture(), original = query('source', 'instruction');
+        original.context.components = ['explanation', 'richContent']; original.context.supportKind = 'written';
+        original.context.readingLevel = 'college-freshman'; original.context.language = 'en';
+        original.context.personas = { student: { traits: [], abilities: [], experiences: [], personalInterests: ['Soccer'] } };
+        const saved = await f.service.publish('author', { query: original, embedding: [1, 0] }, { text: 'Explanation', support: { text: 'Worked case' } });
+        const entry = f.entries.get(saved.reference.entryId)!;
+        // Labels are deliberately different from both the request and actual payload.
+        entry.context.supportKind = 'visual'; entry.context.components = ['explanation'];
+        const next = query('next', 'instruction'); next.context.components = ['explanation', 'richContent', 'question']; next.context.supportKind = 'written';
+        next.context.readingLevel = 'junior-high-freshman'; next.context.language = 'es';
+        next.context.personas = { student: { traits: [], abilities: [], experiences: [], personalInterests: ['Anime'] } };
+        const hit = await f.service.lookup('learner', next, { entryId: saved.reference.entryId, similarity: 1 }, [1, 0]);
+        assert.equal(hit.status, 'hit');
+        assert.deepEqual(entry.context.personas, original.context.personas);
+        assert.equal(entry.context.readingLevel, 'college-freshman');
+        const incomplete = query('incomplete', 'instruction'); incomplete.context.components = ['explanation'];
+        const partial = await f.service.publish('author', { query: incomplete, embedding: [1, 0] }, { text: 'Explanation without support' });
+        await assert.rejects(f.service.lookup('learner', { ...next, eventId: 'missing-support' }, { entryId: partial.reference.entryId, similarity: 1 }, [1, 0]), /composition/);
+        assert.equal(f.requests.size, 3, 'Blocked content must not become an accepted request');
+    });
+    it('separates orientation-owned text and restores accepted old requests exactly', async () => {
+        for (const kind of ['explanation', 'question', 'feedback'] as const) {
+            const f = fixture();
+            const original = query('old-event', kind);
+            const old = await f.service.publish('author', { query: original, embedding: [1, 0] }, { text: 'An old introduction with the original teaching content.' });
+            const owned = query('new-event', kind); owned.context.orientationOwned = true;
+            await assert.rejects(f.service.lookup('first-learner', owned, { entryId: old.reference.entryId, similarity: 1 }, [1, 0]), /category/);
+            const current = await f.service.publish('author', { query: owned, embedding: [1, 0] }, { text: 'Substantive teaching content without a transition.' });
+            const hit = await f.service.lookup('learner', owned, { entryId: current.reference.entryId, similarity: 1 }, [1, 0]);
+            assert.equal(hit.status, 'hit');
+            await assert.rejects(f.service.lookup('another-learner', query('reference-event', kind), { entryId: current.reference.entryId, similarity: 1 }, [1, 0]), /category/);
+            const resumed = await f.service.lookup('author', { ...original, context: { ...original.context, orientationOwned: true } }, null, [1, 0]);
+            assert.equal(resumed.status, 'hit');
+            if (resumed.status === 'hit') assert.equal(resumed.content.text, 'An old introduction with the original teaching content.');
+            assert.deepEqual((await f.service.publish('author', { query: original, embedding: [1, 0] }, { text: 'A replacement must not be saved.' })), old);
+        }
+    });
     it('accepts feedback at 0.975 and rejects lower scores before reading content', async () => {
         const f = fixture();
         const saved = await f.service.publish('a', { query: query('feedback-seed', 'feedback'), embedding: [1, 0] }, { text: 'Feedback for this answer.' });
@@ -65,7 +103,7 @@ describe('Client-selected instructional persistence', () => {
         assert.equal(hit.status, 'hit');
         if (hit.status === 'hit') assert.deepEqual(hit.content, content);
         const visual = structuredClone(q); visual.context.supportKind = 'visual';
-        await assert.rejects(f.service.lookup('c', visual, { entryId: saved.reference.entryId, similarity: .999 }, [1, 0]), /category/);
+        await assert.rejects(f.service.lookup('c', visual, { entryId: saved.reference.entryId, similarity: .999 }, [1, 0]), /visual move requires/);
         f.entries.delete(saved.reference.entryId); f.removed.add(saved.reference.entryId);
         const removed = await f.service.publish('a', ticket, content);
         assert.equal(removed.content.administrativeRemoval, true);

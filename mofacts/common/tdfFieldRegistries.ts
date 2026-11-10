@@ -1,5 +1,7 @@
 import { PROLIFIC_COMPLETION_URL } from './prolific.ts';
 import { SPARC_READING_LEVELS } from '../../learning-components/runtime/sparcReadingLevel.ts';
+import { SPARC_ORIENTATION_MODES } from '../../learning-components/runtime/sparcOrientationMode.ts';
+import { SPARC_TEACHER_PERSONA_SCHEMA } from '../../learning-components/runtime/sparcPersonas.ts';
 import {
   enumStringField,
   GOOGLE_STT_LANGUAGE_CODES,
@@ -528,6 +530,14 @@ export const LEARNING_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
 
 export const SPARC_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
   ...LEARNING_SESSION_FIELD_REGISTRY,
+  orientationMode: simpleField(enumStringField([...SPARC_ORIENTATION_MODES], 'full', 12), {
+    brief: 'KC headings and transition bridges.',
+    verbose: 'full (the default) shows authored KC headings, progress counts, and bridges at meaningful changes. headings shows only KC headings and progress. off retains the preceding presentation and prompt contract. Applies to new categorized SPARC turns; saved turns retain their accepted mode and content.'
+  }),
+  teacherPersona: simpleField(SPARC_TEACHER_PERSONA_SCHEMA, {
+    brief: 'Teacher descriptions for instructional generation.',
+    verbose: 'Optional traits, abilities, experiences, and teachingStyle arrays. These describe intended tutor behavior, not verified credentials. They guide generation and embedding meaning, never instructional selection or exact library matching.'
+  }),
   readingLevel: simpleField(enumStringField([...SPARC_READING_LEVELS], 'unbiased', 12), {
     brief: 'Audience for generated SPARC text.',
     verbose: 'unbiased leaves text prompts unchanged (also the default when omitted). junior-high-freshman (grade 6), high-school-freshman (grade 9), and college-freshman (first year) guide vocabulary and sentence structure in generated learner-facing text without changing concepts, scoring, or assistance.'
@@ -792,6 +802,8 @@ export const LEARNING_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
 
 export const SPARC_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   ...LEARNING_SESSION_DIRECT_RUNTIME_KEYS,
+  'orientationMode',
+  'teacherPersona',
   'readingLevel',
   'pageId',
   'startingKC',

@@ -6,6 +6,10 @@ import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 import type { SparcTrialDisplayDialogueTurnScorer } from './sparcTrialDisplayRuntimeBridge';
 import { createEmptySparcReplayState } from './sparcStateReplay';
 import { normalizeEmbeddingVector } from '../../runtime/vectorSimilarity';
+import type { SparcOrientationRequest } from './sparcTurnOrientation';
+import { primitiveContext } from './sparcMoveLibrary';
+import { instructionalNeed } from './sparcMoveLibrary';
+import { parseSparcPersonas } from '../../runtime/sparcPersonas';
 
 function injectedRuntime(overrides: Partial<SparcDialogueAdapterRuntime> = {}): SparcDialogueAdapterRuntime {
   const unavailable = async () => { throw new Error('Unexpected external operation in SPARC domain test'); };
@@ -52,6 +56,174 @@ function scoreContext(): Parameters<SparcTrialDisplayDialogueTurnScorer>[0] {
 }
 
 describe('SPARC dialogue domain adapter with explicit runtime dependencies', () => {
+  it('carries personas into visual briefs, visual embedding needs, and feedback', async () => {
+    const personas = parseSparcPersonas({ student: { personalInterests: ['Soccer'] }, teacher: { teachingStyle: ['Explain relationships'] } });
+    const schemas: string[] = [];
+    let visualCalls = 0;
+    const adapter = createSparcDialogueOpenRouterAdapter({ personas, tdfId: 'lesson', sessionId: 'provider' }, injectedRuntime({
+      async callGeneratedJson(request) {
+        assert.match(JSON.stringify(request.messages), /Soccer/);
+        assert.match(JSON.stringify(request.messages), /Explain relationships/);
+        schemas.push(request.intent.schemaName!);
+        return { parsedContent: request.intent.schemaName === 'mofacts_sparc_instruction_primitive'
+          ? { tutorMessage: 'Interest applies to the accumulated balance.', kind: 'figure', workedExample: null, heading: null,
+            imagePrompt: 'Show an accumulated balance growing with each interest payment.', figureDescription: 'Balances grow with interest.', displayWidth: 360 }
+          : { tutorMessage: request.intent.schemaName === 'mofacts_sparc_question_primitive'
+            ? 'Which balance earns interest next year?' : 'Interest applies to the full accumulated balance.' } };
+      },
+      async resolveVisual(request) {
+        visualCalls++;
+        assert.deepEqual(request.situation.personas, personas);
+        assert.match(request.imagePrompt, /accumulated balance/);
+        return { video: { segmentId: 'a'.repeat(64), videoId: 'abcdefghijk', language: 'en', title: 'Compound interest',
+          channel: 'Teaching', startSeconds: 0, endSeconds: 10, transcript: 'Balances grow with interest.' } };
+      },
+    }));
+    const visualMove = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-visual-question.text');
+    await adapter.generateTutorUtterance({ ...instructionRequest(), action: visualMove.moveId, moveDefinition: visualMove });
+    const feedbackMove = requireActiveSparcMoveDefinition('instruction.feedback');
+    await adapter.generateTutorUtterance({ ...instructionRequest(), targetType: 'feedback', action: feedbackMove.moveId, moveDefinition: feedbackMove,
+      learnerText: 'Interest applies only to the starting balance.' });
+    assert.equal(visualCalls, 1);
+    assert.deepEqual(schemas, ['mofacts_sparc_instruction_primitive', 'mofacts_sparc_question_primitive', 'mofacts_sparc_dialogue_utterance']);
+  });
+  it('supplies personas to generation and retrieval needs without altering assessment or the selected move', async () => {
+    const personas = parseSparcPersonas({ student: { personalInterests: ['Soccer'], abilities: ['Basic algebra'] },
+      teacher: { traits: ['Patient'], teachingStyle: ['Explain conceptual relationships'] } });
+    const source = instructionRequest();
+    const before = structuredClone(source);
+    const calls: string[] = [];
+    let retrieved = 0;
+    const adapter = createSparcDialogueOpenRouterAdapter({ personas, tdfId: 'lesson', sessionId: 'provider',
+      moveLibrary: {
+        async lookup(query) {
+          retrieved++;
+          assert.deepEqual(query.context.personas, personas);
+          assert.deepEqual(JSON.parse(query.queryText).personas, personas);
+          return { status: 'generate', ticket: { query, embedding: [1, 0] }, previousQuestions: [] };
+        },
+        async publish(ticket, content) {
+          assert.deepEqual(ticket.query.context.personas, personas);
+          return { accepted: true, content, reference: { entryId: 'synthetic', version: 'v1', source: 'generated', similarity: null } };
+        },
+      },
+    }, injectedRuntime({
+      async callGeneratedJson(request) {
+        const prompt = JSON.stringify(request.messages);
+        assert.match(prompt, /Soccer/); assert.match(prompt, /Explain conceptual relationships/);
+        calls.push(request.intent.schemaName!);
+        return { parsedContent: { tutorMessage: request.intent.schemaName === 'mofacts_sparc_instruction_primitive'
+          ? 'Interest applies to the accumulated balance.' : 'Which balance earns interest next year?' } };
+      },
+      async realizePrimitive(params) {
+        assert.deepEqual(params.request.personas, personas);
+        assert.deepEqual(instructionalNeed(params.request, params.dependencies).personas, personas);
+        assert.equal(params.request.action, source.action);
+        return params.generate();
+      },
+      async loadNormalizedAssessmentVectors(texts) {
+        assert.ok(texts.every(text => !text.includes('Soccer') && !text.includes('Patient')));
+        return texts.map(() => [1, 0]);
+      },
+      async callResolvedJson(request) {
+        const prompt = JSON.stringify(request.messages);
+        assert.doesNotMatch(prompt, /Soccer|Patient|\bpersonas?\b|Basic algebra/);
+        return { parsedContent: { learningTargetEvaluations: [], diagnosticMisconceptionEvaluations: [], learnerContribution: { type: 'other' } } };
+      },
+    }));
+    await adapter.generateTutorUtterance({ ...source, historySessionId: 'history',
+      onInstructionCheckpoint: async () => undefined, onInstructionComponent: async () => undefined });
+    assert.deepEqual(source, before);
+    assert.equal(retrieved, 1);
+    assert.deepEqual(calls, ['mofacts_sparc_instruction_primitive', 'mofacts_sparc_question_primitive']);
+    await adapter.scoreLearnerResponse(scoreContext());
+  });
+  const orientationRequest = (reason: SparcOrientationRequest['reason'] = 'advance'): SparcOrientationRequest => ({
+    reason,
+    current: { kind: 'expectation', id: 'kc-b', text: 'Intervals become narrower as sample size increases.' },
+    previous: { kind: 'expectation', id: 'kc-a', text: 'Confidence describes long-run coverage.' },
+    progress: { total: 3, met: 1, remaining: 2 },
+    achieved: [{ id: 'kc-a', text: 'Confidence describes long-run coverage.' }],
+    mentionRemaining: true, lessonContext: { topic: 'Understanding confidence intervals' },
+    recentBridges: ['You have met our goal for long-run coverage. Two learning goals remain.'],
+    adjacentFeedback: ['The confidence level describes repeated sampling.'], selectionReason: 'required-coverage',
+  });
+
+  it('realizes orientation in its own prompt without retrieving or publishing reusable content', async () => {
+    const input = orientationRequest();
+    let calls = 0;
+    const adapter = createSparcDialogueOpenRouterAdapter({ tdfId: 'lesson', policyId: 'dynamic-instruction-agent-v2', sessionId: 'provider' }, injectedRuntime({
+      async callGeneratedJson(request, operation, onResult) {
+        calls++;
+        assert.equal(operation, 'utterance');
+        assert.equal(request.intent.schemaName, 'mofacts_sparc_turn_orientation');
+        assert.equal(request.intent.strictSchema, true);
+        assert.equal(request.tdfId, 'lesson');
+        assert.deepEqual(JSON.parse(request.messages[1]!.content as string), input);
+        const prompt = request.messages[0]!.content as string;
+        assert.match(prompt, /one or two sentences/);
+        assert.match(prompt, /target switch alone is not an achievement/i);
+        assert.match(prompt, /avoid their openings, sentence patterns/i);
+        assert.match(prompt, /including the active unmet goal/);
+        assert.match(prompt, /Do not teach the next concept, ask a question/);
+        const result = { parsedContent: { tutorMessage: 'With long-run coverage established, let us examine how sample size changes interval width. Two learning goals remain.' } };
+        onResult(result);
+        return result;
+      },
+    }));
+    const output = await adapter.generateOrientation(input);
+    assert.match(output, /sample size changes interval width/);
+    assert.equal(calls, 1);
+    assert.equal(await adapter.generateOrientation({ ...orientationRequest('continue'), achieved: [] }), '');
+    assert.equal(calls, 1, 'A continuation displays heading and progress without a generation call');
+  });
+
+  it('generates a milestone bridge for incidental gains while the selected target continues', async () => {
+    const input = orientationRequest('continue');
+    let calls = 0;
+    const adapter = createSparcDialogueOpenRouterAdapter({}, injectedRuntime({
+      async callGeneratedJson(request) {
+        calls++;
+        assert.deepEqual(JSON.parse(request.messages[1]!.content as string), input);
+        assert.match(request.messages[0]!.content as string, /acknowledge only those earned milestones while remaining on the current target/);
+        return { parsedContent: { tutorMessage: 'Long-run coverage is now established; we will keep working on interval width.' } };
+      },
+    }));
+    assert.match(await adapter.generateOrientation(input), /keep working on interval width/);
+    assert.equal(calls, 1);
+  });
+
+  it('rejects repeated or missing orientation text without substituting a canned transition', async () => {
+    const input = orientationRequest('switch');
+    for (const tutorMessage of [input.recentBridges[0]!, input.adjacentFeedback[0]!, '']) {
+      const adapter = createSparcDialogueOpenRouterAdapter({}, injectedRuntime({
+        async callGeneratedJson() { return { parsedContent: { tutorMessage } }; },
+      }));
+      await assert.rejects(adapter.generateOrientation({ ...input, achieved: [] }), /repeats accepted tutor content|requires tutorMessage/);
+    }
+  });
+
+  it('scopes orientation ownership to requests that opt into new turn orientation', async () => {
+    const prompts: string[] = [];
+    const adapter = createSparcDialogueOpenRouterAdapter({}, injectedRuntime({
+      async callGeneratedJson(request) {
+        prompts.push(request.messages[0]!.content as string);
+        return { parsedContent: request.intent.schemaName === 'mofacts_sparc_instruction_primitive'
+          ? { tutorMessage: 'Interest applies to the accumulated balance.' }
+          : { tutorMessage: 'What changes after interest remains in the account?' } };
+      },
+    }));
+    await adapter.generateTutorUtterance({ ...instructionRequest(), orientationOwned: true });
+    assert.ok(prompts.every(prompt => /separate orientation component owns/i.test(prompt)));
+    assert.ok(prompts.every(prompt => !prompt.includes('Starting an expectation:')));
+    assert.equal(primitiveContext({ ...instructionRequest(), orientationOwned: true }, 'instruction', null).orientationOwned, true);
+    assert.equal(primitiveContext(instructionRequest(), 'instruction', null).orientationOwned, undefined);
+    prompts.length = 0;
+    await adapter.generateTutorUtterance(instructionRequest());
+    assert.ok(prompts.every(prompt => !/separate orientation component owns/i.test(prompt)));
+    assert.ok(prompts.every(prompt => prompt.includes('This is the first instructional move.')));
+  });
+
   it('assesses the complete AutoTutor rubric without a current KC or assessment embeddings', async () => {
     const base = scoreContext();
     const { instructionalController: _controller, ...display } = base.display;

@@ -68,6 +68,7 @@
 }
 
 .profile-field input,
+.profile-field textarea,
 .profile-field select {
   width: 100%;
   min-height: var(--app-button-height);
@@ -80,10 +81,15 @@
 }
 
 .profile-field input:focus,
+.profile-field textarea:focus,
 .profile-field select:focus {
   border-color: var(--focus-ring-color);
   box-shadow: 0 0 0 3px var(--app-focus-shadow-color);
   outline: none;
+}
+
+.profile-field textarea {
+  resize: vertical;
 }
 
 .profile-field input[readonly] {
@@ -173,7 +179,15 @@
 .profile-actions button:hover,
 .profile-actions button:focus-visible {
   background: var(--app-state-hover-surface-color);
-  outline: none;
+}
+
+.profile-segmented-control button:focus-visible,
+.profile-icon-grid button:focus-visible,
+.profile-avatar-image-actions button:focus-visible,
+.profile-actions button:focus-visible {
+  box-shadow: 0 0 0 3px var(--app-focus-shadow-color);
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
 }
 
 .profile-icon-grid {
@@ -220,13 +234,24 @@
   border-color: var(--app-primary-action-surface-color);
 }
 
+.profile-actions .profile-primary-action:hover:not(:disabled),
+.profile-actions .profile-primary-action:focus-visible:not(:disabled) {
+  background: var(--btn-hover-bg);
+  color: var(--app-primary-action-text-color);
+  border-color: var(--btn-hover-border);
+}
+
 .profile-actions .profile-danger-action {
   color: var(--feedback-error-color);
   border-color: color-mix(in srgb, var(--feedback-error-color) 36%, transparent);
 }
 
 .profile-actions button:disabled {
-  opacity: 0.62;
+  background: var(--app-state-disabled-surface-color);
+  color: var(--app-state-disabled-text-color);
+  border-color: var(--border-color);
+  box-shadow: none;
+  opacity: 1;
   cursor: progress;
 }
 

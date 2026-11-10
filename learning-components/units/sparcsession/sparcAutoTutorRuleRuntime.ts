@@ -1,4 +1,6 @@
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
+import type { SparcOrientationGenerator } from './sparcTurnOrientation';
+import type { SparcOrientationMode } from '../../runtime/sparcOrientationMode';
 import type { SparcGeneratedInstruction } from './sparcInstructionalPrimitives';
 import type { ExpectationLogitChange } from '../../runtime/expectationLogitHistory';
 import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY } from '../../trial-displays/sparc/sparcProgressiveNodes';
@@ -35,6 +37,8 @@ export type SparcAutoTutorRuleTurnParams = {
   readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
+  readonly generateOrientation?: SparcOrientationGenerator;
+  readonly orientationMode?: SparcOrientationMode;
   readonly dialogueNodeOptions?: SparcDialogueTurnNodeOptions;
 };
 

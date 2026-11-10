@@ -33,6 +33,17 @@ function setup() {
 // These exercise the authorized read/review/CAS boundary; package archive and
 // upload-plan integrity remain covered by the package workflow integration tests.
 describe('editor structural update confirmation', function() {
+  for (const method of ['saveTdfContent', 'saveTdfStimuli'] as const) {
+    it(`${method}: rejects invalid orientation modes before saving`, async function() {
+      const h = setup();
+      h.doc.content.tdfs.tutor.unit[0].sparcsession = { orientationMode: 'HEADINGS' };
+      const original = structuredClone(h.doc);
+      const args = method === 'saveTdfContent' ? [h.doc._id, h.doc.content, {}, []] : [h.doc._id, h.doc.rawStimuliFile, []];
+      await assert.rejects(() => (h.methods[method] as any).call({ userId: 'owner' }, ...args), /orientationMode must be full, headings, or off/);
+      assert.deepEqual(h.doc, original);
+      assert.equal(h.writes.length, 0);
+    });
+  }
   it('prevents an authorized non-admin owner from adding or removing demo markers', async function() {
     const h = setup();
     const proposed = structuredClone(h.doc.content);

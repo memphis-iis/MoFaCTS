@@ -164,6 +164,20 @@
     color: var(--app-secondary-text-color);
   }
 
+  .sparc-dialogue-turn-heading {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    gap: var(--app-space-1);
+    overflow-wrap: anywhere;
+  }
+
+  .sparc-dialogue-turn-progress {
+    margin: 0;
+    color: var(--app-secondary-text-color);
+    font-size: calc(var(--app-font-size-base) * 0.875);
+  }
+
   .sparc-auto-tutor-pending-turn {
     display: flex;
     flex-direction: column;

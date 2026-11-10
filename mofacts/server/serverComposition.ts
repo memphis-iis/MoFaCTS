@@ -1,4 +1,6 @@
 import { publishContentUploadMetadata } from './lib/contentUploadMetadataPublication';
+import { createSimulationTelemetryMethods } from './methods/simulationTelemetryMethods';
+import { ensureSimulationTelemetryIndexes, removeSimulationResearchUserRecords } from './lib/simulationTelemetry';
 import { createSparcVideoCatalogMethods } from './methods/sparcVideoCatalogMethods';
 import { createSparcLibraryCurationMethods } from './methods/sparcLibraryCurationMethods';
 import { SPARC_PROMPT_IMAGE_PURPOSE } from '../common/lib/sparcPromptImage';
@@ -752,6 +754,7 @@ export const methods: any = {
       }
     },
     removeSparcFigureUserDecisions: async userId => { await removeSparcFigureUserDecisions(userId); await removeSparcMoveUserRecords(userId); },
+    removeSimulationResearchUserRecords,
     serverConsole,
     csvParser: PapaAny,
     usersCollection: MeteorAny.users,
@@ -1091,6 +1094,7 @@ export const asyncMethods: Record<string, unknown> = {
   getTdfById: getTdfByIdPublic,
 
   ...speechMethods,
+  ...createSimulationTelemetryMethods({ getMethodAuthorizationDeps }),
 
   ...createSparcLibraryCurationMethods({ getMethodAuthorizationDeps,
     remove: id => withSparcFigureLibraryLock(() => sparcLibraryCuration.remove(id)), removed: readSparcAdministrativeRemovals }),
@@ -1169,6 +1173,7 @@ Meteor.startup(async function() {
   await ensureSparcVideoCatalogIndexes();
   await Histories.rawCollection().createIndex({ userId: 1, TDFId: 1, eventType: 1, _id: 1 });
   await ensureSparcFigureBrowseIndexes();
+  await ensureSimulationTelemetryIndexes();
   await ensureProlificIndexes();
   // Test provisioning checks exact lesson families without course/user scope.
   await GlobalExperimentStates.rawCollection().createIndex({ TDFId: 1 });

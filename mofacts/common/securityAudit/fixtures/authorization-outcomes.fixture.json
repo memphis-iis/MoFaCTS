@@ -1,0 +1,12 @@
+[
+  { "expected": "allow", "outcome": "ALLOWED", "status": "PASS" },
+  { "expected": "allow", "outcome": "DENIED_BY_POLICY", "status": "FAIL" },
+  { "expected": "allow", "outcome": "DOMAIN_REJECTION", "status": "ERROR" },
+  { "expected": "allow", "outcome": "TRANSPORT_OR_RUNNER_ERROR", "status": "ERROR" },
+  { "expected": "allow", "outcome": "INCONCLUSIVE", "status": "ERROR" },
+  { "expected": "deny", "outcome": "ALLOWED", "status": "FAIL" },
+  { "expected": "deny", "outcome": "DENIED_BY_POLICY", "status": "PASS" },
+  { "expected": "deny", "outcome": "DOMAIN_REJECTION", "status": "ERROR" },
+  { "expected": "deny", "outcome": "TRANSPORT_OR_RUNNER_ERROR", "status": "ERROR" },
+  { "expected": "deny", "outcome": "INCONCLUSIVE", "status": "ERROR" }
+]

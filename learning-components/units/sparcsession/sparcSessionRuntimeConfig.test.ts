@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   resolveSparcSessionPageId,
+  resolveSparcSessionOrientationMode,
   resolveSparcSessionProbabilitySource,
   resolveSparcSessionRuntimeConfig,
   resolveSparcSessionStartingKC,
@@ -43,7 +44,31 @@ describe('sparc session runtime config', function() {
     assert.equal(resolveSparcSessionProbabilitySource({ sparcsession: { calculateProbability: '  ' } }), undefined);
   });
 
+  it('defaults orientation to full and preserves each explicit per-lesson mode', function() {
+    assert.equal(resolveSparcSessionOrientationMode(undefined), 'full');
+    assert.equal(resolveSparcSessionOrientationMode({ sparcsession: {} }), 'full');
+    for (const orientationMode of ['full', 'headings', 'off']) {
+      const unit = { sparcsession: { orientationMode } };
+      assert.equal(resolveSparcSessionOrientationMode(unit), orientationMode);
+      assert.deepEqual(validateSparcSessionModelConfiguration(unit), []);
+    }
+  });
+
+  it('rejects invalid orientation modes at runtime and upload configuration validation', function() {
+    for (const orientationMode of ['', 'FULL', 'none', ' full ', true, 0, null, {}, []]) {
+      const unit = { sparcsession: { orientationMode } };
+      assert.throws(() => resolveSparcSessionOrientationMode(unit), /orientationMode must be full, headings, or off/);
+      assert.equal(validateSparcSessionModelConfiguration(unit)[0]?.kind, 'invalid-sparcsession-orientation-mode');
+    }
+  });
+
   it('validates coherent model configuration for model-backed SPARC features', function() {
+    assert.deepEqual(validateSparcSessionModelConfiguration({ sparcsession: {
+      teacherPersona: { teachingStyle: ['Explain conceptual relationships'] },
+    } }), []);
+    assert.equal(validateSparcSessionModelConfiguration({ sparcsession: {
+      teacherPersona: { personalInterests: ['Soccer'] },
+    } })[0]?.kind, 'invalid-sparcsession-teacher-persona');
     assert.deepEqual(validateSparcSessionModelConfiguration({}), [{
       kind: 'missing-sparcsession-model-config',
       message: 'SPARC model-backed features require unit-level sparcsession model configuration',

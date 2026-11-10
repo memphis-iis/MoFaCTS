@@ -1,0 +1,339 @@
+{
+  "schemaVersion": 1,
+  "source": "Official public release-branch manifests retrieved 2026-11-09; build and release-selection evidence is recorded separately under tmp/phet-pilot",
+  "pilots": [
+    {
+      "simulation": "density",
+      "version": "1.2.9",
+      "buildArtifact": "build/adapted-from-phet/density_en_adapted-from-phet.html",
+      "manifestCommit": "56a33bd858794742499090ce40351b940e46b474",
+      "dependencies": {
+        "comment": "# density 1.2.9 Fri Mar 27 2026 14:27:07 GMT-0600 (Mountain Daylight Time)",
+        "assert": {
+          "sha": "4eaabfefb0b88b213e98b9c7f32d6c570c3fc122",
+          "branch": "HEAD"
+        },
+        "axon": {
+          "sha": "2dc86bf271a2a625bbfa919c321a7aa8b90f3687",
+          "branch": "HEAD"
+        },
+        "brand": {
+          "sha": "2903357426dfe08a0826db612ca87de627c907a5",
+          "branch": "HEAD"
+        },
+        "chipper": {
+          "sha": "12695cefe6db6d228be9f22a68f17b5c493cc36f",
+          "branch": "HEAD"
+        },
+        "density": {
+          "sha": "51b6a3165989618d1371bb03dd7bf2c9d0c12433",
+          "branch": "1.2"
+        },
+        "density-buoyancy-common": {
+          "sha": "45fbfa541299a00653d390a74b29b33af4a12b95",
+          "branch": "HEAD"
+        },
+        "dot": {
+          "sha": "5357213b36f5f5ae7c6a9a1759fbc8e264a0e709",
+          "branch": "HEAD"
+        },
+        "joist": {
+          "sha": "4a8751fd123c5ede069d9f66a873e0911df46dcb",
+          "branch": "HEAD"
+        },
+        "kite": {
+          "sha": "d780083bfeb93b5e110c0554dad80adfe85e81b2",
+          "branch": "HEAD"
+        },
+        "mobius": {
+          "sha": "ccc51f1b9c23e95e961c9c1f5b00953a1ef56117",
+          "branch": "HEAD"
+        },
+        "perennial-alias": {
+          "sha": "ad7d3220af1a2cc3ce72e32529f1a304a2ccf0ee",
+          "branch": "HEAD"
+        },
+        "phet-core": {
+          "sha": "ea48154177030cb76708413ecd61a0fe9b05fa5c",
+          "branch": "HEAD"
+        },
+        "phet-io": {
+          "sha": "a390c7d8a226edce98ff64ed061319a106f2cb8c",
+          "branch": "HEAD"
+        },
+        "phet-io-sim-specific": {
+          "sha": "f6246878c9d7dccf8043076a78e61357e4186a93",
+          "branch": "HEAD"
+        },
+        "phet-io-wrappers": {
+          "sha": "089e540c2dc95d6914302c184ac1fdd0ec4c7ae5",
+          "branch": "HEAD"
+        },
+        "phetcommon": {
+          "sha": "e5bcec0ca0030f48b2da5febbe8859049b62f2ee",
+          "branch": "HEAD"
+        },
+        "phetmarks": {
+          "sha": "d3d9fb5b983d81838325533058159760bd507a1e",
+          "branch": "HEAD"
+        },
+        "query-string-machine": {
+          "sha": "1dacedac04aa8515379d9eabff5849da4a244641",
+          "branch": "HEAD"
+        },
+        "scenery": {
+          "sha": "e12e4c7d2f5129ea4224c4d702a2ff1922f83e79",
+          "branch": "HEAD"
+        },
+        "scenery-phet": {
+          "sha": "7746487982317166cd1a93679e96b9adb1fef7d4",
+          "branch": "HEAD"
+        },
+        "sherpa": {
+          "sha": "853c04446ddde6f907dd50b4a37ad0616adcf13a",
+          "branch": "HEAD"
+        },
+        "studio": {
+          "sha": "6d774ef20e61c9bc8f5c5a6b009b7ffee082e9b8",
+          "branch": "HEAD"
+        },
+        "sun": {
+          "sha": "ff6b803a4a43d33dda8e54ac47d95e7889b03e8e",
+          "branch": "HEAD"
+        },
+        "tambo": {
+          "sha": "5b60059e8ef8f9101db3e6cedd501f15acb0ba10",
+          "branch": "HEAD"
+        },
+        "tandem": {
+          "sha": "3f589553d3662f79ecf02aa5755b5e92b2c4f01b",
+          "branch": "HEAD"
+        },
+        "twixt": {
+          "sha": "23c01e63dd9491467a4a420fe218c6349683e743",
+          "branch": "HEAD"
+        },
+        "utterance-queue": {
+          "sha": "8caa26a7841fbb49d5314aadbf4fde6f19cc3309",
+          "branch": "HEAD"
+        }
+      },
+      "supplementalDependencies": {
+        "babel": {
+          "sha": "037ea8cb8bb0c12c7c3acf588eafc4c63ca06856",
+          "provenance": "Official babel repository, last commit before the publication timestamp in dependencies.json. Upstream release manifests omit this build-time locale metadata dependency."
+        }
+      }
+    },
+    {
+      "simulation": "pendulum-lab",
+      "version": "1.0.34",
+      "buildArtifact": "build/pendulum-lab_en.html",
+      "manifestCommit": "9eadf41faf7c27df90fa3deeec83933a6605b7e2",
+      "dependencies": {
+        "comment": "# pendulum-lab 1.0.34 Fri Mar 27 2026 17:09:24 GMT-0600 (Mountain Daylight Time)",
+        "assert": {
+          "sha": "928741cfc8fe804334d5b35292140314511f8678",
+          "branch": "HEAD"
+        },
+        "axon": {
+          "sha": "24c942a45d087621bd125e3b5495a17c67dd3ee3",
+          "branch": "HEAD"
+        },
+        "brand": {
+          "sha": "02cf4d3b331915c285414c905489af1a3879ff47",
+          "branch": "HEAD"
+        },
+        "chipper": {
+          "sha": "b6fc41efd6dd81fefa1f75af350c770e5e2b05fc",
+          "branch": "HEAD"
+        },
+        "dot": {
+          "sha": "db33a2c7fca14980bccd7d9517839c5b8ae7a9ee",
+          "branch": "HEAD"
+        },
+        "joist": {
+          "sha": "85009ea1fef8581a5f98eaeccd74d6efbd6d1a58",
+          "branch": "HEAD"
+        },
+        "kite": {
+          "sha": "dc5c4382bce034652a4e0bae6c739ba8284b2558",
+          "branch": "HEAD"
+        },
+        "pendulum-lab": {
+          "sha": "d5399bd3e0ddf1dc035fcd9a29238374c4459479",
+          "branch": "1.0"
+        },
+        "phet-core": {
+          "sha": "574e21cea6572c2c9f5c75d8cf51560024145c67",
+          "branch": "HEAD"
+        },
+        "phetcommon": {
+          "sha": "31df570160d2d7f1394bb94144c6f4f2b24402c3",
+          "branch": "HEAD"
+        },
+        "phetmarks": {
+          "sha": "a9ad33f2be05b094e134a189391baa52a6c860ab",
+          "branch": "HEAD"
+        },
+        "query-string-machine": {
+          "sha": "c74e454ec68033a9546b8181d4d962eb8ceef81f",
+          "branch": "HEAD"
+        },
+        "scenery": {
+          "sha": "55417e4f517c09731c2bdbd932e8e4c3c7be7c31",
+          "branch": "HEAD"
+        },
+        "scenery-phet": {
+          "sha": "961cb04e3623638a59e1cf0e6888d372876f29d0",
+          "branch": "HEAD"
+        },
+        "sherpa": {
+          "sha": "8a5d6d7f7fe731babf3d0c54b357c82740ba4b8e",
+          "branch": "HEAD"
+        },
+        "sun": {
+          "sha": "9820ea3048d1b97debc53fff442040e189d229fd",
+          "branch": "HEAD"
+        },
+        "tandem": {
+          "sha": "37243b99c58d4195f7f9302b72bda8456dff307a",
+          "branch": "HEAD"
+        }
+      },
+      "supplementalDependencies": {
+        "babel": {
+          "sha": "037ea8cb8bb0c12c7c3acf588eafc4c63ca06856",
+          "provenance": "Official babel repository, last commit before the publication timestamp in dependencies.json. Upstream release manifests omit this build-time locale metadata dependency."
+        }
+      }
+    },
+    {
+      "simulation": "circuit-construction-kit-dc",
+      "version": "1.5.1",
+      "buildArtifact": "build/adapted-from-phet/circuit-construction-kit-dc_en_adapted-from-phet.html",
+      "manifestCommit": "0c6cf95e5a742e873601fa3ec9d50be63fb2b144",
+      "dependencies": {
+        "comment": "# circuit-construction-kit-dc 1.5.1 Fri Apr 10 2026 17:49:44 GMT-0400 (Eastern Daylight Time)",
+        "assert": {
+          "sha": "4fa534de08d265643688965bf233cb73326c3cb7",
+          "branch": "HEAD"
+        },
+        "axon": {
+          "sha": "f39f107a8c3791fb02a192ab8c83302352afa64f",
+          "branch": "HEAD"
+        },
+        "bamboo": {
+          "sha": "5d83d846e0b085a866f8ef6217e57680e683459a",
+          "branch": "HEAD"
+        },
+        "brand": {
+          "sha": "3467b653977a4a722bff76838f9471772c6ac17e",
+          "branch": "HEAD"
+        },
+        "chipper": {
+          "sha": "cff5bce49a00664f6ca7d8f83c8d74204bdb522c",
+          "branch": "HEAD"
+        },
+        "circuit-construction-kit-common": {
+          "sha": "88aa838db0e612556f62e3654f4a8450410dbd08",
+          "branch": "HEAD"
+        },
+        "circuit-construction-kit-dc": {
+          "sha": "85bb5d592d2fc9c0fd8c30522aff911fb33baab9",
+          "branch": "1.5"
+        },
+        "dot": {
+          "sha": "e171982c0a535924cffff003849b4954e78effe6",
+          "branch": "HEAD"
+        },
+        "griddle": {
+          "sha": "92d82f363c553800bdf4bd2527bf3051698e3b3b",
+          "branch": "HEAD"
+        },
+        "joist": {
+          "sha": "e96a0df231553e21328906ba66860681a7c39644",
+          "branch": "HEAD"
+        },
+        "kite": {
+          "sha": "ffeb3d65a0cb51940323117c2d7e93cc0260dbe1",
+          "branch": "HEAD"
+        },
+        "perennial-alias": {
+          "sha": "03ec0abe1c0db379e93614bed5864ef98264316d",
+          "branch": "HEAD"
+        },
+        "phet-core": {
+          "sha": "ea1c4f3f52a2703f5f3f7f359d75e8d38a499344",
+          "branch": "HEAD"
+        },
+        "phet-io": {
+          "sha": "104c5d2243531a6647067a0b80597bd91f288e21",
+          "branch": "HEAD"
+        },
+        "phet-io-sim-specific": {
+          "sha": "9b9d871088bd14babb662da0180fee2b76c33493",
+          "branch": "HEAD"
+        },
+        "phet-io-wrappers": {
+          "sha": "5577acecc7e192ab573c8b1c1e6d35844e133797",
+          "branch": "HEAD"
+        },
+        "phetcommon": {
+          "sha": "cc0ec143b09a5c5096823cb96591df05b26297fd",
+          "branch": "HEAD"
+        },
+        "phetmarks": {
+          "sha": "92a48d5d5294f506f5eb5a5524cacdd49631723a",
+          "branch": "HEAD"
+        },
+        "query-string-machine": {
+          "sha": "e0b764e61a19a08a747c0b2152656bac5420a0b1",
+          "branch": "HEAD"
+        },
+        "scenery": {
+          "sha": "d70e2375b31475391bc18dc1a8dc2c58d0da9943",
+          "branch": "HEAD"
+        },
+        "scenery-phet": {
+          "sha": "c7ff170569f6b5a12a5c64f5660a7b8bf3ddd264",
+          "branch": "HEAD"
+        },
+        "sherpa": {
+          "sha": "972b196a575ab802996223b3b66af8a482fabb0c",
+          "branch": "HEAD"
+        },
+        "studio": {
+          "sha": "48279c0a5b20f59072bdad8b8cfbd20c76193141",
+          "branch": "HEAD"
+        },
+        "sun": {
+          "sha": "8a62815eb800bebe84afd0b5149fe96e1684ffc0",
+          "branch": "HEAD"
+        },
+        "tambo": {
+          "sha": "804a218d738b74b87d20b93c2e0babb49aa26045",
+          "branch": "HEAD"
+        },
+        "tandem": {
+          "sha": "f7504238b954752bee54b4d8d19f186bb6fb1fa0",
+          "branch": "HEAD"
+        },
+        "twixt": {
+          "sha": "1944fc3e3a7504926d86c651fb1b3e6fccb3aec2",
+          "branch": "HEAD"
+        },
+        "utterance-queue": {
+          "sha": "b076c1e9f03590f8a9f2f5b0db97997e78e2b5dc",
+          "branch": "HEAD"
+        }
+      },
+      "supplementalDependencies": {
+        "babel": {
+          "sha": "d0e14b9519b7d35e326eccc6add5b7a42354931b",
+          "provenance": "Official babel repository, last commit before the publication timestamp in dependencies.json. Upstream release manifests omit this build-time locale metadata dependency."
+        }
+      }
+    }
+  ]
+}

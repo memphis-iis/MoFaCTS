@@ -13,8 +13,8 @@ async function buildFixture({ captureSubmissions = false } = {}) {
   const stub = (name, source) => { replacements[name] = write(`${name}.js`, source); };
   stub('sparcMoveLibraryClient', `export const sparcMoveLibraryClient = {};
     export const readSparcAdministrativeRemovals = ids => window.fixture.checkRemovals(ids);`);
-  stub('sparcLocalRetrieval', 'export const prepareSparcPracticeRetrieval = async () => {};');
   stub('meteorSession', 'export const Session = { get: () => undefined };');
+  stub('meteorUser', 'export const Meteor = { user: () => undefined };');
   stub('sparcController', 'export const resolveSparcControllerDisplay = display => display; export const resolveSparcControllerResult = (_display, detail) => detail;');
   stub('sparcAutoTutorRuleCommit', `export const isSparcAutoTutorDisplay = () => true;
     export const commitSparcAutoTutorDocumentLoad = async () => ({ sparcNodeValues: {} });
@@ -57,6 +57,7 @@ async function buildFixture({ captureSubmissions = false } = {}) {
     ] },
     plugins: [new NormalModuleReplacementPlugin(/./, resource => {
       if (resource.request === 'meteor/session') { resource.request = replacements.meteorSession; return; }
+      if (resource.request === 'meteor/meteor') { resource.request = replacements.meteorUser; return; }
       const name = resource.request.split('/').at(-1);
       if (name === 'sparcPromptImage' && !resource.request.includes('/services/')) return;
       if (replacements[name]) resource.request = replacements[name];

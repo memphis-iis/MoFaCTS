@@ -1,9 +1,11 @@
 <script>
   import { sparcMoveLibraryClient, readSparcAdministrativeRemovals } from "../services/sparcMoveLibraryClient";
-  import { prepareSparcPracticeRetrieval } from '../services/sparcLocalRetrieval';
   import { Session } from 'meteor/session';
+  import { Meteor } from 'meteor/meteor';
+  import { parseSparcPersonas } from '../../../../../../learning-components/runtime/sparcPersonas';
   import { sparcContentReferenceIds, projectSparcAdministrativeRemovals } from '../../../../../../learning-components/runtime/sparcAdministrativeRemoval';
-  import { createEventDispatcher, onMount, tick } from 'svelte';
+  import { createEventDispatcher, onMount, tick, setContext } from 'svelte';
+  import { SIMULATION_HOST_CONTEXT } from '../services/simulationResearchHost';
   import {
     resolveSparcControllerDisplay,
     resolveSparcControllerResult,
@@ -20,7 +22,6 @@
   import { readSparcResumeSnapshot } from '../services/sparcRuntimeState';
   import { isSparcCategorizedPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
   import { projectSparcInstructionMessages } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
-  import { SPARC_FEEDBACK_MOVE_DEFINITION } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
   import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { buildSparcBoxedNodeGroups } from '../../../../../../learning-components/trial-displays/sparc/sparcBoxLayout';
   import {
@@ -42,6 +43,7 @@
   import { redactSparcDialogueDiagnosticText } from '../../../../../common/lib/sparcDiagnosticText';
   import { createSparcDialogueScroll } from '../services/sparcDialogueScroll';
   import { resolveSparcReadingLevel } from '../../../../../../learning-components/runtime/sparcReadingLevel';
+  import { buildSparcTurnHeadings, SPARC_TURN_ORIENTATIONS_VALUE_KEY } from '../services/sparcTurnHeadings';
 
   const dispatch = createEventDispatcher();
   const platformText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
@@ -81,6 +83,17 @@
   export let authoringSelectOnly = false;
 
   let activeNodeId = '';
+  setContext(SIMULATION_HOST_CONTEXT, {
+    scope(nodeId, buildId) {
+      const current = currentSparcControllerDisplay('[Simulation]');
+      if (isSparcAutoTutorDisplay(current) || !Array.isArray(current.productionRules)) throw new Error('Simulation pilot requires authored SPARC production rules');
+      return { tdfId, pageKey: current.pageKey, nodeId, buildId };
+    },
+    async observation(nodeId, facts, evidence) {
+      await handleSparcAction({ eventType: 'simulation-observation', triggeredBy: nodeId,
+        submittedNodes: { [nodeId]: { facts, evidence } }, timestamp: Date.now() });
+    },
+  });
   let feedbackFadeElement;
   let dialogueInputResetVersion = 0;
   let dialogueSubmitPending = false;
@@ -190,12 +203,15 @@
       restoringDialogue = !initialPresentationComplete && readSparcResumeSnapshot({
         userId, TDFId: tdfId, levelUnit, pageKey: currentDisplay.pageKey, display: currentDisplay,
       }).retainedHistoryRecords.length > 0;
-      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: activity => { if (mounted && dialogueScope === scope) reportDialogueActivity(activity); }, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
+      const provider = createSparcDialogueOpenRouterProvider({
+        personas: parseSparcPersonas({ student: Meteor.user()?.profile?.sparcPersona, teacher: engine.curUnit.sparcsession.teacherPersona }),
+        contentLanguage: Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.contentLanguage,
+        readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: activity => { if (mounted && dialogueScope === scope) reportDialogueActivity(activity); }, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
         tdfId, sessionId: openRouterSession.sessionIdForScope({ tdfId, attemptId, pageKey: currentDisplay.pageKey }) });
-      await Promise.all([provider.prepareAssessment(currentDisplay), prepareSparcPracticeRetrieval(resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel),
-        Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.contentLanguage ?? '')]);
+      await provider.prepareAssessment(currentDisplay);
       const result = await commitSparcAutoTutorDocumentLoad({ engine, currentDisplay, tdfId, userId, attemptId, levelUnit,
         scoreLearnerResponse: provider.scoreLearnerResponse, generateTutorUtterance: provider.generateTutorUtterance,
+        generateOrientation: provider.generateOrientation,
         onNodeValues: async values => {
           if (!mounted || dialogueScope !== scope) return;
           dispatchSparcNodeValues(values, timestamp); await tick();
@@ -633,7 +649,8 @@
   }
 
   async function handleSparcAction(detail) {
-    if (subsetKind !== 'question') {
+    const scope = dialogueScope;
+    if (subsetKind !== 'question' && detail?.eventType !== 'simulation-observation') {
       return;
     }
     const currentDisplay = currentSparcControllerDisplay('[SparcSessionSurface] SPARC action');
@@ -658,6 +675,7 @@
       attemptId,
       levelUnit,
     });
+    if (!mounted || dialogueScope !== scope) return;
     dispatch('runtimewatchedstatechanged');
     dispatchSparcNodeValues(sparcNodeValues, sparcResult.timestamp);
   }
@@ -673,7 +691,10 @@
       if (!sparcResult) {
         throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC dialogue submit received for non-SPARC display'));
       }
-      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: activity => { if (mounted && dialogueScope === scope) reportDialogueActivity(activity); }, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}),
+      const provider = createSparcDialogueOpenRouterProvider({
+        personas: parseSparcPersonas({ student: Meteor.user()?.profile?.sparcPersona, teacher: engine.curUnit.sparcsession.teacherPersona }),
+        contentLanguage: Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.contentLanguage,
+        readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: activity => { if (mounted && dialogueScope === scope) reportDialogueActivity(activity); }, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}),
         ...(currentDisplay.instructionalController?.policyId ? { policyId: currentDisplay.instructionalController.policyId } : {}),
         tdfId: typeof tdfId === 'string' ? tdfId : null,
         sessionId: openRouterSession.sessionIdForScope({
@@ -702,6 +723,7 @@
           levelUnit,
           scoreLearnerResponse: provider.scoreLearnerResponse,
           generateTutorUtterance: provider.generateTutorUtterance,
+          generateOrientation: provider.generateOrientation,
           onNodeValues: async values => {
             if (!mounted || dialogueScope !== scope) return;
             // These values follow durable history acceptance, including assessment.
@@ -878,19 +900,21 @@
     ].join(':')).join('|');
   }
 
-  // Feedback closes the instructional turn; its response event also owns the
-  // next instruction, so event IDs alone are not learner-facing turn boundaries.
-  function dialogueTurnStarts(messages) {
-    const starts = new Map();
-    let number = 1;
-    let start = true;
-    for (const node of messages) {
-      if (node.groupType === 'button-group' && !node.children?.length) continue;
-      if (start) starts.set(node.id, number);
-      start = node.action === SPARC_FEEDBACK_MOVE_DEFINITION.moveId;
-      if (start) number++;
+  function showTurnSpeaker(messages, index, starts) {
+    const node = messages[index];
+    if (starts.has(node.id)) return true;
+    for (let prior = index - 1; prior >= 0; prior--) {
+      const previous = messages[prior];
+      if (previous.navigationOnly && !previous.value) {
+        if (starts.has(previous.id)) return true;
+        continue;
+      }
+      if (previous.atomType === 'dialogue-utterance') {
+        return (node.speaker === 'learner') !== (previous.speaker === 'learner');
+      }
+      if (starts.has(previous.id)) return true;
     }
-    return starts;
+    return true;
   }
 
   function focusTextResponse(element) {
@@ -921,7 +945,18 @@
     let clearance = 0;
     let observedRow;
     const fit = () => {
-      const first = content.firstElementChild?.matches('.sparc-dialogue-turn-label')
+      const heading = content.firstElementChild?.matches('.sparc-dialogue-turn-heading') ? content.firstElementChild : null;
+      if (heading) {
+        const control = summary.getBoundingClientRect();
+        const rect = heading.getBoundingClientRect();
+        const gap = parseFloat(getComputedStyle(content).rowGap);
+        const unpaddedTop = rect.top + viewport.scrollTop - clearance;
+        // The Progress toggle is physically at the upper right. Reserve only
+        // its width inside the first heading, so long KC labels wrap around it.
+        heading.style.paddingRight = unpaddedTop < control.bottom
+          ? `${Math.max(0, rect.right - control.left + gap)}px` : '';
+      }
+      const first = content.firstElementChild?.matches('.sparc-dialogue-turn-label, .sparc-dialogue-turn-heading')
         ? content.firstElementChild.nextElementSibling : content.firstElementChild;
       const row = first?.matches('.sparc-student-move-history') ? first.querySelector('.sparc-student-menu-size') : null;
       if (row !== observedRow) {
@@ -1057,7 +1092,8 @@
   $: currentQuestionVisible = !latestDialogueQuestion || autoTutorDialogueMessages.flatMap(node => node.children || [node])
     .some(node => node.id === latestDialogueQuestion.id && componentReady(node, dialogueScope, figureReadyKeys));
   $: autoTutorDialogueSignature = buildAutoTutorDialogueSignature(autoTutorDialogueMessages);
-  $: autoTutorTurnStarts = categorizedDialogue ? dialogueTurnStarts(autoTutorDialogueMessages) : new Map();
+  $: autoTutorTurnStarts = categorizedDialogue ? buildSparcTurnHeadings(autoTutorDialogueMessages,
+    nodeValues[SPARC_TURN_ORIENTATIONS_VALUE_KEY]) : new Map();
   $: if (
     autoTutorDialogueMode
     && autoTutorDialogueSignature !== observedAutoTutorDialogueSignature
@@ -1107,11 +1143,23 @@
       {#if removalError}<p role="alert">{removalError}</p>{/if}
       {#each autoTutorDialogueMessages as node, index (node.id)}
         {#if autoTutorTurnStarts.has(node.id)}
-          <h2 class="sparc-dialogue-turn-label">{platformText('autoTutor.turnLabel', { count: autoTutorTurnStarts.get(node.id) })}</h2>
+          {@const heading = autoTutorTurnStarts.get(node.id)}
+          {#if heading.orientation?.current}
+            <header class="sparc-dialogue-turn-heading">
+              <h2 class="sparc-dialogue-turn-label">{platformText('autoTutor.turnLabel', { count: heading.count })} · {heading.orientation.current.text}</h2>
+              <p class="sparc-dialogue-turn-progress">{platformText('autoTutor.turnProgress', heading.orientation.progress)}</p>
+            </header>
+          {:else}
+            <h2 class="sparc-dialogue-turn-label">{platformText('autoTutor.turnLabel', { count: heading.count })}</h2>
+          {/if}
         {/if}
+        {#if node.completionOrientation && nodeValues[SPARC_TURN_ORIENTATIONS_VALUE_KEY]?.[node.turnEventId]?.reason === 'completion'}
+          <p class="sparc-dialogue-turn-progress sparc-dialogue-completion-progress" role="status">{platformText('autoTutor.turnProgress', nodeValues[SPARC_TURN_ORIENTATIONS_VALUE_KEY][node.turnEventId].progress)}</p>
+        {/if}
+        {#if !node.navigationOnly || node.value}
         <SparcNode
           {node}
-          showDialogueSpeaker={autoTutorTurnStarts.has(node.id) || index === 0 || (node.speaker === 'learner') !== (autoTutorDialogueMessages[index - 1].speaker === 'learner')}
+          showDialogueSpeaker={showTurnSpeaker(autoTutorDialogueMessages, index, autoTutorTurnStarts)}
           {adminDiagnosticMode}
           {nodeValues}
           {learningProgressSnapshot}
@@ -1125,6 +1173,7 @@
           onButtonActivate={handleButtonActivate}
           onFigureState={reportFigureState}
         />
+        {/if}
       {/each}
       {#if dialogueSubmitPending}
         <div
@@ -1222,6 +1271,7 @@
   {/if}
 
   {#if !autoTutorDialogueMode}
+  {#key dialogueScope}
   <div class:sparc-surface-body={!usesBoxLayout} class:sparc-box-layout={usesBoxLayout}>
     {#if usesBoxLayout}
       {#each boxedNodeGroups as group (group.box.id)}
@@ -1268,6 +1318,7 @@
       {/each}
     {/if}
   </div>
+  {/key}
   {/if}
 
   {#if feedbackVisible}

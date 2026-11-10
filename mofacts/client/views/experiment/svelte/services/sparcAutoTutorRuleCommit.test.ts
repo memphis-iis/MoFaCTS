@@ -62,6 +62,7 @@ describe('SPARC app instructional commit', () => {
           } }) } as unknown as Parameters<typeof commitSparcAutoTutorDocumentLoad>[0]['engine'],
         currentDisplay: display, tdfId: 'early-instruction-tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
         scoreLearnerResponse: () => { throw new Error('No assessment on initial load'); },
+        generateOrientation: () => 'We will begin by explaining the synthetic condition. One learning goal remains.',
         generateTutorUtterance: async request => {
           const output = instructionFixture(request);
           assert.ok(output.explanation && output.richContent, 'This opening move must include both instruction components');
@@ -76,7 +77,7 @@ describe('SPARC app instructional commit', () => {
           return output;
         },
         onNodeValues: values => {
-          assert.ok(rows.some(row => (row.sparc as { stateTransition: { transitionId: string } }).stateTransition.transitionId.endsWith(':instruction:accepted')),
+          assert.ok(!JSON.stringify(values).includes('An explanation of the condition.') || rows.some(row => (row.sparc as { stateTransition: { transitionId: string } }).stateTransition.transitionId.endsWith(':instruction:accepted')),
             'Instruction must be durably accepted before it is displayed');
           published = values;
         },
@@ -89,7 +90,7 @@ describe('SPARC app instructional commit', () => {
       if (rejectAcceptance) {
         await assert.rejects(pending, /Instruction save rejected/);
         assert.equal(questionStarted, false);
-        assert.deepEqual(published, {});
+        assert.ok(!JSON.stringify(published).includes('An explanation of the condition.'));
       } else {
         await Promise.race([accepted, pending]);
         try {
@@ -125,7 +126,7 @@ describe('SPARC app instructional commit', () => {
           nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor', value: 'Explain A.' }] },
         tdfId: 'tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0, submissionPresentation: presentation,
         sparcResult: { submittedNodes: { 'learner-response-input': 'SECRET-LEARNER-TEXT' }, triggeredBy: 'old:question:answer:b', timestamp: 1 },
-        scoreLearnerResponse: () => { throw new Error('No scoring expected'); }, generateTutorUtterance: () => { throw new Error('No generation expected'); },
+        scoreLearnerResponse: () => { throw new Error('No scoring expected'); }, generateOrientation: () => { throw new Error('No orientation expected'); }, generateTutorUtterance: () => { throw new Error('No generation expected'); },
         deps: { getUserId: () => 'u', getIsAdmin: () => true, reportWarning: warning => {
           reports.push(warning); if (reportingFails) throw new Error('Diagnostic sink unavailable');
         } },
@@ -173,6 +174,7 @@ describe('SPARC app instructional commit', () => {
         currentDisplay: display, tdfId: 'anchor-tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
         sparcResult: { submittedNodes: { 'learner-response-input': 'The preceding KC is understood.' }, triggeredBy: 'learner-response-submit', timestamp: 100 },
         scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: ids.map(clusterKC => ({ clusterKC, coverage: clusterKC === 'a' || clusterKC === 'd' ? .8 : .2 })) }; },
+        generateOrientation: () => 'Let us begin with the selected learning goal.',
         generateTutorUtterance: (request: SparcUtteranceRequest) => {
           if (request.action === 'instruction.feedback') return 'That is correct.';
           targets.push(request.targetId!);
@@ -234,6 +236,7 @@ describe('SPARC app instructional commit', () => {
         assert.equal(progress.turnCount, 1);
         publishedFeedback = JSON.stringify(values).includes('Here is the correction.');
       },
+      generateOrientation: () => 'Let us connect the established goal to the next topic.',
       generateTutorUtterance: request => {
         assert.equal(publishedCoverage, .2, 'Assessment credit must be visible before any generation');
         if (request.action === 'instruction.feedback') return 'Here is the correction.';
@@ -283,6 +286,7 @@ describe('SPARC app instructional commit', () => {
     const args = { engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'], currentDisplay: display,
       tdfId: 'student-tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: ['a', 'b'].map((clusterKC) => ({ clusterKC, coverage: 0.2 })) }; },
+      generateOrientation: () => 'We will now work on the selected learning goal.',
       generateTutorUtterance: (request: SparcUtteranceRequest) => { requests.push(request); return request.action === 'instruction.feedback' ? 'Here is feedback.' : instructionFixture(request); },
       deps: { getUserId: () => 'u', getIsAdmin: () => false, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };
@@ -334,6 +338,7 @@ describe('SPARC app instructional commit', () => {
     const args = { engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'], currentDisplay: display,
       tdfId: 'tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: [{ clusterKC: 'a', coverage: 0.2 }] }; },
+      generateOrientation: () => 'Let us begin this goal and connect it to the lesson.',
       generateTutorUtterance: (request: SparcUtteranceRequest) => { if (request.action === 'instruction.feedback') return 'Feedback.'; if (fail) throw new Error('Synthetic provider failure'); return instructionFixture(request); },
       deps: { getUserId: () => 'u', getIsAdmin: () => false, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };

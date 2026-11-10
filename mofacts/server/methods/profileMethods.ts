@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { parseSparcStudentPersona } from '../../../learning-components/runtime/sparcPersonas';
 import { check, Match } from 'meteor/check';
 import { requireAuthenticatedUser } from '../lib/methodAuthorization';
 import {
@@ -198,6 +199,14 @@ function validateAvatarImageData(value: unknown): string {
 
 export function createProfileMethods(deps: ProfileMethodsDeps) {
   return {
+    async updateOwnSparcPersona(this: MethodContext, persona: unknown) {
+      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to update your persona', 401);
+      const description = parseSparcStudentPersona(persona);
+      await deps.usersCollection.updateAsync({ _id: userId }, {
+        $set: { 'profile.sparcPersona': description },
+      });
+      return { success: true };
+    },
     updateOwnProfile: async function(this: MethodContext, params: unknown) {
       check(params, {
         name: Match.Maybe(String),

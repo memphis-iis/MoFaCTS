@@ -77,6 +77,17 @@ function deps(existing: any[] = [], manageable = true) {
 }
 
 describe('packageTdfIdentity', function() {
+  for (const orientationMode of ['full', 'headings', 'off', undefined, 'FULL', '', null, false, 1]) {
+    it(`validates orientationMode ${JSON.stringify(orientationMode)} in actual package preflight`, async function() {
+      const file = tdfFile('orientation.json');
+      (file.contents as any).tutor.unit[0].sparcsession = orientationMode === undefined ? {} : { orientationMode };
+      const run = () => preflightPackageTdfIdentities({ unzippedFiles: packageFiles(file),
+        packageAssetId: 'orientation', ownerId: 'owner', deps: deps() });
+      if (orientationMode === undefined || ['full', 'headings', 'off'].includes(orientationMode as string)) {
+        assert.equal((await run()).entries.length, 1);
+      } else await assert.rejects(run, /tutor\.unit\[0\]\.sparcsession\.orientationMode must be full, headings, or off/);
+    });
+  }
   for (const factType of ['kcGraph.node', 'kcGraph.relationship', 'kcGraph.chain']) {
     it(`rejects package-supplied ${factType} before persistence`, async function() {
       const files = packageFiles(tdfFile('manual-graph.json'));

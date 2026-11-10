@@ -1,6 +1,7 @@
 import "../common/Collections";
 import "../common/globalHelpers";
 import "./runtime/contentSecurityPolicy";
+import "./runtime/userProfileWrites";
 import "./lib/memphisSaml";
 import "./lib/installMongoDriverUnhandledPolicy";
 import { installStrictMongoReactivity } from './lib/strictMongoReactivity';

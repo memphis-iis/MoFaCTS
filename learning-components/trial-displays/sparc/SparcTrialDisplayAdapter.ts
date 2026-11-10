@@ -2,6 +2,17 @@ import type { LearningComponentManifest } from '../../runtime/ComponentManifest'
 import type { TrialDisplayAdapter } from '../../runtime/TrialDisplayAdapterRegistry';
 import { compileSparcSemanticDisplay } from './sparcSemanticNodes';
 import { normalizeSparcFractionGroups } from './sparcFractionGroups';
+import { validateSimulationConfig } from '../../../packages/phet-monitor/lesson';
+
+function validateSimulationNodes(value: unknown, seen = new WeakSet<object>()): void {
+  if (!value || typeof value !== 'object' || seen.has(value)) return;
+  seen.add(value);
+  if (isPlainObject(value) && value.atomType === 'simulation') {
+    if (typeof value.label !== 'string' || !value.label.trim()) throw new Error('Simulation requires an accessible label');
+    validateSimulationConfig(value.simulation);
+  }
+  for (const child of Object.values(value)) validateSimulationNodes(child, seen);
+}
 
 export const SPARC_TRIAL_DISPLAY_TYPE = 'sparc';
 
@@ -156,6 +167,7 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
     if (!Array.isArray(display.nodes)) {
       throw new Error('SPARC trial display requires a nodes array');
     }
+    validateSimulationNodes(display.nodes);
     const semanticCompiledDisplay = compileSparcSemanticDisplay(display);
     const normalizedProgressReporter = normalizeSparcProgressReporter(semanticCompiledDisplay.display.progressReporter);
     const normalizedResponse = isPlainObject(semanticCompiledDisplay.display.response)

@@ -141,8 +141,9 @@ selected bytes and nesting depth 64. These bounds do not broaden the policy's
 statement matching or imply that all forms of sensitive logging are detected.
 
 The source-suite command explicitly selects `source-security-v2.test.mjs`. That
-entry point includes the existing suite plus the inert external/repository
-contracts. Active V1 continues selecting its existing entry point. The raw TAP
+entry point includes the existing suite plus the inert external/repository,
+retention and pure authorization-outcome contracts. Active V1 continues selecting
+its existing entry point. The raw TAP
 adapter requires complete unfiltered case counts and rejects skipped/crashed
 runs. The existing synthetic host-exposure fixture now uses the established
 root-Linux-with-jq capability check, also used by the V2 host-collector fixture,

@@ -29,12 +29,29 @@ must supply the actual scanner checkout revision in `scannerSourceRevision`;
 event metadata is not evidence of the checked-out scanner source. This module
 does not acquire release identity or assert authenticity of input observations.
 
-Two explicit, unscheduled Node entry points are available:
+Explicit, unscheduled Node entry points include:
 
 ```text
 node scripts/security-audit/emit-host-producers-v2.mjs <exposure|full> <host-observations.json> <udp-observations.json> <producer-directory>
+node scripts/security-audit/assemble-report-v2.mjs <metadata.json> <producer-directory> <report.json>
 node scripts/security-audit/upload-report-v2.mjs <report.json>
+node scripts/security-audit/encrypt-report-v2.mjs <report.json> <encrypted-report.json>
+node scripts/security-audit/assert-execution-complete-v2.mjs <report.json>
 ```
+
+The assembly command accepts canonical metadata containing the report ID,
+profile, start and completion times, the two deployment identity observations,
+and tool versions. It resolves the scanner revision using Git in the scanner
+checkout and takes the target from `AUDIT_TARGET`. Metadata that supplies either
+field is rejected. The command uses the same producer membership and file
+validation as the assembly library.
+
+The V2 admin state adapter consumes the store's projected history and two latest
+cards directly, including an empty list and distinct scanner, application, and
+image identities. The coordinated cutover connects this adapter to the existing
+admin view and verifies the rendered cards and download controls. The source
+suite exercises the adapter with the store's projected output and covers HTML
+and JSON download rendering in a separate test module.
 
 The host emitter reads the current host envelope and the composite evaluator's
 existing three-count UDP observation input. It writes `internal.json` and
@@ -51,10 +68,36 @@ disabled, and accepts only HTTP 201. It neither reads nor prints response bodies
 There is no alternate target, endpoint or retry. Tests use synthetic files and
 an injected request transport, never a real audit target.
 
-Run `node --test scripts/security-audit/tests/producerFilesV2.test.mjs` with the
-pinned Node runtime, or the full `npm run security:test:source`. The active V1
-workflow and its producers/uploader remain unchanged. V2 external/authentication/
-repository acquisition, full orchestration and coordinated cutover remain open.
+The encryption entry point validates the complete V2 report, canonical bytes,
+catalog/digest and protected `AUDIT_TARGET` before using the existing
+RSA-OAEP-SHA256/AES-256-GCM envelope implementation. It requires the existing
+`AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY` setting and exclusively creates a mode-0600
+file. Existing output is never overwritten. The encrypted-file limit includes
+base64 and envelope overhead; the unchanged plaintext limit remains 2 MiB.
+It accepts diagnostic reports containing execution errors so they can be retained.
+It reads no private decryption key, uploads nothing and proves only local output.
+
+The final assertion independently rejects either nonzero ERROR row counts or a
+nonempty execution-error list. Security FAIL rows remain findings and do not
+make an otherwise complete execution fail. This command verifies neither stored
+report identity nor remote artifact retention. The future workflow must verify
+HTTP storage and encrypted-artifact retention before calling it; a successful
+local encryption command alone is insufficient for acceptance.
+
+Run focused file/retention tests with the pinned Node runtime:
+
+```text
+node --test scripts/security-audit/tests/producerFilesV2.test.mjs scripts/security-audit/tests/reportFilesV2.test.mjs
+```
+
+The complete inert gate is `node --test scripts/security-audit/source-security-v2.test.mjs`
+on the supported root Linux/jq worker. It includes the existing source suite and
+new V2 acquisition, retention and authorization-outcome tests. Active V1 retains
+its existing entry point, producer, crypto implementation and workflow. The
+external and repository acquisition modules have synthetic source proof; real
+acquisition, authentication cases, full orchestration and coordinated cutover
+remain open. No new setting, dependency, scheduled job or registered route is
+introduced by these explicit commands.
 
 The opt-in build-source tooling is documented in [the capture guide](../../../deploy/security-audit/source-capture.md). Its isolated tests run with `npm run security:test:capture`; local tests use synthetic tar streams and injected Docker responses, and hosted Linux CI additionally exercises actual source export and kernel write protection. CI retains the protected candidate through tests and canonical Compose construction. These remain unqualified observations, not release qualification.
 

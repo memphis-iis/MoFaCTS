@@ -9,6 +9,8 @@ import { SPARC_VISUAL_MINIMUM_SIMILARITY } from '../../common/lib/sparcRetrieval
 export type SparcFigureLibraryEntry = {
   _id: string; kind?: 'image'; version: string; imageModel: string; embeddingModel: string; dimensions: number;
   situation: string; embedding: number[]; ready: boolean; createdAt: Date;
+  /** Requested language is descriptive metadata, not a measured property or retrieval gate. */
+  requestedLanguage?: string;
   embeddingVersion?: string;
   contentUseKeys?: string[];
   generation?: { imagePrompt: string; tutorMessage: string; description: string; displayWidth: number };
@@ -27,7 +29,7 @@ export type SparcFigureLibraryStore = {
   saveDecision: (decision: SparcVisualDecision) => Promise<void>;
   findEntry: (assetId: string) => Promise<SparcFigureLibraryEntry | undefined>;
   saveEntry: (entry: SparcFigureLibraryEntry) => Promise<void>;
-  findVisual: (id: string, language: string) => Promise<{ video: SparcVideoSegment } | { entry: SparcFigureLibraryEntry } | undefined>;
+  findVisual: (id: string) => Promise<{ video: SparcVideoSegment } | { entry: SparcFigureLibraryEntry } | undefined>;
   /** Administrative asset replacement only; practice generation does not use this operation. */
   withLock: <T>(work: () => Promise<T>, scope?: string) => Promise<T>;
 };
@@ -53,7 +55,7 @@ export async function getOrGenerateSparcLibraryVisual(params: {
   }
   if (params.selection) {
     if (!Number.isFinite(params.selection.similarity) || params.selection.similarity < SPARC_VISUAL_MINIMUM_SIMILARITY || params.selection.similarity > 1) throw new Error('Visual selection must meet the 0.95 threshold');
-    const selected = await store.findVisual(params.selection.entryId, params.language);
+    const selected = await store.findVisual(params.selection.entryId);
     if (!selected) throw new Error('The locally selected visual is unavailable; refresh the vector cache');
     const video = 'video' in selected ? parseSparcVideoSegment(selected.video) : undefined;
     await store.saveDecision({ _id: params.identity, kind: 'decision', userId: params.userId, tdfId: params.tdfId,
@@ -69,7 +71,7 @@ export async function getOrGenerateSparcLibraryVisual(params: {
   const entry: SparcFigureLibraryEntry = { _id: params.assetId, kind: 'image', version: SPARC_FIGURE_LIBRARY_SETTINGS.version,
     imageModel: SPARC_PROMPT_IMAGE_SETTINGS.model, embeddingModel: SPARC_FIGURE_LIBRARY_SETTINGS.embeddingModel,
     dimensions: params.embedding.length, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
-    situation: sparcInstructionalNeedText(JSON.parse(params.situation)), embedding: params.embedding,
+    situation: sparcInstructionalNeedText(JSON.parse(params.situation)), embedding: params.embedding, requestedLanguage: params.language,
     ready: false, createdAt: new Date(), generation: { imagePrompt: params.imagePrompt, tutorMessage: params.tutorMessage,
       description: params.description, displayWidth: params.displayWidth } };
   await store.saveEntry(entry);

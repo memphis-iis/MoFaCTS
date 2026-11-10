@@ -177,6 +177,31 @@
           <div class="admin-inline-feedback">{{> adminStatus variant=profileSaveStatusVariant text=profileSaveStatusMessage urgent=(equals profileSaveStatusVariant "error")}}</div>
         {{/if}}
       </div>
+      <section class="profile-section" aria-labelledby="learningProfileTitle">
+        <div class="profile-section-heading">
+          <span class="fa fa-graduation-cap profile-section-icon" aria-hidden="true"></span>
+          <h2 id="learningProfileTitle">{{t 'profile.learningTitle'}}</h2>
+        </div>
+        <form id="learningProfileForm" aria-busy="{{learningSaving}}">
+          <p id="learningProfileHelp">{{t 'profile.learningIntro'}}</p>
+          <p id="learningProfilePrivacy">{{t 'profile.learningPrivacy'}}</p>
+          <p id="learningProfileLimits">{{t 'profile.learningLimits'}}</p>
+          {{#each learningProfileFields}}
+            <div class="profile-field">
+              <label for="learningProfile-{{key}}">{{t label}}</label>
+              <textarea class="form-control" id="learningProfile-{{key}}" name="{{key}}" rows="3" placeholder="{{t example}}" aria-describedby="learningProfileHelp learningProfileLimits learningProfilePrivacy" {{learningDisabledAttrs}}>{{learningProfileValue key}}</textarea>
+            </div>
+          {{/each}}
+          <div class="profile-actions">
+            <button id="learningProfileSave" type="submit" class="profile-primary-action" {{learningDisabledAttrs}}>
+              {{#if learningSaving}}{{t 'profile.saving'}}{{else}}{{t 'profile.learningSave'}}{{/if}}
+            </button>
+          </div>
+          {{#if learningStatusMessage}}
+            <div class="admin-inline-feedback">{{> adminStatus variant=learningStatusVariant text=learningStatusMessage urgent=(equals learningStatusVariant "error")}}</div>
+          {{/if}}
+        </form>
+      </section>
       {{> adminInlineConfirmation confirmation=profileConfirmationView}}
     </div>
   </div>

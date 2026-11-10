@@ -1,4 +1,6 @@
 import type { SparcInstructionCheckpoint } from '../../runtime/sparcMoveLibraryContract';
+import { resolveSparcOrientationMode, type SparcOrientationMode } from '../../runtime/sparcOrientationMode';
+import { createSparcOrientation, sparcOrientationNeedsBridge, type SparcSavedOrientation } from './sparcTurnOrientation';
 import type { ExpectationLogitChange } from '../../runtime/expectationLogitHistory';
 import { isSparcChoiceFormat } from '../../runtime/sparcTargetCategories';
 import { isSparcCompetitivePolicy, isSparcCategorizedPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
@@ -134,6 +136,20 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   const completed = previous.find((transition) => transition.transitionId === `${event.eventId}:cycle`);
   if (completed) return { transition: completed };
   const acceptedDecision = previous.find((transition) => transition.transitionId === `${event.eventId}:decision`);
+  const acceptedMode = previous.find(transition => transition.event.eventId === event.eventId
+    && transition.writes.some(write => write.key === 'instructionalOrientationMode'))
+    ?? previous.find(transition => transition.transitionId === `${event.eventId}:orientation-mode`);
+  const savedMode = acceptedMode?.writes.find(write => write.key === 'instructionalOrientationMode');
+  if (acceptedMode && (!savedMode || savedMode.value === undefined)) throw new Error('Saved SPARC turn is missing its orientation mode');
+  // Historical events own their contract from submission onward, even if they
+  // failed before selection. Preserve it without modifying historical records.
+  const priorContract: SparcOrientationMode | undefined = acceptedDecision
+    ? writtenFacts(acceptedDecision).some(fact => fact.factType === 'instructional.decision' && fact.slots?.orientationOwned === true) ? 'full' : 'off'
+    : previous.some(transition => transition.event.eventId === event.eventId
+      && transition.writes.some(write => ['instructionalOrientation', 'instructionalOrientationRequest'].includes(write.key))) ? 'full' : acceptedEvent ? 'off' : undefined;
+  const orientationMode = acceptedMode ? resolveSparcOrientationMode(savedMode!.value)
+    : priorContract ?? resolveSparcOrientationMode(params.orientationMode);
+  const orientationOwned = orientationMode !== 'off';
   const acceptedAssessment = previous.find((transition) => transition.transitionId === `${event.eventId}:assessment`);
   const acceptedFeedback = previous.find((transition) => transition.transitionId === `${event.eventId}:feedback`);
   let facts = [...buildSparcWorkingMemoryFacts({ ...params, event })].filter((fact) => !RESPONSE_LOCAL_FACT_TYPES.has(fact.factType)
@@ -147,6 +163,12 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   let stopped = false;
   let documentLoadFacts: readonly SparcWorkingMemoryFact[] = [];
   let feedbackWork: Promise<{ ok: true; transition: SparcStateTransition } | { ok: false; error: unknown }> | undefined;
+  let orientationWork: Promise<{ ok: true } | { ok: false; error: unknown }> | undefined;
+  const waitForOrientation = async () => {
+    if (!orientationWork) return;
+    const result = await orientationWork;
+    if (!result.ok) throw result.error;
+  };
   const waitForFeedback = async () => {
     if (!feedbackWork) return;
     const result = await feedbackWork;
@@ -169,14 +191,24 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
       { target: { pageKey: params.document.id, nodeId: 'root' }, key: SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
         value: { type: 'append-node', boxId: 'dialogue-flow', node: { id: `${event.eventId}:learner`, nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'learner', value: event.payload?.input, turnEventId: event.eventId } } },
   ] : [];
+  const modeWrite: SparcStateWrite = { target: { pageKey: params.document.id, nodeId: 'root' }, key: 'instructionalOrientationMode', value: orientationMode };
+  const needsModeCheckpoint = !acceptedMode && !priorContract;
+  let modeSavedWithSubmission = false;
   if (event.type === 'response-submitted' && !acceptedEvent) {
-    await save({ transitionId: `${event.eventId}:submission`, event, writes: [...learnerWrites, ...inputControls(event, false)] });
+    // Mode and received answer are one acceptance, including a lost save acknowledgement.
+    await save({ transitionId: `${event.eventId}:submission`, event,
+      writes: [...learnerWrites, ...inputControls(event, false), ...(needsModeCheckpoint ? [modeWrite] : [])] });
+    modeSavedWithSubmission = needsModeCheckpoint;
   }
+  // Freeze even off/headings before assessment, feedback, or provider work can
+  // fail. A later TDF setting change applies to a new event, never this retry.
+  if (needsModeCheckpoint && !modeSavedWithSubmission) await save({ transitionId: `${event.eventId}:orientation-mode`, event, writes: [modeWrite] });
   const saveDecision = async (current: readonly SparcWorkingMemoryFact[]) => {
     if (acceptedDecision) return;
     const menu = current.find((fact) => fact.factType === 'instructional.menu');
     await save({ transitionId: `${event.eventId}:decision`, event, writes: factWrites([
-      ...current.filter((fact) => DECISION_STATE_FACT_TYPES.has(fact.factType) || ['dialogue.responseModifier', 'instructional.oet'].includes(fact.factType)),
+      ...current.filter((fact) => DECISION_STATE_FACT_TYPES.has(fact.factType) || ['dialogue.responseModifier', 'instructional.oet'].includes(fact.factType))
+        .map(fact => fact.factType === 'instructional.decision' ? { ...fact, slots: { ...fact.slots, orientationOwned } } : fact),
       ...(student ? [{ factType: 'instructional.menu', slots: { ...menu?.slots, snapshotId: event.eventId,
         status: 'selected', selectedOptionId: event.payload?.optionId } }] : []),
     ], event) });
@@ -203,8 +235,39 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     }));
     return { factType: 'instructional.menu', slots: { snapshotId: event.eventId, menuId: `${params.document.id}:menu:${event.time}`, status: 'pending', options } };
   };
+  const orient = async (current: readonly SparcWorkingMemoryFact[], target?: { kind: 'expectation' | 'misconception'; id: string }) => {
+    if (!orientationOwned) return;
+    const accepted = previous.find(entry => entry.transitionId === `${event.eventId}:orientation`);
+    if (accepted) return;
+    const feedback = await waitForFeedback();
+    const orientationFacts = feedback ? [...current, ...progressiveDialogueFacts({ transitions: [feedback] })] : current;
+    const savedRequest = previous.find(entry => entry.transitionId === `${event.eventId}:orientation:decision`)
+      ?.writes.find(write => write.key === 'instructionalOrientationRequest')?.value as Omit<SparcSavedOrientation, 'bridge'> | undefined;
+    const decision = current.find(fact => fact.factType === 'instructional.decision' && fact.slots?.snapshotId === event.eventId);
+    const context = savedRequest ?? createSparcOrientation({ facts: orientationFacts, candidates: projection(current).candidates,
+      previous, eventId: event.eventId, startup: event.type === 'document-loaded', ...(target ? { target } : { completed: true }), selectionReason: String(decision?.slots?.reason ?? 'required-coverage') });
+    if (!savedRequest) await save({ transitionId: `${event.eventId}:orientation:decision`, event,
+      writes: [{ target: { pageKey: params.document.id, nodeId: 'root' }, key: 'instructionalOrientationRequest', value: context }] });
+    let bridge: string | null = null;
+    if (orientationMode === 'full' && sparcOrientationNeedsBridge(context.request)) {
+      if (!params.generateOrientation) throw new Error('Categorized SPARC requires an orientation generator');
+      bridge = (await params.generateOrientation(context.request)).trim();
+      if (!bridge) throw new Error('SPARC transition generation requires nonempty prose');
+    }
+    const orientation: SparcSavedOrientation = { ...context, bridge };
+    await save({ transitionId: `${event.eventId}:orientation`, event, writes: [
+      { target: { pageKey: params.document.id, nodeId: 'root' }, key: 'instructionalOrientation', value: orientation },
+      { target: { pageKey: params.document.id, nodeId: 'root' }, key: SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
+        value: { type: 'append-node', boxId: 'dialogue-flow', node: {
+          id: `${event.eventId}:orientation`, nodeType: 'atomic',
+          ...(bridge ? { atomType: 'dialogue-utterance', speaker: 'tutor' } : { atomType: 'html-block' }),
+          value: bridge ?? '', component: 'orientation', navigationOnly: true, turnEventId: event.eventId,
+          ...(context.request.reason === 'completion' ? { completionOrientation: true } : {}),
+        } } },
+    ] });
+  };
   const generate: SparcProductionActionHandler = async ({ facts: current, ruleId, actionId }) => {
-    const request = { ...createSparcUtteranceRequestFromFacts(current), historySessionId: params.core.sessionID, learnerText: String(event.payload?.input ||
+    const request = { ...createSparcUtteranceRequestFromFacts(current), ...(orientationOwned ? { orientationOwned: true } : {}), historySessionId: params.core.sessionID, learnerText: String(event.payload?.input ||
       current.filter((fact) => fact.factType === 'dialogue.utterance' && fact.slots?.speaker === 'learner').at(-1)?.slots?.text || '') };
     if ((!request.learnerText && !isSparcCategorizedPolicy(params.document.instructionalController?.policyId))
       || request.sourceRuleId !== ruleId || request.selectedAction.snapshotId !== event.eventId
@@ -218,6 +281,8 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     const menuConsumed = { factType: 'instructional.menu', slots: { ...menu?.slots, snapshotId: event.eventId,
       status: 'consumed', ...(student ? { selectedOptionId: event.payload?.optionId } : {}) } };
     await saveDecision(current);
+    if (orientationOwned) orientationWork = orient(current, { kind: decisions[0]!.slots!.targetKind as 'expectation' | 'misconception', id: request.targetId })
+      .then(() => ({ ok: true as const }), error => ({ ok: false as const, error }));
     const realized: Partial<{ -readonly [K in keyof SparcInstructionComponents]: SparcInstructionComponents[K] }> = {};
     const savedComponents = new Set<string>();
     for (const prior of previous.filter(entry => entry.transitionId === `${event.eventId}:primitive:question`)) {
@@ -246,6 +311,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
       onInstructionCheckpoint: async checkpoint => {
         const writes: SparcStateWrite[] = [{ target: { pageKey: params.document.id, nodeId: 'root' }, key: 'instructionalComposition', value: checkpoint }];
         if (checkpoint.stage === 'accepted') {
+          await waitForOrientation();
           await waitForFeedback();
           for (const component of ['explanation', 'richContent'] as const) {
             const content = component === 'explanation' ? checkpoint.content : checkpoint.content.support;
@@ -265,12 +331,14 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
         }
       },
       onInstructionComponent: async (component, text, figure, details) => {
+        await waitForOrientation();
         await waitForFeedback();
         const write = createSparcInstructionComponentWrite({ document: params.document, event, request, component, text, ...(figure ? { figure } : {}), ...(details ? { details } : {}) });
         await save({ transitionId: `${event.eventId}:primitive:${component}`, event, writes: [write] });
         savedComponents.add(component);
       },
     });
+    await waitForOrientation();
     await waitForFeedback();
     const transition = createSparcInstructionTransition({ document: params.document, event, learnerText: request.learnerText, request, generated: output, includeLearner: false });
     generatedRequest = request;
@@ -286,7 +354,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
       const realizeFeedback = async (): Promise<SparcStateTransition> => {
       let transition = acceptedFeedback;
       if (!transition) {
-        const request = { ...createSparcFeedbackRequest(current, event, ruleId), historySessionId: params.core.sessionID };
+        const request = { ...createSparcFeedbackRequest(current, event, ruleId), ...(orientationOwned ? { orientationOwned: true } : {}), historySessionId: params.core.sessionID };
         let feedbackSaved = false;
         const output = await params.generateTutorUtterance({ ...request, onFeedback: async (text, reference) => {
           const saved = createSparcInstructionTransition({ document: params.document, event, learnerText: request.learnerText!, request, generated: text, includeLearner: false });
@@ -400,7 +468,11 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
       menuOffered = true;
       return { assertions: assertions([menuFrom({ options: menu?.slots?.options, targetKind: 'expectation', targetId: decision?.slots?.targetId, nextTargetId: candidate?.slots?.nextTargetId })], true), writes: inputControls(event, false) };
     },
-    [SPARC_STOP_ACTION]: async () => { stopped = true; return { assertions: [], writes: inputControls(event, false) }; },
+    [SPARC_STOP_ACTION]: async ({ facts: current }) => {
+      await orient(current);
+      stopped = true;
+      return { assertions: [], writes: inputControls(event, false) };
+    },
   };
   if (event.type === 'document-loaded') {
     if (!isSparcCategorizedPolicy(params.document.instructionalController?.policyId)) throw new Error('Document startup requires a categorized instructional policy');
@@ -457,6 +529,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   }
   } finally {
     // Do not leave a provider/history operation running after this turn fails.
+    await waitForOrientation();
     await waitForFeedback();
   }
   if (documentLoadFacts.length) transition = { ...transition, writes: [...transition.writes, ...factWrites(documentLoadFacts, event)] };

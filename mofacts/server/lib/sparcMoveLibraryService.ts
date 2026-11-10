@@ -1,3 +1,4 @@
+import { parseSparcPersonas } from '../../../learning-components/runtime/sparcPersonas';
 import { validatePrimitiveContent } from '../../../learning-components/runtime/sparcPrimitiveContent';
 export { validatePrimitiveContent } from '../../../learning-components/runtime/sparcPrimitiveContent';
 import { SPARC_VIDEO_EMBEDDING_VERSION, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
@@ -84,6 +85,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
       bounded(query?.tdfId, 'lesson identity', 200); bounded(query.sessionId, 'session identity', 200); bounded(query.eventId, 'event identity', 500);
       bounded(query.queryText, 'instructional context', 30000);
       if (query.context?.version !== SPARC_MOVE_LIBRARY_VERSION || !['feedback', 'explanation', 'richContent', 'question', 'instruction'].includes(query.context.kind)
+        || (query.context.orientationOwned !== undefined && query.context.orientationOwned !== true)
         || (query.context.supportKind !== undefined && (!['richContent', 'instruction'].includes(query.context.kind) || !['written', 'visual'].includes(query.context.supportKind)))
         || !Number.isFinite(query.context.assistance) || stableMoveJson(query.context).length > 60000
         || !Array.isArray(query.context.components) || query.context.components.length > 3 || !(query.context.kind === 'instruction' ? query.context.components.includes('explanation') : query.context.components.includes(query.context.kind))
@@ -93,6 +95,8 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
       for (const question of query.previousQuestions) if (typeof question?.text !== 'string' || !question.text.trim()) throw new Error('Invalid previous question');
       for (const key of ['target', 'move', 'responseFormat', 'requirements', 'focus', 'dependencies', 'specification'] as const) bounded(query.context[key], 'context ' + key, 30000);
       resolveSparcReadingLevel(query.context.readingLevel);
+      if (query.context.personas !== undefined) parseSparcPersonas(query.context.personas);
+      if (query.context.language !== undefined) bounded(query.context.language, 'content language', 100);
       if (!Array.isArray(embedding) || (!embedding.length && (query.context.kind === 'instruction' || query.context.supportKind !== 'visual')) || embedding.length > 8192 || embedding.some(n => typeof n !== 'number' || !Number.isFinite(n))) throw new Error('Invalid query embedding');
       if (query.context.kind !== 'instruction' && query.context.supportKind === 'visual' && embedding.length) throw new Error('Visual primitives do not use retrieval embeddings');
       if (sparcInstructionalNeedText(JSON.parse(query.queryText)) !== query.queryText) throw new Error('Noncanonical instructional need');
@@ -115,11 +119,10 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
         const entry = await store.entry(selection.entryId);
         if (!entry) throw new Error('The locally selected component was removed; refresh its cache');
         if (entry.kind !== query.context.kind || entry.version !== SPARC_MOVE_LIBRARY_VERSION
+          || (entry.context.orientationOwned === true) !== (query.context.orientationOwned === true)
           || entry.embeddingModel !== deps.embeddingModel || entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION
-          || resolveSparcReadingLevel(entry.context.readingLevel) !== resolveSparcReadingLevel(query.context.readingLevel)
           || (entry.kind === 'question' && entry.context.responseFormat !== query.context.responseFormat)
-          || (query.context.kind === 'instruction' && (entry.context.supportKind !== query.context.supportKind || stableMoveJson(entry.context.components) !== stableMoveJson(query.context.components)))
-          || (query.context.supportKind === 'written' && (entry.content.video || entry.content.figure))) throw new Error('Local selection is outside the requested category');
+        ) throw new Error('Local selection is outside the requested category');
         await verifyContent(entry.content, query.context);
         selected = entry;
       }

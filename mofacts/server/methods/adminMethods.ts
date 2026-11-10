@@ -106,6 +106,7 @@ type AdminMethodsDeps = {
   deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
   removeUploadedAsset: (assetId: string) => Promise<void>;
   removeSparcFigureUserDecisions: (userId: string) => Promise<void>;
+  removeSimulationResearchUserRecords: (userId: string) => Promise<void>;
   clearStimDisplayTypeMap: () => void;
   encryptData?: (value: string) => string;
   decryptData?: (value: string) => string;
@@ -722,6 +723,7 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
 
       await removeUserOwnedData(deps, normalizedTargetUserId);
       await deps.removeSparcFigureUserDecisions(normalizedTargetUserId);
+      await deps.removeSimulationResearchUserRecords(normalizedTargetUserId);
       await Roles.setUserRolesAsync(normalizedTargetUserId, []);
       await deps.usersCollection.removeAsync({ _id: normalizedTargetUserId });
       deps.syncUsernameCaches(normalizedTargetUserId, '', String(targetUser?.username || ''));

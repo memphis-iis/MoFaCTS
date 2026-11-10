@@ -46,6 +46,7 @@ db/mongodump.tar.gz
 .claude/settings.local.json
 
 # Local/generated analysis artifacts
+/debug.log
 spacing-inventory.json
 padding-inventory*.json
 autotutor-concern-matrix-working-copy.md

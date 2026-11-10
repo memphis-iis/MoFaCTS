@@ -1,5 +1,6 @@
 import { SPARC_TARGET_CATEGORIES, type SparcTargetCategory } from './sparcTargetCategories';
 import type { SparcPrimitiveKind } from './sparcMoveLibraryContract';
+import { parseSparcPersonas, type SparcPersonas } from './sparcPersonas';
 
 /** Representation identity is metadata, never part of the embedded instructional meaning. */
 export const SPARC_INSTRUCTIONAL_NEED_VERSION = 'sparc-instructional-need-v1';
@@ -18,6 +19,7 @@ export type SparcInstructionalNeed = {
   case?: { explanation?: string; support?: string; figureDescription?: string };
   feedback?: { precedingQuestion: string; learnerResponse: string };
   illustrationBrief?: string;
+  personas?: SparcPersonas;
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -32,10 +34,13 @@ function exactKeys(value: Record<string, unknown>, allowed: string[]) {
   if (Object.keys(value).some(key => !allowed.includes(key))) throw new Error('Unexpected instructional need field');
 }
 
-/** One canonical serializer for every component. No IDs, generation policies, or nested JSON. */
+/** One canonical serializer for every component. Descriptions carry meaning, never matching IDs.
+ * Optional personas extend v1 without changing the serialized input of existing entries;
+ * those embeddings remain valid and acquire no invented descriptions during reindexing.
+ */
 export function sparcInstructionalNeedText(value: unknown): string {
   const data = record(value);
-  exactKeys(data, ['target', 'assistance', 'evidence', 'currentValue', 'case', 'feedback', 'illustrationBrief']);
+  exactKeys(data, ['target', 'assistance', 'evidence', 'currentValue', 'case', 'feedback', 'illustrationBrief', 'personas']);
   const target = record(data.target);
   exactKeys(target, ['texts', 'category']);
   if (!Array.isArray(target.texts) || !target.texts.length || target.texts.length > 20) throw new Error('Instructional need requires target texts');
@@ -71,6 +76,7 @@ export function sparcInstructionalNeedText(value: unknown): string {
     need.feedback = { precedingQuestion: text(feedback.precedingQuestion), learnerResponse: text(feedback.learnerResponse) };
   }
   if (data.illustrationBrief !== undefined) need.illustrationBrief = text(data.illustrationBrief);
+  if (data.personas !== undefined) need.personas = parseSparcPersonas(data.personas);
   const serialized = JSON.stringify(need);
   if (serialized.length > 30000) throw new Error('Instructional need exceeds its embedding input budget');
   return serialized;
@@ -80,6 +86,7 @@ export function sparcInstructionalNeedText(value: unknown): string {
 export function buildSparcInstructionalNeed(params: {
   targetContent: unknown; targetTexts: readonly string[]; assistance: number; evidence: readonly unknown[];
   currentValue?: number; dependencies?: unknown; feedback?: SparcInstructionalNeed['feedback']; illustrationBrief?: string;
+  personas?: SparcPersonas;
 }): SparcInstructionalNeed {
   const authored = params.targetContent && typeof params.targetContent === 'object' && !Array.isArray(params.targetContent) ? record(params.targetContent) : {};
   const selected = authored.selectedMisconception ? record(authored.selectedMisconception) : authored;
@@ -103,5 +110,6 @@ export function buildSparcInstructionalNeed(params: {
     ...(Object.keys(context).length ? { case: context } : {}),
     ...(params.feedback ? { feedback: params.feedback } : {}),
     ...(params.illustrationBrief ? { illustrationBrief: params.illustrationBrief } : {}),
+    ...(params.personas ? { personas: params.personas } : {}),
   })) as SparcInstructionalNeed;
 }

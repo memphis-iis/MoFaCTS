@@ -153,6 +153,7 @@ function atomicEntry(params: {
   readonly atomType: string;
   readonly label: string;
   readonly description: string;
+  readonly requiredProperties?: readonly string[];
   readonly properties?: Readonly<Record<string, SparcAuthoringSchema>>;
   readonly defaultValue?: unknown;
   readonly renderedBy?: readonly string[];
@@ -165,7 +166,7 @@ function atomicEntry(params: {
     description: params.description,
     schema: {
       type: 'object',
-      required: ['id', 'nodeType', 'atomType'],
+      required: ['id', 'nodeType', 'atomType', ...(params.requiredProperties ?? [])],
       properties: {
         ...baseAtomicNodeProperties,
         atomType: { const: params.atomType },
@@ -206,6 +207,20 @@ function groupEntry(params: {
 }
 
 export const SPARC_ATOMIC_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
+  atomicEntry({
+    atomType: 'simulation', label: 'Simulation',
+    description: 'Approved simulation build with continuous observations mapped to authored production-rule facts. Reload starts a fresh physical attempt and retains completed work.',
+    requiredProperties: ['label', 'simulation'],
+    properties: { label: { type: 'string' }, simulation: { type: 'object', required: ['buildId', 'bindings'],
+      properties: { buildId: { type: 'string' }, bindings: { type: 'array', items: { type: 'object', required: ['name', 'address', 'projection'],
+        properties: { name: { type: 'string' }, address: { oneOf: [
+          { type: 'object', required: ['path'], properties: { path: { type: 'string' } }, additionalProperties: false },
+          { type: 'object', required: ['tandem'], properties: { tandem: { type: 'string' } }, additionalProperties: false },
+        ] }, projection: { enum: ['value', 'count', 'any-nonzero'] }, memberProperty: { type: 'string' } }, additionalProperties: false } } }, additionalProperties: false } },
+    defaultValue: { nodeType: 'atomic', atomType: 'simulation', label: 'Simulation', simulation: { buildId: 'select-an-approved-build',
+      bindings: [{ name: 'observation', address: { path: 'replace-with-validated-property-address' }, projection: 'value' }] } },
+    renderedBy: ['SparcSimulation.svelte'],
+  }),
   atomicEntry({
     atomType: 'html-block',
     label: 'HTML block',

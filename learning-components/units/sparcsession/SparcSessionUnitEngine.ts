@@ -53,6 +53,7 @@ import type {
 } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import {
   resolveSparcSessionPageId,
+  resolveSparcSessionOrientationMode,
   resolveSparcSessionStartingKC,
   resolveSparcSessionProbabilitySource,
   resolveSparcSessionRuntimeConfig,
@@ -458,6 +459,7 @@ export type SparcTrialDisplayAutoTutorRuleRuntimeParams = {
   readonly replayState?: SparcReplayState;
   readonly scoreLearnerResponse: SparcTrialDisplayDialogueTurnScorer;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
+  readonly generateOrientation?: import('./sparcTurnOrientation').SparcOrientationGenerator;
   readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory' | 'writeCanonicalHistoryBatch'>;
@@ -556,6 +558,7 @@ export async function createSparcSessionUnitEngine(
         ...(params.candidateOptions ? { candidateOptions: params.candidateOptions } : {}),
         ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
         generateTutorUtterance: params.generateTutorUtterance,
+        orientationMode: resolveSparcSessionOrientationMode(this.curUnit),
         runtime: {
           history: params.history,
         },
@@ -594,6 +597,8 @@ export async function createSparcSessionUnitEngine(
         ...(params.replayState ? { replayState: params.replayState } : {}),
         scoreLearnerResponse: params.scoreLearnerResponse,
         generateTutorUtterance: params.generateTutorUtterance,
+        ...(params.generateOrientation ? { generateOrientation: params.generateOrientation } : {}),
+        orientationMode: resolveSparcSessionOrientationMode(this.curUnit),
         ...(params.candidateOptions ? { candidateOptions: params.candidateOptions } : {}),
         ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
         history: params.history,

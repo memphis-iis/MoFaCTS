@@ -76,6 +76,10 @@ function traceDetails(params: {
   return {
     sourceEventId: params.event.eventId,
     sourceEventType: params.event.type,
+    ...(params.event.type === 'simulation-observation' ? {
+      observationEvidence: params.event.payload?.evidence,
+      evidenceComplete: params.event.payload?.evidenceComplete === true,
+    } : {}),
     firingIndex: params.index,
     ...(params.firing.executedActions?.length ? { executedActions: params.firing.executedActions } : {}),
     ...ruleMetadata(params.document, params.firing.ruleId),

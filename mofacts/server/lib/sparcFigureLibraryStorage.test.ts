@@ -41,8 +41,8 @@ describe('SPARC figure library Mongo contracts', function() {
       dimensions: 2, situation: 'Synthetic situation', embedding: [1, 0], embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION, ready: true, createdAt: new Date() };
     await store.saveEntry(entry);
     await store.saveEntry({ ...entry, _id: 'test-library-pending', ready: false });
-    assert.ok(await store.findVisual(entry._id, 'en'));
-    assert.equal(await store.findVisual('test-library-pending', 'en'), undefined);
+    assert.ok(await store.findVisual(entry._id));
+    assert.equal(await store.findVisual('test-library-pending'), undefined);
     const decision = { _id: 'test-library-decision', kind: 'decision' as const, userId: 'test-library-user-base',
       tdfId: 'synthetic-lesson', sessionId: 'synthetic-session', assetId: entry._id,
       source: 'semantic' as const, similarity: 1, createdAt: new Date() };

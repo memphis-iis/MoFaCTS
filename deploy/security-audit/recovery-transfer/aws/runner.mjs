@@ -2,7 +2,7 @@ import { validateRestoreExpected, validateRestoreTarget } from './restore.mjs';
 import { RecoveryTransferError } from '../../../../mofacts/scripts/security-audit/recovery-transfer.mjs';
 const fail = category => { throw new RecoveryTransferError(category); };
 export function assertRecoveryRunner(env, workflow, platform) {
-  if (!['recovery-transfer.yml', 'recovery-restore.yml', 'recovery-retention.yml', 'recovery-confirm.yml'].includes(workflow)) fail('runner-context');
+  if (!['recovery-transfer.yml', 'recovery-restore.yml', 'recovery-retention.yml', 'recovery-confirm.yml', 'recovery-probe-inventory.yml'].includes(workflow)) fail('runner-context');
   if (platform !== 'linux' || process.version !== 'v24.22.1' || env.GITHUB_ACTIONS !== 'true'
     || env.RUNNER_ENVIRONMENT !== 'github-hosted' || env.GITHUB_EVENT_NAME !== 'workflow_dispatch'
     || env.GITHUB_REPOSITORY !== 'memphis-iis/MoFaCTS' || env.GITHUB_REF !== 'refs/heads/main'

@@ -94,6 +94,7 @@ export function paletteIconClass(entry) {
     'oli-group': 'fa-object-group',
   };
   const atomIcons = {
+    simulation: 'fa-flask',
     'html-block': 'fa-code',
     'text-block': 'fa-align-left',
     'message-box': 'fa-commenting-o',

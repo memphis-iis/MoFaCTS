@@ -36,6 +36,13 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     return;
   }
   rateLimitsRegistered = true;
+  DDPRateLimiter.addRule({ type: 'method', name: 'ingestSimulationResearchBatch',
+    connectionId() { return true; } }, 40, 1000);
+  DDPRateLimiter.addRule({ type: 'method', name(name: string) {
+    return ['startSimulationResearchAttempt', 'interruptSimulationResearchActivity', 'endSimulationResearchAttempt'].includes(name);
+  }, connectionId() { return true; } }, 30, 60000);
+  DDPRateLimiter.addRule({ type: 'method', name: 'exportSimulationResearchTrace',
+    connectionId() { return true; } }, 60, 60000);
 
   DDPRateLimiter.addRule({ type: 'method', name: 'deleteSparcInstructionalComponent',
     userId(userId: string | null | undefined) { return !!userId; } }, 60, 60000);
@@ -142,6 +149,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     name(name: string) {
       return [
         'updateOwnProfile',
+        'updateOwnSparcPersona',
         'updateOwnUiLocale',
         'updateOwnOpenRouterSettings',
         'getOwnOpenRouterSettings',

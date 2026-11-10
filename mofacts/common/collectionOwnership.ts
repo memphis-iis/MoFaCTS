@@ -7,6 +7,7 @@ type CollectionOwnership = {
 };
 
 export const COLLECTION_OWNERSHIP = {
+  SimulationTelemetry: { mongoName: 'simulation_telemetry', globalName: 'SimulationTelemetry', owner: 'simulation-research', purpose: 'Server-only authenticated simulation attempts and ordered research trace batches, independent of scored learning history. No reactive publication; research export requires administrator authorization.' },
   SparcInstructionalRemovals: { mongoName: 'sparc_instructional_removals', globalName: 'SparcInstructionalRemovals', owner: 'sparc-instructional-library', purpose: 'Content-free administrative deletion receipts for accurate reload placeholders and restartable asset cleanup; no learner data.' },
   SparcVideoTranscripts: { mongoName: 'sparc_video_transcripts', globalName: 'SparcVideoTranscripts', owner: 'sparc-video-catalog', purpose: 'Cached timestamped YouTube captions and resumable passage selection; no video bytes or learner data.' },
   SparcVideoCatalogTargets: { mongoName: 'sparc_video_catalog_targets', globalName: 'SparcVideoCatalogTargets', owner: 'sparc-video-catalog', purpose: 'Successful per-authored-target video selections and resumable preparation checkpoints.' },

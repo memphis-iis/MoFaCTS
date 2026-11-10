@@ -34,6 +34,7 @@ import {
   type InlineConfirmationView,
 } from '../../lib/adminUi/inlineConfirmationController';
 import '../shared/adminUi/adminUi';
+import { LEARNING_PROFILE_FIELDS, learningProfileDraft, learningProfilePersona, type LearningProfileDraft } from './learningProfile';
 
 const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
@@ -46,6 +47,10 @@ type ProfileTemplateInstance = Blaze.TemplateInstance & {
   saving: ReactiveVar<boolean>;
   testing: ReactiveVar<boolean>;
   dirty: ReactiveVar<boolean>;
+  learningDirty: ReactiveVar<boolean>;
+  learningSaving: ReactiveVar<boolean>;
+  learningLoaded: ReactiveVar<boolean>;
+  learningDraft: ReactiveVar<LearningProfileDraft>;
   statuses: ReactiveVar<Partial<Record<ProfileStatusScope, ProfileStatus>>>;
   avatarType: ReactiveVar<ProfileAvatarType>;
   avatarIconId: ReactiveVar<string>;
@@ -64,7 +69,7 @@ type ProfileTemplateInstance = Blaze.TemplateInstance & {
   beforeUnloadHandler: (event: BeforeUnloadEvent) => void;
 };
 
-type ProfileStatusScope = 'save' | 'avatar' | 'locale' | 'openrouter';
+type ProfileStatusScope = 'save' | 'avatar' | 'locale' | 'openrouter' | 'learning';
 type ProfileStatus = Readonly<{ kind: 'success' | 'error' | 'info'; message: string }>;
 
 const AVATAR_IMAGE_SIZE = 256;
@@ -72,6 +77,7 @@ const AVATAR_IMAGE_QUALITY = 0.86;
 let activeProfileTemplate: ProfileTemplateInstance | null = null;
 let profileNavigationBypass = false;
 let profileNavigationGuardRegistered = false;
+let returningToProfileForConfirmation = false;
 
 function markProfileDirty(template: ProfileTemplateInstance): void {
   template.dirty.set(true);
@@ -108,17 +114,28 @@ function requestUnsavedChangesDecision(
 function registerProfileNavigationGuard(): void {
   if (profileNavigationGuardRegistered) return;
   profileNavigationGuardRegistered = true;
-  FlowRouter.triggers.enter([function(context: any, redirect: (path: string) => void) {
+  FlowRouter.triggers.enter([function(context: any, redirect: (path: string) => void, stop: () => void) {
     const template = activeProfileTemplate;
-    if (!template || context?.route?.name === 'client.profile') return;
+    if (!template) return;
+    if (context?.route?.name === 'client.profile') {
+      // Returning from a blocked navigation must restore the route without running
+      // its action: the management-route loading frame would destroy this draft.
+      if (returningToProfileForConfirmation) stop();
+      return;
+    }
     if (profileNavigationBypass) {
       profileNavigationBypass = false;
       return;
     }
-    if (!template.dirty.get()) return;
+    if (!template.dirty.get() && !template.learningDirty.get()) return;
 
-    const destination = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    redirect(template.profileRoutePath);
+    const destination = context.path;
+    returningToProfileForConfirmation = true;
+    try {
+      redirect(template.profileRoutePath);
+    } finally {
+      returningToProfileForConfirmation = false;
+    }
     Tracker.afterFlush(() => {
       if (activeProfileTemplate === template) {
         requestUnsavedChangesDecision(template, destination);
@@ -358,10 +375,36 @@ async function saveProfile(template: ProfileTemplateInstance): Promise<boolean> 
   }
 }
 
+async function saveLearningProfile(template: ProfileTemplateInstance): Promise<boolean> {
+  if (template.learningSaving.get() || !template.learningLoaded.get()) return false;
+  clearStatus(template, 'learning');
+  let persona;
+  try { persona = learningProfilePersona(template.learningDraft.get()); }
+  catch {
+    setStatus(template, 'error', profileText('profile.learningInvalid'), 'learning');
+    return false;
+  }
+  template.learningSaving.set(true);
+  try {
+    await MeteorAny.callAsync('updateOwnSparcPersona', persona);
+    template.learningDraft.set(learningProfileDraft(persona));
+    template.learningDirty.set(false);
+    setStatus(template, 'success', profileText('profile.learningSaved'), 'learning');
+    return true;
+  } catch (error: unknown) {
+    setStatus(template, 'error', getErrorMessage(error), 'learning');
+    return false;
+  } finally { template.learningSaving.set(false); }
+}
+
 Template.profile.onCreated(function(this: ProfileTemplateInstance) {
   this.saving = new ReactiveVar(false);
   this.testing = new ReactiveVar(false);
   this.dirty = new ReactiveVar(false);
+  this.learningDirty = new ReactiveVar(false);
+  this.learningSaving = new ReactiveVar(false);
+  this.learningLoaded = new ReactiveVar(false);
+  this.learningDraft = new ReactiveVar(learningProfileDraft(undefined));
   this.statuses = new ReactiveVar({});
   this.avatarType = new ReactiveVar('initials');
   this.avatarIconId = new ReactiveVar(PROFILE_AVATAR_DEFAULT_ICON_ID);
@@ -381,7 +424,7 @@ Template.profile.onCreated(function(this: ProfileTemplateInstance) {
   this.profileRoutePath = FlowRouter.current()?.path || '/profile';
   this.savedUiLocale = getActiveUiLocale();
   this.beforeUnloadHandler = (event: BeforeUnloadEvent) => {
-    if (!this.dirty.get()) return;
+    if (!this.dirty.get() && !this.learningDirty.get()) return;
     event.preventDefault();
     event.returnValue = '';
   };
@@ -390,9 +433,24 @@ Template.profile.onCreated(function(this: ProfileTemplateInstance) {
   window.addEventListener('beforeunload', this.beforeUnloadHandler);
   this.autorun(() => {
     if (Meteor.user()) {
-      syncAvatarFromCurrentUser(this);
       this.openRouterHasServerKey.set(userHasServerOpenRouterKey(Meteor.user()));
-      syncOpenRouterSettingsFromCurrentUser(this);
+      // Saving either section publishes the user record; preserve the other section's draft.
+      const profile = currentProfile();
+      Tracker.nonreactive(() => {
+        if (!this.dirty.get()) {
+          syncAvatarFromCurrentUser(this);
+          syncOpenRouterSettingsFromCurrentUser(this);
+        }
+        if (!this.learningDirty.get() && !this.learningSaving.get()) {
+          try {
+            this.learningDraft.set(learningProfileDraft(profile.sparcPersona));
+            this.learningLoaded.set(true);
+          } catch {
+            this.learningLoaded.set(false);
+            setStatus(this, 'error', profileText('profile.learningLoadFailed'), 'learning');
+          }
+        }
+      });
     }
   });
   void loadProfileOpenRouterModelCatalog(this);
@@ -407,6 +465,25 @@ Template.profile.onDestroyed(function(this: ProfileTemplateInstance) {
 });
 
 Template.profile.helpers({
+  learningProfileFields() {
+    return LEARNING_PROFILE_FIELDS.map(field => ({ ...field, _id: field.key }));
+  },
+  learningProfileValue(key: keyof LearningProfileDraft): string {
+    return (Template.instance() as ProfileTemplateInstance).learningDraft.get()[key];
+  },
+  learningSaving(): boolean {
+    return (Template.instance() as ProfileTemplateInstance).learningSaving.get();
+  },
+  learningDisabledAttrs(): Record<string, boolean> {
+    const template = Template.instance() as ProfileTemplateInstance;
+    return template.learningSaving.get() || !template.learningLoaded.get() ? { disabled: true } : {};
+  },
+  learningStatusMessage(): string {
+    return statusFor(Template.instance() as ProfileTemplateInstance, 'learning')?.message || '';
+  },
+  learningStatusVariant(): string {
+    return statusFor(Template.instance() as ProfileTemplateInstance, 'learning')?.kind || 'info';
+  },
   contentCreatorDisplayNameRequired(): boolean {
     return (globalThis as any).FlowRouter?.getQueryParam?.('contentCreator') === 'required'
       && !String(currentProfile().displayName || '').trim();
@@ -656,6 +733,18 @@ Template.profile.helpers({
 });
 
 Template.profile.events({
+  'input #learningProfileForm textarea'(event: Event, template: ProfileTemplateInstance) {
+    const input = event.currentTarget as HTMLTextAreaElement;
+    const field = LEARNING_PROFILE_FIELDS.find(({ key }) => key === input.name);
+    if (!field || template.learningSaving.get()) return;
+    template.learningDirty.set(true);
+    template.learningDraft.set({ ...template.learningDraft.get(), [field.key]: input.value });
+    clearStatus(template, 'learning');
+  },
+  'submit #learningProfileForm': async function(event: Event, template: ProfileTemplateInstance) {
+    event.preventDefault();
+    await saveLearningProfile(template);
+  },
   'input #profileDisplayName'(_event: Event, template: ProfileTemplateInstance) {
     markProfileDirty(template);
     template.avatarType.set(template.avatarType.get());
@@ -804,7 +893,8 @@ Template.profile.events({
     const context = template.confirmationController.getContext();
     if (context?.kind === 'leave-profile') {
       template.confirmationController.setPending(true);
-      const saved = await saveProfile(template);
+      const saved = (!template.dirty.get() || await saveProfile(template))
+        && (!template.learningDirty.get() || await saveLearningProfile(template));
       if (!saved) {
         template.confirmationController.setPending(false);
         return;
@@ -829,6 +919,7 @@ Template.profile.events({
     if (context.kind === 'leave-profile') {
       setActiveUiLocale(template.savedUiLocale);
       template.dirty.set(false);
+      template.learningDirty.set(false);
       template.confirmationController.complete();
       navigateFromProfile(context.destination);
       return;

@@ -9,3 +9,7 @@ import './tests/clientBundleCanariesV2.test.mjs';
 import './tests/repositorySourceV2.test.mjs';
 import './tests/repositoryImageV2.test.mjs';
 import './tests/repositoryProducerFilesV2.test.mjs';
+import './tests/authorizationOutcomes.test.mjs';
+import './tests/legacyProbeInventory.test.mjs';
+import './tests/reportFilesV2.test.mjs';
+import './tests/reportAdminPresentationV2.test.mjs';

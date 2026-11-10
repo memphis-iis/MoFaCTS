@@ -1,5 +1,6 @@
 import { SPARC_INSTRUCTIONAL_POLICY_IDS, isSparcCategorizedPolicy } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import { sparcTargetCategoryFields } from '../../../learning-components/runtime/sparcTargetCategories';
+import { resolveSparcOrientationMode } from '../../../learning-components/runtime/sparcOrientationMode';
 
 export type AutoTutorValidationResult = {
   valid: boolean;
@@ -69,6 +70,13 @@ export function validateAutoTutorContent(context: AutoTutorValidationContext): A
     units.forEach((unit, index) => {
       if (isRecord(unit) && Object.prototype.hasOwnProperty.call(unit, 'autotutorsession')) {
         errors.push(`${path}[${index}].autotutorsession is no longer supported; standalone AutoTutor has been removed`);
+      }
+      if (isRecord(unit) && isRecord(unit.sparcsession)) {
+        try {
+          resolveSparcOrientationMode(unit.sparcsession.orientationMode);
+        } catch (error) {
+          errors.push(`${path}[${index}].${(error as Error).message}`);
+        }
       }
     });
   }

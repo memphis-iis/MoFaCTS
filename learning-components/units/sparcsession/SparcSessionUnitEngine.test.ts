@@ -336,6 +336,49 @@ function createPageRuntimeDeps(overrides: Record<string, unknown> = {}): any {
 }
 
 describe('SparcSessionUnitEngine document runtime boundary', function() {
+  it('passes the authoritative per-lesson orientation mode into categorized startup', async function() {
+    for (const mode of [undefined, 'full', 'headings', 'off']) {
+      const unit = { sparcsession: mode === undefined ? {} : { orientationMode: mode } };
+      const engine = await createSparcSessionUnitEngine(createMinimalDeps({
+        getSessionValue(key: UnitEngineSessionReadKey) {
+          if (key === 'currentTdfUnit') return unit;
+          if (key === 'curStudentPerformance') return { totalTime: 0 };
+          return undefined;
+        },
+      }));
+      const rows: CanonicalHistoryRecord[] = [];
+      let orientationCalls = 0;
+      let ownsOrientation: boolean | undefined;
+      await assert.rejects(engine.commitSparcTrialDisplayAutoTutorRules({
+        core: { TDFId: 'mode-lesson', sessionID: 'mode-session', levelUnit: 0, userId: 'mode-user' },
+        pageKey: 'mode-page',
+        display: {
+          pageKey: 'mode-page', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
+          instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v2', policyVersion: 1 },
+          autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Goal A', category: 'model' }], misconceptions: [] },
+          clusterTargets: [{ clusterKC: 'a', clusterIndex: 0 }],
+          workingMemoryFacts: [
+            { factType: 'dialogue.source', slots: { topic: 'The lesson topic' } },
+            { factType: 'kcGraph.node', slots: { clusterKC: 'a', centrality: .5 } },
+          ],
+          nodes: [],
+        },
+        priorHistoryRecords: [],
+        scoreLearnerResponse: () => { throw new Error('Startup must not assess an answer'); },
+        generateOrientation: () => { orientationCalls++; return 'Let us begin with Goal A.'; },
+        generateTutorUtterance: (request: { orientationOwned?: boolean }) => {
+          ownsOrientation = request.orientationOwned;
+          throw new Error('Instruction probe complete');
+        },
+        history: { writeCanonicalHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); } },
+      }), /Instruction probe complete/);
+      assert.equal(ownsOrientation === true, mode !== 'off', `Generation ownership must use lesson mode ${String(mode)}`);
+      assert.equal(orientationCalls, mode === undefined || mode === 'full' ? 1 : 0);
+      const orientations = rows.flatMap(row => ((row.sparc as { stateTransition: { writes: { key: string }[] } }).stateTransition.writes))
+        .filter(write => write.key === 'instructionalOrientation');
+      assert.equal(orientations.length, mode === 'off' ? 0 : 1);
+    }
+  });
   it('inherits model-progress provider capability from the adaptive logistic engine', async function() {
     const cluster = {
       stims: [{

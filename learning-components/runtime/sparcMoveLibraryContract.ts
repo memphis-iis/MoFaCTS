@@ -2,6 +2,7 @@ import type { SparcVideoSegment } from './sparcVideo';
 import type { SparcPromptFigure } from '../../mofacts/common/lib/sparcPromptImage';
 import type { SparcQuestionChoice } from './sparcQuestionChoiceContract';
 import type { SparcReadingLevel } from './sparcReadingLevel';
+import type { SparcPersonas } from './sparcPersonas';
 
 export const SPARC_MOVE_LIBRARY_VERSION = 'sparc-moves-v1';
 export type SparcPrimitiveKind = 'feedback' | 'richContent' | 'explanation' | 'question' | 'instruction';
@@ -16,7 +17,12 @@ export type SparcPrimitiveReference = {
   priorNodeId?: string;
 };
 export type SparcPrimitiveContext = {
+  /** Requested generation context, not measured content properties or retrieval filters. */
+  personas?: SparcPersonas;
+  language?: string;
   readingLevel?: SparcReadingLevel;
+  /** Text generated with separate turn orientation owning introductions and milestones. */
+  orientationOwned?: true;
   version: typeof SPARC_MOVE_LIBRARY_VERSION; kind: SparcPrimitiveKind; target: string;
   move: string; assistance: number; responseFormat: string; requirements: string;
   focus: string; dependencies: string; components: SparcPrimitiveKind[]; specification: string;

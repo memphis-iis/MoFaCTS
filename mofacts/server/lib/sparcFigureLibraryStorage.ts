@@ -75,8 +75,8 @@ export function createSparcFigureLibraryStore(): SparcFigureLibraryStore {
       await SparcFigureLibrary.rawCollection().replaceOne({ _id: entry._id }, { ...entry, kind: 'image', contentUseKeys: sparcCatalogUseKeys({ ...entry, kind: 'image' }) } as SparcFigureLibraryEntry, { upsert: true });
       if (entry.ready) await invalidateSparcFigureBrowse();
     },
-    async findVisual(id, language) {
-      const row = await SparcInstructionalLibrary.findOneAsync({ ...sparcRetrievalSelector({ kind: 'visual', language }), _id: id });
+    async findVisual(id) {
+      const row = await SparcInstructionalLibrary.findOneAsync({ ...sparcRetrievalSelector({ kind: 'visual', language: '' }), _id: id });
       if (!row) return undefined;
       if (row.kind === 'video') return { video: parseSparcVideoSegment(row.content.video) };
       if (row.kind !== 'image') throw new Error('Selected resource is not visual');

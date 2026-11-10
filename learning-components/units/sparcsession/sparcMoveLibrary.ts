@@ -24,6 +24,7 @@ export function instructionalNeed(request: SparcUtteranceRequest, dependencies: 
   feedback?: boolean; illustrationBrief?: string;
 } = {}): SparcInstructionalNeed {
   return buildSparcInstructionalNeed({ targetContent: request.targetContent, targetTexts: request.contentTexts,
+    ...(request.personas ? { personas: request.personas } : {}),
     assistance: request.moveDefinition.assistance ?? 0, evidence: selectedSparcEvidence(request), dependencies,
     ...(request.selectionDiagnostic ? { currentValue: request.selectionDiagnostic.currentValue } : {}),
     ...(options.feedback ? { feedback: { precedingQuestion: previousSparcQuestions(request).at(-1)?.text ?? '', learnerResponse: request.learnerText ?? '' } } : {}),
@@ -33,6 +34,9 @@ export function instructionalNeed(request: SparcUtteranceRequest, dependencies: 
 
 export function primitiveContext(request: SparcUtteranceRequest, kind: SparcPrimitiveKind, dependencies: unknown, readingLevel?: SparcReadingLevel): SparcPrimitiveContext {
   return { version: SPARC_MOVE_LIBRARY_VERSION, kind, target: request.targetId,
+    ...(request.orientationOwned ? { orientationOwned: true as const } : {}),
+    ...(request.personas ? { personas: request.personas } : {}),
+    ...(request.contentLanguage ? { language: request.contentLanguage } : {}),
     readingLevel: resolveSparcReadingLevel(readingLevel),
     move: request.action, assistance: request.moveDefinition.assistance ?? 0,
     responseFormat: request.moveDefinition.responseFormat ?? 'text', requirements: stableMoveJson(request.targetContent ?? request.contentTexts),

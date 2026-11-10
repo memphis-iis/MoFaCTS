@@ -22,8 +22,8 @@ export async function removeSparcMoveUserRecords(userId: string) {
 
 export async function ensureSparcMoveLibraryIndexes() {
   await SparcMoveLibrary.rawCollection().createIndex({ kind: 1, embeddingModel: 1, _id: 1 });
-  await SparcMoveLibrary.rawCollection().createIndex({ kind: 1, embeddingModel: 1, embeddingVersion: 1, 'context.readingLevel': 1, 'context.responseFormat': 1, _id: 1 });
-  await SparcMoveLibrary.rawCollection().createIndex({ kind: 1, version: 1, embeddingModel: 1, embeddingVersion: 1, 'context.readingLevel': 1, 'context.supportKind': 1, _id: 1 });
+  await SparcMoveLibrary.rawCollection().createIndex({ kind: 1, version: 1, embeddingModel: 1, embeddingVersion: 1, 'context.responseFormat': 1, _id: 1 });
+  await SparcMoveLibrary.rawCollection().createIndex({ kind: 1, version: 1, embeddingModel: 1, embeddingVersion: 1, _id: 1 });
   await SparcMoveLibrary.rawCollection().createIndex({ contentUseKeys: 1, _id: 1 });
   await SparcMoveRequests.rawCollection().createIndex({ userId: 1, 'query.tdfId': 1, 'query.context.kind': 1, entryId: 1 });
   await SparcMoveRequests.rawCollection().createIndex({ userId: 1, contentUseKeys: 1, _id: 1 });

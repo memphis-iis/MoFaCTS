@@ -2805,6 +2805,64 @@
                           "grid_columns": 12
                         }
                       },
+                      "orientationMode": {
+                        "title": "KC headings and transition bridges.",
+                        "description": "full (the default) shows authored KC headings, progress counts, and bridges at meaningful changes. headings shows only KC headings and progress. off retains the preceding presentation and prompt contract. Applies to new categorized SPARC turns; saved turns retain their accepted mode and content.",
+                        "type": "string",
+                        "enum": [
+                          "full",
+                          "headings",
+                          "off"
+                        ],
+                        "default": "full",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
+                      "teacherPersona": {
+                        "title": "Teacher descriptions for instructional generation.",
+                        "description": "Optional traits, abilities, experiences, and teachingStyle arrays. These describe intended tutor behavior, not verified credentials. They guide generation and embedding meaning, never instructional selection or exact library matching.",
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "traits": {
+                            "type": "array",
+                            "maxItems": 8,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 240
+                            }
+                          },
+                          "abilities": {
+                            "type": "array",
+                            "maxItems": 8,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 240
+                            }
+                          },
+                          "experiences": {
+                            "type": "array",
+                            "maxItems": 8,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 240
+                            }
+                          },
+                          "teachingStyle": {
+                            "type": "array",
+                            "maxItems": 8,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 240
+                            }
+                          }
+                        }
+                      },
                       "readingLevel": {
                         "title": "Audience for generated SPARC text.",
                         "description": "unbiased leaves text prompts unchanged (also the default when omitted). junior-high-freshman (grade 6), high-school-freshman (grade 9), and college-freshman (first year) guide vocabulary and sentence structure in generated learner-facing text without changing concepts, scoring, or assistance.",
@@ -5205,6 +5263,64 @@
                     "default": "",
                     "options": {
                       "grid_columns": 12
+                    }
+                  },
+                  "orientationMode": {
+                    "title": "KC headings and transition bridges.",
+                    "description": "full (the default) shows authored KC headings, progress counts, and bridges at meaningful changes. headings shows only KC headings and progress. off retains the preceding presentation and prompt contract. Applies to new categorized SPARC turns; saved turns retain their accepted mode and content.",
+                    "type": "string",
+                    "enum": [
+                      "full",
+                      "headings",
+                      "off"
+                    ],
+                    "default": "full",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "teacherPersona": {
+                    "title": "Teacher descriptions for instructional generation.",
+                    "description": "Optional traits, abilities, experiences, and teachingStyle arrays. These describe intended tutor behavior, not verified credentials. They guide generation and embedding meaning, never instructional selection or exact library matching.",
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "traits": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 240
+                        }
+                      },
+                      "abilities": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 240
+                        }
+                      },
+                      "experiences": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 240
+                        }
+                      },
+                      "teachingStyle": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 240
+                        }
+                      }
                     }
                   },
                   "readingLevel": {

@@ -1,4 +1,5 @@
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
+import { projectSparcTurnOrientations, SPARC_TURN_ORIENTATIONS_VALUE_KEY } from './sparcTurnHeadings';
 import { projectSparcAnsweredQuestionOperations, projectSparcResponseCorrectness } from '../../../../../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
 import { isSparcCompetitivePolicy, isSparcCategorizedPolicy, SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { logistic, targetExpectancy } from '../../../../../../learning-components/units/sparcsession/sparcCompetitiveSelection';
@@ -137,6 +138,7 @@ export function projectSparcReplayStateToNodeValues(
 ): Record<string, unknown> {
   const { document, replayState } = params;
   const nodeValues: Record<string, unknown> = {};
+  nodeValues[SPARC_TURN_ORIENTATIONS_VALUE_KEY] = projectSparcTurnOrientations(replayState);
   for (const cell of Object.values(replayState.cells)) {
     const nodeId = nonBlankString(cell.address?.nodeId);
     const key = nonBlankString(cell.key);

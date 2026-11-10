@@ -8,9 +8,48 @@ import { parseSparcSupportedPrompt, parseSparcSupportedPromptBrief } from './spa
 import { progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
 import { buildSparcAssessmentDialogueHistory, buildSparcDialogueHistory } from './sparcUtteranceRequest';
 import { parseSparcQuestionChoices } from '../../runtime/sparcQuestionChoiceContract';
-import { composeSparcCategoryInstructions } from './sparcCategoryInstructions';
+import { composeSparcCategoryInstructions, SPARC_CATEGORY_INSTRUCTION_BLOCKS } from './sparcCategoryInstructions';
+import { SPARC_TARGET_CATEGORIES } from '../../runtime/sparcTargetCategories';
 
 describe('SPARC instructional primitives', () => {
+  it('joins the invariant relationship to functional use only for fact-rule instruction', () => {
+    const prompt = composeSparcCategoryInstructions('fact-rule', ['question'], 'text');
+    assert.match(prompt, /invariant relationship within its stated validity conditions/);
+    assert.match(prompt, /stable formula worth recalling accurately/);
+    assert.match(prompt, /not merely a fixed cue-response association or remembered wording/);
+    assert.match(prompt, /functional understanding of what that relationship does: select, apply, or rearrange it correctly/);
+    assert.match(prompt, /combination makes the knowledge lawlike within those conditions, without implying universal applicability/);
+    assert.match(prompt, /Reciting the formula alone is insufficient/);
+    assert.match(prompt, /need not include a deep model derivation unless the authored KC requires it/);
+    assert.match(prompt, /varied applications and boundary cases/);
+  });
+  it('promotes substantive concept transfer while retaining target scope and scaffolding', () => {
+    const prompt = composeSparcCategoryInstructions('fact-model-rule', ['explanation', 'richContent', 'question'], 'text');
+    assert.match(prompt, /Integrate factual knowledge and recall, explanatory relationships, and functional application/);
+    assert.match(prompt, /unfamiliar but target-relevant contexts, examples, or representations/);
+    assert.match(prompt, /preserving the underlying relationship and its validity conditions/);
+    assert.match(prompt, /rather than merely changing names or surface wording/);
+    assert.match(prompt, /preserve the structural relationship to the actual worked case or representation/);
+    assert.match(prompt, /transfer may be scaffolded and does not require unassisted performance on every turn/);
+    assert.match(prompt, /Do not introduce new KCs or require every activity in a single task/);
+  });
+  it('keeps combination guidance scoped across all categories compositions and response formats', () => {
+    const blocks = SPARC_CATEGORY_INSTRUCTION_BLOCKS;
+    for (const category of SPARC_TARGET_CATEGORIES) for (const move of SPARC_CATEGORIZED_MOVE_DEFINITIONS) {
+      const prompt = composeSparcCategoryInstructions(category, move.components!, move.responseFormat!);
+      assert.equal(prompt.includes(blocks.factRule), category === 'fact-rule', `${category} ${move.moveId}: production scope`);
+      assert.equal(prompt.includes(blocks.factModelRule), category === 'fact-model-rule', `${category} ${move.moveId}: concept scope`);
+      for (const part of ['fact', 'model', 'rule'] as const) {
+        assert.equal(prompt.includes(blocks[part]), category.split('-').includes(part), `${category}: base ${part}`);
+      }
+      assert.ok(prompt.includes(blocks.boundary));
+      assert.ok(prompt.includes(blocks.synthesis));
+      assert.ok(prompt.includes(move.components!.includes('richContent') ? blocks.explanationRichQuestion
+        : move.components!.includes('explanation') ? blocks.explanationQuestion : blocks.question));
+      const formats = { text: blocks.text, cloze: blocks.cloze, 'multiple-choice': blocks.multipleChoice, 'true-false': blocks.trueFalse };
+      assert.ok(prompt.includes(formats[move.responseFormat!]));
+    }
+  });
     it('projects assessment questions, answers and feedback without teaching prose or delivery metadata', () => {
         const facts: SparcWorkingMemoryFact[] = [
             { factType: 'dialogue.utterance', factId: 'turn:explanation', slots: { speaker: 'tutor', component: 'explanation', text: 'Long explanation. '.repeat(500) } },

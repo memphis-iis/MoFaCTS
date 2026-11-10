@@ -347,3 +347,26 @@ now uses bounded read-only settling between exact reviewed states, with no write
 retry and explicit uncertainty after an unconfirmed write. Its 32 synthetic SDK
 tests passed on Windows and Linux. This is source verification only: the failed
 historical protected run stays failed, and no new protected execution is enabled.
+
+## Phase 1 selected-probe inventory preparation
+
+P1-D8 approves moving minimum typed authentication evidence into Phase 1. The
+selected V1 cases are stored with the protected fixture, so a separate
+[single-version inventory-read review](probe-inventory-review.md) is prepared.
+It reuses the optional read-only SDK capability and an inactive workflow; no
+protected read, access activation, publication or dispatch is authorized here.
+The provider-independent formatter lives under the scanner's `verification/`
+directory and imports no AWS code. It omits all protected values, retains
+unresolved cases without their unknown identifiers, and declares no policy.
+Original recovery acceptance stays complete; this does not repeat the two-version
+restore, alter stored versions/labels, call a target or create an application
+dependency. See the review for scope, expiry, output and cleanup boundaries.
+
+The approved temporary-operator design now has a separate inert
+[CloudShell preparation/operation procedure](operator-runbook.md). It keeps the
+GitHub guard unchanged, uses an MFA console-only identity and a 15-minute exact-
+role session, and binds later environment cleanup to the newly created shell.
+Its eight new operator cases join the existing optional SDK suite (50 total).
+Source tests and bootstrap rejection checks do not authorize identity creation,
+software acquisition or a backup read. Actual CloudShell/MFA/read/cleanup proof
+is still required after the reviewed source is published and execution approved.

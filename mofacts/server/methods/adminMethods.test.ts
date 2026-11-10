@@ -92,6 +92,7 @@ function createAdminDeps(
     deleteTdfRuntimeData: async () => undefined,
     removeUploadedAsset: async () => undefined,
     removeSparcFigureUserDecisions: async () => undefined,
+    removeSimulationResearchUserRecords: async () => undefined,
     clearStimDisplayTypeMap: () => undefined,
     encryptData: (value: string) => `encrypted:${value}`,
     openRouterModelCatalogService: {
@@ -114,6 +115,7 @@ describe('adminMethods', function() {
       },
       removeUploadedAsset: async id => { removedAssets.push(id); },
       removeSparcFigureUserDecisions: async () => { throw new Error('Bulk content removal must preserve learner decisions'); },
+      removeSimulationResearchUserRecords: async () => { throw new Error('Bulk content removal must preserve research traces'); },
     });
 
     expect(await methods.deleteAllFiles.call({ userId: 'admin-user' })).to.equal(2);

@@ -8,6 +8,7 @@ import type {
 } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import { sparcTrialDisplayAdapter } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
+import { validateSimulationConfig } from '../../../packages/phet-monitor/lesson';
 import type { ModelPracticeRuntime } from '../../runtime/modelPracticeRuntime';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import {
@@ -53,6 +54,7 @@ type DisplayNodeRecord = {
   readonly value?: unknown;
   readonly nodeType?: unknown;
   readonly atomType?: unknown;
+  readonly simulation?: unknown;
   readonly children?: unknown;
   readonly panels?: unknown;
   readonly clusterIndex?: unknown;
@@ -658,6 +660,27 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
   const events: SparcInterfaceEvent[] = [];
   let index = 0;
   const submittedEntries = Object.entries(params.result.submittedNodes);
+  if (params.result.eventType === 'simulation-observation') {
+    if (submittedEntries.length !== 1) throw new Error('Simulation observation requires one source node');
+    const [nodeId, submitted] = submittedEntries[0]!;
+    const node = nodesById.get(nodeId);
+    if (node?.atomType !== 'simulation' || !isRecord(submitted) || !isRecord(submitted.facts) || !isRecord(submitted.evidence)) throw new Error('Invalid simulation observation source');
+    const config = validateSimulationConfig(node.simulation);
+    const evidence = submitted.evidence;
+    const facts = submitted.facts;
+    if (evidence.buildId !== config.buildId || typeof evidence.attemptId !== 'string'
+      || !Number.isSafeInteger(evidence.checkpointSequence) || !Number.isSafeInteger(evidence.firstSequence)
+      || !Number.isSafeInteger(evidence.lastSequence)
+      || Number(evidence.firstSequence) > Number(evidence.checkpointSequence)
+      || Number(evidence.checkpointSequence) > Number(evidence.lastSequence)) throw new Error('Invalid simulation evidence reference');
+    if (Object.keys(facts).length !== config.bindings.length || config.bindings.some(binding => {
+      const value = facts[binding.name];
+      return value !== null && typeof value !== 'boolean' && typeof value !== 'string' && !(typeof value === 'number' && Number.isFinite(value));
+    })) throw new Error('Invalid simulation observation facts');
+    return [{ eventId: `${evidence.attemptId}:${evidence.checkpointSequence}:${nodeId}`,
+      type: 'simulation-observation', source: { pageKey: params.pageKey, nodeId }, time: params.result.timestamp,
+      payload: { ...submitted.facts, evidence, evidenceComplete: true } }];
+  }
   if (params.result.eventType === 'focus-changed' && submittedEntries.length === 0) {
     const nodeId = typeof params.result.triggeredBy === 'string' ? params.result.triggeredBy.trim() : '';
     if (nodeId) {
@@ -772,6 +795,8 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
   readonly replayState?: SparcReplayState;
   readonly scoreLearnerResponse: SparcTrialDisplayDialogueTurnScorer;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
+  readonly generateOrientation?: import('./sparcTurnOrientation').SparcOrientationGenerator;
+  readonly orientationMode?: import('../../runtime/sparcOrientationMode').SparcOrientationMode;
   readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory' | 'writeCanonicalHistoryBatch'>;
@@ -921,6 +946,7 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
     ...(params.candidateOptions ? { candidateOptions: params.candidateOptions } : {}),
     ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
     generateTutorUtterance: params.generateTutorUtterance,
+    ...(params.generateOrientation ? { generateOrientation: params.generateOrientation } : {}),
     runtime: {
       history: params.history,
     },

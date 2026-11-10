@@ -80,6 +80,18 @@ function buildValidSparcAutoTutorStimuli() {
 }
 
 describe('AutoTutor content contract', function() {
+  it('validates orientation modes in both unit template locations', function() {
+    for (const nested of [false, true]) {
+      for (const orientationMode of ['full', 'headings', 'off', undefined, 'Full', '', null, true, {}]) {
+        const unitTemplate = [{ sparcsession: orientationMode === undefined ? {} : { orientationMode } }];
+        const tutor = nested ? { setspec: { unitTemplate } } : { unitTemplate };
+        const result = validateAutoTutorContent({ tdf: { tutor } });
+        const valid = orientationMode === undefined || ['full', 'headings', 'off'].includes(orientationMode as string);
+        expect(result.valid).to.equal(valid);
+        if (!valid) expect(result.errors[0]).to.equal(`tutor.${nested ? 'setspec.' : ''}unitTemplate[0].sparcsession.orientationMode must be full, headings, or off`);
+      }
+    }
+  });
   it('requires exactly one valid authored category for every target in the new dynamic family', function() {
     for (const policyId of ['dynamic-instruction-agent-v2', 'dynamic-instruction-student-v2']) {
       const stimuli = buildValidSparcAutoTutorStimuli();

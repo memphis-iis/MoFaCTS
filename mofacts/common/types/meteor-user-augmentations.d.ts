@@ -1,4 +1,5 @@
 type AugmentedMeteorUserProfile = {
+  sparcPersona?: import('../../../learning-components/runtime/sparcPersonas').SparcStudentPersona;
   username?: string | undefined;
   experiment?: unknown;
   [key: string]: unknown;

@@ -12,6 +12,7 @@ const suites = [
   'sparcLearnerResponseScoring',
   'sparcInstructionalPrimitives',
   'sparcInstructionalCycle',
+  'sparcTurnOrientation',
   'sparcCompetitiveSelection',
   'sparcDynamicInstructionRules',
   'SparcSessionUnitEngine',
@@ -27,6 +28,8 @@ require('../common/lib/sparcFigureClustering.test.ts');
 require('../common/publicDemoContract.test.ts');
 // Meteor-dependent KC-chain integration is discovered by server-test-entry.js.
 require('../../learning-components/runtime/sparcInstructionalNeed.test.ts');
+require('../../learning-components/runtime/sparcPersonas.test.ts');
+require('../../learning-components/units/sparcsession/sparcSessionRuntimeConfig.test.ts');
 require('../../learning-components/runtime/sparcReadingLevel.test.ts');
 require('../../learning-components/runtime/sparcEmbeddingIndex.test.ts');
 require('../server/lib/sparcInstructionalEmbeddingMigration.test.ts');
@@ -75,7 +78,12 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
     if (request === 'meteor/tracker') return { Tracker: {} };
     if (request === 'meteor/mongo') return { Mongo: {} };
     if (request === 'meteor/session') return { Session: { get: () => undefined } };
-    if (request === 'meteor/check') return { check: () => {}, Match: { ObjectIncluding: value => value } };
+    // Meteor argument-pattern checks are outside this isolated harness. Domain
+    // validators (including upload/editor SPARC validation) execute unchanged.
+    if (request === 'meteor/check') return { check: () => {}, Match: {
+      ObjectIncluding: value => value, OneOf: (...values) => values,
+      Maybe: value => value, Where: predicate => predicate, Integer: Number,
+    } };
     if (request === 'meteor/random') return { Random: { secret: () => require('node:crypto').randomBytes(32).toString('hex') } };
     return originalLoad.call(this, request, parent, isMain);
   };
@@ -95,6 +103,7 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
     global.__meteor_bootstrap__ = { serverDir: require('node:path').resolve(__dirname, '..') };
     require('../server/lib/packageUploadPostProcess.test.ts');
     require('../server/lib/packageTdfIdentity.test.ts');
+    require('../server/methods/packageMethods.test.ts');
     require('../server/lib/tdfRuntimeLifecycle.test.ts');
     require('../server/lib/packageExport.test.ts');
     require('../server/methods/openRouterMethods.test.ts');

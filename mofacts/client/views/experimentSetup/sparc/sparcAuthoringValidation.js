@@ -6,6 +6,7 @@ import {
   flattenNodes,
   nodeClusterIndices,
 } from './sparcAuthoringTargets.js';
+import { validateSimulationConfig } from '../../../../../packages/phet-monitor/lesson.ts';
 
 function validClusterIndicesForSave(clusters) {
   const valid = new Set();
@@ -33,6 +34,10 @@ export function validateSparcDisplaysBeforeSave({ sparcTargets, sparcPages, clus
         throw new Error(`Duplicate SPARC node id "${node.id}" in "${target.label}".`);
       }
       seen.add(node.id);
+      if (node.atomType === 'simulation') {
+        requireNonBlankString(node.label, `Simulation "${node.id}" label`);
+        validateSimulationConfig(node.simulation);
+      }
       for (const clusterIndex of node.clusterIndices || []) {
         if (!Number.isInteger(Number(clusterIndex)) || !validClusterIndices.has(Number(clusterIndex))) {
           throw new Error(`Node "${node.id}" in "${target.label}" attaches unknown clusterIndex ${String(clusterIndex)}.`);

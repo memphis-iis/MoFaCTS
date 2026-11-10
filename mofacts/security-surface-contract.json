@@ -2,6 +2,26 @@
   "schema": "MoFaCTSSecuritySurfaceContractV1",
   "methods": [
     {
+      "name": "startSimulationResearchAttempt",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "interruptSimulationResearchActivity",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "ingestSimulationResearchBatch",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "endSimulationResearchAttempt",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "exportSimulationResearchTrace",
+      "access": "admin-only"
+    },
+    {
       "name": "_FilesCollectionAbort_Assets",
       "access": "authenticated-self"
     },
@@ -904,6 +924,11 @@
       "access": "authenticated-self"
     },
     {
+      "name": "updateOwnSparcPersona",
+      "access": "authenticated-self",
+      "notes": "Validates explicit student persona descriptions and updates only the authenticated caller; no target user identifier is accepted. runtime/userProfileWrites.ts denies direct client user updates, including whole-profile replacement; server-owned account methods remain available."
+    },
+    {
       "name": "updateOwnUiLocale",
       "access": "authenticated-self"
     },
@@ -1201,6 +1226,10 @@
     }
   ],
   "exports": [
+    {
+      "name": "method:exportSimulationResearchTrace",
+      "access": "admin-only"
+    },
     {
       "name": "http:/admin/backups/download",
       "access": "single-use-download"

@@ -1,4 +1,5 @@
 import { parseSparcVideoSegment } from '../../runtime/sparcVideo';
+import type { SparcPersonas } from '../../runtime/sparcPersonas';
 import { sparcEvidenceContext } from './sparcEvidenceHistory';
 import type { SparcPrimitiveReference, SparcInstructionCheckpoint } from './sparcMoveLibrary';
 import { parseSparcPromptFigure, type SparcPromptFigure } from './sparcSupportedPrompt';
@@ -12,6 +13,10 @@ import {
 } from './sparcMoveDefinitions';
 
 export type SparcUtteranceRequest = {
+  readonly personas?: SparcPersonas;
+  readonly contentLanguage?: string;
+  /** Categorized turns have a separate, saved owner for orientation prose. */
+  readonly orientationOwned?: boolean;
   /** Canonical lesson-session identity; distinct from provider prefix-cache correlation. */
   readonly historySessionId?: string;
   readonly onFeedback?: (text: string, reference: SparcPrimitiveReference) => Promise<void>;
@@ -152,7 +157,7 @@ export function buildSparcDialogueHistory(
 export function buildSparcAssessmentDialogueHistory(facts: readonly SparcWorkingMemoryFact[]) {
   return factsByType(facts, 'dialogue.utterance')
     .filter(fact => fact.slots?.speaker === 'learner'
-      || !['explanation', 'richContent'].includes(String(fact.slots?.component)))
+      || !['explanation', 'richContent', 'orientation'].includes(String(fact.slots?.component)))
     .map(fact => ({
       role: fact.slots?.speaker === 'learner' ? 'student' as const : 'tutor' as const,
       responseId: fact.factId,

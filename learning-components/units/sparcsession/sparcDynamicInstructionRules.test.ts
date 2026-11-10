@@ -15,8 +15,10 @@ import { createEmptySparcReplayState, replaySparcHistory } from './sparcStateRep
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
 import { logistic, targetExpectancy } from './sparcCompetitiveSelection';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
+import type { SparcOrientationMode } from '../../runtime/sparcOrientationMode';
 import type { SparcTrialDisplay, SparcTrialResult } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import type { SparcUtteranceRequest } from './sparcUtteranceRequest';
+import { savedSparcOrientations, type SparcOrientationRequest, type SparcSavedOrientation } from './sparcTurnOrientation';
 import type { SparcAuthoredDocument, SparcWorkingMemoryFact, SparcStateTransition } from './sparcSessionContracts';
 
 const transition = (row: CanonicalHistoryRecord) => (row.sparc as { stateTransition: SparcStateTransition }).stateTransition;
@@ -24,6 +26,8 @@ const transition = (row: CanonicalHistoryRecord) => (row.sparc as { stateTransit
 function fixture(version: 'student' | 'agent', longIdentities = false, category: SparcTargetCategory = 'model-rule', targetCount = 7, misconceptionCount = 3) {
   const rows: CanonicalHistoryRecord[] = [];
   const requests: SparcUtteranceRequest[] = [];
+  const orientationRequests: SparcOrientationRequest[] = [];
+  const orientationDecisions: Omit<SparcSavedOrientation, 'bridge'>[] = [];
   const scoredResponses: { learnerText: string; event: SparcStateTransition['event'] }[] = [];
   const ids = Array.from({ length: targetCount }, (_, i) => String.fromCharCode(97 + i)).map(id => longIdentities ? `dynamic.biology-species-speciation-hlw4e-ch21-001.kc.${id}` : id);
   const misconceptionIds = Array.from({ length: misconceptionCount }, (_, i) => `m${i + 1}`);
@@ -47,8 +51,14 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
   let timestamp = 10;
   let coverage = .2;
   let firstCoverage: number | undefined;
+  const coverageByTarget = new Map<string, number>();
   let support = 0;
   let failQuestion = false;
+  let failOrientation = false;
+  let failOrientationDecision = false;
+  let strictHistory = false;
+  let orientationGenerator: ((request: SparcOrientationRequest) => Promise<string>) | undefined;
+  let orientationMode: SparcOrientationMode | undefined;
   let failModelAfter: number | undefined;
   let failBatch = false;
   let failScoring = false;
@@ -61,12 +71,19 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
   const submit = (result?: SparcTrialResult) => commitSparcTrialDisplayAutoTutorRules({
     core: { userId: 'u', TDFId: 'dynamic', sessionID: 'session', levelUnit: 0 }, pageKey, display: source,
     ...(result ? { result } : {}), priorHistoryRecords: JSON.parse(JSON.stringify(rows)),
+    ...(orientationMode !== undefined ? { orientationMode } : {}),
     scoreLearnerResponse: response => { calls++; scoredResponses.push({ learnerText: response.learnerText, event: response.event });
       assert.ok(rows.some(row => transition(row).transitionId === `${response.event.eventId}:submission`));
       assert.ok(!response.replayState.transitions.some(entry => entry.event.eventId === response.event.eventId), 'Scoring receives the pre-response context');
       if (failScoring) throw new Error('assessment provider interrupted');
-      return { learningTargetScores: ids.map(clusterKC => ({ clusterKC, coverage: clusterKC === ids[0] ? firstCoverage ?? coverage : coverage })),
+      return { learningTargetScores: ids.map(clusterKC => ({ clusterKC, coverage: coverageByTarget.get(clusterKC) ?? (clusterKC === ids[0] ? firstCoverage ?? coverage : coverage) })),
       evidence, diagnosticMisconceptionScores: misconceptionIds.map(id => ({ id, supportStrength: id === 'm1' ? support : 0 })) }; },
+    generateOrientation: async request => {
+      orientationRequests.push(request);
+      if (failOrientation) throw new Error('orientation provider interrupted');
+      if (orientationGenerator) return orientationGenerator(request);
+      return `Transition ${request.reason} to ${request.current?.text ?? 'lesson completion'}; ${request.progress.remaining} goals remain.`;
+    },
     generateTutorUtterance: async request => {
       requests.push(request);
       if (request.action === 'instruction.feedback') {
@@ -101,6 +118,17 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
       if (failBatch) throw new Error('assessment write interrupted');
       rows.push(...records);
     }, writeCanonicalHistory: async record => {
+      if (transition(record).transitionId.endsWith(':orientation:decision')) {
+        orientationDecisions.push(transition(record).writes[0]!.value as Omit<SparcSavedOrientation, 'bridge'>);
+        if (failOrientationDecision) throw new Error('orientation decision storage unavailable');
+      }
+      if (strictHistory) {
+        const prior = rows.find(row => transition(row).transitionId === transition(record).transitionId);
+        if (prior) {
+          if (JSON.stringify(prior) !== JSON.stringify(record)) throw new Error('Conflicting history write. Reload before continuing.');
+          return;
+        }
+      }
       if (failSubmission && transition(record).transitionId.endsWith(':submission')) throw new Error('submission storage unavailable');
       if (transition(record).transitionId.includes(':assessment:model:') && failModelAfter !== undefined
         && rows.filter(row => transition(row).transitionId.includes(':assessment:model:')).length >= failModelAfter) throw new Error('model write interrupted');
@@ -131,9 +159,14 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
     const node = `${String(question.id)}:answer:${id}`;
     return submit({ submittedNodes: { [node]: id }, triggeredBy: node, timestamp: time });
   };
-  return { source, rows, requests, scoredResponses, submit, answer, choice, mcAnswer, menu, facts, evidence: (value: SparcRetainedEvidence[]) => { evidence = value; }, calls: () => calls,
+  return { source, rows, requests, orientationRequests, orientationDecisions, scoredResponses, submit, answer, choice, mcAnswer, menu, facts, evidence: (value: SparcRetainedEvidence[]) => { evidence = value; }, calls: () => calls,
     scores: (value: number, misconception = 0) => { coverage = value; support = misconception; }, firstTarget: (value: number) => { firstCoverage = value; },
+    targetScore: (id: string, value: number) => { coverageByTarget.set(id, value); },
     fail: (value: boolean) => { failQuestion = value; }, failModel: (after?: number) => { failModelAfter = after; },
+    failOrientation: (value: boolean) => { failOrientation = value; },
+    mode: (value?: SparcOrientationMode) => { orientationMode = value; },
+    failOrientationDecision: (value: boolean) => { failOrientationDecision = value; },
+    strictHistory: () => { strictHistory = true; }, orientationGenerator: (generator: (request: SparcOrientationRequest) => Promise<string>) => { orientationGenerator = generator; },
     failBatch: (value: boolean) => { failBatch = value; },
     failScoring: (value: boolean) => { failScoring = value; }, failSubmission: (value: boolean) => { failSubmission = value; },
     loseSubmissionAck: (value: boolean) => { loseSubmissionAck = value; },
@@ -142,6 +175,383 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
 }
 
 describe('Dynamic instruction production cycles', () => {
+  const orientations = (f: ReturnType<typeof fixture>) => savedSparcOrientations(replaySparcHistory(f.rows).transitions);
+  const freshOrientationFixture = (version: 'agent' | 'student', targetCount = 7) => {
+    const f = fixture(version, false, 'rule', targetCount, 0);
+    f.source.nodes = f.source.nodes!.filter(node => (node as { id: string }).id !== 'opening-tutor-message');
+    f.source.workingMemoryFacts = (f.source.workingMemoryFacts as SparcWorkingMemoryFact[]).filter(fact => fact.factType !== 'dialogue.utterance');
+    return f;
+  };
+  const acceptedOrientationModes = (f: ReturnType<typeof fixture>) => f.rows.flatMap(row => transition(row).writes
+    .filter(write => write.key === 'instructionalOrientationMode').map(write => write.value));
+  const instructionRequests = (f: ReturnType<typeof fixture>) => f.requests.filter(request => request.action !== 'instruction.feedback');
+  for (const version of ['agent', 'student'] as const) {
+    it(`applies full by default and the explicit full/headings/off realization contracts (${version})`, async () => {
+      for (const configured of [undefined, 'full', 'headings', 'off'] as const) {
+        const f = freshOrientationFixture(version, 3);
+        f.mode(configured);
+        await f.submit(); if (version === 'student') await f.choice('question.text');
+        const mode = configured ?? 'full';
+        assert.equal(acceptedOrientationModes(f).at(-1), mode);
+        assert.equal(instructionRequests(f).at(-1)!.orientationOwned, mode === 'off' ? undefined : true);
+        assert.equal(orientations(f).length, mode === 'off' ? 0 : 1);
+        assert.equal(f.orientationRequests.length, mode === 'full' ? 1 : 0);
+        if (mode === 'headings') {
+          assert.equal(orientations(f)[0]!.bridge, null);
+          assert.deepEqual(orientations(f)[0]!.request.progress, { total: 3, met: 0, remaining: 3 });
+        }
+        const before = JSON.stringify(f.rows), generated = f.orientationRequests.length;
+        f.mode(mode === 'off' ? 'full' : 'off');
+        await f.submit();
+        assert.equal(JSON.stringify(f.rows), before, 'Changing lesson configuration must not rewrite a completed turn');
+        assert.equal(f.orientationRequests.length, generated);
+      }
+    });
+    it(`uses a changed mode only for the next accepted selection and preserves historical snapshots (${version})`, async () => {
+      for (const [initial, next] of [['full', 'off'], ['off', 'full'], ['headings', 'full'],
+        ['full', 'headings'], ['headings', 'off'], ['off', 'headings']] as const) {
+        const f = freshOrientationFixture(version, 3);
+        f.mode(initial);
+        await f.submit(); if (version === 'student') await f.choice('question.text');
+        const prefix = JSON.stringify(f.rows), length = f.rows.length;
+        const earlier = JSON.parse(JSON.stringify(orientations(f))) as SparcSavedOrientation[];
+        f.mode(next); f.firstTarget(.9);
+        await f.answer(); if (version === 'student') await f.choice('question.text');
+        assert.equal(JSON.stringify(f.rows.slice(0, length)), prefix, 'Earlier history must remain byte-identical');
+        assert.deepEqual(orientations(f).slice(0, earlier.length), earlier);
+        assert.equal(acceptedOrientationModes(f).at(-1), next);
+        assert.equal(instructionRequests(f).at(-1)!.orientationOwned, next === 'off' ? undefined : true);
+        assert.equal(orientations(f).length, Number(initial !== 'off') + Number(next !== 'off'));
+        assert.equal(f.orientationRequests.length, Number(initial === 'full') + Number(next === 'full'));
+        if (next === 'headings') assert.equal(orientations(f).at(-1)!.bridge, null);
+      }
+    });
+    it(`reenables full orientation from the latest off turn rather than an older visible heading (${version})`, async () => {
+      const f = freshOrientationFixture(version, 3);
+      f.mode('full');
+      await f.submit(); if (version === 'student') await f.choice('question.text');
+      assert.equal(orientations(f)[0]!.request.current!.id, 'a');
+      f.mode('off'); f.firstTarget(.9);
+      await f.answer(); if (version === 'student') await f.choice('question.text');
+      assert.equal(instructionRequests(f).at(-1)!.targetId, 'b');
+      assert.equal(orientations(f).length, 1);
+      f.mode('full'); f.targetScore('b', .9);
+      await f.answer(); if (version === 'student') await f.choice('question.text');
+      const resumed = orientations(f).at(-1)!;
+      assert.equal(resumed.request.previous!.id, 'b', 'Orientation must describe the most recently presented instructional target');
+      assert.equal(resumed.request.current!.id, 'c');
+      assert.deepEqual(resumed.request.achieved, [{ id: 'b', text: 'Explain b' }], 'Credit already achieved before the off instruction is not new progress');
+      assert.deepEqual(resumed.request.progress, { total: 3, met: 2, remaining: 1 });
+    });
+    it(`preserves the selected mode across a failed question and applies a later edit on the following turn (${version})`, async () => {
+      for (const initial of ['full', 'headings', 'off'] as const) {
+        const f = freshOrientationFixture(version, 3);
+        const next = initial === 'off' ? 'full' : 'off';
+        f.mode(initial); f.fail(true);
+        if (version === 'student') await f.submit();
+        await assert.rejects(version === 'student' ? f.choice('question.text', 100) : f.submit(), /question failed/);
+        const before = JSON.stringify(f.rows), length = f.rows.length;
+        const earlier = JSON.parse(JSON.stringify(orientations(f))) as SparcSavedOrientation[];
+        const generated = f.orientationRequests.length;
+        f.mode(next); f.fail(false); await f.submit();
+        assert.equal(JSON.stringify(f.rows.slice(0, length)), before);
+        assert.deepEqual(orientations(f), earlier);
+        assert.equal(acceptedOrientationModes(f).at(-1), initial, 'Retry must reuse the accepted mode checkpoint');
+        assert.equal(instructionRequests(f).at(-1)!.orientationOwned, initial === 'off' ? undefined : true);
+        assert.equal(f.orientationRequests.length, generated);
+        f.firstTarget(.9); await f.answer(); if (version === 'student') await f.choice('question.text');
+        assert.equal(acceptedOrientationModes(f).at(-1), next);
+        assert.equal(instructionRequests(f).at(-1)!.orientationOwned, next === 'off' ? undefined : true);
+      }
+    });
+    it(`keeps a pending full bridge mandatory after a lesson is changed to off (${version})`, async () => {
+      const f = freshOrientationFixture(version, 3);
+      f.mode('full'); f.failOrientation(true);
+      if (version === 'student') await f.submit();
+      await assert.rejects(version === 'student' ? f.choice('question.text', 100) : f.submit(), /orientation provider interrupted/);
+      assert.equal(acceptedOrientationModes(f).at(-1), 'full');
+      assert.equal(orientations(f).length, 0);
+      f.mode('off'); f.failOrientation(false); await f.submit();
+      assert.equal(acceptedOrientationModes(f).at(-1), 'full');
+      assert.equal(orientations(f).length, 1);
+      assert.ok(orientations(f)[0]!.bridge);
+      assert.equal(f.orientationRequests.length, 2);
+      assert.deepEqual(f.orientationRequests[1], f.orientationRequests[0]);
+      assert.equal(instructionRequests(f).at(-1)!.orientationOwned, true);
+    });
+    it(`finishes headings/off lessons without generating a completion bridge or extra question (${version})`, async () => {
+      for (const mode of ['headings', 'off'] as const) {
+        const f = freshOrientationFixture(version, 1);
+        f.mode(mode);
+        await f.submit(); if (version === 'student') await f.choice('question.text');
+        const questions = instructionRequests(f).length;
+        f.scores(.9); await f.answer();
+        assert.equal(instructionRequests(f).length, questions);
+        assert.equal(f.orientationRequests.length, 0);
+        assert.equal(acceptedOrientationModes(f).at(-1), mode);
+        if (mode === 'headings') {
+          const completion = orientations(f).at(-1)!;
+          assert.equal(completion.request.reason, 'completion');
+          assert.equal(completion.bridge, null);
+          assert.deepEqual(completion.request.progress, { total: 1, met: 1, remaining: 0 });
+        } else assert.equal(orientations(f).length, 0);
+        const before = JSON.stringify(f.rows);
+        f.mode('full'); await f.submit();
+        assert.equal(JSON.stringify(f.rows), before);
+        assert.equal(f.orientationRequests.length, 0, 'Completed lessons must not regenerate under a later setting');
+      }
+    });
+  }
+  it('uses the setting at student acceptance rather than freezing it when only a menu was offered', async () => {
+    const f = freshOrientationFixture('student');
+    f.mode('full'); await f.submit();
+    assert.equal(orientations(f).length, 0);
+    f.mode('off'); await f.choice('question.text');
+    assert.equal(acceptedOrientationModes(f).at(-1), 'off');
+    assert.equal(orientations(f).length, 0);
+    assert.equal(f.orientationRequests.length, 0);
+    assert.equal(instructionRequests(f).at(-1)!.orientationOwned, undefined);
+  });
+  it('saves authored KC orientation for question-only startup, excludes it from assessment, and replays it unchanged', async () => {
+    const f = freshOrientationFixture('student');
+    await f.submit();
+    assert.equal(f.orientationRequests.length, 0, 'Offering a menu does not establish a destination');
+    await f.choice('question.text');
+    const saved = orientations(f);
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0]!.request.reason, 'introduction');
+    assert.deepEqual(saved[0]!.request.current, { kind: 'expectation', id: 'a', text: 'Explain a' });
+    assert.deepEqual(saved[0]!.request.progress, { total: 7, met: 0, remaining: 7 });
+    assert.ok(saved[0]!.bridge);
+    assert.ok(f.requests.at(-1)!.orientationOwned);
+    const dialogue = progressiveDialogueFacts(replaySparcHistory(f.rows));
+    assert.equal(dialogue.some(fact => fact.slots?.text === saved[0]!.bridge), false, 'Navigation is not dialogue evidence');
+    const before = JSON.stringify(f.rows);
+    await f.submit();
+    assert.equal(JSON.stringify(f.rows), before);
+    assert.deepEqual(orientations(f), saved);
+    assert.equal(f.orientationRequests.length, 1);
+  });
+  it('announces incidental gains without switching the active target and preserves earlier progress', async () => {
+    const f = freshOrientationFixture('student');
+    await f.submit(); await f.choice('question.text');
+    f.scores(.9); f.firstTarget(.2);
+    await f.answer(); await f.choice('question.text');
+    const saved = orientations(f);
+    assert.equal(saved.length, 2);
+    assert.equal(saved[1]!.request.reason, 'continue');
+    assert.equal(saved[1]!.request.current!.id, 'a');
+    assert.ok(saved[1]!.bridge);
+    assert.deepEqual(saved[1]!.request.progress, { total: 7, met: 6, remaining: 1 });
+    assert.deepEqual(saved[1]!.request.achieved.map(goal => goal.id), ['b', 'c', 'd', 'e', 'f', 'g']);
+    assert.equal(f.orientationRequests.length, 2, 'Earned incidental milestones require a bridge even on the same target');
+    assert.deepEqual(saved[0]!.request.progress, { total: 7, met: 0, remaining: 7 });
+    await f.answer(); await f.choice('question.text');
+    assert.equal(orientations(f).at(-1)!.bridge, null);
+    assert.deepEqual(orientations(f).at(-1)!.request.achieved, []);
+    assert.equal(f.orientationRequests.length, 2, 'Unchanged continuation does not repeat the announcement');
+  });
+  it('uses a neutral bridge after an unfinished student-selected KC switch and waits for the accepted choice', async () => {
+    const f = freshOrientationFixture('student');
+    await f.submit(); await f.choice('question.text');
+    await f.answer(); await f.choice('next-target');
+    assert.equal(f.orientationRequests.length, 1);
+    assert.equal(orientations(f).length, 1);
+    await f.choice('question.text');
+    const saved = orientations(f).at(-1)!;
+    assert.equal(saved.request.reason, 'switch');
+    assert.equal(saved.request.previous!.id, 'a');
+    assert.equal(saved.request.current!.id, 'b');
+    assert.deepEqual(saved.request.achieved, []);
+    assert.deepEqual(saved.request.progress, { total: 7, met: 0, remaining: 7 });
+    assert.equal(saved.request.mentionRemaining, false);
+  });
+  it('announces criterion-based advancement and closes completion without an extra question', async () => {
+    for (const version of ['agent', 'student'] as const) {
+      const f = freshOrientationFixture(version, 2);
+      await f.submit(); if (version === 'student') await f.choice('question.text');
+      f.firstTarget(.9); await f.answer(); if (version === 'student') await f.choice('question.text');
+      const advanced = orientations(f).at(-1)!;
+      assert.equal(advanced.request.reason, 'advance');
+      assert.equal(advanced.request.current!.id, 'b');
+      assert.deepEqual(advanced.request.achieved, [{ id: 'a', text: 'Explain a' }]);
+      assert.deepEqual(advanced.request.progress, { total: 2, met: 1, remaining: 1 });
+      assert.equal(advanced.request.mentionRemaining, true);
+      const questions = f.requests.filter(request => request.action !== 'instruction.feedback').length;
+      f.scores(.9); await f.answer();
+      const completed = orientations(f).at(-1)!;
+      assert.equal(completed.request.reason, 'completion');
+      assert.equal(completed.request.current, undefined);
+      assert.deepEqual(completed.request.progress, { total: 2, met: 2, remaining: 0 });
+      assert.equal(f.requests.filter(request => request.action !== 'instruction.feedback').length, questions);
+      const before = JSON.stringify(f.rows), generated = f.orientationRequests.length;
+      await f.submit();
+      assert.equal(JSON.stringify(f.rows), before);
+      assert.equal(f.orientationRequests.length, generated);
+    }
+  });
+  it('restores accepted orientation after question failure without another bridge generation', async () => {
+    const f = freshOrientationFixture('student');
+    await f.submit(); f.fail(true);
+    await assert.rejects(f.choice('question.text', 100), /question failed/);
+    const saved = orientations(f);
+    assert.equal(saved.length, 1);
+    assert.equal(f.orientationRequests.length, 1);
+    f.fail(false); await f.submit();
+    assert.deepEqual(orientations(f), saved);
+    assert.equal(f.orientationRequests.length, 1);
+    assert.equal(f.calls(), 0);
+  });
+  for (const stage of ['submission', 'assessment', 'feedback']) {
+    it(`resumes a historical pre-orientation ${stage} under its original contract before selection`, async () => {
+      for (const version of ['agent', 'student'] as const) {
+        const f = fixture(version);
+        f.mode('off'); f.firstTarget(.9); await f.answer(100);
+        const stop = f.rows.findIndex(row => transition(row).transitionId.endsWith(`:${stage}`));
+        assert.ok(stop >= 0);
+        const oldRows = structuredClone(f.rows.slice(0, stop + 1).filter(row =>
+          /:(submission|assessment|feedback)$/.test(transition(row).transitionId) || transition(row).transitionId.includes(':assessment:')));
+        for (const row of oldRows) {
+          const state = transition(row);
+          (row.sparc as { stateTransition: SparcStateTransition }).stateTransition = {
+            ...state, writes: state.writes.filter(write => write.key !== 'instructionalOrientationMode'),
+          };
+        }
+        f.rows.splice(0, f.rows.length, ...oldRows);
+        f.requests.splice(0);
+        const before = JSON.stringify(oldRows);
+        const scoresBeforeResume = f.calls();
+        f.mode('full'); await f.submit();
+        assert.equal(JSON.stringify(f.rows.slice(0, oldRows.length)), before);
+        assert.equal(f.calls(), scoresBeforeResume + (stage === 'submission' ? 1 : 0), 'Accepted assessment evidence is reused');
+        assert.ok(f.requests.every(request => request.orientationOwned === undefined));
+        assert.equal(orientations(f).length, 0);
+        assert.equal(acceptedOrientationModes(f).length, 0);
+        if (version === 'agent') assert.equal(f.requests.at(-1)!.targetId, 'b', 'The accepted completion of a still advances instruction');
+        if (version === 'agent') await f.answer();
+        else await f.choice('question.text');
+        assert.equal(f.requests.at(-1)!.orientationOwned, true);
+        assert.equal(orientations(f).length, 1);
+      }
+    });
+  }
+  it('finishes a saved pre-orientation selection under its original contract and orients the following new turn', async () => {
+    for (const version of ['agent', 'student'] as const) {
+      const f = fixture(version);
+      if (version === 'student') await f.submit();
+      f.fail(true);
+      await assert.rejects(version === 'student' ? f.choice('explanation-rich-question.text', 100) : f.answer(100), /question failed/);
+      const originalRequest = f.requests.at(-1)!;
+      const oldRows = JSON.parse(JSON.stringify(f.rows.filter(row => !/:orientation(?::decision|-mode)?$/.test(transition(row).transitionId)))) as CanonicalHistoryRecord[];
+      for (const row of oldRows) {
+        const state = transition(row);
+        (row.sparc as { stateTransition: SparcStateTransition }).stateTransition = {
+          ...state, writes: state.writes.filter(write => write.key !== 'instructionalOrientationMode'),
+        };
+      }
+      for (const row of oldRows) for (const write of transition(row).writes) {
+        const fact = write.value as SparcWorkingMemoryFact;
+        if (fact?.factType === 'instructional.decision') delete (fact.slots as Record<string, unknown>).orientationOwned;
+      }
+      f.rows.splice(0, f.rows.length, ...oldRows);
+      const before = JSON.stringify(oldRows), generated = f.orientationRequests.length;
+      f.fail(false); await f.submit();
+      const resumed = f.requests.at(-1)!;
+      assert.equal(resumed.orientationOwned, undefined);
+      assert.equal(resumed.action, originalRequest.action);
+      assert.equal(resumed.targetId, originalRequest.targetId);
+      assert.equal(f.orientationRequests.length, generated);
+      assert.equal(orientations(f).length, 0);
+      assert.equal(JSON.stringify(f.rows.slice(0, oldRows.length)), before, 'Finishing an old selection must not rewrite its saved components');
+      if (originalRequest.instructionCheckpoint?.stage === 'accepted') assert.deepEqual(resumed.instructionCheckpoint, originalRequest.instructionCheckpoint);
+      await f.answer();
+      if (version === 'student') await f.choice('question.text', 200, true);
+      assert.equal(f.requests.at(-1)!.orientationOwned, true);
+      assert.equal(orientations(f).length, 1, 'The next new selection must acquire its own orientation');
+    }
+  });
+  it('restores saved full turns written before mode configuration even when the lesson now specifies off', async () => {
+    for (const version of ['agent', 'student'] as const) {
+      const f = freshOrientationFixture(version, 3);
+      f.fail(true);
+      if (version === 'student') await f.submit();
+      await assert.rejects(version === 'student' ? f.choice('question.text', 100) : f.submit(), /question failed/);
+      const oldRows = JSON.parse(JSON.stringify(f.rows.filter(row => !transition(row).transitionId.endsWith(':orientation-mode')))) as CanonicalHistoryRecord[];
+      for (const row of oldRows) {
+        const state = transition(row);
+        (row.sparc as { stateTransition: SparcStateTransition }).stateTransition = {
+          ...state, writes: state.writes.filter(write => write.key !== 'instructionalOrientationMode'),
+        };
+      }
+      f.rows.splice(0, f.rows.length, ...oldRows);
+      const prefix = JSON.stringify(f.rows), length = f.rows.length;
+      const saved = JSON.parse(JSON.stringify(orientations(f))) as SparcSavedOrientation[];
+      const generated = f.orientationRequests.length;
+      f.mode('off'); f.fail(false); await f.submit();
+      assert.equal(JSON.stringify(f.rows.slice(0, length)), prefix);
+      assert.deepEqual(orientations(f), saved);
+      assert.equal(f.orientationRequests.length, generated);
+      assert.equal(instructionRequests(f).at(-1)!.orientationOwned, true);
+      assert.equal(acceptedOrientationModes(f).length, 0, 'Reading an old mode must not rewrite its saved contract');
+      await f.answer(); if (version === 'student') await f.choice('question.text');
+      assert.equal(acceptedOrientationModes(f).at(-1), 'off');
+      assert.equal(instructionRequests(f).at(-1)!.orientationOwned, undefined);
+      assert.deepEqual(orientations(f), saved);
+    }
+  });
+  it('keeps a failed transition explicit and resumes its accepted decision without showing instruction early', async () => {
+    const f = freshOrientationFixture('student');
+    await f.submit(); f.failOrientation(true);
+    await assert.rejects(f.choice('question.text', 100), /orientation provider interrupted/);
+    assert.equal(orientations(f).length, 0);
+    assert.equal(f.rows.some(row => transition(row).transitionId.endsWith(':primitive:question')), false);
+    const accepted = f.rows.map(transition).find(row => row.transitionId.endsWith(':orientation:decision'))!;
+    assert.ok(accepted);
+    f.failOrientation(false); await f.submit();
+    assert.equal(orientations(f).length, 1);
+    assert.equal(f.orientationRequests.length, 2);
+    assert.deepEqual(f.orientationRequests[1], f.orientationRequests[0]);
+    assert.equal(f.calls(), 0);
+    assert.equal(f.rows.map(transition).filter(row => row.transitionId === accepted.transitionId).length, 1);
+  });
+  it('retains newly achieved legacy progress when orientation-decision persistence fails before its first snapshot', async () => {
+    const f = fixture('agent', false, 'rule', 2, 0);
+    f.firstTarget(.9); f.failOrientationDecision(true);
+    await assert.rejects(f.answer(100), /orientation decision storage unavailable/);
+    assert.equal(orientations(f).length, 0);
+    assert.equal(f.orientationRequests.length, 0);
+    assert.deepEqual(f.orientationDecisions[0]!.request.achieved, [{ id: 'a', text: 'Explain a' }]);
+    f.failOrientationDecision(false); await f.submit();
+    assert.equal(f.calls(), 1);
+    assert.deepEqual(f.orientationDecisions[1], f.orientationDecisions[0]);
+    assert.deepEqual(orientations(f)[0]!.request.achieved, [{ id: 'a', text: 'Explain a' }]);
+  });
+  it('rejects conflicting concurrent bridge output while preserving and replaying the accepted turn', async () => {
+    const f = freshOrientationFixture('student');
+    f.strictHistory(); await f.submit();
+    const releases: ((text: string) => void)[] = [];
+    const waiters: (() => void)[] = [];
+    const waitFor = async (count: number) => { while (releases.length < count) await new Promise<void>(resolve => waiters.push(resolve)); };
+    f.orientationGenerator(() => new Promise<string>(resolve => { releases.push(resolve); waiters.shift()?.(); }));
+    const original = f.choice('question.text', 100);
+    await waitFor(1);
+    const resumed = f.submit();
+    try {
+      await waitFor(2);
+      releases[0]!('The first accepted bridge.'); await original;
+      releases[1]!('A different concurrent bridge.');
+      await assert.rejects(resumed, /Conflicting history write/);
+      assert.equal(orientations(f).length, 1);
+      assert.equal(orientations(f)[0]!.bridge, 'The first accepted bridge.');
+      const before = JSON.stringify(f.rows);
+      await f.submit();
+      assert.equal(JSON.stringify(f.rows), before);
+      assert.equal(f.orientationRequests.length, 2, 'Restoring the winner must not request a third bridge');
+    } finally {
+      for (const release of releases) release('Released pending bridge.');
+      await Promise.allSettled([original, resumed]);
+    }
+  });
   it('recovers a persisted submission after its acknowledgement is lost without saving it twice', async () => {
     const f = fixture('agent'); f.loseSubmissionAck(true);
     await assert.rejects(f.answer(), /acknowledgement lost/);
@@ -149,6 +559,25 @@ describe('Dynamic instruction production cycles', () => {
     f.loseSubmissionAck(false); await f.submit();
     assert.equal(f.calls(), 1);
     assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(':submission')).length, 1);
+  });
+  it('restores the mode atomically accepted with an answer after a lost submission acknowledgement', async () => {
+    for (const version of ['agent', 'student'] as const) for (const initial of ['full', 'headings', 'off'] as const) {
+      const f = fixture(version, false, 'rule', 3, 0);
+      f.mode(initial); f.loseSubmissionAck(true);
+      await assert.rejects(f.answer(100), /acknowledgement lost/);
+      assert.equal(f.calls(), 0);
+      const submission = transition(f.rows[0]!);
+      const before = JSON.stringify(submission);
+      assert.equal(submission.writes.find(write => write.key === 'instructionalOrientationMode')?.value, initial);
+      f.mode(initial === 'off' ? 'full' : 'off'); f.loseSubmissionAck(false);
+      await f.submit();
+      assert.equal(f.calls(), 1);
+      assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(':submission')).length, 1);
+      assert.equal(JSON.stringify(transition(f.rows[0]!)), before);
+      assert.equal(acceptedOrientationModes(f).at(-1), initial);
+      assert.equal(f.requests.find(request => request.action === 'instruction.feedback')!.orientationOwned, initial === 'off' ? undefined : true);
+      if (version === 'agent') assert.equal(instructionRequests(f).at(-1)!.orientationOwned, initial === 'off' ? undefined : true);
+    }
   });
   it('resumes existing assessment-owned answers without rewriting their history', async () => {
     const f = fixture('agent'); f.fail(true);
@@ -675,8 +1104,9 @@ describe('Dynamic instruction production cycles', () => {
     const index = messages.findIndex(node => node.action === 'instruction.dynamic.explanation-rich-question.text');
     assert.equal(messages.filter(node => node.action === 'instruction.dynamic.explanation-rich-question.text').length, 1);
     assert.equal((messages[index]!.children as unknown[]).length, 3);
-    assert.ok(String(messages[index - 1]!.id).endsWith(':selected'), JSON.stringify(messages.map(node => node.id)));
-    const button = (messages[index - 1]!.children as Record<string, unknown>[])[0]!;
+    assert.equal(messages[index - 1]!.navigationOnly, true);
+    assert.ok(String(messages[index - 2]!.id).endsWith(':selected'), JSON.stringify(messages.map(node => node.id)));
+    const button = (messages[index - 2]!.children as Record<string, unknown>[])[0]!;
     assert.equal(button.label, 'Explanation with written example or comparison and question (text answer)');
     assert.equal(button.selected, true); assert.equal(button.readOnly, true);
     await f.answer(); await f.choice('next-target'); await f.choice('question.text');
@@ -718,6 +1148,16 @@ describe('Dynamic instruction production cycles', () => {
       assert.equal(f.requests.at(-1)!.targetType, 'misconception');
       assert.equal(f.requests.at(-1)!.targetId, 'm1');
       assert.ok(f.requests.at(-1)!.action.startsWith('instruction.dynamic.'));
+      assert.equal(orientations(f).at(-1)!.request.reason, 'repair');
+      assert.deepEqual(orientations(f).at(-1)!.request.progress, { total: 7, met: 0, remaining: 7 });
+      f.scores(.2, 0); await f.answer();
+      if (version === 'student') await f.choice('question.text');
+      const returned = orientations(f).at(-1)!;
+      assert.equal(returned.request.reason, 'return');
+      assert.equal(returned.request.previous!.id, 'm1');
+      assert.equal(returned.request.current!.id, 'a');
+      assert.deepEqual(returned.request.achieved, []);
+      assert.deepEqual(returned.request.progress, { total: 7, met: 0, remaining: 7 });
     }
   });
   it('saves final-answer feedback before stopping in both conditions', async () => {

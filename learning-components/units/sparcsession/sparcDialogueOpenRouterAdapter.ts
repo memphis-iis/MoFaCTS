@@ -1,3 +1,4 @@
+import { parseSparcPersonas, sparcPersonaGenerationInstruction, type SparcPersonas } from '../../runtime/sparcPersonas';
 import { validatePrimitiveContent } from '../../runtime/sparcPrimitiveContent';
 import { parseSparcVideoSegment } from '../../runtime/sparcVideo';
 import { SPARC_ASSESSMENT_TARGET_LIMIT, isSparcInstructionalCycle, sparcAssessmentClusterKcs, sparcInstructionalAnchor } from './sparcInstructionalControl';
@@ -23,8 +24,11 @@ import { requireSparcDialogueText, SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS } from '.
 import { buildSparcAssessmentDialogueHistory, type SparcUtteranceRequest } from './sparcUtteranceRequest';
 import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
 import { resolveSparcReadingLevel, sparcReadingLevelInstruction, type SparcReadingLevel } from '../../runtime/sparcReadingLevel';
+import { sparcOrientationNeedsBridge, type SparcOrientationRequest } from './sparcTurnOrientation';
 
 export type SparcDialogueAdapterOptions = {
+  readonly personas?: SparcPersonas;
+  readonly contentLanguage?: string;
   readonly readingLevel?: SparcReadingLevel;
   readonly onActivity?: (activity: 'assessment' | 'feedback' | 'instruction' | 'explanation' | 'question' | 'visual') => void;
   readonly moveLibrary?: SparcMoveLibraryClient;
@@ -60,6 +64,20 @@ export type SparcDialogueAdapterRuntime = {
 };
 
 const instructionTextBudget = 'Write concise, complete instructional text. Preserve the selected target, requested teaching action, and necessary reasoning.';
+
+/** Orientation is generated for this learner's accepted decision, never retrieved as reusable teaching content. */
+export function buildSparcOrientationSystemPrompt(): string {
+  return [
+    'Return JSON only, with one tutorMessage string. Write a brief transition of one or two sentences using only the supplied transition facts.',
+    'Orient the learner to the selected topic and, when permitted by achieved, acknowledge the specific learning goal just achieved. Vary milestone wording naturally: initial mastery, meeting this goal, or readiness to move on describe the current lesson milestone, never durable or final mastery.',
+    'A target switch alone is not an achievement. For a non-completion transition when achieved is empty, do not claim mastery, success, completion, or readiness. At completion, the authoritative progress snapshot permits a lesson-completion claim even when no KC newly crossed its criterion in this event. Misconception repair and return are purposeful detours, not additional completed learning goals.',
+    'At introduction, briefly connect the selected topic to the authored lesson purpose. At completion, summarize the achieved lesson goals and close the sequence. Elsewhere connect topics only when the supplied authored context supports that connection; omit generic statements about progress toward final mastery.',
+    'When mentionRemaining is true, state the exact supplied remaining count as learning goals remaining, including the active unmet goal. Never count turns, repairs, or positions in a presumed fixed sequence. Otherwise leave the numerical count to the visible progress line.',
+    'Recent bridges and adjacent feedback are wording context, not templates or new evidence. Avoid their openings, sentence patterns, praise, and generic statements of purpose. Do not repeat feedback, evaluate the prior answer, or produce a fixed congratulatory formula.',
+    'Do not teach the next concept, ask a question, invite a response, select a target, invent progress, or expose internal identifiers or planner metadata. Do not include learner names, account identifiers, personal details, or verbatim learner responses.',
+    'For continue without achieved goals, no prose is permitted: the application displays only the heading and progress. For continue with achieved goals, acknowledge only those earned milestones while remaining on the current target; do not imply a target switch. All other reasons require a transition.',
+  ].join('\n');
+}
 
 export type CallResolvedOpenRouterJson = (params: {
   readonly tdfId?: string | null;
@@ -501,12 +519,14 @@ function buildSparcUtteranceSystemPrompt(request: SparcUtteranceRequest): string
     'Follow the selected runtime move policy.',
     'Lesson context role: Use the lesson context as background. The actual preceding tutor question determines what the current learner response answers.',
     ...(request.targetType === 'feedback' ? ['Respond to the prior answer using its existing assessment and the actual preceding tutor problem. Do not choose a new instructional target or ask another question.', 'Write reusable instructional feedback about the expressed reasoning. Do not include learner names, account identifiers, personal details, or verbatim learner responses.'] : ['Active-target isolation: For every move except summary, choose the next question to elicit the currently selected expectation or address the selected misconception. Both the explanation and the question must serve that app-selected target in Relevant authored target content. Answering the question must give the learner an opportunity to demonstrate that target. The opening scenario, dialogue history, and acknowledgement context do not authorize introducing, explaining, comparing, or asking about another expectation or misconception. Do not preview or address a requirement outside the selected target. Finish the selected target before any transition to another target.']),
-    'Acknowledgement boundary for every move: Usually begin with one brief, natural response to the substance of the learner\'s latest contribution or the progress it demonstrates. If there was no progress, use a neutral acknowledgement without agreeing with an incorrect claim. Speak directly to the learner rather than narrating the receipt or processing of their message. Do not say that you heard, received, noted, recorded, recognized, or processed the learner\'s answer or question. Do not use a fixed acknowledgement template, and avoid repeating the same opening pattern across nearby turns. Omit the acknowledgement when including one would sound artificial.',
+    request.orientationOwned
+      ? 'Orientation ownership: A separate saved transition owns topic introductions, progress counts, milestone announcements, and bridges. Feedback evaluates the preceding answer only; all other components begin their substantive selected teaching task without repeating acknowledgement, orientation, or achievement claims.'
+      : 'Acknowledgement boundary for every move: Usually begin with one brief, natural response to the substance of the learner\'s latest contribution or the progress it demonstrates. If there was no progress, use a neutral acknowledgement without agreeing with an incorrect claim. Speak directly to the learner rather than narrating the receipt or processing of their message. Do not say that you heard, received, noted, recorded, recognized, or processed the learner\'s answer or question. Do not use a fixed acknowledgement template, and avoid repeating the same opening pattern across nearby turns. Omit the acknowledgement when including one would sound artificial.',
     'Learner-language and terminology boundary for every move: Represent the learner\'s meaning faithfully, but do not mechanically reproduce their wording. In the tutor\'s own voice, use canonical authored terminology and silently normalize obvious misspellings, transcription errors, malformed grammar, and incorrect nonconceptual word choices. Do not attribute rubric language, unstated beliefs, or missing content to the learner. Do not interrupt the lesson to correct the learner\'s language unless the terminology distinction is itself instructionally relevant.',
     'Misconception boundary for every move: If the latest answer states or relies on a misconception, do not praise, endorse, validate, or describe that claim as correct, useful progress, close, or a good start. Acknowledge it neutrally, or give accurate corrective feedback when the selected move calls for feedback.',
     'Use earlier dialogue only as context; never mention content found only in an earlier response as though it were the latest contribution.',
     ...(responseModifierPrompt.length > 0 ? [
-      'Apply the response modifiers and the selected move as one natural tutor response. Usually begin with one brief acknowledgement of the learner\'s latest contribution. Then answer, clarify, correct, redirect, or defer as required by each response modifier. After that, bridge directly into the selected pedagogical move without announcing the transition. Do not describe tutoring procedure, answer revelation, reflection time, application state, or system behavior. Produce exactly one coherent tutorMessage with no more than one instructional question, supplied by the selected move.',
+      `Apply the response modifiers and the selected move as one natural tutor response. ${request.orientationOwned ? 'The separate orientation component owns acknowledgement of milestones and topic transitions.' : 'Usually begin with one brief acknowledgement of the learner\'s latest contribution.'} Then answer, clarify, correct, redirect, or defer as required by each response modifier. Continue directly into the selected pedagogical move without another transition announcement. Do not describe tutoring procedure, answer revelation, reflection time, application state, or system behavior. Produce exactly one coherent tutorMessage with no more than one instructional question, supplied by the selected move.`,
       ...responseModifierPrompt,
     ] : []),
     `Selected move: ${moveDefinition.moveId}.`,
@@ -575,10 +595,14 @@ export function createSparcDialogueOpenRouterAdapter(
   readonly prepareAssessment: (display: SparcTrialDisplay) => Promise<void>;
   readonly scoreLearnerResponse: SparcTrialDisplayDialogueTurnScorer;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
+  readonly generateOrientation: (request: SparcOrientationRequest) => Promise<string>;
 } {
   const callResolvedOpenRouterJson = runtime.callResolvedJson;
   const readingLevel = resolveSparcReadingLevel(options.readingLevel);
   const readingInstruction = sparcReadingLevelInstruction(readingLevel);
+  const suppliedPersonas = options.personas === undefined ? undefined : parseSparcPersonas(options.personas);
+  const personas = suppliedPersonas?.student || suppliedPersonas?.teacher ? suppliedPersonas : undefined;
+  const personaInstruction = sparcPersonaGenerationInstruction(personas ?? {});
   const assessmentVectors = async (display: SparcTrialDisplay): Promise<number[][]> => {
     const texts = [...targetSummaries(display), ...misconceptionSummaries(display)].map(target => String(target.text));
     const vectors = await runtime.loadNormalizedAssessmentVectors(texts);
@@ -642,14 +666,16 @@ export function createSparcDialogueOpenRouterAdapter(
         messages: [{ role: 'system', content: [
           'Return only JSON matching the schema. The production owns the target and requested composition.',
           instructionTextBudget,
-          ...(readingInstruction ? [readingInstruction] : []),
+          ...(readingInstruction ? [readingInstruction] : []), ...(personaInstruction ? [personaInstruction] : []),
           'Primitive boundary: The move policy describes the completed move. The instruction call composes the explanation and its requested support together. Only the separate question call may ask a learner question; instruction must contain no learner question, invitation, or response task.',
           'Use canonical authored terminology and silently normalize obvious nonconceptual language errors. Do not attribute unstated beliefs to the learner. Do not expose scoring, identifiers, or planner metadata.',
           'Write reusable instructional content. Do not include learner names, account identifiers, personal details, or verbatim learner responses in the output.',
-          request.learnerText
+          request.orientationOwned
+            ? 'A separate orientation component owns the topic introduction, progress count, milestone announcement, and bridge. Begin the selected substantive teaching task directly. Do not repeat acknowledgement, correction, orientation, or an achievement claim.'
+            : request.learnerText
             ? 'Feedback has already been delivered. Do not repeat an acknowledgement or correction of the prior answer. Do not introduce another target.'
             : 'This is the first instructional move. No learner answer or feedback exists yet. Introduce the selected target without inventing an earlier answer, learner difficulty, acknowledgement, or correction.',
-          ...(categorized && starting && component === 'instruction' ? [
+          ...(categorized && starting && component === 'instruction' && !request.orientationOwned ? [
             'Starting an expectation: give this selected concept a brief basis or purpose in the lesson topic before explaining it. A natural lead-in such as "When first thinking about ..." may help; name the conceptual task rather than using a generic welcome or assuming an opening scenario. Then explain only the selected target. Do not repeat this introductory framing in continuation moves.',
           ] : []),
           'Focus on unresolved authored requirements in the retained assessment. Treat demonstrated requirements as established unless there is conflicting evidence. Do not repeat prior feedback. Never invent a new requirement to prolong a target.',
@@ -951,6 +977,29 @@ export function createSparcDialogueOpenRouterAdapter(
   };
   return {
     prepareAssessment,
+    async generateOrientation(request) {
+      if (!sparcOrientationNeedsBridge(request)) return '';
+      const result = await callGeneratedJson({
+        tdfId: options.tdfId ?? null,
+        ...(options.policyId ? { policyId: options.policyId } : {}),
+        ...(options.sessionId ? { sessionId: options.sessionId } : {}),
+        temperature: 0.6, maxTokens: 500,
+        messages: [{ role: 'system', content: [buildSparcOrientationSystemPrompt(), ...(readingInstruction ? [readingInstruction] : []), ...(personaInstruction ? [personaInstruction] : [])].join('\n') },
+          { role: 'user', content: JSON.stringify(request) }],
+        intent: { title: 'MoFaCTS SPARC turn orientation', schemaName: 'mofacts_sparc_turn_orientation',
+          schema: SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA, strictSchema: true,
+          missingContentMessage: 'SPARC turn orientation returned no content.' },
+        telemetry: { surface: 'sparc-dialogue-runtime', operation: 'generate-orientation', componentId: 'mofacts.sparc-session-unit', unitType: 'sparcsession' },
+      }, 'utterance');
+      const text = parseUtteranceEnvelope(result.parsedContent);
+      const normalized = (value: string) => value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+      if ([...request.recentBridges, ...request.adjacentFeedback].some(prior => normalized(prior) === normalized(text))) {
+        throw new Error('SPARC orientation repeats accepted tutor content');
+      }
+      // The cycle journals this direct tutor node before exposure. The history writer
+      // applies the same learner-wide atomic content-use receipts as library output.
+      return text;
+    },
     async scoreLearnerResponse(params) {
       options.onActivity?.('assessment');
       const evaluation = await scoreLearnerResponseWithEvidence(params);
@@ -958,6 +1007,8 @@ export function createSparcDialogueOpenRouterAdapter(
     },
 
     async generateTutorUtterance(request) {
+      request = { ...request, ...(personas ? { personas } : {}),
+        ...(options.contentLanguage ? { contentLanguage: options.contentLanguage } : {}) };
       if (request.moveDefinition.components) return generateInstructionPrimitives(request);
       options.onActivity?.(request.targetType === 'feedback' ? 'feedback' : 'explanation');
       const generate = async () => {
@@ -970,7 +1021,7 @@ export function createSparcDialogueOpenRouterAdapter(
         maxTokens: supported ? 3000 : SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS,
         messages: [{
           role: 'system',
-          content: [buildSparcUtteranceSystemPrompt(request), ...(readingInstruction ? [readingInstruction] : [])].join('\n'),
+          content: [buildSparcUtteranceSystemPrompt(request), ...(readingInstruction ? [readingInstruction] : []), ...(personaInstruction ? [personaInstruction] : [])].join('\n'),
         }, {
           role: 'user',
           content: buildSparcUtteranceUserPrompt(request),

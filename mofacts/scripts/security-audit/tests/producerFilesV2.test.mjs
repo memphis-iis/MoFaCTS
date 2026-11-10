@@ -13,6 +13,7 @@ import { verifyAuditRequestV2, AUDIT_V2_MAX_BODY_BYTES } from '../../../server/s
 import { assembleAuditReportFilesV2, readAuditFileV2, parseAuditFileV2,
   writeAuditFileV2, writeAuditProducerFileV2 } from '../core/producerFilesV2.mjs';
 import { uploadAuditReportFileV2 } from '../core/uploadV2.mjs';
+import { runAssemblyCommandV2 } from '../assemble-report-v2.mjs';
 import { writeHostProducerFilesV2 } from '../internal/producerFilesV2.mjs';
 import { hostFixture, unavailableFact } from './fixtures/hostFixtures.mjs';
 import { envelope, errorArtifacts, ingestionContext } from './fixtures/v2Fixtures.mjs';
@@ -41,6 +42,44 @@ test('V2 file assembly preserves exact full/exposure profiles and canonical repo
     assert.deepEqual(await parseSecurityAuditReportV2(report, ingestionContext), report);
     assert.equal((await fs.readFile(input.outputPath, 'utf8')), canonicalAuditJson(report) + '\n');
     if (process.platform !== 'win32') assert.equal((await fs.stat(input.outputPath)).mode & 0o777, 0o600);
+  }
+});
+
+test('V2 assembly command binds the checked-out scanner revision and preserves the exact profile', async t => {
+  const expectedRevision = 'c'.repeat(40);
+  const expectedRoot = fileURLToPath(new URL('../../../../', import.meta.url));
+  for (const profile of ['full', 'exposure']) {
+    const input = await fixture(t, profile);
+    const { scannerSourceRevision: _ignored, ...metadata } = input.envelope;
+    const metadataPath = path.join(input.root, 'metadata.json');
+    await writeAuditFileV2(metadataPath, metadata);
+    await runAssemblyCommandV2([metadataPath, input.artifactDirectory, input.outputPath],
+      { ...env, GITHUB_SHA: '0'.repeat(40), GIT_DIR: 'foreign-checkout' }, async (program, args, options) => {
+        assert.equal(program, 'git');
+        assert.deepEqual(args, ['-C', expectedRoot, 'rev-parse', '--verify', 'HEAD']);
+        assert.equal(options.env.GIT_DIR, undefined);
+        assert.equal(options.env.AUDIT_REPORT_INGEST_SECRET, undefined);
+        return { stdout: `${expectedRevision}\n` };
+      });
+    const report = await parseSecurityAuditReportV2(parseAuditFileV2(await readAuditFileV2(input.outputPath)), ingestionContext);
+    assert.equal(report.scannerSourceRevision, expectedRevision);
+    assert.equal(report.reportType, profile);
+    assert.equal(report.counts.error, profile === 'full' ? 70 : 23);
+  }
+});
+
+test('V2 assembly command rejects caller-provided target or scanner revision without writing a report', async t => {
+  const run = promisify(execFile);
+  const script = fileURLToPath(new URL('../assemble-report-v2.mjs', import.meta.url));
+  const input = await fixture(t);
+  const { scannerSourceRevision: _ignored, ...metadata } = input.envelope;
+  for (const extra of [{ target: 'https://private.example' }, { scannerSourceRevision: 'a'.repeat(40) }]) {
+    const metadataPath = path.join(input.root, `${Object.keys(extra)[0]}.json`);
+    await writeAuditFileV2(metadataPath, { ...metadata, ...extra });
+    await assert.rejects(run(process.execPath, [script, metadataPath, input.artifactDirectory, input.outputPath], {
+      env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, AUDIT_TARGET: env.AUDIT_TARGET },
+    }), error => error.code === 1 && error.stderr === 'V2 audit assembly failed.\n');
+    await assert.rejects(fs.stat(input.outputPath), { code: 'ENOENT' });
   }
 });
 

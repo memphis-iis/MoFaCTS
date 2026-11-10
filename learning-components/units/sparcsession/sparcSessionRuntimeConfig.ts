@@ -1,10 +1,15 @@
+import { parseSparcTeacherPersona } from '../../runtime/sparcPersonas';
+import { resolveSparcOrientationMode, type SparcOrientationMode } from '../../runtime/sparcOrientationMode';
+
 type SparcSessionConfigUnit = {
   sparcsession?: Record<string, unknown> | null;
 };
 
 export type SparcSessionModelConfigurationValidationIssue = {
   readonly kind:
-    | 'missing-sparcsession-model-config';
+    | 'missing-sparcsession-model-config'
+    | 'invalid-sparcsession-orientation-mode'
+    | 'invalid-sparcsession-teacher-persona';
   readonly message: string;
 };
 
@@ -37,6 +42,12 @@ export function resolveSparcSessionStartingKC(
     throw new Error('sparcsession.startingKC must be a nonempty clusterKC identity');
   }
   return startingKC.trim();
+}
+
+export function resolveSparcSessionOrientationMode(
+  unit: SparcSessionConfigUnit | null | undefined,
+): SparcOrientationMode {
+  return resolveSparcOrientationMode(resolveSparcSessionRuntimeConfig(unit)?.orientationMode);
 }
 
 export function resolveSparcSessionUnitMode(
@@ -72,5 +83,13 @@ export function validateSparcSessionModelConfiguration(
   }
 
   const issues: SparcSessionModelConfigurationValidationIssue[] = [];
+  try { resolveSparcOrientationMode(config.orientationMode); }
+  catch (error) { issues.push({ kind: 'invalid-sparcsession-orientation-mode',
+    message: error instanceof Error ? error.message : 'Invalid SPARC orientation mode' }); }
+  if (config.teacherPersona !== undefined) {
+    try { parseSparcTeacherPersona(config.teacherPersona); }
+    catch (error) { issues.push({ kind: 'invalid-sparcsession-teacher-persona',
+      message: error instanceof Error ? error.message : 'Invalid SPARC teacher persona' }); }
+  }
   return issues;
 }

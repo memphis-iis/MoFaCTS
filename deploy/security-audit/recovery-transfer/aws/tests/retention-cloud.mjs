@@ -11,6 +11,8 @@ export function retentionCloud({ baseline, runId, sessionKind = 'retention', fau
   const response = body => ({ response: { statusCode: 200,
     headers: { 'content-type': 'application/x-amz-json-1.1' }, body: Buffer.from(JSON.stringify(body)) } });
   const context = { calls, versions };
+  const sessions = { retention: 'mofacts-recovery-rehearsal/mofacts-retention', confirm: 'mofacts-recovery-restore/mofacts-confirm', inventory: 'mofacts-recovery-restore/mofacts-inventory' };
+  assert.ok(Object.hasOwn(sessions, sessionKind));
   return { ...context, handler: { metadata: { handlerProtocol: 'http/1.1' }, destroy() {},
     async handle(request) {
       assert.equal(request.hostname === 'sts.us-east-2.amazonaws.com'
@@ -22,7 +24,7 @@ export function retentionCloud({ baseline, runId, sessionKind = 'retention', fau
         calls.push({ operation, input: Object.fromEntries(input) });
         const fields = operation === 'AssumeRoleWithWebIdentity'
           ? '<Credentials><AccessKeyId>synthetic-access</AccessKeyId><SecretAccessKey>synthetic-secret</SecretAccessKey><SessionToken>synthetic-session</SessionToken><Expiration>2100-01-01T00:00:00Z</Expiration></Credentials>'
-          : `<Account>${target.accountId}</Account><Arn>arn:aws:sts::${target.accountId}:assumed-role/${sessionKind === 'confirm' ? 'mofacts-recovery-restore/mofacts-confirm' : 'mofacts-recovery-rehearsal/mofacts-retention'}-${runId}</Arn>`;
+          : `<Account>${target.accountId}</Account><Arn>arn:aws:sts::${target.accountId}:assumed-role/${sessions[sessionKind]}-${runId}</Arn>`;
         return { response: { statusCode: 200, headers: { 'content-type': 'text/xml' },
           body: Buffer.from(`<${operation}Response><${operation}Result>${fields}</${operation}Result></${operation}Response>`) } };
       }

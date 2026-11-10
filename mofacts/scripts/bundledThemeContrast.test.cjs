@@ -139,6 +139,11 @@ function assertThemeContrast(theme) {
     for (const background of surfaces) check(`var(${foreground})`, `var(${background})`);
   }
   check('var(--app-secondary-text-color)', 'var(--app-secondary-surface-color)');
+  for (const selector of ['.form-control:focus', '.form-select:focus']) {
+    const focused = rule(selector);
+    check(focused.color, focused['background-color']);
+    check(rule('.form-control::placeholder').color, focused['background-color']);
+  }
   check('var(--navigation-text-color)', 'var(--navigation-surface-color)');
   check('var(--learning-card-primary-action-text-color)', 'var(--learning-card-primary-action-surface-color)');
   check('var(--learning-card-audio-control-color)', 'var(--learning-card-surface-color)', 3);

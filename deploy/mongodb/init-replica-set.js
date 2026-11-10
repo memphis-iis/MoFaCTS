@@ -52,7 +52,9 @@ while (Date.now() < deadline) {
   const hasWritablePrimary = status.ok === 1 && Array.isArray(status.members) && status.members.some(
     (member) => member.state === 1 || member.stateStr === 'PRIMARY',
   );
-  if (hello.ok === 1 && hello.setName === setName && hasWritablePrimary) {
+  // Election status can precede this server accepting primary writes.
+  // Application-role provisioning must wait for the local writable boundary.
+  if (hello.ok === 1 && hello.isWritablePrimary === true && hello.setName === setName && hasWritablePrimary) {
     const configResult = admin.runCommand({replSetGetConfig: 1});
     if (configResult.ok !== 1) {
       throw new Error('Replica-set configuration could not be read after primary election.');

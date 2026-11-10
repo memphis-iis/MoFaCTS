@@ -3,6 +3,7 @@
   import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../../../../learning-components/runtime/sparcAdministrativeRemoval';
   import DOMPurify from 'dompurify';
   import SparcVideo from './SparcVideo.svelte';
+  import SparcSimulation from './SparcSimulation.svelte';
   import SparcStudentMoveMenu from './SparcStudentMoveMenu.svelte';
   import SparcPromptFigure from './SparcPromptFigure.svelte';
   import LearningProgressChart from './LearningProgressChart.svelte';
@@ -474,6 +475,8 @@
     {:else}
       <div class={`sparc-atom sparc-${node.atomType}`} class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{getNodeValue(node)}</div>
     {/if}
+  {:else if node.atomType === 'simulation'}
+    <SparcSimulation {node} {authoringSelectOnly} />
   {:else if node.atomType === 'html-block'}
     {#if authoringSelectOnly}
       <div

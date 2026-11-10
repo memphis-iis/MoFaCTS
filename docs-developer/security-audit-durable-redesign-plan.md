@@ -40,6 +40,7 @@ These decisions record Phil's explicit answers to the nine-question design revie
 | --- | --- |
 | Historical Meteor integration authorization - 2026-11-04 | Phil authorized up to five Meteor integration invocations for continued security-audit integration checks, including necessary retries, with a written count and continuation to a real decision point. This task-specific instruction supersedes fresh single-use approval for those five invocations only; prior runs do not consume it. Reserve before triggering, record actual commit/run/attempt and result in the status ledger, and do not exceed five. Acceptance, staging2 scope, privacy, dependency and spending boundaries remain in force. |
 | Current Meteor allowance - 2026-11-05 | The later explicit authorization permits one primary fresh invocation plus up to ten additional project invocations if needed. The sole current remaining/reserved counter and exact consumption receipts are maintained in the [Phase 1 worklist](security-audit-durable-redesign-status.md#phase-1-worklist-started-2026-11-05); dated checkpoints are historical. Reserve/count each invocation there. Protected AWS/host runs require their own scope. |
+| Phase 1 minimum authentication evidence - approved 2026-11-08 | P1-D8 moves the minimum typed outcome capture, exact source-owned expected allowed/denied cases and positive allowed baselines for the existing selected probes into Phase 1. Use the single Section 7.2 verificationCatalog.ts owner; never translate generic V1 error booleans into matches. Application permission rules, actor/resource meanings and the remaining Phase 2 authorization coverage/review are unchanged. This is source-work approval, not a new protected read/transfer, Meteor invocation, publication, live probe or deployment permission. |
 | Phase 1 mixed-impact controls - approved 2026-11-05 | Phil selected splitting the eight mixed-impact V1 checks into separate fixed-severity V2 controls, preserving actual severity distinctions. Original aggregate IDs remain unchanged V1 provenance and are not reused for narrower meanings. The initial V2 candidate has 70 full and 23 exposure controls; catalog JSON owns the exact new IDs/membership. This changes reporting granularity, not application permissions or the treatment of unconfirmed development advisories. |
 | Phase 1 rollback-test baseline - approved 2026-11-05 | Phil selected the image observed running in the single approved production metadata check, revision 18677291993b66b890a090e55d65f703b45ff653, as the isolated compatibility-test target. The exact immutable platform/config binding and completed selection are recorded in status decision P1-D2. Preserve the older authoritative release record and leave missing later build/acceptance/deployment history unverified. This is not release qualification, a production change or permission for another production query. Previous-image runtime qualification remains open. |
 | Phase 1 confirmed UDP finding - approved 2026-11-05 | Preserve a confirmed external public UDP service response as HIGH FAIL even when host acquisition is unavailable. This narrow exception to Section 6.4 uses only the three actual external counts, preserves host-owned errors separately, and never fills missing host values. PASS still requires complete external and host evidence. This modifies the unreleased V2 candidate only; released evidence contracts remain append-only. |
@@ -1115,6 +1116,13 @@ Exit gate: the confirmed release entry point has a specified/testable qualificat
 
 ### Phase 1 — Catalog and V2 report integrity
 
+Approved sequencing amendment P1-D8 adds the minimum authentication evidence
+subset needed by the V2 producer to this phase: distinct policy/domain/transport/
+inconclusive outcomes, exact source-owned intent and positive allowed baselines
+for the existing selected cases. The rest of Phase 2 remains below. Recover the
+selected non-secret inventory through a separately approved format-only read;
+do not invent cases from the surface manifest or use fixture booleans as policy.
+
 Deliverables:
 
 - Canonical JSON catalog and shared runtime-neutral TypeScript contracts consumed directly by the pinned Node scanner and Meteor.
@@ -1148,7 +1156,7 @@ Exit gates:
 - Local checks, authorized CI, staging, and production cutover gates pass.
 - Existing source build, startup, health, login and learner behavior remain unchanged when audit identity/proof is absent; normal build/deploy commands retain their established options and defaults.
 
-Phase 1 may deploy independently. It proves report completeness and evidence shape, not that the current surface checker or authorization probes classify reality correctly. Phase 0 should freeze evidence shapes broad enough for the planned Phase 2/3 observations. If either later phase changes a control's claimed property, profile membership, or evidence-contract shape, it requires a new catalog/evidence-contract version and another coordinated receiver/workflow cutover; a scanner-only deploy is allowed only when those contracts remain unchanged. Admin and operator language must preserve these distinctions until phases 2 and 3 finish.
+Phase 1 may deploy independently. It proves report completeness and evidence shape; P1-D8 additionally requires correct typed outcomes and baselines for the existing selected authorization cases. It does not qualify the remaining authorization scenarios or the current whole-runtime surface checker. Phase 0 should freeze evidence shapes broad enough for the planned Phase 2/3 observations. If either later phase changes a control's claimed property, profile membership, or evidence-contract shape, it requires a new catalog/evidence-contract version and another coordinated receiver/workflow cutover; a scanner-only deploy is allowed only when those contracts remain unchanged. Admin and operator language must preserve these distinctions until phases 2 and 3 finish.
 
 ### Phase 2 — Authorization evidence
 

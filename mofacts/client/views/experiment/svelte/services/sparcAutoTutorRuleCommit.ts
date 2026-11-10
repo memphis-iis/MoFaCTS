@@ -21,6 +21,7 @@ import type {
   SparcUtteranceGenerator,
 } from '../../../../../../learning-components/units/sparcsession/sparcAutoTutorRuleRuntime';
 import type { UnitEngineLike } from '../../../../../common/types';
+import type { SparcOrientationGenerator } from '../../../../../../learning-components/units/sparcsession/sparcTurnOrientation';
 import { insertCompressedHistory, insertCompressedHistoryBatch } from '../../../../lib/historyWire';
 import {
   readSparcResumeSnapshot,
@@ -112,6 +113,7 @@ type SparcAutoTutorCommitParams = {
   readonly levelUnit: unknown;
   readonly scoreLearnerResponse: SparcTrialDisplayDialogueTurnScorer;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
+  readonly generateOrientation?: SparcOrientationGenerator;
   readonly onNodeValues?: (values: Record<string, unknown>) => void | Promise<void>;
   readonly deps?: SparcControllerDialogueCommitDeps;
 };
@@ -183,6 +185,7 @@ async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Pr
       priorHistoryRecords,
       scoreLearnerResponse: params.scoreLearnerResponse,
       generateTutorUtterance: params.generateTutorUtterance,
+      ...(params.generateOrientation ? { generateOrientation: params.generateOrientation } : {}),
       history: {
         async writeCanonicalHistoryBatch(records) {
           if (params.deps?.writeHistoryBatch) await params.deps.writeHistoryBatch(records);
@@ -205,7 +208,7 @@ async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Pr
           writtenHistoryCount += 1;
           const transitionId = (historyRecord.sparc as { stateTransition?: { transitionId?: string } })?.stateTransition?.transitionId ?? '';
           if (isSparcCategorizedPolicy(sparcDisplay.instructionalController?.policyId)
-            && (transitionId.endsWith(':submission') || transitionId.endsWith(':feedback')
+            && (transitionId.endsWith(':submission') || transitionId.endsWith(':feedback') || transitionId.endsWith(':orientation')
               || transitionId.endsWith(':instruction:accepted') || transitionId.includes(':primitive:'))) {
             await params.onNodeValues?.(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit, pageKey: sparcDisplay.pageKey, display: sparcDisplay }).nodeValues);
           }

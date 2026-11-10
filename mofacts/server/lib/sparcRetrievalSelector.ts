@@ -12,18 +12,11 @@ export function sparcRetrievalSelector(value: unknown): Record<string, unknown> 
   if (category.kind === 'visual') return { embeddingModel: SPARC_EMBEDDING_MODEL, $or: [
     { kind: 'image', version: SPARC_FIGURE_LIBRARY_SETTINGS.version, imageModel: SPARC_PROMPT_IMAGE_SETTINGS.model,
       embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION, ready: true },
-    ...(category.language ? [{ kind: 'video', embeddingVersion: SPARC_VIDEO_EMBEDDING_VERSION, 'content.video.language': category.language }] : []),
+    { kind: 'video', embeddingVersion: SPARC_VIDEO_EMBEDDING_VERSION },
   ] };
   const selector: Record<string, unknown> = { kind: category.kind, version: SPARC_MOVE_LIBRARY_VERSION,
-    embeddingModel: SPARC_EMBEDDING_MODEL, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION };
-  if (category.readingLevel === 'unbiased') selector.$or = [
-    { 'context.readingLevel': 'unbiased' }, { 'context.readingLevel': { $exists: false } },
-  ];
-  else selector['context.readingLevel'] = category.readingLevel;
+    embeddingModel: SPARC_EMBEDDING_MODEL, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
+    'context.orientationOwned': category.orientationOwned === true ? true : { $ne: true } };
   if (category.kind === 'question') selector['context.responseFormat'] = category.responseFormat;
-  if (category.kind === 'instruction') selector['context.supportKind'] = category.supportKind ?? { $exists: false };
-  if (category.kind !== 'instruction' && category.supportKind === 'written') {
-    selector['content.video'] = { $exists: false }; selector['content.figure'] = { $exists: false };
-  }
   return selector;
 }

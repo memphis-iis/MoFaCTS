@@ -5,7 +5,6 @@ import { Tracker } from 'meteor/tracker';
 import { SparcEmbeddingIndex } from '../../../../../../learning-components/runtime/sparcEmbeddingIndex';
 import { SPARC_RETRIEVAL_EMBEDDINGS_COLLECTION, parseSparcRetrievalCategory, sparcRetrievalCategoryKey,
   type SparcRetrievalCategory } from '../../../../../common/lib/sparcRetrieval';
-import type { SparcReadingLevel } from '../../../../../../learning-components/runtime/sparcReadingLevel';
 
 type RetrievalDependencies = {
   userId(): string | null;
@@ -96,17 +95,5 @@ export async function prepareSparcLocalRetrieval(value: SparcRetrievalCategory):
     vectors: new Mongo.Collection<{ _id: string; embedding: number[] }>(SPARC_RETRIEVAL_EMBEDDINGS_COLLECTION),
   });
   return localRetrieval.prepareSparcLocalRetrieval(value);
-}
-
-/** Load category vectors before the first learner response; later practice searches stay local. */
-export async function prepareSparcPracticeRetrieval(readingLevel: SparcReadingLevel, language: string): Promise<void> {
-  await Promise.all([
-    ...['feedback', 'instruction'].map(kind => prepareSparcLocalRetrieval({
-      kind: kind as 'feedback' | 'instruction', readingLevel, responseFormat: 'text',
-    })),
-    ...(['written', 'visual'] as const).map(supportKind => prepareSparcLocalRetrieval({ kind: 'instruction', readingLevel, responseFormat: 'text', supportKind })),
-    ...['text', 'multiple-choice', 'cloze', 'true-false'].map(responseFormat => prepareSparcLocalRetrieval({ kind: 'question', readingLevel, responseFormat })),
-    prepareSparcLocalRetrieval({ kind: 'visual', language }),
-  ]);
 }
 

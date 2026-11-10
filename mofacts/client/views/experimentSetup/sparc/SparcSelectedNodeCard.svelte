@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../lib/interfaceI18n';
+  import SparcSimulationNodeFields from './SparcSimulationNodeFields.svelte';
 
   export let activeNode = null;
   export let activeParentNode = null;
@@ -117,7 +118,11 @@
       {sparcText('sparc.nodeType')}
       <input value={activeNode.atomType || ''} readonly />
     </label>
-    {#if isImageHtmlSelected}
+    {#if activeNode.atomType === 'simulation'}
+      {#key activeNode.id}
+      <SparcSimulationNodeFields node={activeNode} {onUpdateField} />
+      {/key}
+    {:else if isImageHtmlSelected}
       <div class="sparc-image-editor">
         <div class="sparc-image-preview">
           {@html activeNode.value || ''}

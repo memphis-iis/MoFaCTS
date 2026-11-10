@@ -1,5 +1,148 @@
 # SPARC instructional cycle
 
+## Personas and embedding-based descriptive matching, November 9, 2026
+
+Student and teacher personas guide instructional generation, never target/move
+selection or assessment. Student categories are traits, abilities, experiences,
+and personalInterests; teacher categories are traits, abilities, experiences,
+and teachingStyle. Each category contains up to eight nonempty descriptions of
+at most 240 characters. Omitted categories are unknown (empty arrays), not inferred.
+Reported student abilities are not mastery observations; teacher descriptions are
+intended tutor behavior, not verified credentials. The selected target, category,
+move, assistance, response format, and component restrictions remain authoritative.
+
+The learner record is profile.sparcPersona, edited in the optional **Learning profile**
+section at the bottom of the profile page and written only by the authenticated-self
+updateOwnSparcPersona method. Its four fields collect explanation preferences,
+self-reported knowledge and skills, relevant experience, and interests, one description
+per line. Saving an empty field clears that category. It has a separate save button,
+inline validation/status, and unsaved-change protection; saving either profile section
+preserves the other's unsaved edits. The page explains that descriptions go to the AI
+tutor and are retained with shared instructional-library records, and asks learners to
+avoid sensitive information. Changes apply to newly generated instruction, not accepted
+saved content. The teacher record is unit.sparcsession.teacherPersona in the TDF.
+No automatic persona learning is introduced.
+Direct client updates to user documents are denied at server startup; account and
+persona edits use authenticated server methods. This includes whole-profile replacement
+and nested modifiers, so Meteor's default self-profile rule cannot bypass validation.
+The navigation guard keeps the editor mounted until save or explicit discard, including
+browser Back. These boundaries do not rewrite existing profiles or accepted turns.
+The adapter receives both on document load and submit, then supplies their descriptions
+to generation, including questions, support/visual briefs, feedback, and orientation.
+Scoring and instructional competition receive no persona descriptions.
+
+Library context retains requested reading level, language, support kind, components,
+and persona descriptions for inspection. These are generation context, not measurements
+of the output. Image entries retain requestedLanguage; video.language remains the
+cataloged language. Persona descriptions also enter the canonical instructional-need
+embedding input for text and visuals. Optional personas extend the existing
+representation without changing historical serialized inputs: old vectors remain
+compatible and old records acquire no invented persona attributes. The existing
+explicit reindex workflow accepts the extended representation. No live library rewrite
+or automatic reindex is needed solely to add this optional context.
+
+Reading level, language, support/composition labels, and personas never partition
+browser indexes, filter database candidates, rerank results, or independently reject
+the selected result. Keep the approved component-type and question-response-format
+boundaries, the separately approved orientation-owned text boundary, compatible
+vectors, authorization, availability, and the same-user no-repeat requirement. Choose the single maximum cosine similarity at 0.95,
+or 0.975 for feedback.
+
+Actual payload integrity remains required: a selected instruction lacking required
+support, or lacking the required actual medium, is blocked without accepting it,
+reranking, substituting content, or changing the move. Metadata labels alone cannot
+trigger that block. Saved decisions retain their existing event identity and accepted
+content; persona changes do not invalidate or regenerate a saved turn.
+
+This section supersedes historical descriptive retrieval restrictions below.
+Implementation and automated checks do not establish deployed behavior or live
+provider quality.
+
+## Turn orientation and transitions, November 9, 2026
+
+Categorized instructional cycles run a separate orientation production phase after
+the accepted instructional selection. The phase reads that decision and assessed
+progress; it cannot select a target, change scores, or award mastery. It applies
+to every composition, including question-only turns, according to the lesson's
+`sparcsession.orientationMode`. Reference policies retain their existing behavior.
+
+Set `orientationMode` in the `sparcsession` object of the lesson's `tutor.unit`
+entry. Omission selects `full`; other values are rejected.
+
+```json
+{
+  "sparcsession": {
+    "orientationMode": "headings"
+  }
+}
+```
+
+| Mode | New instructional turns |
+| --- | --- |
+| `full` (default) | Stable KC/progress headings and generated bridges at meaningful changes. |
+| `headings` | Stable KC/progress headings; no generated bridge, including at completion. |
+| `off` | Original turn-number headings and original component prompt/retrieval contract, without added KC/progress headings or bridges. |
+
+The mode is saved with the turn's realization contract. Changing the TDF affects
+new turns only: accepted output, historical progress snapshots, and an interrupted
+turn's saved mode remain unchanged on retry or reload. Saved turns without
+orientation snapshots retain their original presentation. No learner history is
+rewritten when this setting changes.
+Upload and editor-save validation reject any supplied value outside `full`,
+`headings`, and `off`, including in unit templates; omission remains valid.
+
+In `full` and `headings`, each new instructional turn shows its stable authored KC
+wording beside the localized turn number, followed by goals met and remaining.
+Count distinct required expectation KCs at the existing lesson criterion. Remaining includes the active KC
+when it has not met that criterion; turns, misconception repairs, and position in
+the generated chain are not progress counts. Snapshot these facts with the turn so
+later assessments do not recolor or relabel historical progress.
+
+In `full`, a dedicated generation prompt writes a one- or two-sentence bridge for
+introduction, KC changes, repair, return, lesson completion, and newly earned
+incidental goals while the active KC stays unchanged. Continuation without new gains
+retains only the heading and progress line. A target change without criterion achievement
+receives neutral wording. When a goal is met, vary qualified milestone language
+such as initial mastery, meeting the current goal, or readiness to move on without
+claiming durable mastery. State the remaining count in prose at startup, when it
+decreases, and at completion. Connect to the lesson purpose when the authored
+content supports the connection rather than repeating a generic mastery slogan.
+
+The prompt receives the last five accepted bridges and adjacent feedback to vary
+its openings, sentence patterns, and acknowledgements. Generated bridges obey the
+same learner-wide exact-content no-repeat acceptance boundary as other directly
+generated tutor messages. Stable KC labels and numerical progress are navigation
+metadata rather than repeated instructional components. Bridges are saved with
+the learner's turn, separately from reusable library instructions.
+
+Presentation order is previous-answer feedback, new turn heading/progress, bridge,
+and then the selected explanation/support/question. Feedback owns evaluation of the
+preceding answer; the bridge owns navigation and milestone announcements; instruction
+prompts begin their substantive work without duplicating either. Student menus do
+not establish a destination: realize its bridge only after the choice is accepted,
+and retain one heading for the menu and resulting instruction. Completion closes
+the sequence with its accepted final progress count in both enabled modes, without
+an empty extra instructional turn. `headings` completion makes no bridge call.
+
+Categorized reusable feedback, instructions, and questions in `full` and `headings`
+carry the internal `orientationOwned: true` generation/retrieval category. Browser
+eligibility and server selection require the same category, so older library text containing its
+own introductions or milestone announcements cannot be paired with the new
+bridge. `off` uses the original text pool and prompt contract. Visual assets remain
+shared in all modes. Exact accepted library decisions and saved history retain
+their original output; changing modes does not migrate content.
+An older interrupted event without mode or orientation-ownership markers finishes
+under its original realization contract, including interruptions at submission,
+assessment, or feedback before selection. Its retry does not add
+a bridge or change the component prompt contract; subsequent new selections use
+the then-configured mode.
+
+Accepted orientation output resumes unchanged after retry or reload. Failures use
+the existing explicit recovery UI; no canned transition or silent omission is
+substituted. Navigation prose and metadata are excluded from learner-evidence
+scoring. The optional mode setting adds no new advancement criterion. Local source
+changes, automated verification, and production deployment are separate states.
+
 ## Approved same-user no-repeat requirement, October 28, 2026
 
 **Current source contract; production deployment is a separate operation.**
@@ -212,7 +355,10 @@ structured publication-ticket contract together.
 
 This contract supersedes server candidate searches, question novelty rejection,
 video-first/image-second selection, and coordinated practice generation described below.
-The browser loads live category indexes before the first learner response. The
+The browser prepares each live category index when an actual component request
+first needs it, using that request's saved orientation ownership and response format.
+Startup does not preload an owned text pool for an `off` turn or subscribe to
+unused question formats. Later requests reuse the category cache. The
 authenticated lesson-authorized `sparcRetrievalEmbeddings` publication projects only IDs and
 embedding vectors from indexed category selectors. These are DDP cache documents,
 not another stored library. Additions, vector changes and removals update the local
@@ -225,9 +371,9 @@ ties. There is no candidate sorting, semantic novelty evaluation or database
 paging during a practice search. Exact per-user use eligibility is enforced before
 vectors reach this search and again when content is accepted.
 Text component reuse uses 0.975 for feedback and 0.95 for other components, retaining
-the existing reading-level/question response-type categories. Images and matching-language videos compete in a single
+the approved component-type/question-response-format categories. Images and videos across languages compete in a single
 visual index with one query and a shared **0.95** threshold. An absent authored
-content language excludes videos without inferring one from the interface locale.
+content language is retained as descriptive metadata and does not exclude videos.
 Only the winning content is fetched by ID; a stale/deleted selection fails clearly.
 
 Completed query embeddings are cached in browser memory, scoped to account, lesson,
@@ -617,10 +763,10 @@ classification from KC wording. These can be overlapping demonstrations of the s
 | Fact | Memory and fluency through retrieval and recall |
 | Rule | Induction and refinement through varied cases, generalization, discrimination, and application |
 | Model | Understanding and sense-making through relationships, interpretation, self-explanation, prediction, or reconstruction |
-| Fact–rule | Retrieval and recall combined with induction and refinement |
+| Fact–rule | Recall of an invariant factual relationship combined with functional application within its validity conditions |
 | Fact–model | Retrieval and recall combined with understanding and sense-making |
 | Model–rule (principle) | Induction and refinement combined with understanding the model-based rationale |
-| Fact–model–rule | All three focuses integrated around the same knowledge |
+| Fact–model–rule | All three focuses integrated around the same knowledge, including transfer to unfamiliar target-relevant cases |
 
 This is the approved MoFaCTS adaptation of the learning-process relationships in
 [KLI Table 4 and its discussion](https://pact.cs.cmu.edu/pubs/KLI-KoedingerCorbettPerfetti2012-pre.pdf),
@@ -633,6 +779,19 @@ relational understanding; rule recitation alone does not establish generalizatio
 a single correct response does not establish fluency. These generation instructions
 do not add scoring dimensions, category-specific assistance, or automatic credit.
 No extra synthesis provider call or generation engine is introduced.
+
+Fact-rule generation joins an invariant factual relationship, often a formula worth
+recalling, to functional selection, application, or rearrangement within its validity
+conditions. Its lawlike character belongs to that combination; recitation alone does not
+establish correct use, and a deep model derivation is required only when the authored KC
+calls for it. Use varied applications and boundary cases when appropriate. Fact-model-rule
+generation integrates all three focuses and promotes transfer to unfamiliar but target-
+relevant contexts, examples, or representations while preserving the underlying
+relationship. Match novelty and support to the selected move, response format, and learner
+need. Transfer may be scaffolded; do not add new KCs or force every activity into one
+turn. These are generation instructions, not new scoring criteria or a spaced-practice
+schedule.
+
 The review workbook in `docs/sparc-primitive-instructions-proposal.xlsx`
 contains the earlier 42 text/MC specifications and ten initial target assignments;
 the runtime now composes 112 specifications across all four response formats.
@@ -1083,12 +1242,8 @@ assistance, and response format. Scoring, target/move selection, embeddings, ima
 generation instructions, authored text, and existing media are unchanged. This is
 prompt guidance, not a measured or guaranteed reading grade.
 
-Shared text reuse requires the same reading level. Entries without a reading-level
-field belong to the unbiased setting; no data migration is required. Saved decisions
-still replay their originally accepted content. Start a separate lesson for a clean
-comparison rather than changing the setting on an in-progress attempt. Each new
-library entry records its reading level, including when identical wording happens
-to be produced for different audiences.
+Reading level remains generation guidance and recorded metadata. It is not an
+exact-match retrieval requirement. Saved decisions replay their accepted content.
 
 `learning-components/runtime/sparcMoveLibraryContract.ts` owns the transport contract;
 `units/sparcsession/sparcMoveLibrary.ts` builds the pedagogical request context.
@@ -1096,9 +1251,9 @@ The client `sparcPrimitiveRealization.ts` owns the branch. Server storage, autho
 validation, and matching live in `sparcMoveLibraryService.ts`,
 `sparcMoveLibraryStorage.ts`, and `sparcMoveLibraryMethods.ts`.
 
-- Candidates share the requested primitive type, text reading level, and, for questions, response format.
+- Candidates share the requested primitive type and, for questions, response format.
   Instructional relevance is decided only by cosine similarity of embeddings, starting
-  at the configured cutoff (currently 0.99). There is no exact-context filter,
+  at 0.95 (0.975 for feedback). There is no exact-context filter,
   exact-text shortcut, or AI review of matches.
   Selected KC meaning and category, assistance, selected evidence, and actual case
   form the shared embedding input. Feedback adds the preceding question and learner

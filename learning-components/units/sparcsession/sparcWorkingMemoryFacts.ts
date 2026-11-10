@@ -166,6 +166,8 @@ export function progressiveDialogueFacts(replayState: Pick<SparcReplayState, 'tr
     const id = typeof node.id === 'string' ? node.id.trim() : '';
     const speaker = node.speaker === 'learner' || node.speaker === 'tutor' ? node.speaker : '';
     const text = typeof node.value === 'string' ? node.value.trim() : '';
+    // Navigation identifies the path; it is never evidence or assessment context.
+    if (node.navigationOnly === true) continue;
     if ((node.atomType !== 'dialogue-utterance' && !(node.atomType === 'html-block' && node.turnEventId)) || !id || !speaker || !text) {
       continue;
     }

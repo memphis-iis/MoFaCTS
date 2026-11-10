@@ -303,6 +303,29 @@ describe('SPARC durable content-use boundary', () => {
     assert.equal(f.rows.requests.size, 1);
   });
 
+  it('journals orientation bridges across lessons without treating repeated headings as tutor content', async () => {
+    const f = fixture();
+    const bridge = 'You have met the coverage goal. Next we will examine interval width.';
+    const orientation = (id: string, text: string, lesson: string, attempt: string) => {
+      const row = history(id, { text });
+      row.TDFId = lesson; row.sessionID = attempt;
+      const node = row.sparc.stateTransition.writes[0].value.node;
+      node.id = `${id}:orientation`; node.component = 'orientation'; node.navigationOnly = true;
+      node.orientation = { current: { id: 'kc-a', text: 'Interval width' }, progress: { total: 3, met: 1, remaining: 2 } };
+      return row;
+    };
+    await f.present([orientation('first-orientation', bridge, 'lesson-a', 'attempt-a')]);
+    await assert.rejects(f.present([orientation('repeated-orientation', bridge, 'lesson-b', 'attempt-b')]), SparcContentAlreadyUsedError);
+    await f.present([orientation('fresh-orientation', 'Let us use that foundation to explore sample size.', 'lesson-b', 'attempt-b')]);
+    const headingOnly = orientation('continuation-heading', '', 'lesson-b', 'attempt-b');
+    headingOnly.sparc.stateTransition.writes[0].value.node.atomType = 'html-block';
+    delete headingOnly.sparc.stateTransition.writes[0].value.node.speaker;
+    await f.present([headingOnly]);
+    assert.equal(f.rows.histories.size, 3);
+    assert.equal([...f.rows.requests.values()].filter(row => row.kind === 'presentation-use').length, 2);
+    assert.equal(f.rows.entries.size, 0, 'Personalized bridges never enter the reusable catalog');
+  });
+
   it('lets an accepted matched instruction journal its own exact explanation and support together', async () => {
     const f = fixture();
     const content: SparcPrimitiveContent = { text: 'One explanation.', support: { text: 'Its worked support.', supportHeading: 'Worked Case',

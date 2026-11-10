@@ -40,16 +40,63 @@ Source/limits/isolation/cleanup and unchanged original services passed. Zero
 invocations/retries remain. No new staging2 operation occurred. Production/
 original staging remain excluded.
 
-**Current publication/sequence approval (2026-11-08):** Phil explicitly approved
-committing and pushing the reviewed 35-path Node/file/external/repository batch
-with [skip ci]. All 244 source cases and full lint pass; this approval grants no
-Meteor, live scanner, Docker, provider, remote or deployment invocation. Publication
-execution is being recorded against the exact reviewed cohort. The eight unrelated
-files remain excluded. Phil also approved bringing the minimum typed authentication
-capture and source-owned expected allowed/denied catalog into Phase 1. Application
-access rules stay unchanged and the remaining Phase 2 scope stays in Phase 2.
-Dated pending questions below are superseded by this approval. Meteor allowance
-remains zero; the accepted 603c1233 source proof is not a new invocation grant.
+**Current CloudShell preflight (2026-11-08):** the approved read-only
+preflight PASSED after Phil's fresh sign-in. Ohio STS caller identity matched the
+retained backup target account; caller kind is root. Observed Node 20.20.2 and
+AWS CLI 2.39.3. Container-credential variable names are present; no credential
+value or backup payload was read. The existing pinned reader requires Node
+24.22.1/npm 11.19.1, so it is not ready to execute unchanged in that shell.
+AWS documents that root cannot assume a restricted IAM role. Do not bypass the
+strict hosted-runner guard, read the backup directly as root, install a runtime
+or change IAM under this preflight permission. The later separately approved
+identity inspection is now complete; see the current operator boundary below.
+No IAM mutation, protected read, install, app/provider request, Meteor run or new
+publication occurred. Older pending preflight/sign-in notes are superseded.
+
+**Current operator identity inspection (2026-11-08):** the approved
+read-only IAM/Identity Center metadata inspection is complete. Twelve IAM users
+were enumerated; four have existing console login profiles and eight explicitly
+have none. No profile remains classified from an arbitrary error. Eight IAM
+roles include one unrelated GitHub OIDC wiki-publishing role and no wildcard
+principal or SSO-provisioned role. The Ohio Identity Center instance list is
+empty; no global absence of Identity Center is claimed. Existing identities,
+passwords, MFA and permissions are unchanged. Private names stay out of these
+public notes. Phil confirmed that none of the four is an identity he owns and
+can use. Custody clarification is complete; do not repurpose these identities.
+A temporary console-only operator design is now prepared for review in the
+optional reader guide. No new identity, access, runtime or protected read is
+approved. Implementation/execution follows the separate gates in that proposal. Prior pending inspection-
+permission notes below are superseded. No source acceptance test was repeated.
+
+**Current temporary-operator source preparation (2026-11-08):** Phil
+approved the design and source preparation/testing only. The separate operator
+entry point, expiring/MFA/region-bound bootstrap and exact-environment reader
+policies, existing SDK reader bridge, single-use private attempt file, ownership-
+checked cleanup verifier and bounded runtime bootstrap/runbook are implemented.
+Eight operator cases plus the retained optional suite PASS: 50/50, zero skips or
+failures. Full app lint PASS (323 facets); optional-tool lint PASS; shell syntax
+and invalid/unreviewed-source bootstrap rejections PASS without downloads.
+The earlier shared-TypeScript typecheck and 261-case Node gate remain unchanged.
+That checkpoint covered 33 intentional, uncommitted paths. The current
+42-path source cohort is recorded in the V2 admin presentation and assembly
+checkpoint below. No new Meteor invocation is authorized or executed.
+Next publication/verification permission is the complete reviewed source cohort
+plus one fresh existing isolated 6 GiB/two-CPU Meteor run. Actual runtime install,
+new IAM access, MFA sign-in, protected read and cleanup remain separately
+unapproved/unexecuted. Earlier pending design/custody questions are superseded.
+
+**Current publication/sequence status (2026-11-08):** the explicitly approved
+35-path Node/file/external/repository cohort is committed and pushed as
+ba87985ec6ba134018cd5e6b1a527ba244e1fb8f with [skip ci]. Remote main, all 35
+post-hook hashes, empty index and the eight excluded unrelated files were
+verified. Full lint and 244 Node source cases passed before publication; no
+Meteor/live/remote application run occurred. A stale private pre-publication
+HEAD assertion was replaced by the post-publication cohort check; source
+verification did not fail. P1-D8's minimum authentication sequencing amendment
+is approved and now recorded in the written plan. The following inventory-reader, shared-outcome and report-retention
+preparation remains uncommitted; no protected read or its temporary access is
+approved. Meteor allowance remains zero. Older pending publication/sequence
+questions below are superseded; existing source/Meteor/staging2 proofs stay done.
 
 The previous authorized 070c693e 6 GiB run passed 987 server/1,237 client cases;
 the earlier 7f373eff 4 GiB run was OOM-killed after server completion. Preserve
@@ -93,20 +140,55 @@ that actually needs another check.
 | P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [x] Candidate 70/23 catalog and direct shared imports pass pinned Windows/Linux Node and actual Meteor server parity, including the fixed digest. This completes the source contract, not V2 cutover. |
 | P1-02 | Active/append-only catalog and evidence-contract registries | [x] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators pass mutation tests and shared-runtime checks. Initial catalog remains unreleased until coordinated cutover; released entries/validators are append-only. |
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
-| P1-04 | Integrated build identity/host-release comparison | [ ] Retained embedded-loader/revision proof remains valid. Inert receiver now composes that loader after HMAC verification and requires an independent platform adapter. The protected receipt/platform adapter and optional read-only overlay are now implemented and locally tested under P1-D7. New receipt parity and real-Mongo cases plus the full suite PASS on 831ef74b. Bounded staging2 receipt/mount installation, real-reader acceptance and exact restoration also passed. The protected production composition factory now passes the real-Mongo HTTP/Meteor fixture and full suite on 603c1233. Coordinated activation and the permanent release hook remain open. |
+| P1-04 | Integrated build identity/host-release comparison | [ ] Protected receipt loading, independent image comparison and staging2 mount/restoration passed. Wire the permanent release hook and verify the integrated release and receiver identity in the coordinated rollout. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. P1-14 remains open only for staging report ingestion/rollback. Active V1 is restored and unchanged. |
-| P1-07 | Exact assembly and independent server validation | [ ] Pure assembly/authentication and inert receiver/storage/identity composition pass Node checks. Signature verification precedes metadata; storage independently validates again. Receipt receiver/runtime proof PASS on 831ef74b is retained. New inert HTTP/admin composition, typed transport errors and shared ID validation pass local checks; their real-Mongo HTTP/Meteor fixture and full suite PASS on corrected 603c1233; the earlier e7803997 fixture-loading failure remains historical. The new inert file/host/composite adapters and target-bound uploader pass 16 focused Node cases; orchestration and remaining acquisitions are open. No route is registered. |
-| P1-08 | V2-only new-ingestion endpoint | [ ] Inert HTTP callbacks and one shared runtime/admin composition are implemented and pass local loopback tests. Supported HTTP/Mongo Meteor proof PASS on 603c1233; coordinated route/producer/client cutover remains open; active V1 is unchanged. |
-| P1-09 | Summary projections, indexes and read-time integrity | [ ] Version-separated namespace and inert composition source implemented from actual old-image evidence; exact-ID summary projection added. Prior real-Mongo proof retained; the receiver case and full Meteor suite passed on 070c693e. Runtime activation and complete candidate rollback qualification remain pending. |
-| P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
-| P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
-| P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Current unpublished V2 source gate: 244 total/244 pass/zero failures/skips through the actual source collector, including 24 external and 50 repository-candidate cases; 19 retained operator regressions plus four new window cases pass. Host source/Meteor and protected-channel proof, 26 emitter cases and prior 16 capture cases are retained. Receipt receiver suite passed on 831ef74b. The changed HTTP/admin runtime passes its corrected 603c1233 Meteor gate; the earlier e7803997 failure is retained. Registered endpoint and complete candidate rollback gates remain open. |
-| P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Protected staging2 forced-command/install/restore qualification passed on 2026-11-07; canonical V2/eleven internal controls, PTY/forwarding denials and exact V1 restoration verified. Synthetic adverse branches retain their 26-case proof. Staging report ingestion/rollback remains open. |
+| P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |
+| P1-08 | V2-only new-ingestion endpoint | [ ] V2 HTTP and admin handlers passed the real-Mongo Meteor fixture on 603c1233. The V2 assembly command and admin data adapter pass source checks. Recover the selected authentication cases, wire the scanner workflow and rendered admin view, and register the V2-only endpoint in the coordinated cutover. |
+| P1-09 | Summary projections, indexes and read-time integrity | [x] Bounded history, independent latest queries, exact-ID summaries and read-time validation are implemented. Real Mongo created the indexes and enforced nonce uniqueness. Tests cover retained V1 exclusion, digest integrity and rejected corrupt records. P1-16 owns the full previous-image rollback trial. |
+| P1-10 | Retire old-format access without rewriting/deleting records | [ ] Retire V1 report access at cutover and verify that existing records are preserved. |
+| P1-11 | Truthful temporary security-surface manifest update | [ ] Update and verify the security-surface manifest when the V2 route replaces the V1 route. |
+| P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Remove the duplicate control tables and V1 ingestion path with the coordinated V2 replacement. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Catalog, assembly, signed ingestion, storage, download rendering and projected admin response cases pass in the 266-case source suite. A Meteor client adapter case is prepared. Run supported Meteor verification and test the rendered admin view and downloads after the final bindings are wired. |
+| P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Staging2 passed protected host collector installation, acquisition and restoration. Prove V2 report ingestion, existing-record exclusion and rollback on the coordinated staging2 candidate. |
 | P1-15 | Exact host install/rollback procedure and hashes | [x] Reviewed nine-file cohort, pinned source/controller/baseline hashes, bounded root controller and independent recovery documented/tested. Actual staging2 installation and exact restoration passed; Phase 0 production baseline is retained. No production installation is implied. |
-| P1-16 | Previous-production-image qualification with V2 records | [ ] Actual selected-image V1/DDP/download baseline and mixed/separate storage prequalification passed 2026-11-07. One collection is unsafe; version separation selected. Full candidate/previous/candidate sequence remains open. |
-| P1-17 | Updated operator documentation | [ ] Public inert-development/testing checkpoint added; final cutover/operator procedure pending implementation and qualification. |
+| P1-16 | Previous-production-image qualification with V2 records | [ ] The actual previous image read and downloaded V1 reports with V2 records in separate storage. Run the full candidate/previous/candidate sequence and verify list, latest and download behavior across the rollback. |
+| P1-17 | Updated operator documentation | [ ] Development and temporary-operator procedures are documented. Finish the operator instructions for the qualified V2 workflow, production cutover and rollback. |
+
+### Worklist reconciliation (2026-11-10)
+
+Eight of 17 deliverables are complete. The review closed P1-07 and P1-09
+against their individual requirements in plan Section 12. The exact assembly,
+independent server validation, projected reads, indexes and read-time integrity
+have behavioral source and real-Mongo evidence. See the V2 file pipeline,
+receiver storage and corrected HTTP/Mongo checkpoints below. The earlier
+open labels in those dated checkpoints describe their status at the time.
+
+Nine deliverables remain. P1-04 covers permanent release integration. P1-08
+and P1-10 through P1-12 cover the coordinated activation and V1 retirement.
+P1-13 covers the outstanding V2 presentation and final integration checks.
+P1-14 and P1-16 retain staging2 and previous-image rollback qualification.
+P1-17 closes the operator documentation after those procedures are verified.
+All Phase 1 exit gates in the plan still apply.
+
+### V2 admin presentation and assembly command (2026-11-10)
+
+- [x] Verify the V2 admin data adapter against the storage projection. Source
+  cases cover empty history, independent latest profiles, distinct scanner and
+  deployment identities and rejected malformed summaries. Download rendering
+  has a separate suite for exact JSON, escaped HTML and digest verification.
+- [x] Add the explicit V2 assembly command. It resolves the scanner SHA from
+  the Git checkout and takes the target from the protected environment.
+  Both exact report profiles passed synthetic checks. A checkout smoke test
+  independently matched the reported SHA to Git HEAD.
+- [x] Verify the current source. Full app typecheck and lint passed with 330
+  classified surfaces in the working tree. The Linux V2 source suite passed
+  266 of 266 cases, with zero skips. The existing V1 workflow and admin view
+  remain active. No live requests or new staging checks were made.
+- [ ] Publish the verified 42-path cohort and run one fresh authorized Meteor
+  invocation for the prepared client adapter and two outcome parity cases.
+  P1-08 still needs the protected selected-case inventory, workflow and route
+  wiring. P1-13 still needs the rendered admin view and download checks.
 
 ### Native Meteor verification: capacity decision (2026-11-06)
 
@@ -1511,6 +1593,234 @@ its individual image-bridge implementation box, not operational acceptance.
   registered receiver, ingestion/rollback and release acceptance. Do not check
   P1-07/13 or Phase 1 complete from the synthetic artifact/source proof. The full
   goal stays active; no new deployment or production/original-staging access.
+
+### Approved amendment: inventory preparation and next boundary (2026-11-08)
+
+- [x] Publish only the approved 35 intentional paths as ba87985e; preserve all
+  eight unrelated files and verify remote main/post-hook bytes/index. No CI or
+  Meteor invocation was authorized by [skip ci] publication or run here.
+- [x] Record P1-D8 in the written plan. Keep all remaining Phase 2 scope and
+  application permissions unchanged. No verification catalog entries have been
+  invented from the V1 configured error booleans or source surface labels.
+- [x] Review selected-case provenance. Fresh metadata-only GitHub reads show
+  AUDIT_AUTH_FIXTURES_JSON updated 2026-08-20T14:20:17Z, before accepted transfer
+  42024117227 on 2026-11-05T12:04:51Z-12:06:06Z. This supports using that accepted
+  backup as the starting point; it is not a plaintext value comparison.
+- [x] Prepare a provider-independent bounded metadata formatter and optional
+  one-version read-only SDK diagnostic/inactive workflow. Synthetic cases retain
+  unresolved source rows without identifier values, omit private fields and
+  forbid writes. A first test exposed the legacy userHistory/current-manifest
+  mismatch; the diagnostic now preserves an unresolved row rather than dropping
+  it or declaring a policy. No protected payload was read by these tests.
+- [x] Full app lint and optional-tool lint PASS. All 42 optional SDK/formatter
+  cases and nine affected source regressions PASS; no protected operation ran.
+  Source-only tests are not a recovered selected inventory or authentication
+  acceptance. Current app TypeScript, routes, permissions and V1 workflow are
+  unchanged. AWS remains an optional operator tool, outside the application.
+- [ ] Approve/publish the reviewed diagnostic and ONE bounded read of the exact
+  retained original backup, with time-limited read-only access and cleanup. No
+  labels/versions, production/staging/provider request, new account/static key,
+  paid service, dependency or Meteor invocation is proposed. Existing Phase 0
+  recovery acceptance is retained; do not repeat the two-version restore.
+- [ ] Author actual verificationCatalog.ts intent and typed capture only after
+  the selected cases are known/reviewed. The missing non-secret inventory is the
+  current data boundary, not permission to guess fixture targets or baseline data.
+- [x] Characterize the pending presentation cutover with a synthetic empty V2
+  snapshot: the current V1 client rejects the missing generatedAt and displays
+  old sourceRevision/productionImage fields. Record this for coordinated client
+  migration; the active UI was not changed. P1-08/13 acceptance remains open.
+
+### Protected inventory execution feasibility (2026-11-08)
+
+- [x] Verify runner availability before any access activation or dispatch. The
+  latest scheduled V1 audit, 42453904351, has zero job steps and the GitHub
+  check-run annotation states: The job was not started because your account is
+  locked due to a billing issue. The audit was not re-run or changed here.
+- [x] Keep the prepared GitHub workflow inactive. Its 42-case source/SDK proof
+  remains valid; it cannot establish an available hosted execution lane. Do not
+  recreate temporary IAM access for a job known unable to start.
+- [ ] Obtain permission for a read-only AWS CloudShell preflight: account identity,
+  Node/AWS CLI versions and AWS credential-variable names only, never values.
+  No install, secret read, IAM/backup change or application/provider request.
+  This observes the missing runtime/credential-source facts before implementing
+  an explicit supported operator lane. Do not impersonate a GitHub runner or
+  silently use another account/profile. The optional AWS backup remains outside
+  application dependencies and the original recovery acceptance stays complete.
+- [ ] After preflight, prepare/test the applicable operator adapter and obtain
+  concrete publication/protected-read/runtime/access permissions before execution.
+  No such execution permission is inferred from P1-D8 or 35-path publication.
+
+### Independent shared outcome layer while preflight is pending (2026-11-08)
+
+- [x] Implement the plan's common authorizationOutcomes.ts pure layer: exactly
+  five internal outcomes and the ten expected/observed decisions. Keep public
+  statuses PASS/FAIL/ERROR. No actual verification catalog entry, actor/resource
+  binding, policy error code or allowed baseline has been invented.
+- [x] Require exact source-provided method denial criteria and an explicit
+  positive scoped-success match. Arbitrary errors, unverified returned values,
+  legacy booleans, wildcard/duplicate codes, transport errors and inconclusive
+  observations cannot become successful denial. Emit only categories, not raw
+  response/code text. Actual capture/baseline qualification remains separate.
+- [x] Six focused pinned Node cases PASS; full application typecheck and lint
+  PASS, including 323 unchanged surfaces. Preserve all eight unrelated files.
+  This is new inert shared TypeScript, separate from the Node-only thirteen-path
+  inventory preparation. Active V1/application startup imports are unchanged.
+- [ ] Two prepared shared-runtime Meteor parity cases are unexecuted: no fresh
+  invocation is authorized. Defer this shared contract's publication/qualification
+  until supported proof is obtained; do not relabel earlier 603c1233 evidence as
+  proof of the new source. Keep it separate from any earlier publication scope.
+- [ ] Author actual verificationCatalog.ts and scoped acquisition after selected
+  inventory recovery/review. The JSON ten-row decision fixture is unit-test
+  ground truth, not a second catalog or evidence that a real probe executed.
+- [ ] The already-requested read-only CloudShell preflight remains pending. No
+  console/runtime, protected read, installation, IAM, workflow activation, live
+  target, Meteor or new publication action occurred during this source work.
+
+### Inert report retention and checklist reconciliation (2026-11-08)
+
+- [x] Add explicit V2 report-encryption and execution-complete entry points.
+  Require strict canonical V2/catalog/digest parsing and the protected target;
+  reuse the existing authenticated encryption envelope. Keep the plaintext 2 MiB
+  limit and bound encrypted overhead separately. Create output once, mode 0600.
+  No private key, protected fixture, actual uploader or remote artifact is used.
+- [x] Verify six new cases: exact encrypt/decrypt bytes/digests, diagnostic ERROR
+  retention, complete PASS/security FAIL acceptance, independent ERROR-row and
+  execution-list rejection, bad input/target/key/output preservation and both
+  real Node CLI boundaries. Generated RSA keys and all data are synthetic/local.
+  Share the existing external safe fixture rather than duplicate observations.
+- [x] Expand only the inert source entry point: six authorization-outcome, five
+  inventory-format and six retention cases join the published 244-case baseline.
+  Actual root Linux/jq collector completed 261/261 matched, zero errors/skips;
+  surface coverage remains 323 and sensitive-logging findings remain zero.
+  The first default-user attempt had zero failing cases but three capability
+  skips; the strict collector correctly rejected it. The root run resolves that
+  missing evidence without changing fixture requirements or production state.
+- [x] Full app lint PASS. A private shell wrapper was edited while its earlier
+  lint command was running; lint stages passed, but the wrapper then exited with
+  a parse error. A stable-wrapper repeat passed with exit zero. No source defect
+  or required failure is concealed. Full shared-TypeScript typecheck from the
+  outcome layer remains PASS; subsequent changes are JavaScript/docs only.
+- [x] Reconcile the sole 17-row worklist: six deliverables remain complete;
+  source-only progress does not close the eleven remaining coordinated gates.
+  The 35-file publication, 603c1233 Meteor gate and completed staging2 trials
+  remain done. Preserve all eight unrelated files and previous evidence.
+- [ ] Verify remote storage and encrypted-artifact acknowledgement in the future
+  coordinator before final execution assertion. Local ciphertext is not remote
+  retention acceptance, and these commands are neither scheduled nor activated.
+- [ ] Recover/review selected authentication inventory through the pending
+  explicitly approved execution lane, then author the single intent catalog.
+  The requested read-only CloudShell preflight is still unanswered. No protected
+  read, IAM change, install, live scanner, Docker, deployment or Meteor was run.
+- [ ] Publish only after concrete batch approval and supported proof for the new
+  shared TypeScript. The current 26 intentional paths are uncommitted. No new
+  publication or Meteor allowance is inferred; the whole Phase 1 goal stays active.
+
+### CloudShell preflight accepted; operator identity boundary (2026-11-08)
+
+- [x] Complete exactly the approved preflight after sign-in: same expected account,
+  root caller kind, Node 20.20.2, AWS CLI 2.39.3 and AWS variable names only.
+  The identity request completed successfully and returned to the shell prompt.
+  Compare account with the retained local target metadata without copying account
+  coordinates into this public record. No second backup recovery test occurred.
+- [x] Check AWS's official role-switching contract: root cannot assume a role.
+  Existing GHA OIDC trust is not an operator-login contract, and the GHA reader
+  remains inactive. Do not invent an alternate actor or weaken identity checks.
+- [ ] With separate permission, inspect existing non-root operator identities
+  before proposing a new identity, login/access grant or resource. Read-only
+  identity metadata is not included in the completed narrow preflight approval.
+- [ ] After the identity is selected, prepare/test the supported operator adapter
+  and ephemeral pinned-runtime setup. Their publication, runtime acquisition,
+  temporary least-privilege access, one protected read and cleanup remain concrete
+  approval boundaries. Neither a root backup read nor a new static key is proposed.
+- [ ] The full Phase 1 goal remains incomplete/active; all prior completed
+  staging2, Meteor and recovery subgates stay done. No invocation allowance remains.
+
+### Existing sign-in metadata inspected; custody boundary (2026-11-08)
+
+- [x] Complete the separately approved read-only metadata inspection. Enumerate
+  twelve IAM users, confirm four existing console profiles and eight explicit
+  NoSuchEntity responses. Read role principal/action metadata and independently
+  check wildcard/SSO role membership across all eight IAM roles. Preserve the
+  unrelated GitHub wiki-publishing role; no access is repurposed or expanded.
+- [x] Confirm no Identity Center instance in Ohio. Other regions were not queried;
+  that regional result does not prove account-wide absence. No SSO-provisioned
+  IAM role was returned by the global role inventory. No operator is selected.
+- [x] Resolve a conservative one-off CLI metadata-classification failure. The
+  first two classifiers left eight negative responses unknown; direct diagnosis
+  verified the actual AWS CLI 2.39.3 NoSuchEntity/max-retries suffix. Targeted
+  checks resolved the remaining seven. The four positive profile reads were not
+  repeated, and unknown responses never became passing/absent evidence. No
+  permanent CLI-text parser or application change was introduced.
+- [x] Retain only aggregate results here and private identity metadata locally.
+  No password/key/MFA value, backup payload, learner data or service setting was
+  read. No installation, permission change, new account, IAM role assumption,
+  application/provider call, live scanner, Meteor, publication or deploy occurred.
+- [ ] Obtain Phil's custody clarification for an existing console sign-in or
+  confirmation that none is available. The question is pending. A login profile
+  is not proof of ownership, usable credentials, CloudShell permission or permission
+  to assume the future reader role. Do not reset a password or add access here.
+- [ ] After selecting the legitimate operator, prepare and review the exact
+  temporary restricted session, pinned runtime and one-read/cleanup operation.
+  Whole Phase 1, coordinated cutover and prior open gates remain incomplete.
+
+### No existing usable operator; proposed temporary login (2026-11-08)
+
+- [x] Record Phil's explicit answer: none of the four existing console profiles
+  is an identity he owns and can sign in to. Close the custody question; do not
+  repeat identity discovery or touch those users. Root remains the current
+  management identity, not the reader's permitted identity.
+- [x] Prepare the concrete temporary-operator design in the optional
+  [reader review](../deploy/security-audit/recovery-transfer/probe-inventory-review.md#proposed-temporary-console-operator-design-2026-11-08).
+  Proposed name: mofacts-recovery-operator. Console sign-in plus MFA, no API key,
+  only CloudShell and assumption of the exact restricted recovery role. Scope
+  expires within one hour; the read session lasts 900 seconds. Remove this
+  newly created user/role and their owned material after the bounded operation.
+- [ ] Obtain design approval before implementing a new-identity execution lane.
+  This is an actual new access choice under Section 0, not a renewed request for
+  completed staging2/recovery/Meteor proof. No IAM write is authorized here.
+- [ ] After design approval, implement/test the complete operator adapter,
+  policy/bootstrap and cleanup procedure, then present the exact reviewed batch
+  and required publication/runtime/access/read actions for concrete authorization.
+  Keep the current GHA guard strict; do not read directly as root or make AWS an
+  application dependency. The entire Phase 1 objective remains incomplete.
+
+### Approved temporary-operator source preparation (2026-11-08)
+
+- [x] Record design approval for source preparation/testing. It authorizes no
+  IAM account/access change, software acquisition, protected read or publication.
+- [x] Implement the distinct CloudShell operator lane without altering GHA or
+  existing SDK capabilities. Reject root/foreign actor, dirty/wrong source,
+  unsupported Node/CLI/context, alternate profiles/static credentials and unsafe
+  metadata-provider input. Keep CLI credential output in bounded memory and
+  discard stderr. The original SDK independently rechecks the assumed identity.
+- [x] Render the one-hour/MFA/Ohio bootstrap policy without backup/role/delete
+  access. After capturing the new shell ID, bind session/credential/cleanup
+  writes to that exact ARN, remove environment creation and use the exact-source
+  MFA/session-name role trust with the existing three-read exact-secret grant.
+  Retain the original expiry; no automatic window extension.
+- [x] Reserve mode-0600 attempt evidence before credentials in a private owned
+  mode-0700 workspace. Preserve failed markers, refuse reuse, check expiry before
+  each request and keep the single baseline payload read/metadata checks intact.
+- [x] Verify cleanup using creation/current immutable IDs, exact policies/names,
+  zero extra keys/groups/managed grants and only the new MFA association. Expired
+  access stays removable; drift or replaced identities stop deletion planning.
+- [x] Prepare a bounded, credential-free-to-npm runtime bootstrap using existing
+  Node/npm/SDK pins, official HTTPS/checksum, private tool/cache locations,
+  lifecycle-disabled lockfile installation and finite install/test timeouts.
+  Bash syntax and invalid/dirty-source preflight branches PASS; no installation
+  or download was run. The runbook avoids a duplicate root runtime installation.
+- [x] All 50 optional SDK/formatter/operator cases PASS. Full app lint and optional
+  lint PASS, including 323 unchanged surface facets. Shared TypeScript and the
+  existing 261-case app source gate were not changed or needlessly rerun. No new
+  dependency/lockfile, app behavior, provider request or wiki UI change occurred.
+- [ ] Obtain publication and one fresh Meteor permission for the reviewed
+  33-path cohort. The two new shared-outcome Meteor cases remain unexecuted;
+  no old source receipt substitutes for this candidate. This is the next concrete
+  permission boundary, not completion of Phase 1.
+- [ ] After supported source proof, prepare the exact private activation records
+  and obtain runtime/access/read/cleanup approval. Actual MFA/role/source/runtime
+  fit, restricted AWS permissions, one protected read and resource absence are
+  still unqualified. Do not infer them from the synthetic 50-case suite.
 
 ### Decision P1-D8: minimum authentication evidence sequencing (approved 2026-11-08)
 

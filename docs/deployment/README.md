@@ -15,6 +15,7 @@ The hosted production operator procedure is the existing private `deploy product
 
 ## Self-Hosted MoFaCTS
 
+- `hosted-staging.md`: isolated staging deployment, acceptance, and retired-site recovery boundaries.
 - `self-hosted-guide.md`: end-to-end operator guide.
 - `settings-reference.md`: required and optional settings.
 - `settings-inventory.md`: release-readiness settings and environment classification.

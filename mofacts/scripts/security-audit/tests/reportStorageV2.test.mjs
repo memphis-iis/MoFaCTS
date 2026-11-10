@@ -1,48 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import crypto from 'node:crypto';
-import { auditDigest } from '../../../common/securityAudit/canonicalReport.ts';
-import { createAuditReportStoreV2 } from '../../../server/securityAudit/securityAuditReportStoreV2.ts';
-import { auditDownloadBytesV2 } from '../../../server/securityAudit/securityAuditPresentationV2.ts';
+import { database, resign, stored } from './fixtures/reportStorageFixtures.mjs';
 import { errorReport, ingestionContext } from './fixtures/v2Fixtures.mjs';
-
-const clock = new Date('2026-11-05T12:02:00.000Z');
-async function resign(report) {
-  const { digestSha256: _old, ...payload } = report;
-  return { ...payload, digestSha256: await auditDigest(payload) };
-}
-function database(initial = []) {
-  const rows = structuredClone(initial), calls = [], indexes = [];
-  function select(selector, options = {}) {
-    let matches = rows.filter(row => Object.entries(selector).every(([key, value]) => row[key] === value));
-    if (options.sort) matches = [...matches].sort((a,b) => b.completedAt.localeCompare(a.completedAt));
-    if (options.limit !== undefined) matches = matches.slice(0,options.limit);
-    return matches.map(row => {
-      if (!options.fields) return structuredClone(row);
-      const projected = {};
-      for (const [key,include] of Object.entries(options.fields)) {
-        if (!include) continue;
-        const parts = key.split('.'); let source=row, destination=projected;
-        for (const part of parts.slice(0,-1)) { source=source?.[part]; destination[part]??={}; destination=destination[part]; }
-        destination[parts.at(-1)] = structuredClone(source?.[parts.at(-1)]);
-      }
-      return projected;
-    });
-  }
-  const reports = {
-    find(selector, options) { calls.push({kind:'list',selector:structuredClone(selector),options:structuredClone(options)});return {fetchAsync:async()=>select(selector,options)}; },
-    async findOneAsync(selector,options) { calls.push({kind:'one',selector:structuredClone(selector),options:structuredClone(options)});return select(selector,options)[0]; },
-    async insertAsync(row) {
-      if (rows.some(old=>old.reportId===row.reportId||old.digestSha256===row.digestSha256||old.ingestNonce===row.ingestNonce)) {
-        const error=new Error('Duplicate synthetic audit identity');error.code=11000;throw error;
-      }
-      rows.push(structuredClone(row));return 'synthetic-row';
-    },
-    rawCollection:()=>({async createIndex(keys,options){indexes.push({keys,options});}}),
-  };
-  return {rows,calls,indexes,store:createAuditReportStoreV2(reports,()=>new Date(clock))};
-}
-const stored = report => ({...report,_id:'synthetic-id',ingestNonce:'synthetic-opaque-nonce-0001',ingestedAt:clock,expiresAt:new Date(clock.getTime()+90*86400000)});
 
 test('V2 storage: independently validate before insertion, preserve flat report bytes and the existing TTL contract',async()=>{
   const report=await errorReport();const db=database();await db.store.ensureIndexes();
@@ -101,19 +60,4 @@ test('V2 storage: corrupt selected reports and malformed summaries fail visibly 
   db.rows[0].catalogVersion=999;
   await assert.rejects(db.store.list());
   assert.equal(db.rows.length,1);
-});
-
-test('V2 downloads: exact JSON/report digest, escaped HTML with no-script CSP, and independent byte checksum',async()=>{
-  const report=await errorReport();report.sections.external.controls[0].evidence.summary='<img src=x onerror=alert(1)>';
-  const valid=await resign(report);
-  const json=await auditDownloadBytesV2(valid,'json');assert.deepEqual(JSON.parse(json.body.toString()),valid);
-  assert.equal(json.sha256,crypto.createHash('sha256').update(json.body).digest('hex'));
-  const exported=await auditDownloadBytesV2(valid,'html');const html=exported.body.toString();
-  assert.ok(html.includes("content=\"default-src 'none'\""));assert.ok(html.includes('&lt;img'));
-  assert.equal(html.includes('<img'),false);assert.ok(html.includes(valid.digestSha256));
-  assert.ok(html.includes(valid.catalogDigestSha256));assert.ok(html.includes('Execution errors'));
-  assert.ok(html.includes('external.dns-addresses'));
-  const corrupt=structuredClone(valid);corrupt.digestSha256='0'.repeat(64);
-  await assert.rejects(auditDownloadBytesV2(corrupt,'json'));
-  await assert.rejects(auditDownloadBytesV2(valid,'pdf'));
 });

@@ -47,6 +47,30 @@ describe('Content-removal lookup diagnostics', () => {
 
 
 describe('Instruction publication embedding ownership', () => {
+  it('forwards orientation ownership without descriptive metadata in the browser retrieval category', async () => {
+    const originalCall = Meteor.callAsync, originalUser = Meteor.userId;
+    Meteor.userId = () => 'orientation-category-user';
+    const categories: unknown[] = [];
+    const query = { tdfId: 'orientation-category-lesson', sessionId: 'attempt', eventId: 'event', queryText: 'Selected instructional need.',
+      context: { kind: 'instruction', readingLevel: 'unbiased', responseFormat: 'text', orientationOwned: true } } as SparcPrimitiveQuery;
+    Meteor.callAsync = (async (method: string) => method === 'callResolvedOpenRouterEmbeddings'
+      ? { embeddings: [[1, 0]] } : { status: 'generate' }) as typeof Meteor.callAsync;
+    try {
+      const client = createSparcMoveLibraryClient(async category => { categories.push(category); return new SparcEmbeddingIndex(); });
+      const { orientationOwned: _ownership, ...unowned } = query.context;
+      assert.deepEqual(categories, [], 'Creating a client does not preselect a mode or prepare unrelated categories');
+      await client.lookup({ ...query, context: unowned });
+      assert.deepEqual(categories, [{ kind: 'instruction', responseFormat: 'text' }], 'Off uses only the preceding text contract');
+      await client.lookup(query);
+      await client.lookup({ ...query, context: unowned });
+      assert.deepEqual(categories, [
+        { kind: 'instruction', responseFormat: 'text' },
+        { kind: 'instruction', responseFormat: 'text', orientationOwned: true },
+        { kind: 'instruction', responseFormat: 'text' },
+      ], 'Each actual request owns its category, including a restored off request after an owned request');
+    } finally { Meteor.callAsync = originalCall; Meteor.userId = originalUser; }
+  });
+
   it('rebuilds a resumed query embedding and reuses its browser cache for retries', async () => {
     const originalCall = Meteor.callAsync;
     const originalUser = Meteor.userId;

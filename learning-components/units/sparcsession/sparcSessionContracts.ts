@@ -177,6 +177,7 @@ export type SparcInterfaceEventType =
   | 'node-mounted'
   | 'focus-changed'
   | 'value-changed'
+  | 'simulation-observation'
   | 'response-submitted'
   | 'outcome-recorded'
   | 'model-updated'

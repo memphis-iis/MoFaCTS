@@ -35,6 +35,22 @@ function createDeps(
 }
 
 describe('profile methods', function() {
+  it('stores explicit personas only for the authenticated learner without changing other profile fields', async function() {
+    const updates: UpdateCall[] = [];
+    const methods = createProfileMethods(createDeps(updates));
+    await methods.updateOwnSparcPersona.call({ userId: 'learner' }, { personalInterests: ['Soccer'] });
+    expect(updates[0]?.selector).to.deep.equal({ _id: 'learner' });
+    expect(updates[0]?.modifier).to.deep.equal({ $set: { 'profile.sparcPersona': {
+      traits: [], abilities: [], experiences: [], personalInterests: ['Soccer'],
+    } } });
+    for (const [actor, persona] of [[{}, {}], [{ userId: 'learner' }, { userId: 'someone-else' }],
+      [{ userId: 'learner' }, { abilities: [''] }]] as const) {
+      let error: unknown;
+      try { await methods.updateOwnSparcPersona.call(actor, persona); } catch (caught) { error = caught; }
+      expect(error).to.be.instanceOf(Error);
+    }
+    expect(updates).to.have.length(1);
+  });
   it('saves supported UI locale preferences on the user profile', async function() {
     const updateCalls: UpdateCall[] = [];
     const methods = createProfileMethods(createDeps(updateCalls));

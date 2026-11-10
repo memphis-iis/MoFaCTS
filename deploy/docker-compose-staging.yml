@@ -1,3 +1,8 @@
+# Historical staging definition. The retired site's original runtime definition
+# is preserved in its private recovery archive. Current hosted staging uses the
+# canonical docker-compose.yml plus the private staging identity/storage overlay;
+# see docs/deployment/hosted-staging.md and the private deploy staging.txt.
+# Do not use this file to upgrade or overwrite the retired standalone database.
 services:
   mofacts:
     container_name: mofacts
