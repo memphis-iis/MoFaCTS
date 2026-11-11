@@ -69,7 +69,11 @@ export function verifyRecoveryOperatorCleanup({ target, deadline, runId, created
     || canonicalAuditJson(current.roleInlinePolicyNames) !== canonicalAuditJson(['mofacts-recovery-restore'])
     || !Array.isArray(current.mfaSerials) || current.mfaSerials.length !== 1
     || current.mfaSerials[0] !== created.mfaSerial
-    || created.mfaSerial !== `arn:aws:iam::${target.accountId}:mfa/${RECOVERY_OPERATOR}-key`) fail();
+    // AWS assigns FIDO registrations a generated suffix in the u2f/user ARN
+    // namespace, including WebAuthn keys. Bind the recorded registration to
+    // this account/user/name and require its exact current association above.
+    || typeof created.mfaSerial !== 'string' || created.mfaSerial.length > 256
+    || !new RegExp(`^arn:aws:iam::${target.accountId}:u2f/user/${RECOVERY_OPERATOR}/${RECOVERY_OPERATOR}-key-[\\w+=,.@-]+$`).test(created.mfaSerial)) fail();
   for (const key of ['userPolicy', 'trustPolicy', 'rolePolicy']) {
     if (canonicalAuditJson(current[key]) !== canonicalAuditJson(expected[key])) fail();
   }

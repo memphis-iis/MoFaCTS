@@ -65,10 +65,16 @@ exact npm, so its redundant global reinstall is removed.
 - [x] Create the exact temporary user without permissions; retain its immutable
   UserId privately and verify zero inline/attached policies, groups and API keys.
 - [x] Verify the console login profile is enabled without a forced password reset.
-- [ ] Complete and verify hardware-key enrollment. AWS metadata returned no MFA
-  devices after the completion report, and this user's wizard was still at
-  device selection. Enrollment was reopened for the human PIN/touch handoff.
-  No expiring grant or protected read has started.
+- [x] Verify hardware-key enrollment. After the browser-control handoff was
+  corrected, AWS console and independent list/get-MFA API metadata confirmed
+  exactly one FIDO registration on the recorded immutable user. Association
+  counts remain zero for policies, groups and API keys. Retain the actual
+  registration ARN privately; no expiring grant or protected read has started.
+- [x] Correct the cleanup verifier's virtual-MFA-only ARN assumption to the
+  documented FIDO/WebAuthn u2f/user namespace and generated suffix, preserving
+  exact recorded/current association equality. All 51 optional SDK cases pass,
+  including rejection of root, foreign user/account/name, replacement key,
+  virtual MFA, malformed path and oversized identifier. Full app lint passes.
 - [ ] Render and retain the exact reviewed bootstrap policy and expiry after
   verified credential setup, then attach the expiring CloudShell-only grant.
 - [ ] Verify the new user environment/runtime, activate the exact read role,

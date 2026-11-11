@@ -146,7 +146,7 @@ test('cleanup remains possible after expiry but refuses replaced objects, extra 
   const policies = recoveryOperatorPolicies({ target: input.target, deadline: input.window.deadline, runId: input.window.runId, environmentId }, clock);
   const created = { operatorArn: policies.operatorArn, roleArn: input.target.roleArn, activatedAt: clock.toISOString(),
     userId: 'AIDA' + 'A'.repeat(17), roleId: 'AROA' + 'B'.repeat(17), environmentId,
-    mfaSerial: `arn:aws:iam::${input.target.accountId}:mfa/mofacts-recovery-operator-key` };
+    mfaSerial: `arn:aws:iam::${input.target.accountId}:u2f/user/mofacts-recovery-operator/mofacts-recovery-operator-key-EXAMPLEBN5FHTECLFG7EXAMPLE` };
   const current = { ...policies, userArn: created.operatorArn, userId: created.userId, roleArn: created.roleArn, roleId: created.roleId,
     accessKeyCount: 0, groupCount: 0, attachedUserPolicyCount: 0, attachedRolePolicyCount: 0,
     userInlinePolicyNames: ['mofacts-recovery-operator'], roleInlinePolicyNames: ['mofacts-recovery-restore'], mfaSerials: [created.mfaSerial] };
@@ -157,4 +157,18 @@ test('cleanup remains possible after expiry but refuses replaced objects, extra 
     { userInlinePolicyNames: ['unrelated-policy'] }, { roleInlinePolicyNames: ['unrelated-policy'] }]) {
     assert.throws(() => verifyRecoveryOperatorCleanup({ ...args, current: { ...current, ...change } }));
   }
+  for (const mfaSerial of [
+    `arn:aws:iam::${input.target.accountId}:mfa/mofacts-recovery-operator-key`,
+    created.mfaSerial.replace(':u2f/user/', ':u2f/root/'),
+    created.mfaSerial.replace('/mofacts-recovery-operator/', '/another-user/'),
+    created.mfaSerial.replace('-key-', '-other-'),
+    created.mfaSerial.replace(input.target.accountId, '999999999999'),
+    created.mfaSerial + '/another-registration',
+    created.mfaSerial + 'A'.repeat(256),
+  ]) {
+    assert.throws(() => verifyRecoveryOperatorCleanup({ ...args,
+      created: { ...created, mfaSerial }, current: { ...current, mfaSerials: [mfaSerial] } }));
+  }
+  assert.throws(() => verifyRecoveryOperatorCleanup({ ...args,
+    current: { ...current, mfaSerials: [created.mfaSerial.replace('-EXAMPLE', '-REPLACED')] } }));
 });

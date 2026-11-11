@@ -77,7 +77,12 @@ as well. No second backup version or alternate actor is tried.
    naming only this registration `mofacts-recovery-operator-key`. Independently
    verify the login profile and actual MFA association against the recorded
    immutable UserId; an open wizard or a reported enrollment is insufficient.
-   Record its ARN. Then render and attach the initial bootstrap policy with
+   Record its actual FIDO registration ARN, including AWS's generated suffix.
+   Physical-key/WebAuthn registrations use `u2f/user/<user>/<name>-<suffix>`,
+   rather than the virtual-authenticator `mfa/` namespace. Cleanup validates this
+   account/user/registration name and the exact recorded current association.
+   See AWS's [FIDO device metadata example](https://docs.aws.amazon.com/cli/latest/reference/iam/get-mfa-device.html).
+   Then render and attach the initial bootstrap policy with
    `recoveryOperatorBootstrapPolicy`, starting the one shared activation/expiry
    window. Its one-hour/MFA/Ohio grant allows only launching the new user's
    CloudShell; it has no role/secret or environment-delete permission. Require
