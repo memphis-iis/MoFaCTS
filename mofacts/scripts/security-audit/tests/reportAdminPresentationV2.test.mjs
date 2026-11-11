@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeSecurityAuditSnapshotV2 } from '../../../client/views/adminSecurityAuditsStateV2.ts';
+import { normalizeSecurityAuditSnapshotV2, securityAuditIsStaleV2 } from '../../../client/views/adminSecurityAuditsStateV2.ts';
 import { database, resign, stored } from './fixtures/reportStorageFixtures.mjs';
 import { errorReport, missingIdentity, platformImage, revision } from './fixtures/v2Fixtures.mjs';
 
@@ -48,5 +48,14 @@ test('V2 admin state rejects malformed dates, origins, status and deployment met
     { sectionStatuses: { ...response.latestFull.sectionStatuses, internal: 'unknown' } },
   ]) {
     assert.throws(() => normalizeSecurityAuditSnapshotV2({ ...response, latestFull: { ...response.latestFull, ...invalid } }));
+  }
+});
+
+test('V2 admin freshness retains the separate exposure and full report time windows', async () => {
+  const response = await projectedSnapshot();
+  for (const [report, hours] of [[response.latestExposure, 36], [response.latestFull, 8 * 24]]) {
+    const expires = Date.parse(report.completedAt) + hours * 60 * 60 * 1000;
+    assert.equal(securityAuditIsStaleV2(report, expires), false);
+    assert.equal(securityAuditIsStaleV2(report, expires + 1), true);
   }
 });

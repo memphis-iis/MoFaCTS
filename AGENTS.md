@@ -42,6 +42,7 @@ Resolve competing instructions in this order:
 - Stay on the current branch unless explicitly asked to create/switch. Never create `codex/*` or other branches automatically. When on `main`, agent commits normally stay on `main`.
 - Never revert user or unrelated working changes without explicit instruction.
 - Commit/push only when explicitly requested; include intentional files only and state verification. For direct commit-and-push requests, use plain Git and existing credentials. Open a PR only when explicitly requested; require `gh` only for an explicitly requested PR or another operation that needs it.
+- The security-audit standing authorization approved 2026-11-11 covers intentional commits/pushes and the agreed staging2 build/deploy/rollback work throughout the remaining written plan. Follow its [execution mandate](docs-developer/security-audit-durable-redesign-plan.md#standing-execution-authorization-approved-2026-11-11) and sole [run ledger](docs-developer/security-audit-durable-redesign-status.md#standing-execution-ledger-2026-11-11). Continue within that scope without per-batch approval. Preserve the explicit production, access, cost and data boundaries.
 
 ## Common Commands
 
@@ -102,7 +103,7 @@ Use the path matching the change:
 | Meteor integration or client contracts | CI or another supported Meteor environment; do not routinely run `npm run test:ci` on local Windows. |
 | Docker build, push, deploy, or release confidence | Only when explicitly requested. |
 
-Every `npm run test:ci` invocation requires fresh, explicit, single-use user authorization, including repeated invocations in the same task.
+Every `npm run test:ci` invocation requires fresh, explicit, single-use user authorization, including repeated invocations in the same task, unless an explicit bounded project allowance applies. The security-audit authorization of 2026-11-11 supplies up to ten invocations including retries on the existing isolated 6 GiB/two-CPU Linux worker. Reserve and reconcile each invocation in its sole run ledger; ask again only after that allowance is exhausted or a material execution boundary changes.
 
 The CI runner cleans transient test-generated `meteortesting:*` resolutions from `.meteor/versions`. Lint and pre-commit checks must reject their persistence in the application manifest.
 

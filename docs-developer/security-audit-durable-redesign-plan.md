@@ -17,7 +17,7 @@ Original audit baseline: `main` at `fa8dc09156500bb0458de3028a9e0ee11e4ae5c7`. W
 
 This document is the developer implementation plan for making the MoFaCTS security-audit system maintainable, efficient, and resistant to false-green results. It does not claim that any phase has been implemented, tested, deployed, or verified in production.
 
-Before Phase 1 implementation begins, re-run the Phase 0 inventory against the then-current source. This baseline records what was audited; it does not authorize relying on stale paths or control membership after intervening changes.
+The Phase 1 entry inventory is complete and recorded in the status worklist. Reuse that accepted baseline for unchanged inputs and refresh affected paths or control membership when source changes require it.
 
 Concrete Phase 0 contract ownership and test limitations are now recorded in [Phase 0 contracts and characterization](security-audit-phase0-contracts.md). Optional proof was acquired/joined and the protected receipt installed for staging2. It remains an unqualified evidence carrier, not a production integration or complete audit-qualification claim.
 
@@ -30,7 +30,7 @@ Staging2 execution does not establish production qualification-hook integration.
 
 The current operator-facing behavior and protected-environment setup remain documented in [`docs/deployment/security-audit.md`](../docs/deployment/security-audit.md). That file is the operational source of truth. This plan owns target architecture, implementation sequencing, verification gates, and eventual cleanup; it must not duplicate secrets or environment-specific operator commands.
 
-Reading order for every AI worker: first read and follow the repository [AGENTS.md](../AGENTS.md) and any applicable deeper AGENTS.md instructions. Then read Section 0 below, the current execution entry point in the [status record](security-audit-durable-redesign-status.md#reconciled-phase-0-checklist-2026-11-05), and the [Phase 0 contracts](security-audit-phase0-contracts.md). Sections 1-5 define the problem and invariants; Sections 6-11 define contracts, architecture, layout, and ownership; Section 12 is the work sequence; Sections 13-15 are verification and deployment gates; Sections 16-21 cover extension, impact, decisions, completion, and source mapping.
+Reading order for every AI worker: first read and follow the repository [AGENTS.md](../AGENTS.md) and any applicable deeper AGENTS.md instructions. Then read Section 0 below, the current execution entry point in the [current execution ledger](security-audit-durable-redesign-status.md#standing-execution-ledger-2026-11-11), and the [Phase 0 contracts](security-audit-phase0-contracts.md). Sections 1-5 define the problem and invariants; Sections 6-11 define contracts, architecture, layout, and ownership; Section 12 is the work sequence; Sections 13-15 are verification and deployment gates; Sections 16-21 cover extension, impact, decisions, completion, and source mapping.
 
 ## 0. Controlling decisions and worker entry point (2026-11-02)
 
@@ -39,7 +39,7 @@ These decisions record Phil's explicit answers to the nine-question design revie
 | Decision | Controlling instruction |
 | --- | --- |
 | Historical Meteor integration authorization - 2026-11-04 | Phil authorized up to five Meteor integration invocations for continued security-audit integration checks, including necessary retries, with a written count and continuation to a real decision point. This task-specific instruction supersedes fresh single-use approval for those five invocations only; prior runs do not consume it. Reserve before triggering, record actual commit/run/attempt and result in the status ledger, and do not exceed five. Acceptance, staging2 scope, privacy, dependency and spending boundaries remain in force. |
-| Current Meteor allowance - 2026-11-05 | The later explicit authorization permits one primary fresh invocation plus up to ten additional project invocations if needed. The sole current remaining/reserved counter and exact consumption receipts are maintained in the [Phase 1 worklist](security-audit-durable-redesign-status.md#phase-1-worklist-started-2026-11-05); dated checkpoints are historical. Reserve/count each invocation there. Protected AWS/host runs require their own scope. |
+| Historical Meteor allowance - 2026-11-05 (superseded) | The later explicit authorization permits one primary fresh invocation plus up to ten additional project invocations if needed. The sole current remaining/reserved counter and exact consumption receipts are maintained in the [Phase 1 worklist](security-audit-durable-redesign-status.md#phase-1-worklist-started-2026-11-05); dated checkpoints are historical. Reserve/count each invocation there. Protected AWS/host runs require their own scope. |
 | Phase 1 minimum authentication evidence - approved 2026-11-08 | P1-D8 moves the minimum typed outcome capture, exact source-owned expected allowed/denied cases and positive allowed baselines for the existing selected probes into Phase 1. Use the single Section 7.2 verificationCatalog.ts owner; never translate generic V1 error booleans into matches. Application permission rules, actor/resource meanings and the remaining Phase 2 authorization coverage/review are unchanged. This is source-work approval, not a new protected read/transfer, Meteor invocation, publication, live probe or deployment permission. |
 | Phase 1 mixed-impact controls - approved 2026-11-05 | Phil selected splitting the eight mixed-impact V1 checks into separate fixed-severity V2 controls, preserving actual severity distinctions. Original aggregate IDs remain unchanged V1 provenance and are not reused for narrower meanings. The initial V2 candidate has 70 full and 23 exposure controls; catalog JSON owns the exact new IDs/membership. This changes reporting granularity, not application permissions or the treatment of unconfirmed development advisories. |
 | Phase 1 rollback-test baseline - approved 2026-11-05 | Phil selected the image observed running in the single approved production metadata check, revision 18677291993b66b890a090e55d65f703b45ff653, as the isolated compatibility-test target. The exact immutable platform/config binding and completed selection are recorded in status decision P1-D2. Preserve the older authoritative release record and leave missing later build/acceptance/deployment history unverified. This is not release qualification, a production change or permission for another production query. Previous-image runtime qualification remains open. |
@@ -63,9 +63,82 @@ These decisions record Phil's explicit answers to the nine-question design revie
 | Staging2 registry publication - approved 2026-11-03 | Phil approved the separate public Docker Hub repository `ppavlikmemphis/mofacts-staging2` using the existing Docker sign-in, with candidate verification before publication and runtime-only credentials/settings. This excludes changing production repository tags/configuration and does not waive exact image/config identity or release qualification. The published `630eabdb` candidate and the containerd identity incompatibility are recorded in status. |
 | Docker image identity compatibility correction - approved 2026-11-03 | Phil approved correcting the collectors and protected receipt reader to distinguish immutable engine references from configuration digests. One bounded Docker-save content-graph reader owns resolution for classic and containerd stores; missing, tampered or ambiguous evidence fails explicitly. Preserve historical proof/receipt schemas and actual config semantics. No Docker backend switch, provenance disabling, new dependency or substitution of registry identity is authorized. Continue to the next decision point; fresh Meteor CI and commit/push retain their explicit authorization rules. |
 
-Start each continuation by reading AGENTS.md and checking the latest status evidence. Do not reopen settled decisions merely because older text calls them pending, and do not confuse incomplete technical proof with an undecided preference. Current implementation work remains the separately authorized three-batch continuation; this register does not itself authorize later-phase implementation or phase activation. Keep production secrets, learner data and raw sensitive evidence out of these documents.
+Start each continuation by reading AGENTS.md and checking the sole current status ledger. Credit accepted evidence before repeating work. Historical permission requests and completed gates do not create new work. The standing execution authorization below governs the remaining phases and supersedes the older per-batch continuation boundary. Keep production secrets, learner data and raw sensitive evidence out of these documents.
 
-Execution boundaries remain explicit: each `npm run test:ci` invocation needs fresh, explicit, single-use authorization, including retries. Commit/push, workflow dispatch or state changes, production builds/pushes/deployment, protected-host installation and other restricted operations require the authorization applicable to the concrete action. The staging2 permission above is the scoped exception for its necessary offline/reset/rebuild lifecycle; it is not a production or general access grant. Required acceptance and rollback evidence still applies. No code, test, build, deployment, commit, push or host operation is authorized by this documentation update.
+### Standing execution authorization (approved 2026-11-11)
+
+Phil explicitly approved completion of the remaining written security-audit plan,
+intentional commits and pushes, the agreed staging2 build/deploy/rollback work,
+and up to ten full Meteor invocations including necessary retries on the existing
+isolated 6 GiB/two-CPU Linux worker. This is a new allowance. Earlier invocations
+consume none of its ten slots. The status document owns the sole reservation,
+source, attempt, outcome and remaining-count ledger.
+
+This mandate supersedes earlier requests for per-batch publication approval,
+fresh permission per Meteor invocation within this allowance, and source-only
+continuation boundaries. It applies across the remaining phases and includes
+ordinary implementation, verification, diagnosis and repair within the approved
+design. Existing approved staging2 tooling, image construction/publication,
+deployment, synthetic checks and application rollback may proceed when their
+technical prerequisites pass. Preserve the current branch and unrelated work.
+
+Continue until the written acceptance conditions are met or a real decision is
+required. Ask for a consequential change to the approved design, new security-
+sensitive access, new spending, destructive data changes, production operations,
+exhaustion of the ten-run allowance, or a blocker remaining after reasonable
+diagnosis. Existing approved identities and permissions may be reused within
+their scope. The proposed new AWS operator/access remains such a decision.
+User sign-in, MFA and hardware-key prompts remain user actions. No new package
+or system dependency is currently planned; existing dependency approval rules
+continue to apply if implementation discovers one is required.
+
+#### Execution and verification cycle
+
+1. Select the next incomplete functional milestone from the current worklist.
+   Join related source changes and acceptance work rather than making each
+   file or helper a publication/approval boundary.
+2. Reuse accepted evidence when its relevant source, configuration and runtime
+   inputs are unchanged. Identify the changed inputs before requiring a rerun.
+   Find retained local/native evidence as well as GitHub evidence.
+3. Implement the milestone and use focused checks during development. Run full
+   typecheck/lint for the affected application source and full Meteor tests at
+   meaningful integration milestones, reserving an allowance slot before the
+   actual invocation. Documentation-only changes do not require Meteor.
+4. Diagnose and repair ordinary failures within scope and rerun affected checks.
+   Failed acceptance remains failed until repaired. Do not waive a check,
+   weaken permissions/CSP or invent passing observations. A routine failure
+   does not require another permission question.
+5. Publish only intentional verified changes. Existing exact-commit Linux
+   verification may follow publication when clean committed source is its
+   technical input. Hold staging deployment until required source checks pass.
+   A pre-step GitHub billing block proves no test execution and consumes no
+   Meteor slot; the supported native worker supplies application test proof.
+6. Execute the authorized staging2 milestone through the supported Compose
+   workflow, retain the previous usable state, check the actual candidate and
+   roll back if its acceptance fails. Source proof and deployment qualification
+   retain their own evidence and success conditions.
+7. Check off each satisfied requirement with its exact source/result. Record
+   one next action and unresolved dependencies, then continue automatically.
+   Use progress messages for information and questions for real decisions.
+
+#### Combined remaining milestones
+
+- Phase 1 prepares the V2 presentation/workflow/release wiring, verifies the
+  changed source, and joins V2 activation, V1 retirement, staging2 ingestion
+  and candidate/previous/candidate rollback in one coordinated qualification
+  sequence. Selected authentication inventory still depends on separately
+  approved protected access. Keep all 17 deliverable IDs as acceptance owners.
+- Phase 2 joins source-owned authorization expectations, typed probe execution
+  and its actor/resource scenarios into functional verification milestones.
+- Phase 3 joins runtime registration, policy descriptors, coverage and removal
+  of superseded manifest ownership according to the existing contracts.
+- Phase 4 performs the remaining closure and organization work in Section 12.
+  Production operations remain a real decision before execution.
+
+The active Goal follows this plan and the status ledger. Retain it through
+ordinary failures and completed intermediate milestones. Completion requires
+the whole authorized outcome to be satisfied. A necessary user decision is
+recorded as the current dependency; it does not complete the audit.
 
 ## 1. Goal
 
@@ -1258,7 +1331,7 @@ npm run lint
 
 The security test command should be updated to execute the decomposed behavioral suites through one stable entry point. Do not substitute narrow per-file TypeScript checks for the full app typecheck.
 
-Meteor integration requires the supported CI environment. Every invocation of `npm run test:ci` requires fresh, explicit, single-use authorization, including retries. Commit/push, Docker build/push, workflow dispatch or disable/enable, protected-host installation, production deployment and production audit runs retain their concrete authorization requirements. Apply the explicit staging2 offline/reset/rebuild permission in Section 0 for this security work; it does not authorize original staging/production, irreversible deletion, new persistent access/security-sensitive permissions, new spending or bypassing verification gates.
+Meteor integration requires a supported environment. Apply Section 0's standing execution mandate and ten-run ledger for the existing isolated Linux worker, intentional publication and agreed staging2 work. Production/original-staging operations, destructive deletion, new security-sensitive access and spending remain outside that mandate. Required verification, privacy and rollback contracts still apply.
 
 Documentation-only changes require at least:
 
@@ -1336,7 +1409,7 @@ Do not combine all three solely to reduce deployment count. That would enlarge t
 
 The current production workflow reads default-branch source independently from the deployed application image unless the explicit scanner-release selection in Section 15.1 has been implemented and verified. A V2 producer and V1 receiver, or a V1 producer and V2-only receiver, will fail ingestion. Use a short authorized mismatch window after existing runs have completed, away from the next configured trigger. The checked-in schedules currently use 06:00 UTC; verify actual workflow/run state at cutover rather than treating a timestamp as proof that no job is active. Disabling the workflow affects manual and scheduled runs together.
 
-1. Apply Section 0's settled receipt/history, staging2, scanner-isolation and storage decisions; finish the helper interface, exact-source proof and remaining technical verification. Secret recovery design/owner are selected; complete the AWS setup/account-recovery/size-fit and two-version restore gates in Section 7.2 before claiming operational recovery. Obtain the concrete permissions still required for publication/CI, workstation build/push, protected-host install, workflow state/dispatch and production actions. Do not re-request the bounded staging2 offline/reset/rebuild permission already granted; retain all explicit per-run integration and other excluded-action requirements.
+1. Apply Section 0's settled receipt/history, staging2, scanner-isolation and storage decisions; finish the helper interface, exact-source proof and remaining technical verification. Secret recovery design/owner are selected; complete the AWS setup/account-recovery/size-fit and two-version restore gates in Section 7.2 before claiming operational recovery. Use Section 0's standing publication, integration and agreed staging2 mandate. Obtain only permissions still excluded from it, including production workflow state/dispatch, production actions and new security-sensitive access. Preserve the existing acceptance gates.
 2. Review the complete candidate and rollback unit (receiver, scanner, catalog, host script and applicable receipt). Run required source checks; publish source only with the active scanner preserved by Section 15.1, or disable the production audit workflow before publishing any incompatible active change. Confirm no run is active/queued before a mismatch. Obtain fresh authorization for `npm run test:ci` before a publication that triggers it.
 3. Verify supported source outcomes for the exact candidate inputs, preserving base-commit/dirty-snapshot distinctions. Through the confirmed workstation procedure, build once, qualify that exact image and push it using Section 7.2's interface. CI does not supply a substitute image. Bind proof to the existing release-record identity and its qualification extension.
 4. Deploy that same image through existing tooling to staging; pass the applicable report, host, authorization and runtime qualification lanes and previous-image storage rollback tests. Do not rebuild after qualification. If the source/image changes, repeat the affected gates.
@@ -1482,7 +1555,7 @@ Section 0 is the controlling 2026-11-02 decision register. Do not ask again for 
 | Host migration | Mandatory observation-contract qualification, exact install hash, and paired rollback in Phase 1 |
 | Implementation status | Separate companion status/evidence document created in Phase 0 and maintained throughout |
 
-Execution permission is distinct from settled design: apply Section 0's bounded standing staging2 permission, but keep fresh explicit single-use authorization for each `npm run test:ci` and retain the applicable commit/push, workflow dispatch/state, production build/push/deploy, protected-host installation and other excluded-action approvals. This documentation update executes/authorizes none of them and does not waive failed checks. Routine engineering within the approved boundaries proceeds without another design question.
+Execute under the standing authorization recorded in Section 0 and its sole ten-run ledger. Intentional publication, agreed staging2 work and routine repair proceed within that mandate. Production actions, new security-sensitive access and the other stated real decision boundaries require their own approval. Verification failures remain visible and must be repaired before acceptance.
 
 ## 20. Definition of Complete
 

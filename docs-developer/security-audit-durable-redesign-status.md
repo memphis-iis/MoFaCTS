@@ -6,17 +6,68 @@ auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
 
 
+## Standing execution ledger (2026-11-11)
+
+Phil approved completion of the remaining written plan with intentional commits/
+pushes, agreed staging2 build/deploy/rollback work and up to ten full Meteor
+invocations including retries on the existing isolated 6 GiB/two-CPU Linux
+worker. Section 0 of the plan defines the standing mandate and real decision
+boundaries. It supersedes earlier per-batch publication questions, source-only
+continuation limits and exhausted historical counters. Preserve those dated
+records as provenance. The active Goal tracks the remaining written plan.
+
+**Current allowance: 10 total, 0 consumed, 0 reserved, 10 available.**
+Reserve before invocation. Record the committed source, private receipt
+location, actual start/result and remaining slots here. An exclusive native
+worker invocation marker consumes the slot; a preparation failure or a GitHub
+job blocked before steps consumes none. Reconcile a reservation against that
+marker before continuing. Ordinary failed runs count and may be repaired/retried
+within this allowance. Do not import historical invocations into this counter.
+
+| Slot | Source | Execution and result |
+| --- | --- | --- |
+| 1-10 | Pending | Available; no new invocation started under this mandate. |
+
+Current functional milestone: publish/verify the prepared V2 admin presentation,
+crediting the existing 070a1c9a native baseline. Then continue the remaining
+Phase 1 wiring and qualification until the protected selected-case inventory
+requires the separately reviewed new AWS access. No such access is granted by
+this mandate. The 17-row Phase 1 table below remains its sole deliverable queue.
+
 ## Phase 1 worklist (started 2026-11-05)
 
 Phil explicitly requested Phase 1 implementation from the written plan, marking
 completed items and continuing until a real decision point. Source baseline:
 `63dff4c7ed9e6b793873212d6a3ab21f662f021b`, current branch `main`. The eight
-unrelated working-tree changes remain preserved. This request authorizes Phase 1
-source work; concrete commit/push, protected operation, build/deploy and production
-cutover permissions remain separate. Use the current counter immediately below;
-counts in dated execution records describe those checkpoints only.
+unrelated working-tree changes remain preserved. The standing mandate above
+now governs continued execution and publication. Its run ledger is the sole
+current allowance; counts in dated execution records are historical.
 
-**Current Meteor allowance (2026-11-08):** Phil approved the reviewed 21-path
+**Current continuation (2026-11-10):** the earlier 42-path source cohort is
+published in 070a1c9a3bedd4061cc9b30420f575e7f39dcf81. Local HEAD and remote
+main match. CI run 42943883147 and Security run 42943883189 both stopped
+before any job steps. The CI annotation reports the account billing lock.
+This closes publication of that cohort and consumes zero Meteor invocations.
+Correction verified 2026-11-11: the separately retained local Linux receipt
+for 070a1c9a records 1,011 server and 1,245 Chromium client passes, zero
+failures/hooks and 15/seven pending, on the 6 GiB/two-CPU worker. Its source
+identity excludes uncommitted changes. This is the latest verified native
+Meteor result. The earlier request for its log was unnecessary. Credit the
+committed adapter and outcome cases without repeating that accepted run.
+
+The new inert V2 Blaze page and its five rendered browser cases are prepared.
+Full app typecheck/lint and 34 focused presentation/localization cases pass.
+The updated source suite reports 267 cases: 264 passed and three root-only
+fixtures skipped under the ordinary worker user. Those exact three cases then
+passed under the existing root Linux/jq worker, with zero failures or skips.
+Execution of the new browser cases and coordinated activation remain open.
+The source-only continuation introduced no cloud access, live probe, deployment
+or new Meteor invocation. Eight of 17 Phase 1 deliverables remain complete.
+This paragraph supersedes earlier pending publication statements for the
+42-path cohort. The protected inventory operation still needs separate access
+and execution approval under the prepared temporary-operator procedure.
+
+**Prior Meteor allowance (2026-11-08, exhausted):** Phil approved the reviewed 21-path
 receipt batch for commit/push and ONE fresh 6 GiB/two-CPU invocation. Published
 source 831ef74b231f496d7f7d0e36c1e16b57c30542c2 PASSED that invocation: 989 server
 and 1,237 client cases, zero failures/hooks, 15/seven pending. The allowance is
@@ -144,12 +195,12 @@ that actually needs another check.
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. P1-14 remains open only for staging report ingestion/rollback. Active V1 is restored and unchanged. |
 | P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |
-| P1-08 | V2-only new-ingestion endpoint | [ ] V2 HTTP and admin handlers passed the real-Mongo Meteor fixture on 603c1233. The V2 assembly command and admin data adapter pass source checks. Recover the selected authentication cases, wire the scanner workflow and rendered admin view, and register the V2-only endpoint in the coordinated cutover. |
+| P1-08 | V2-only new-ingestion endpoint | [ ] V2 HTTP and admin handlers passed the real-Mongo Meteor fixture on 603c1233. The V2 assembly command and admin adapter pass source checks, and the separate V2 Blaze page is prepared. Recover the selected authentication cases, verify the new page, wire the scanner workflow and replace the V1 registrations in the coordinated cutover. |
 | P1-09 | Summary projections, indexes and read-time integrity | [x] Bounded history, independent latest queries, exact-ID summaries and read-time validation are implemented. Real Mongo created the indexes and enforced nonce uniqueness. Tests cover retained V1 exclusion, digest integrity and rejected corrupt records. P1-16 owns the full previous-image rollback trial. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Retire V1 report access at cutover and verify that existing records are preserved. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Update and verify the security-surface manifest when the V2 route replaces the V1 route. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Remove the duplicate control tables and V1 ingestion path with the coordinated V2 replacement. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Catalog, assembly, signed ingestion, storage, download rendering and projected admin response cases pass in the 266-case source suite. A Meteor client adapter case is prepared. Run supported Meteor verification and test the rendered admin view and downloads after the final bindings are wired. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Catalog, assembly, signed ingestion, storage, download rendering and projected admin response suites are split. The V2 Blaze page and five browser cases are prepared. The adapter and outcome cases have native Meteor acceptance on 070a1c9a (1,011 server/1,245 client passes). The five newer rendered-page cases await execution. GitHub CI remains separately blocked before startup by billing. |
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Staging2 passed protected host collector installation, acquisition and restoration. Prove V2 report ingestion, existing-record exclusion and rollback on the coordinated staging2 candidate. |
 | P1-15 | Exact host install/rollback procedure and hashes | [x] Reviewed nine-file cohort, pinned source/controller/baseline hashes, bounded root controller and independent recovery documented/tested. Actual staging2 installation and exact restoration passed; Phase 0 production baseline is retained. No production installation is implied. |
 | P1-16 | Previous-production-image qualification with V2 records | [ ] The actual previous image read and downloaded V1 reports with V2 records in separate storage. Run the full candidate/previous/candidate sequence and verify list, latest and download behavior across the rollback. |
@@ -185,8 +236,12 @@ All Phase 1 exit gates in the plan still apply.
   classified surfaces in the working tree. The Linux V2 source suite passed
   266 of 266 cases, with zero skips. The existing V1 workflow and admin view
   remain active. No live requests or new staging checks were made.
-- [ ] Publish the verified 42-path cohort and run one fresh authorized Meteor
-  invocation for the prepared client adapter and two outcome parity cases.
+- [x] Publish the verified 42-path cohort. It is included in 070a1c9a, verified
+  against remote main on 2026-11-10.
+- [x] Verify the committed client adapter and two outcome parity cases through
+  the separate local Meteor receipt for 070a1c9a. It passed 1,011 server and
+  1,245 client cases with zero failures/hooks. Receipt inspected 2026-11-11.
+- [ ] Execute the five newer rendered-page cases from the current local batch.
   P1-08 still needs the protected selected-case inventory, workflow and route
   wiring. P1-13 still needs the rendered admin view and download checks.
 

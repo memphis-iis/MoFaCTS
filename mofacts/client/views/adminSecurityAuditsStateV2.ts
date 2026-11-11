@@ -2,7 +2,7 @@ import { contentDigest, proofRecord, proofString, sourceCommit } from '../../com
 import { parseAuditIdentity } from '../../common/securityAudit/reportIdentity.ts';
 import type { AuditReportSummaryV2 } from '../../common/securityAudit/summaryTypes.ts';
 
-type AuditReportSnapshotV2 = {
+export type AuditReportSnapshotV2 = {
   reports: AuditReportSummaryV2[];
   latestExposure: AuditReportSummaryV2 | null;
   latestFull: AuditReportSummaryV2 | null;
@@ -61,4 +61,9 @@ export function normalizeSecurityAuditSnapshotV2(value: unknown): AuditReportSna
   const latestFull = snapshot.latestFull === null ? null : summary(snapshot.latestFull);
   if ((latestExposure && latestExposure.reportType !== 'exposure') || (latestFull && latestFull.reportType !== 'full')) invalid();
   return { reports: snapshot.reports.map(summary), latestExposure, latestFull };
+}
+
+export function securityAuditIsStaleV2(report: AuditReportSummaryV2, nowMs = Date.now()): boolean {
+  const thresholdMs = report.reportType === 'exposure' ? 36 * 60 * 60 * 1000 : 8 * 24 * 60 * 60 * 1000;
+  return nowMs - Date.parse(report.completedAt) > thresholdMs;
 }

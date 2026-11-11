@@ -48,10 +48,21 @@ validation as the assembly library.
 
 The V2 admin state adapter consumes the store's projected history and two latest
 cards directly, including an empty list and distinct scanner, application, and
-image identities. The coordinated cutover connects this adapter to the existing
-admin view and verifies the rendered cards and download controls. The source
-suite exercises the adapter with the store's projected output and covers HTML
-and JSON download rendering in a separate test module.
+image identities. The explicit `adminSecurityAuditsV2` template prepares the
+Blaze presentation with that adapter, existing theme CSS and admin components.
+It displays unavailable/conflicting identity observations explicitly and keeps
+the existing download actions, retry, announcements and focus handling. Its
+metadata labels are present in all ten interface locales. Source tests cover
+the store projection, separate freshness windows and HTML/JSON export rendering.
+The prepared Meteor browser cases cover rendered cards, empty history, rejected
+responses, exact download selection, duplicate clicks, focus and view cleanup.
+
+The coordinated cutover must replace the V1 route loader/template and controller
+with this V2 presentation and remove their superseded source, then verify the
+rendered page against the V2 receiver. The V2 template has no registered route
+or automatic network activity until it is rendered. Its import in browser tests
+uses synthetic method responses. Keep its browser execution evidence separate
+from the already accepted V1 page and earlier V2 receiver tests.
 
 The host emitter reads the current host envelope and the composite evaluator's
 existing three-count UDP observation input. It writes `internal.json` and
