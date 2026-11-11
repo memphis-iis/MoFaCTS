@@ -1199,8 +1199,9 @@
       "access": "single-use-download"
     },
     {
-      "name": "/internal/security-audits/v1",
-      "access": "signed-ingestion"
+      "name": "/internal/security-audits/v2",
+      "access": "signed-ingestion",
+      "notes": "V2-only bounded HMAC ingestion with exact catalog/evidence validation, independent receiver build/image identity and replay-safe private V2 storage. V1 records remain untouched and have no application reader."
     },
     {
       "name": "/data-download/own-history",

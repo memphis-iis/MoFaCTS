@@ -14,7 +14,6 @@ import "./http/health";
 import "./http/pwa";
 import "./http/socialPreview";
 import "./http/backupArchives";
-import "./http/securityAudits";
 import "./http/ownHistoryDownload";
 import "./http/ownedHistoryDownload";
 import "./migrations/convert_delivery_settings";

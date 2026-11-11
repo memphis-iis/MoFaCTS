@@ -1178,7 +1178,7 @@ FlowRouter.route('/admin/security-audits', {
   name: 'client.adminSecurityAudits',
   action: async function() {
     waitForAuthenticatedRoute(this, 'client.adminSecurityAudits', async () => {
-      await renderRouteTemplate(this, 'adminSecurityAudits');
+      await renderRouteTemplate(this, 'adminSecurityAuditsV2');
     }, getRouteAccessPolicy('client.adminSecurityAudits'));
   }
 })

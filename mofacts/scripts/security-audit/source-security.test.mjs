@@ -701,8 +701,8 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   assert.match(serverMain, /runtime\/contentSecurityPolicy/);
   assert.match(cspRuntime, /setInlineScriptsAllowed\(false\)/);
   assert.doesNotMatch(apache, /ws:\/\/localhost:3000/);
-  const auditAdmin = fs.readFileSync(new URL('../../client/views/adminSecurityAudits.ts', import.meta.url), 'utf8');
-  assert.match(auditAdmin, /auditText\(key, options\?\.hash\)/);
+  const auditAdmin = fs.readFileSync(new URL('../../client/views/adminSecurityAuditsV2.ts', import.meta.url), 'utf8');
+  assert.match(auditAdmin, /text\(key, options\?\.hash\)/);
   const studentPerformance = fs.readFileSync(new URL('../../client/lib/studentPerformanceRuntime.ts', import.meta.url), 'utf8');
   assert.match(studentPerformance, /clientConsole\(2, 'setStudentPerformance:start'\)/);
   assert.doesNotMatch(studentPerformance, /clientConsole\([^\n]*student(?:ID|Username)/);

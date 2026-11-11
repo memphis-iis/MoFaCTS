@@ -38,7 +38,7 @@ export function readAuditBodyV2(req: IncomingMessage): Promise<Buffer> {
 }
 
 // Inert callbacks with Connect's mount-stripped URL contract. Importing or
-// constructing registers nothing; V1 stays active until coordinated cutover.
+// constructing registers nothing; the application composition owns registration.
 export function createSecurityAuditHttpV2(deps: {
   receiver: Pick<ReturnType<typeof createSecurityAuditReceiverV2>, 'receive' | 'download'>;
   ingestionConfigured: () => boolean;

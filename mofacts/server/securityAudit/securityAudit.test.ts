@@ -17,7 +17,6 @@ import {
   issueSecurityAuditDownloadToken,
 } from './securityAuditDownloadTokens';
 import { renderSecurityAuditHtml, securityAuditDownloadBytes } from './securityAuditPresentation';
-import { ensureSecurityAuditIndexes } from './securityAuditStorage';
 
 function reportFixture(): SecurityAuditReportV1 {
   const control = (sectionId: string) => ({
@@ -137,20 +136,6 @@ describe('security audit report ingestion', function() {
     expect(() => parseSecurityAuditReport(unsafe)).to.throw('forbidden sensitive');
     expect(() => parseSecurityAuditReport({ ...report, rawOutput: 'forbidden' })).to.throw('unexpected or missing');
     expect(canonicalJson(reportPayloadForDigest(report))).not.to.include('digestSha256');
-  });
-
-  it('creates unique replay indexes and a 90-day TTL index contract', async function() {
-    const calls: Array<{ keys: Record<string, number>; options?: Record<string, unknown> }> = [];
-    await ensureSecurityAuditIndexes({
-      async createIndex(keys, options) {
-        calls.push(options ? { keys, options } : { keys });
-        return 'index';
-      },
-    });
-    expect(calls).to.deep.include({ keys: { reportId: 1 }, options: { unique: true } });
-    expect(calls).to.deep.include({ keys: { digestSha256: 1 }, options: { unique: true } });
-    expect(calls).to.deep.include({ keys: { ingestNonce: 1 }, options: { unique: true } });
-    expect(calls).to.deep.include({ keys: { expiresAt: 1 }, options: { expireAfterSeconds: 0 } });
   });
 
   it('issues single-use five-minute download tokens', function() {

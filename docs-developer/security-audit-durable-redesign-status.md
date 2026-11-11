@@ -30,14 +30,35 @@ within this allowance. Do not import historical invocations into this counter.
 | 2-10 | Pending | Available. |
 
 Current result: the V2 admin presentation milestone is published and verified.
-P1-13 is complete. Phase 1 has nine completed and eight open deliverables.
+P1-13 is complete. Phase 1 has ten completed and seven open deliverables.
 The approved authentication inventory operation is complete: one successful
 read, sanitized evidence retained, backup labels unchanged and all temporary
 AWS access/environment/workspaces removed. Its 22 selected cases include five
-unresolved publication rows. The next real decision is their replacement
-selection in [the source-grounded review](security-audit-selected-authentication-review.md).
+unresolved publication rows. Their replacement proposal is unapproved; independent implementation continues.
+The current work is the coordinated V2 source activation and its native Meteor proof.
 The 17-row Phase 1 table below remains the sole deliverable queue.
 
+
+### V2 application activation implementation (2026-11-11)
+
+- [x] Replace the active V1 receiver, methods and admin loader with the existing
+  V2 runtime. Register its collection once for the app and real-Mongo tests.
+  Remove the superseded V1 admin page/state/methods/storage registrations.
+  Retained V1 database records are neither migrated nor deleted.
+- [x] Update and verify the signed-ingestion security-surface classification.
+  Full typecheck and lint pass; 330 surfaces remain covered. This closes P1-11.
+- [x] Apply the already approved immutable scanner isolation: production keeps
+  scanner 09f0c32fc2af6d220c699dd805133df3c0507c2e while its receiver remains V1.
+  Guard checkout identity and bind report identity to the checked-out source.
+  No production workflow was dispatched and no production host was contacted.
+- [x] Linux pinned-Node source regressions: 482/490 pass, zero failures, eight
+  conditional skips; source-security 169/172 pass, zero failures, three skips.
+  Additional root receipt/isolation fixtures: 17/19 pass, zero failures, two
+  CI-only skips. Reuse accepted unchanged CI seal evidence for those conditions.
+- [ ] Execute the added actual-registration Meteor cases and existing V2
+  HTTP/Mongo/Blaze coverage using an allowance slot, then reconcile P1-10.
+- [ ] Continue the release/scanner wiring and coordinated staging2 acceptance.
+  The five unknown publication rows are not a global implementation blocker.
 ### Protected inventory execution (approved 2026-11-11)
 
 - [x] Record explicit approval for temporary console-only/MFA identity setup,
@@ -314,10 +335,10 @@ that actually needs another check.
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. P1-14 remains open only for staging report ingestion/rollback. Active V1 is restored and unchanged. |
 | P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |
-| P1-08 | V2-only new-ingestion endpoint | [ ] V2 HTTP/admin real-Mongo proof, assembly/admin adapter checks and rendered V2 Blaze proof are accepted. The selected inventory read/cleanup is complete. Decide the five unresolved publication selections, implement source-owned authentication intent/adapters/baselines, then wire the scanner workflow and replace V1 registrations in the coordinated cutover. |
+| P1-08 | V2-only new-ingestion endpoint | [ ] V2 receiver/admin source activation is implemented with one composition and one private V2 collection registration; actual registered-handler Meteor proof is next. Production scanner source remains pinned to its matching V1 receiver. Complete the source-owned authentication intent/adapters/baselines and V2 scanner workflow; keep the five unknown publication selections unresolved. |
 | P1-09 | Summary projections, indexes and read-time integrity | [x] Bounded history, independent latest queries, exact-ID summaries and read-time validation are implemented. Real Mongo created the indexes and enforced nonce uniqueness. Tests cover retained V1 exclusion, digest integrity and rejected corrupt records. P1-16 owns the full previous-image rollback trial. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Retire V1 report access at cutover and verify that existing records are preserved. |
-| P1-11 | Truthful temporary security-surface manifest update | [ ] Update and verify the security-surface manifest when the V2 route replaces the V1 route. |
+| P1-11 | Truthful temporary security-surface manifest update | [x] V2 replaces V1 in the application HTTP registration and reviewed signed-ingestion classification. Existing admin method/download policies are unchanged. Full typecheck/lint pass; the surface verifier covers 330 surfaces. Actual registered-handler Meteor proof is included in this activation batch. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Remove the duplicate control tables and V1 ingestion path with the coordinated V2 replacement. |
 | P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [x] Split source suites and actual Meteor server/client coverage pass. The five V2 Blaze cases passed on bf37152b with 1,011 server/1,250 client passes, zero failures/hooks. P1-08/14 own activation and staging2 acceptance; P1-16 owns image rollback. |
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Staging2 passed protected host collector installation, acquisition and restoration. Prove V2 report ingestion, existing-record exclusion and rollback on the coordinated staging2 candidate. |

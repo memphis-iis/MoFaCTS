@@ -5,7 +5,8 @@ import {
   type SecurityAuditReportV1,
   type SecurityAuditStatus,
 } from '../../common/securityAuditReport';
-import type { StoredSecurityAuditReport } from './securityAuditStorage';
+// Historical V1 fixture rendering only; no collection or application reader.
+type StoredSecurityAuditReport = SecurityAuditReportV1 & { ingestedAt: Date };
 
 export type SecurityAuditReportSummary = {
   reportId: string;

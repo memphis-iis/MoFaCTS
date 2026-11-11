@@ -30,10 +30,21 @@ jobs:
     env:
       AUDIT_TARGET: https://mofacts.optimallearning.org
     steps:
-      - name: Checkout the audited source revision
+      # Production still accepts V1. Keep this scanner paired with that receiver
+      # while the V2 application candidate is qualified on staging2.
+      - name: Checkout the reviewed V1 scanner revision
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
+          ref: 09f0c32fc2af6d220c699dd805133df3c0507c2e
+
+      - name: Verify the immutable production scanner selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          scanner_revision="$(git rev-parse HEAD)"
+          test "$scanner_revision" = 09f0c32fc2af6d220c699dd805133df3c0507c2e
+          printf 'AUDIT_SCANNER_REVISION=%s\n' "$scanner_revision" >> "$GITHUB_ENV"
 
       - name: Use the pinned Node runtime
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -215,7 +226,7 @@ jobs:
             --arg trivy "$(trivy --version 2>/dev/null | head -n1 || echo unavailable)" \
             --arg playwright "1.60.0" \
             '{node:$node,nmap:$nmap,gitleaks:$gitleaks,trivy:$trivy,playwright:$playwright}')"
-          AUDIT_TOOL_VERSIONS_JSON="$tool_versions" \
+          GITHUB_SHA="$AUDIT_SCANNER_REVISION" AUDIT_TOOL_VERSIONS_JSON="$tool_versions" \
             node scripts/security-audit/assemble-report.mjs "$AUDIT_TYPE" \
               "$AUDIT_DIR/external.json" "$AUDIT_DIR/internal.json" \
               "$AUDIT_DIR/authentication.json" "$AUDIT_DIR/repository.json" \

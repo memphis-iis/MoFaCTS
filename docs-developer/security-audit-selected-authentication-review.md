@@ -40,7 +40,12 @@ as a denied download. P1-D8 already authorizes correcting those evidence rules
 and adding the required positive baselines. No application access-rule change
 is proposed here.
 
-## Decision ready for review
+## Unapproved selection proposal
+
+The proposal below has not been approved. It does not block independent V2
+receiver, presentation, manifest and release work. Keep the five unidentified
+rows explicitly unresolved while that work proceeds. Approval of the execution
+mandate does not turn these unknown subjects into known authorization policies.
 
 Recommended: replace the five unresolvable publication selections with explicit
 current `userExperimentState` privacy scenarios for the same five actors.

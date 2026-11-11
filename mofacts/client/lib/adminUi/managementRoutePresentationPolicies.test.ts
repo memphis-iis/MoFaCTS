@@ -44,6 +44,14 @@ describe('management route presentation policies', function() {
     expect(new Set(policies.map((policy) => policy.template)).size).to.equal(policies.length);
   });
 
+  it('loads the V2 presentation through the existing admin-only audit route', function() {
+    expect(getManagementRoutePolicyByRouteName('client.adminSecurityAudits')).to.include({
+      path: '/admin/security-audits', template: 'adminSecurityAuditsV2',
+      requiresAuth: true, allowedRoles: 'admin',
+    });
+    expect(getManagementRoutePolicyByTemplate('adminSecurityAudits')).to.equal(undefined);
+  });
+
   it('owns pilot route access, title, chrome, and loader metadata together', function() {
     expect(getManagementRoutePolicyByRouteName('client.adminTests')).to.include({
       path: '/admin/tests',

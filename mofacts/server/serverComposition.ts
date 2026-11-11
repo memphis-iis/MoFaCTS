@@ -72,9 +72,10 @@ import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
 import { createLearnerAnalyticsMethods } from './methods/learnerAnalyticsMethods';
 import { createDeploymentReadinessMethods } from './methods/deploymentReadinessMethods';
 import { createBackupMethods, createBackupRegistry } from './methods/backupMethods';
-import { createSecurityAuditMethods } from './methods/securityAuditMethods';
+import { createSecurityAuditRuntimeV2 } from './securityAudit/securityAuditRuntimeV2';
+import { SecurityAuditReportsV2 } from './securityAudit/securityAuditCollectionsV2';
+import { registerSecurityAuditHttp } from './http/securityAudits';
 import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
-import { ensureSecurityAuditIndexes, SecurityAuditReports } from './securityAudit/securityAuditStorage';
 import { createExperimentMethods, issueExperimentLoginToken } from './methods/experimentMethods';
 import { createExperimentTargetFamilyResolver } from './lib/experimentTargetFamilyResolver';
 import { createPackageMethods } from './methods/packageMethods';
@@ -266,6 +267,14 @@ const authSupport = createAuthSupport({
   serverConsole,
   getMethodAuthorizationDeps,
 });
+const securityAuditRuntime = createSecurityAuditRuntimeV2({
+  createReports: () => SecurityAuditReportsV2,
+  requireAdminUser: authSupport.requireAdminUser,
+  targetOrigin: () => new URL(String(process.env.ROOT_URL || '')).origin,
+  ingestSecret: () => String(process.env.MOFACTS_SECURITY_AUDIT_INGEST_SECRET || ''),
+  now: () => new Date(),
+});
+registerSecurityAuditHttp(securityAuditRuntime);
 const {
   minPasswordLength,
   experimentUsernameRegex,
@@ -1147,10 +1156,7 @@ export const asyncMethods: Record<string, unknown> = {
     requireAdminUser: authSupport.requireAdminUser,
   }),
 
-  ...createSecurityAuditMethods({
-    reports: SecurityAuditReports,
-    requireAdminUser: authSupport.requireAdminUser,
-  }),
+  ...securityAuditRuntime.methods,
 }
 
 // Server-side startup logic
@@ -1187,7 +1193,7 @@ Meteor.startup(async function() {
     catch { serverConsole(1, 'Prolific reminder processing failed; queued work retained'); }
     finally { prolificReminderRunning = false; }
   }, 60000);
-  await ensureSecurityAuditIndexes();
+  await securityAuditRuntime.initialize();
   const publicDemoCleanupDeps = {
     usersCollection: MeteorAny.users,
     Histories,

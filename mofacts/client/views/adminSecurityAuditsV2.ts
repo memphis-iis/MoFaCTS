@@ -53,8 +53,7 @@ function identityText(identity: AuditIdentityObservation): string {
 }
 function state(): ViewState { return (Template.instance() as AuditInstance).viewState.get(); }
 
-// This template is deliberately absent from the route loader until the single
-// V2 receiver/workflow cutover. Importing it registers no method or HTTP route.
+// The existing admin route loads the V2 receiver's bounded summary presentation.
 Template.adminSecurityAuditsV2.onCreated(function(this: AuditInstance) {
   this.destroyed = false;
   this.viewState = new ReactiveVar<ViewState>({ status: 'loading' });

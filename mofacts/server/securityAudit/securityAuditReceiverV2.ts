@@ -20,9 +20,9 @@ export class AuditReceiverRequestError extends Error {
 }
 
 // Inert composition: importing this module constructs no collection, registers
-// no route/method and reads no metadata. The coordinated cutover owns activation.
+// no route/method and reads no metadata. The server composition owns activation.
 // The platform observation is a required independently owned adapter, never a
-// request/report value or a guessed tag/config ID. Its runtime wiring is pending.
+// request/report value or a guessed tag/config ID.
 export function createSecurityAuditReceiverV2(deps: {
   createReports: (mongoName: string) => AuditReportCollectionV2;
   requireAdminUser: (userId: UserId, message?: string, code?: string | number) => Promise<void>;
