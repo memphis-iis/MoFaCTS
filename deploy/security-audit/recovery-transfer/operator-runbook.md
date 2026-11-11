@@ -82,8 +82,10 @@ as well. No second backup version or alternate actor is tried.
    With separate runtime approval, prepare a clean checkout in its private /tmp
    directory and run prepare-operator-runtime.sh with the reviewed commit once
    there. It uses the package's Node/npm pins, official HTTPS Node archive/exact
-   vendor checksum, isolated npm runtime/cache, lockfile npm ci without lifecycle
-   scripts and synthetic tests. It installs no system tool or root-user runtime
+   vendor checksum, isolated npm runtime/cache, the existing app production
+   lockfile for shared strict-JSON dependencies, the optional SDK lockfile and
+   synthetic tests. Both installs disable lifecycle scripts and preserve their
+   lockfiles. It installs no system tool or root-user runtime
    and forwards no credentials to npm/tests. Capture the returned private
    workspace, runtime prefix, source SHA and test receipt. A preparation failure
    preserves that named workspace for review without selecting another runtime.

@@ -40,11 +40,21 @@ tar -xJf "$workspace/downloads/$archive" -C "$workspace"
 runtime_path="$workspace/node-v${node_pin}-linux-x64/bin:$PATH"
 [[ "$(env -i PATH="$runtime_path" node --version)" == "v$node_pin" ]]
 lock_before="$(sha256sum "$tool_package/package-lock.json")"
+app_package="$source_root/mofacts"
+app_lock_before="$(sha256sum "$app_package/package-lock.json")"
 # The credential-bearing CloudShell environment never reaches npm or tests.
 timeout 300 env -i PATH="$runtime_path" HOME="$workspace/npm-home" NPM_CONFIG_USERCONFIG=/dev/null NPM_CONFIG_GLOBALCONFIG=/dev/null NPM_CONFIG_CACHE="$workspace/npm-cache" \
   npm install --global --prefix "$workspace/npm-runtime" "npm@$npm_pin" --ignore-scripts --no-audit --no-fund > "$workspace/npm-runtime.log" 2>&1
 runtime_path="$workspace/npm-runtime/bin:$runtime_path"
 [[ "$(env -i PATH="$runtime_path" npm --version)" == "$npm_pin" ]]
+(
+  # Shared recovery/strict-JSON code resolves the existing app-owned acorn
+  # dependency. Prepare its owning lockfile rather than relying on a developer
+  # checkout's node_modules or a separate parser implementation.
+  cd "$app_package"
+  timeout 300 env -i PATH="$runtime_path" HOME="$workspace/npm-home" NPM_CONFIG_USERCONFIG=/dev/null NPM_CONFIG_GLOBALCONFIG=/dev/null NPM_CONFIG_CACHE="$workspace/npm-cache" \
+    npm ci --omit=dev --ignore-scripts --no-audit --no-fund > "$workspace/shared-runtime-install.log" 2>&1
+)
 (
   cd "$tool_package"
   timeout 300 env -i PATH="$runtime_path" HOME="$workspace/npm-home" NPM_CONFIG_USERCONFIG=/dev/null NPM_CONFIG_GLOBALCONFIG=/dev/null NPM_CONFIG_CACHE="$workspace/npm-cache" \
@@ -52,6 +62,7 @@ runtime_path="$workspace/npm-runtime/bin:$runtime_path"
   timeout 120 env -i PATH="$runtime_path" HOME="$workspace/npm-home" NODE_OPTIONS='' npm test > "$workspace/sdk-tests.log" 2>&1
 )
 [[ "$(sha256sum "$tool_package/package-lock.json")" == "$lock_before" ]]
+[[ "$(sha256sum "$app_package/package-lock.json")" == "$app_lock_before" ]]
 [[ "$(git -C "$source_root" rev-parse HEAD)" == "$expected_commit" && -z "$(git -C "$source_root" status --porcelain=v1 --untracked-files=all)" ]]
 trap - ERR
 printf 'Operator runtime prepared. Private workspace: %s\nRuntime PATH prefix: %s\n' "$workspace" "$runtime_path"

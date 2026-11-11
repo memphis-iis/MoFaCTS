@@ -48,6 +48,13 @@ sole deliverable queue.
   tests, optional-tool lint and full app lint passed. Exact actor, role,
   session expiry, scoped environment and payload checks remain enforced.
   This optional-tool-only change needs no additional Meteor invocation.
+Clean-checkout policy rendering then exposed missing acorn: the optional
+installer had prepared its SDK package while shared strict-JSON code imports
+the existing app runtime dependency. No IAM access or payload read occurred.
+The installer now prepares the owning app production lockfile with lifecycle
+scripts disabled and checks both lockfiles for mutation. Its syntax passes;
+actual clean-bootstrap smoke and CloudShell runtime proof remain pending.
+
 - [ ] Render and retain the exact reviewed bootstrap policy and expiry,
   create the owned temporary identity and complete password/MFA handoff.
 - [ ] Verify the new user environment/runtime, activate the exact read role,
