@@ -52,15 +52,25 @@ Clean-checkout policy rendering then exposed missing acorn: the optional
 installer had prepared its SDK package while shared strict-JSON code imports
 the existing app runtime dependency. No IAM access or payload read occurred.
 The installer now prepares the owning app production lockfile with lifecycle
-scripts disabled and checks both lockfiles for mutation. Its syntax passes;
-actual clean-bootstrap smoke and CloudShell runtime proof remain pending.
+scripts disabled and checks both lockfiles for mutation.
 The first actual bootstrap also exposed npm rejecting the same /dev/null file
 for user/global config. Distinct empty private files resolve that regression
 on the downloaded npm 11.19.1. The verified Node archive already bundles that
 exact npm, so its redundant global reinstall is removed.
 
-- [ ] Render and retain the exact reviewed bootstrap policy and expiry,
-  create the owned temporary identity and complete password/MFA handoff.
+- [x] Complete an actual clean Linux bootstrap on committed source 31ce969e:
+  vendor checksum and pinned Node/npm verified, both existing lockfiles
+  preserved, all 51 optional tests passed with zero skips, source tree clean.
+  This is worker bootstrap proof; the new user's CloudShell proof stays open.
+- [x] Create the exact temporary user without permissions; retain its immutable
+  UserId privately and verify zero inline/attached policies, groups and API keys.
+- [x] Verify the console login profile is enabled without a forced password reset.
+- [ ] Complete and verify hardware-key enrollment. AWS metadata returned no MFA
+  devices after the completion report, and this user's wizard was still at
+  device selection. Enrollment was reopened for the human PIN/touch handoff.
+  No expiring grant or protected read has started.
+- [ ] Render and retain the exact reviewed bootstrap policy and expiry after
+  verified credential setup, then attach the expiring CloudShell-only grant.
 - [ ] Verify the new user environment/runtime, activate the exact read role,
   verify installed grants and execute the single protected baseline read.
 - [ ] Preserve sanitized inventory and source/expiry/read evidence, retire

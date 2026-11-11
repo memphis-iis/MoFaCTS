@@ -69,14 +69,19 @@ as well. No second backup version or alternate actor is tried.
    the protected review record. No new root CloudShell runtime is needed for
    policy rendering, and this is not a second Meteor invocation. Retain the full
    verified optional-tool source tests before provisioning any AWS access.
-3. Render an initial bootstrap policy with `recoveryOperatorBootstrapPolicy`.
-   Its one-hour/MFA/Ohio grant allows only launching the new user's CloudShell;
-   it has no role/secret or environment-delete permission. Create the exact new
-   user with that inline policy and no groups, managed policy or API key. Record
-   the returned immutable UserId/ARN in the protected creation receipt.
+3. Create the exact new user without permissions, groups, managed policies or
+   API keys. Record the returned immutable UserId/ARN in the protected creation
+   receipt. Complete the password and hardware-key handoff before starting the
+   expiring grant, so human enrollment cannot consume its access window.
 4. Phil enters the new console password and enrolls his physical key himself,
-   naming only this registration `mofacts-recovery-operator-key`. Record its ARN,
-   require a fresh MFA sign-in and launch that user's new Ohio CloudShell. Capture
+   naming only this registration `mofacts-recovery-operator-key`. Independently
+   verify the login profile and actual MFA association against the recorded
+   immutable UserId; an open wizard or a reported enrollment is insufficient.
+   Record its ARN. Then render and attach the initial bootstrap policy with
+   `recoveryOperatorBootstrapPolicy`, starting the one shared activation/expiry
+   window. Its one-hour/MFA/Ohio grant allows only launching the new user's
+   CloudShell; it has no role/secret or environment-delete permission. Require
+   a fresh MFA sign-in and launch that user's new Ohio CloudShell. Capture
    the actual environment ID from its visible terminal/tab or AWS metadata; never
    substitute the root user's environment. This is a new per-user environment.
    With separate runtime approval, prepare a clean checkout in its private /tmp
