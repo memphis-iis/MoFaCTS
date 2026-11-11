@@ -54,6 +54,10 @@ the existing app runtime dependency. No IAM access or payload read occurred.
 The installer now prepares the owning app production lockfile with lifecycle
 scripts disabled and checks both lockfiles for mutation. Its syntax passes;
 actual clean-bootstrap smoke and CloudShell runtime proof remain pending.
+The first actual bootstrap also exposed npm rejecting the same /dev/null file
+for user/global config. Distinct empty private files resolve that regression
+on the downloaded npm 11.19.1. The verified Node archive already bundles that
+exact npm, so its redundant global reinstall is removed.
 
 - [ ] Render and retain the exact reviewed bootstrap policy and expiry,
   create the owned temporary identity and complete password/MFA handoff.
