@@ -9,10 +9,14 @@ const app = path.resolve(__dirname, '..');
 function load(relative, globals = {}, imports = {}) {
   const exports = {};
   const source = fs.readFileSync(path.resolve(app, relative), 'utf8');
-  const code = ts.transpileModule(source, {
+  const code = ts.transpileModule(source.replaceAll('import.meta.url', JSON.stringify('http://localhost:3200/poseTracking.ts')), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   vm.runInNewContext(code, { exports, DOMException, ...globals, require(name) {
+    if (name.endsWith('cameraTrackingSession')) return load('client/views/experiment/svelte/services/cameraTrackingSession.ts', { window: { addEventListener() {} } }, {
+      'meteor/tracker': { Tracker: { autorun() {} } }, 'meteor/meteor': {}, 'meteor/session': {},
+      '../../../../lib/lessonRoute': {}, 'meteor/ostrio:flow-router-extra': {},
+    });
     if (name.endsWith('/skeleton-demo/figureGestures')) return load('../learning-components/units/skeleton-demo/figureGestures.ts');
     if (!(name in imports)) throw Error(`Unexpected dependency ${name}`);
     return imports[name];
@@ -80,6 +84,7 @@ test('camera releases streams granted after cancellation and never requests audi
   const camera = api.createCameraCapture();
   const video = { srcObject: null, pause() {}, async play() {} };
   const pending = camera.start(video, () => {});
+  await new Promise(resolve => setImmediate(resolve));
   camera.stop();
   grant({ getTracks: () => [{ stop() { stops++; } }] });
   await assert.rejects(pending, { name: 'AbortError' });
@@ -136,76 +141,68 @@ test('camera switching releases the old stream before requesting the exact devic
   assert.ok(tracks.every(track => track.stopped));
 });
 
-test('pose tracker bounds frames, clears inference on stop, and closes late models', async () => {
+test('pose worker preserves observations and cadence, terminates active and pending models, and ignores stale replies', async () => {
+  const createPoseWorkerHarness = require('./helpers/poseTrackingWorkerHarness.cjs');
   let frame;
-  let closed = 0;
   let detections = 0;
-  let handDetections = 0;
   let samples = 0;
-  let create;
-  const api = load('client/views/experiment/svelte/services/poseTracking.ts', {
-    document: { hidden: false },
-    requestAnimationFrame(fn) { frame = fn; return 1; },
-    cancelAnimationFrame() { frame = null; },
-  }, { '@mediapipe/tasks-vision': {
+  let releaseModel;
+  let pendingModel = false;
+  const workers = createPoseWorkerHarness({
     FilesetResolver: { async forVisionTasks() { return {}; } },
-    PoseLandmarker: { POSE_CONNECTIONS: [], createFromOptions() { return new Promise(resolve => { create = resolve; }); } },
-    HandLandmarker: { HAND_CONNECTIONS: [{ start: 0, end: 1 }], async createFromOptions(_files, options) {
-      assert.equal(options.numHands, 2);
-      return { close() { closed++; }, detectForVideo() {
-        handDetections++;
-        return { landmarks: [Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 0 }))],
-          worldLandmarks: [Array.from({ length: 21 }, () => ({ x: 0.01, y: 0.02, z: 0.03 }))],
-          handedness: [[{ categoryName: 'Right', score: 0.95 }]] };
-      } };
+    PoseLandmarker: { POSE_CONNECTIONS: [], async createFromOptions() {
+      if (pendingModel) await new Promise(resolve => { releaseModel = resolve; });
+      return { close() {}, detectForVideo() { detections++; return { landmarks: [], worldLandmarks: [[{ x: 1, y: 2, z: 3, visibility: 1 }]] }; } };
     } },
-  } });
+    HandLandmarker: { HAND_CONNECTIONS: [], async createFromOptions() {
+      return { close() {}, detectForVideo() { return { landmarks: [[{ x: .5, y: .5, z: 0, visibility: 0 }]],
+        worldLandmarks: [[{ x: .01, y: .02, z: .03 }]], handedness: [[{ categoryName: 'Right', score: .65 }]] }; } };
+    } },
+  });
+  const api = load('client/views/experiment/svelte/services/poseTracking.ts', {
+    URL, Worker: workers.Worker, document: { hidden: false },
+    createImageBitmap: async () => ({ close() {} }),
+    requestAnimationFrame(fn) { frame = fn; return 1; }, cancelAnimationFrame() { frame = null; },
+  });
   const tracking = api.createPoseTracking();
   const video = { readyState: 2, currentTime: 0, videoWidth: 640, videoHeight: 480 };
-  const model = { close() { closed++; }, detectForVideo() { detections++; return { landmarks: [], worldLandmarks: [[{ x: 1, y: 2, z: 3, visibility: 1 }]] }; } };
-  const pending = tracking.start(video, observation => {
+  const consume = observation => {
     samples++;
-    assert.equal(observation.worldLandmarks[0].z, 3, "Pose world coordinates reach the same frame consumer");
-    assert.equal(observation.hands.length, 1);
-    assert.equal(observation.hands[0].length, 21);
-    assert.equal(observation.handWorldLandmarks[0][0].z, 0.03);
+    assert.equal(observation.worldLandmarks[0].z, 3);
+    assert.equal(observation.handWorldLandmarks[0][0].z, .03);
     assert.equal(observation.handedness[0], 'Right');
-    assert.equal(api.isInFrameLandmark(observation.hands[0][0]), true, 'Hand landmarks do not require pose visibility');
+    assert.equal(observation.handednessConfidence[0], .65, 'Inference retains confidence; the gesture consumer owns policy');
+    assert.equal(api.isInFrameLandmark(observation.hands[0][0]), true);
     assert.equal(api.isVisiblePoseLandmark(observation.hands[0][0]), false);
-  }, assert.fail);
+  };
+  await tracking.start(video, consume, assert.fail);
+  frame(100); await new Promise(resolve => setImmediate(resolve)); video.currentTime++;
+  frame(110); frame(180); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(detections, 2); assert.equal(samples, 2);
+  const stale = workers.instances[0].onmessage;
+  tracking.stop();
+  stale({ data: { type: 'frame', observation: {} } });
+  assert.equal(samples, 2); assert.equal(frame, null); assert.equal(workers.instances[0].terminated, true);
+  pendingModel = true;
+  const pending = tracking.start(video, assert.fail, assert.fail);
   await new Promise(resolve => setImmediate(resolve));
-  create(model); await pending;
-  frame(100); video.currentTime++;
-  frame(110); frame(180);
-  assert.equal(detections, 2); assert.equal(handDetections, 2); assert.equal(samples, 2);
-  const stale = frame;
-  tracking.stop(); stale(300);
-  assert.equal(detections, 2); assert.equal(closed, 2); assert.equal(frame, null);
-  const cancelled = tracking.start(video, assert.fail, assert.fail);
-  await new Promise(resolve => setImmediate(resolve));
-  tracking.stop(); create(model); await cancelled;
-  assert.equal(closed, 3);
+  tracking.stop(); await pending; releaseModel(); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(workers.instances[1].terminated, true);
+  assert.equal(frame, null);
 });
 
-test('late hand initialization is closed on cancellation and a failed hand model releases the pose model', async () => {
-  let createHand;
-  let rejectHand;
+test('hand initialization errors close created models, reject startup, and terminate the worker', async () => {
+  const createPoseWorkerHarness = require('./helpers/poseTrackingWorkerHarness.cjs');
   let closed = 0;
-  const api = load('client/views/experiment/svelte/services/poseTracking.ts', {
-    document: { hidden: false }, requestAnimationFrame: assert.fail, cancelAnimationFrame() {},
-  }, { '@mediapipe/tasks-vision': {
+  const workers = createPoseWorkerHarness({
     FilesetResolver: { async forVisionTasks() { return {}; } },
     PoseLandmarker: { async createFromOptions() { return { close() { closed++; } }; } },
-    HandLandmarker: { createFromOptions() { return new Promise((resolve, reject) => { createHand = resolve; rejectHand = reject; }); } },
-  } });
+    HandLandmarker: { async createFromOptions() { throw Error('Hand model unavailable'); } },
+  });
+  const api = load('client/views/experiment/svelte/services/poseTracking.ts', {
+    URL, Worker: workers.Worker, document: { hidden: false }, requestAnimationFrame: assert.fail, cancelAnimationFrame() {},
+  });
   const tracking = api.createPoseTracking();
-  const pending = tracking.start({}, assert.fail, assert.fail);
-  await new Promise(resolve => setImmediate(resolve));
-  tracking.stop(); createHand({ close() { closed++; } }); await pending;
-  assert.equal(closed, 2);
-  const failed = tracking.start({}, assert.fail, assert.fail);
-  await new Promise(resolve => setImmediate(resolve));
-  rejectHand(new Error('Hand model unavailable'));
-  await assert.rejects(failed, /Hand model unavailable/);
-  assert.equal(closed, 3);
+  await assert.rejects(tracking.start({}, assert.fail, assert.fail), /Hand model unavailable/);
+  assert.equal(closed, 1); assert.equal(workers.instances[0].terminated, true);
 });

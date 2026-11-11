@@ -8,13 +8,13 @@ Choose Start calibration, grant camera permission, and click each blue target on
 
 On entry to a tracked practice unit without an active calibration, including a resumed later unit, the calibration panel appears before practice begins. Continue without tracking dismisses it and starts practice. During an enabled practice unit, a small red dot follows the mean of each complete bin of five valid predictions, accepted at most once every 100 ms (a maximum 10 Hz input rate and roughly 2 Hz dot updates). A slower camera or prediction loop produces fewer updates. Invalid predictions or a 250 ms gap clear any partial bin and hide the dot. Resizing invalidates calibration. The inline Calibrate gaze action remains available after practice begins; it opens the calibration panel while practice timing continues, so the entry prompt or dedicated calibration unit is preferable for an undisturbed check.
 
-Tracking is shared across drill, test, study, SPARC, video, and AutoTutor surfaces. It pauses on instructions, disabled units, and hidden tabs. The camera remains acquired between units; leaving the lesson or logging out releases it. Use HTTPS or localhost and a desktop webcam. Chrome and Edge are the initial manual verification targets.
+Tracking is shared across drill, test, study, SPARC, video, and AutoTutor surfaces. It pauses on instructions, disabled units, and hidden tabs. The camera and calibration remain acquired across ordinary disabled units. Choosing Start camera in a skeleton unit hands ownership to pose/hand tracking: the gaze stream is stopped and its in-memory calibration is reset. Returning to a gaze-enabled unit uses the existing entry calibration prompt. Leaving the lesson, changing lessons/accounts, logging out, or page hide releases the owner, including a pending start. Use HTTPS or localhost and a desktop webcam. Chrome and Edge are the initial manual verification targets.
 
 ## Setup and evaluation
 
 `npm install` prepares pinned WebGazer 3.5.3 MediaPipe assets in the ignored `mofacts/public/webgazer` directory. If dependencies were installed with scripts disabled, run `node scripts/prepareWebGazerAssets.cjs` from `mofacts/`. Generated assets must be available in the application build. The tracker is GPL-3.0-or-later; its packaged MediaPipe assets retain their upstream notices. Asset preparation also replaces the pinned MediaPipe Embind string-compiling helpers with equivalent ordinary JavaScript closures in both WASM runtimes. The application keeps its CSP prohibition on `unsafe-eval`; WebAssembly uses the existing `wasm-unsafe-eval` permission. Preparation checks upstream runtime checksums and fails if they change, requiring a compatibility review. Generated notices identify this modification.
 
-Run `node --test scripts/webGazerCsp.test.cjs scripts/gazeTracking.test.cjs` from `mofacts/` to check binding equivalence, real Chromium WASM initialization under CSP, and calibration lifecycle behavior. The browser test needs the existing Playwright Chromium installation and uses no camera or learner data.
+Run `node --test scripts/webGazerCsp.test.cjs scripts/gazeTracking.test.cjs scripts/cameraTrackingSuite.test.cjs` from `mofacts/` to check binding equivalence, real Chromium WASM initialization under CSP, and calibration lifecycle behavior. The browser test needs the existing Playwright Chromium installation and uses no camera or learner data.
 
 An isolated example lives in the canonical configuration repository under `Gaze Tracking Prototype`. Load its TDF and stimulus file through the normal content workflow. It contains calibration, tracked study and drill, an untracked test, and a tracked test.
 
@@ -25,3 +25,28 @@ Evaluate whether the red dot is near intended viewing locations (roughly 100 pix
 The registered calibration engine owns its complete initialization, resume, and completion lifecycle. It does not construct the practice base engine, read lesson stimuli, or create an adaptive model. Practice engines retain their required stimulus identity checks.
 
 The client gaze service exposes a Svelte subscription to completed five-prediction bin means, containing viewport coordinates and the last prediction's monotonic receipt timestamp, plus explicit unit activation and current practice phase. The only buffer is the current in-memory bin; it is cleared on pause, invalid prediction, and lesson change. A later recorder can subscribe without changing unit engines. No history fields, storage, server endpoints, or region classification are present in this version. Prediction receipt time is not camera capture time.
+
+## Camera ownership and handoff
+
+`cameraTrackingSession.ts` owns one camera lease at the application-session boundary.
+Gaze and pose keep separate inference, calibration, output types, and consumers.
+A successor revokes the previous lease and waits for pending initialization and
+late-resource cleanup before acquiring its camera. Browser permission requests and
+WebGazer `begin()` cannot be aborted: a pending handoff waits for that request to
+settle. Revoked callbacks cannot mutate the successor's service state. Ordinary
+instructions/disabled units retain gaze calibration; they do not dispose the service.
+
+Pinned WebGazer 3.5.3 obtains its own stream. `pause()` keeps it; `end()` removes
+its DOM but does not stop video or clear regressions; `stopVideo()` stops only the
+first track. The app stops every acquired track and resets in-memory regressions
+on handoff. Although regressions can survive those library calls, the library does
+not establish their validity after camera reacquisition or device switching, so
+handoff requires recalibration. It does not clear IndexedDB or save calibration.
+
+The real-library browser check in `scripts/skeletonDemoBrowser.test.cjs` exercises
+this transition through the production route wrapper, gaze service, capture,
+pose worker, and calibration UI. Streams come from blank canvases, and the initial
+synthetic calibration is accepted programmatically to test lifecycle rather than
+accuracy. App identity/session inputs and the practice surface are controlled test
+boundaries. No physical webcam is opened. The existing manual accuracy check is
+still required.

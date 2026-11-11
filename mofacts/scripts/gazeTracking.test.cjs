@@ -98,7 +98,7 @@ test('registered calibration initializes without practice stimuli or an adaptive
       exports,
       require(name) {
         if (!name.startsWith('.')) return require(name);
-        const resolved = path.resolve(path.dirname(filename), name + '.ts');
+        const resolved = path.resolve(path.dirname(filename), name.endsWith('.ts') ? name : name + '.ts');
         if (resolved === path.join(componentRoot, 'defaultLearningComponentCatalog.ts')) {
           return { defaultUnitComponentManifestsFromCatalog: [
             load(path.join(componentRoot, 'units/gaze-calibration/manifest.ts')).gazeCalibrationUnitComponentManifest,
@@ -172,13 +172,17 @@ function harness(beginOverride) {
   const windowRef = { ...events, innerWidth: 1000, innerHeight: 800 };
   const exports = {};
   const source = fs.readFileSync(path.join(__dirname, '../client/views/experiment/svelte/services/gazeTracking.ts'), 'utf8');
+  const cameraSession = {};
+  let currentExports = cameraSession;
   const code = ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true,
   } }).outputText;
-  vm.runInNewContext(code, {
-    exports, performance: { now: () => now }, setTimeout, clearTimeout, document,
+  const globals = {
+    get exports() { return currentExports; }, DOMException, performance: { now: () => now }, setTimeout, clearTimeout, document,
     window: windowRef,
     require(name) {
+      if (name.endsWith('cameraTrackingSession')) return cameraSession;
+      if (name === 'meteor/session') return { Session: { get: () => 'lesson' } };
       if (name === 'svelte/store') return { writable: value => {
         snapshot = value; return { set(next) { snapshot = next; } };
       } };
@@ -191,7 +195,11 @@ function harness(beginOverride) {
       if (name === 'webgazer/dist/webgazer.commonjs2.js') return { webgazer: fake };
       throw new Error(name);
     },
-  });
+  };
+  const sessionSource = fs.readFileSync(path.join(__dirname, '../client/views/experiment/svelte/services/cameraTrackingSession.ts'), 'utf8');
+  vm.runInNewContext(ts.transpileModule(sessionSource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, globals);
+  currentExports = exports;
+  vm.runInNewContext(code, globals);
   return { api: exports, fake, regression, document, handlers, windowRef,
     sample: value => listener(value), state: () => snapshot,
     counts: () => ({ pauses, resumes, stops, ends }), advance: () => { now += 1000; },
@@ -283,7 +291,7 @@ test('leaving while permission is pending cleans up a late camera grant', async 
   await new Promise(resolve => setImmediate(resolve));
   h.api.disposeGazeTracking();
   grant();
-  await pending;
+  await assert.rejects(pending, { name: 'AbortError' });
   assert.equal(h.state().calibrated, false);
   assert.equal(h.counts().stops, 1);
   assert.equal(h.counts().ends, 1);

@@ -1,45 +1,40 @@
-import type { PoseLandmarker, HandLandmarker, NormalizedLandmark, Landmark } from '@mediapipe/tasks-vision';
-import { FIGURE_GESTURE_LIMITS } from '../../../../../../learning-components/units/skeleton-demo/figureGestures';
-import type { HandPoint } from '../../../../../../learning-components/units/skeleton-demo/figureGestures';
+import type { NormalizedLandmark, Landmark } from '@mediapipe/tasks-vision';
+import type { PoseWorkerMessage, PoseWorkerRequest } from './poseTrackingWorker';
 
 export interface PoseObservation {
   readonly landmarks: readonly NormalizedLandmark[];
   readonly worldLandmarks: readonly Landmark[];
   readonly hands: readonly (readonly NormalizedLandmark[])[];
-  readonly handWorldLandmarks: readonly (readonly HandPoint[])[];
+  readonly handWorldLandmarks: readonly (readonly Landmark[])[];
   readonly handedness: readonly string[];
-  // Monotonic inference timestamp, not a claim of sensor capture time.
+  readonly handednessConfidence: readonly number[];
+  // Monotonic inference input timestamp, not a claim of sensor capture time.
   readonly timestamp: number;
   readonly width: number;
   readonly height: number;
 }
-
 export interface PoseConnection { readonly start: number; readonly end: number }
-
 export function isInFrameLandmark(point: NormalizedLandmark | undefined): point is NormalizedLandmark {
   return Boolean(point && Number.isFinite(point.x) && Number.isFinite(point.y)
     && point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1);
 }
-
 export function isVisiblePoseLandmark(point: NormalizedLandmark | undefined): point is NormalizedLandmark {
   return isInFrameLandmark(point) && point.visibility >= 0.5;
 }
 
-// Each consumer owns its instance; no global camera, frame buffer, or sample history.
 export function createPoseTracking() {
   let generation = 0;
-  let landmarker: PoseLandmarker | null = null;
-  let handLandmarker: HandLandmarker | null = null;
+  let worker: Worker | null = null;
   let animationFrame: number | null = null;
+  let cancelInitialization: (() => void) | null = null;
 
   function stop(): void {
     generation++;
     if (animationFrame !== null) cancelAnimationFrame(animationFrame);
     animationFrame = null;
-    landmarker?.close();
-    landmarker = null;
-    handLandmarker?.close();
-    handLandmarker = null;
+    // Termination also releases WASM/models during pending initialization.
+    worker?.terminate(); worker = null;
+    cancelInitialization?.(); cancelInitialization = null;
   }
 
   async function start(
@@ -49,59 +44,57 @@ export function createPoseTracking() {
   ): Promise<void> {
     stop();
     const token = generation;
-    const { FilesetResolver, PoseLandmarker, HandLandmarker } = await import('@mediapipe/tasks-vision');
-    if (token !== generation) return;
-    const files = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
-    if (token !== generation) return;
-    const created = await PoseLandmarker.createFromOptions(files, {
-      baseOptions: { modelAssetPath: '/mediapipe/pose_landmarker_full.task', delegate: 'CPU' },
-      runningMode: 'VIDEO',
-      numPoses: 1,
-      outputSegmentationMasks: false,
+    const created = new Worker(new URL('./poseTrackingWorker.ts', import.meta.url));
+    worker = created;
+    let busy = false;
+    let rejectInitialization: (error: Error) => void;
+    let ready = false;
+    const initialized = new Promise<void>((resolve, reject) => {
+      cancelInitialization = resolve;
+      rejectInitialization = reject;
+      created.onmessage = ({ data }: MessageEvent<PoseWorkerMessage>) => {
+        if (token !== generation) return;
+        if (data.type === 'ready') { ready = true; cancelInitialization = null; resolve(); }
+        else if (data.type === 'error') fail(new Error(data.message));
+        else {
+          busy = false;
+          if (document.hidden) return;
+          try { onFrame(data.observation, data.connections, data.handConnections); }
+          catch (error) { fail(error); }
+        }
+      };
     });
-    if (token !== generation) { created.close(); return; }
-    landmarker = created;
-    let hands: HandLandmarker;
-    try {
-      hands = await HandLandmarker.createFromOptions(files, {
-        baseOptions: { modelAssetPath: '/mediapipe/hand_landmarker.task', delegate: 'CPU' },
-        runningMode: 'VIDEO', numHands: 2,
-      });
-    } catch (error) {
-      if (token === generation) stop();
-      throw error;
+    function fail(error: unknown): void {
+      if (token !== generation) return;
+      if (!ready) rejectInitialization(error instanceof Error ? error : new Error('Pose inference unavailable'));
+      stop();
+      if (ready) onError(error);
     }
-    if (token !== generation) { hands.close(); return; }
-    handLandmarker = hands;
+    created.onerror = event => { event.preventDefault(); fail(new Error(event.message || 'Pose worker unavailable')); };
+    const initialize: PoseWorkerRequest = { type: 'initialize' };
+    try { created.postMessage(initialize); await initialized; }
+    catch (error) { if (token === generation) stop(); throw error; }
+    if (token !== generation) return;
     let lastVideoTime = -1;
     let lastInference = -Infinity;
     function frame(timestamp: number): void {
       if (token !== generation) return;
-      // Bound synchronous inference to 15 Hz; skip repeated decoded frames.
-      if (!document.hidden && video.readyState >= 2 && video.currentTime !== lastVideoTime
+      // No queue: one transferred frame at a time, at most 15 Hz, no duplicates.
+      if (!busy && !document.hidden && video.readyState >= 2 && video.currentTime !== lastVideoTime
         && timestamp - lastInference >= 1000 / 15) {
         lastVideoTime = video.currentTime;
         lastInference = timestamp;
-        try {
-          const result = created.detectForVideo(video, timestamp);
-          const handResult = hands.detectForVideo(video, timestamp);
-          onFrame({ landmarks: result.landmarks[0] ?? [], worldLandmarks: result.worldLandmarks[0] ?? [], hands: handResult.landmarks,
-            handWorldLandmarks: handResult.worldLandmarks,
-            handedness: handResult.handedness.map(categories => {
-              const hand = categories[0];
-              return hand && hand.score >= FIGURE_GESTURE_LIMITS.minHandednessConfidence ? hand.categoryName : '';
-            }), timestamp,
-            width: video.videoWidth, height: video.videoHeight }, PoseLandmarker.POSE_CONNECTIONS, HandLandmarker.HAND_CONNECTIONS);
-        } catch (error) {
-          stop();
-          onError(error);
-          return;
-        }
+        busy = true;
+        void createImageBitmap(video).then(bitmap => {
+          if (token !== generation) { bitmap.close(); return; }
+          const request: PoseWorkerRequest = { type: 'frame', bitmap, timestamp, width: bitmap.width, height: bitmap.height };
+          try { created.postMessage(request, [bitmap]); }
+          catch (error) { bitmap.close(); fail(error); }
+        }).catch(fail);
       }
-      if (token === generation) animationFrame = requestAnimationFrame(frame);
+      animationFrame = requestAnimationFrame(frame);
     }
     animationFrame = requestAnimationFrame(frame);
   }
-
   return { start, stop };
 }

@@ -115,10 +115,11 @@ database fields, or data migration are needed. The demo's labels are English.
   after cancellation; requests video only and releases the old stream before
   requesting an explicitly selected device ID. Camera identities stay in memory
   only for the current capture; they are not logged or persisted.
-- `poseTracking.ts`: owns one pose model and one two-hand model with a single
-  bounded frame loop. Both process the same video frame and timestamp.
+- `poseTracking.ts`: schedules one frame at a time for a dedicated local worker.
+  `poseTrackingWorker.ts` owns one pose model and one two-hand model, processing
+  the same transferred frame and timestamp.
   Publishes current normalized hand landmarks, aligned hand-world landmarks
-  and confident handedness labels, dimensions, and monotonic inference
+  and raw handedness labels/confidence, dimensions, and monotonic inference-input
   timestamp to its consumer. No history buffer or global sample store exists.
 - `PoseCameraPreview.svelte`: renders video and visible landmarks together with
   identical sizing and mirroring. The central theme owns appearance.
@@ -141,7 +142,7 @@ The Full Pose model estimates one person's 33 body landmarks. The Hand Landmarke
 adds 21 landmarks per hand for up to two hands, including all five fingers.
 Hand landmarks use the hand detector's confidence thresholds, rather than the
 pose model's per-landmark visibility field. Depth is inferred, not a calibrated room
-measurement. CPU inference is capped at 15 Hz and skips duplicate video frames;
+measurement. Worker CPU inference is capped at 15 Hz and skips duplicate video frames;
 actual speed depends on the learner's device.
 
 ## Gesture limits and coordinate contract
@@ -291,3 +292,38 @@ frames for simple and personally calibrated upper-body distance scores. See
 [the method and test plan](pose-matcher-plan.md) for calibration, topology,
 reflection semantics, limitations, and verification. Existing gestures remain active.
 No comparison samples or scores are saved or uploaded.
+
+## Camera suite lifecycle
+
+Gaze and this demo share the application's `cameraTrackingSession.ts` ownership
+boundary. Starting this camera releases a paused gaze stream and invalidates its
+calibration. On return, a gaze-enabled unit prompts for calibration again; ordinary
+disabled units still retain it. Models and observations remain separate, and a unit
+still cannot enable both modes. Route exit, logout/account change, lesson change,
+page hide, unit unmount, Stop camera, and switching cancel pending work and release
+owned resources. A pending browser permission request must settle before a new
+owner opens its camera. A late stream is stopped before handoff proceeds.
+
+`poseTracking.ts` schedules at most one inference frame at a time and at most 15 Hz,
+skipping duplicate decoded video frames. It transfers one temporary `ImageBitmap`
+to `poseTrackingWorker.ts`, which loads the same pinned local CPU pose/hand models.
+The worker closes each bitmap after inference; stopping terminates the worker,
+including pending WASM/model loading. No frames are recorded, retained as history,
+or uploaded. Observation timestamps are monotonic inference-input times, not
+physical camera capture times. Pose and hand landmarks/confidence reach the app;
+`FigureOverlay.svelte` applies the existing 0.7 handedness-confidence policy at the
+gesture-consumer boundary. Gesture interpretation stays in `learning-components/`.
+
+The worker provides runtime isolation because WebGazer's older FaceMesh WASM and
+Tasks Vision both use Emscripten globals. Loading them in the same window reproduced
+a `Module.noExitRuntime` initialization failure. Separate globals resolve that
+collision without changing dependencies, upstream bundles, served assets, or CSP.
+A browser must support workers, transferable `ImageBitmap`, and `OffscreenCanvas`;
+unsupported/failed inference reports the existing explicit unavailable state.
+There is no substitute model or main-thread inference path.
+
+Run `node --test scripts/cameraTrackingSuite.test.cjs scripts/gazeTracking.test.cjs
+scripts/skeletonDemo.test.cjs` for controlled lifecycle checks, and
+`node --test scripts/skeletonDemoBrowser.test.cjs` with the supported localhost
+watcher for the real-library transition and existing gesture/display checks.
+The latter uses synthetic video and does not establish physical tracking accuracy.

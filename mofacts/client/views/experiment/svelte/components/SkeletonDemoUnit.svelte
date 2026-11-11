@@ -29,7 +29,7 @@
   let mounted = true;
   let generation = 0;
   let engine: Awaited<ReturnType<typeof initializeEngine>> | null = null;
-  const camera = createCameraCapture();
+  const camera = createCameraCapture(stop);
   const tracking = createPoseTracking();
   let figureSurface: FigureOverlay;
   let figureReady = false;

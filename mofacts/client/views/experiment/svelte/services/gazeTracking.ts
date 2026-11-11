@@ -1,6 +1,4 @@
-import { Tracker } from 'meteor/tracker';
-import { Meteor } from 'meteor/meteor';
-import { isLessonRoutePath } from '../../../../lib/lessonRoute';
+import { startCameraTracking, type CameraTrackingLease } from './cameraTrackingSession';
 import { writable } from 'svelte/store';
 
 export interface GazeSample {
@@ -25,7 +23,6 @@ interface WebGazer {
   pause(): void;
   resume(): Promise<unknown>;
   end(): void;
-  stopVideo(): void;
   saveDataAcrossSessions(value: boolean): WebGazer;
   applyKalmanFilter(value: boolean): WebGazer;
   showPredictionPoints(value: boolean): WebGazer;
@@ -45,6 +42,7 @@ let tracker: WebGazer | null = null;
 let initialized = false;
 let initializing: Promise<void> | null = null;
 let generation = 0;
+let cameraLease: CameraTrackingLease<void> | null = null;
 let calibrationActive = false;
 let context: GazeContext = { lessonId: '', unitId: 0, enabled: false };
 let staleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -86,6 +84,7 @@ export function isValidGazeSample(sample: { x: number; y: number } | null): bool
 function receive(sample: { x: number; y: number } | null): void {
   const receivedAt = performance.now();
   lastFrameAt = receivedAt;
+  if (!cameraLease?.isCurrent()) return;
   if ((!context.enabled && !calibrationActive) || document.hidden || !isValidGazeSample(sample)) {
     clearPrediction();
     return;
@@ -107,11 +106,13 @@ function receive(sample: { x: number; y: number } | null): void {
 }
 function updateActivity(): void {
   clearPrediction();
-  if (!initialized || !tracker) return;
+  if (!initialized || !tracker || !cameraLease?.isCurrent()) return;
+  const token = generation;
   const active = !document.hidden && (calibrationActive || (context.enabled && state.calibrated));
   tracker.showVideoPreview(calibrationActive);
   if (active) {
     void tracker.resume().catch(() => {
+      if (token !== generation || !cameraLease?.isCurrent()) return;
       state.status = 'Tracking unavailable';
       state.calibrated = false;
       tracker?.pause();
@@ -141,59 +142,74 @@ export function setGazeContext(next: GazeContext): void {
 }
 export async function startGazeCalibration(): Promise<void> {
   if (initializing) return initializing;
-  const token = generation;
-  initializing = (async () => {
+  const operation = (async () => {
     state.status = 'Starting camera';
     state.calibrated = false;
     publish();
-    try {
-      if (!tracker) {
-        // The CommonJS bundle exposes the same documented WebGazer API.
-        const module = await import('webgazer/dist/webgazer.commonjs2.js');
-        if (token !== generation) return;
-        tracker = module.default.webgazer as WebGazer;
-        tracker.params.faceMeshSolutionPath = '/webgazer/mediapipe/face_mesh';
-        tracker.saveDataAcrossSessions(false).applyKalmanFilter(false)
-          .showPredictionPoints(false).showFaceOverlay(false).showFaceFeedbackBox(false)
-          .setGazeListener(receive);
-      }
-      if (!initialized) {
-        await tracker.begin();
-        if (token !== generation) {
-          releaseCamera();
-          return;
+    if (!initialized) {
+      const request = startCameraTracking('gaze', () => {
+        if (cameraLease === request) initializing = null;
+        generation++;
+        if (initialized) releaseCamera();
+        initialized = false;
+        if (cameraLease === request) {
+          calibrationActive = false;
+          state.calibrated = false;
+          state.status = 'Not calibrated';
+          clearPrediction();
         }
-        initialized = true;
+        window.removeEventListener('resize', resize);
+        document.removeEventListener('visibilitychange', updateActivity);
+      }, async isCurrent => {
+        if (!tracker) {
+          const module = await import('webgazer/dist/webgazer.commonjs2.js');
+          if (!isCurrent()) return;
+          tracker = module.default.webgazer as WebGazer;
+          tracker.params.faceMeshSolutionPath = '/webgazer/mediapipe/face_mesh';
+          tracker.saveDataAcrossSessions(false).applyKalmanFilter(false)
+            .showPredictionPoints(false).showFaceOverlay(false).showFaceFeedbackBox(false);
+        }
+        // Set a lease-scoped listener: revoked callbacks cannot clear a newer bin.
+        tracker.setGazeListener(sample => { if (isCurrent()) receive(sample); });
+        try { await tracker.begin(); }
+        finally {
+          // begin can leave a stream/DOM behind even when initialization fails.
+          // Its loadeddata listener owns that DOM until begin settles.
+          initialized = true;
+        }
+        if (!isCurrent()) return;
         tracker.removeMouseEventListeners();
         dimensions = `${window.innerWidth}x${window.innerHeight}`;
         window.addEventListener('resize', resize);
         document.addEventListener('visibilitychange', updateActivity);
-        window.addEventListener('pagehide', disposeGazeTracking);
         const stream = (document.getElementById('webgazerVideoFeed') as HTMLVideoElement | null)?.srcObject as MediaStream | null;
         stream?.getVideoTracks().forEach(track => track.addEventListener('ended', () => {
-          if (token !== generation) return;
+          if (!isCurrent()) return;
           disposeGazeTracking();
           state.status = 'Camera unavailable - recalibrate';
           publish();
         }));
+      });
+      cameraLease = request;
+      state.status = 'Starting camera';
+      publish();
+      try { await request.ready; }
+      catch (error) {
+        if (cameraLease === request && !(error instanceof DOMException && error.name === 'AbortError')) {
+          state.status = error instanceof Error ? `Tracking unavailable: ${error.message}` : 'Tracking unavailable';
+          publish();
+        }
+        throw error;
       }
-      // Reset only the in-memory regressions. clearData() also touches IndexedDB.
-      tracker.getRegression().forEach(regression => regression.init());
-      calibrationActive = true;
-      state.status = 'Calibration';
-      updateActivity();
-    } catch (error) {
-      releaseCamera();
-      initialized = false;
-      state.status = error instanceof Error ? `Tracking unavailable: ${error.message}` : 'Tracking unavailable';
-      state.calibrated = false;
-      calibrationActive = false;
-      tracker?.pause();
-      clearPrediction();
-      throw error;
+      if (!request.isCurrent()) throw new DOMException('Camera start was cancelled', 'AbortError');
     }
+    tracker!.getRegression().forEach(regression => regression.init());
+    calibrationActive = true;
+    state.status = 'Calibration';
+    updateActivity();
   })();
-  try { await initializing; } finally { initializing = null; }
+  initializing = operation;
+  try { await operation; } finally { if (initializing === operation) initializing = null; }
 }
 export function trainGazeTarget(x: number, y: number): boolean {
   if (!tracker || !calibrationActive || document.hidden || performance.now() - lastFrameAt > 250 || !tracker.getTracker().getPositions()?.length) return false;
@@ -214,35 +230,18 @@ export function acceptGazeCalibration(): void {
   updateActivity();
 }
 export function cancelGazeCalibration(): void {
-  if (initializing) generation++;
+  if (initializing) disposeGazeTracking();
   calibrationActive = false;
   state.calibrated = false;
   state.status = 'Not calibrated';
   updateActivity();
 }
 export function disposeGazeTracking(): void {
-  generation++;
+  cameraLease?.stop();
+  cameraLease = null;
+  initializing = null;
   calibrationActive = false;
-  // A pending begin owns initialization DOM until it settles; its generation guard
-  // releases a late stream without tearing down the loadeddata listener prematurely.
-  if (initialized && tracker) releaseCamera();
-  initialized = false;
   state.calibrated = false;
   state.status = 'Not calibrated';
   clearPrediction();
-  window.removeEventListener('resize', resize);
-  document.removeEventListener('visibilitychange', updateActivity);
-  window.removeEventListener('pagehide', disposeGazeTracking);
 }
-
-const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
-  FlowRouter: { watchPathChange(): void; current(): { path?: string } };
-};
-Tracker.autorun(() => {
-  FlowRouter.watchPathChange();
-  const path = FlowRouter.current().path || '';
-  const user = Meteor.userId();
-  if (!user || (!isLessonRoutePath(path, '/content') && !isLessonRoutePath(path, '/instructions'))) {
-    if (initialized || initializing) disposeGazeTracking();
-  }
-});

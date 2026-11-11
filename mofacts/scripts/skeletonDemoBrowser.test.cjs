@@ -11,7 +11,7 @@ const app = path.resolve(__dirname, '..');
 const shellStylesheets = [...fs.readFileSync(path.join(app, 'client/index.html'), 'utf8')
   .matchAll(/<link\b[^>]*>/g)].map(match => match[0]).filter(tag => /rel="stylesheet"/.test(tag)).join('\n');
 
-async function buildFixture(syntheticTracking = false) {
+async function buildFixture(syntheticTracking = false, cameraSuite = false) {
   const temporaryRoot = path.join(app, '../tmp');
   fs.mkdirSync(temporaryRoot, { recursive: true });
   const directory = fs.mkdtempSync(path.join(temporaryRoot, 'skeleton-demo-'));
@@ -25,19 +25,24 @@ async function buildFixture(syntheticTracking = false) {
     stub('poseTracking', `export { isInFrameLandmark, isVisiblePoseLandmark } from ${JSON.stringify(tracker)};
       export function createPoseTracking() {
         let callback = null;
-        window.handTest = { emit(frame) { callback?.(frame, [{ start: 0, end: 1 }], [{ start: 4, end: 8 }]); } };
+        window.handTest = { emit(frame) { callback?.({ ...frame, handednessConfidence: frame.handedness.map(() => 1) }, [{ start: 0, end: 1 }], [{ start: 4, end: 8 }]); } };
         return { async start(video, onFrame) { callback = onFrame; }, stop() { callback = null; } };
       }`);
   }
   const engine = path.join(app, '../learning-components/units/skeleton-demo/manifest.ts').replaceAll('\\', '/');
+  const fixtureUnits = cameraSuite ? [{ gazeTracking: true }, {}, { skeletondemosession: {} }, { gazeTracking: true }]
+    : [{ skeletondemosession: {} }, { skeletondemosession: {} }, { unitinstructions: 'Practice boundary' }];
   stub('meteor/session', `const listeners = new Set();
-    const units = [{ skeletondemosession: {} }, { skeletondemosession: {} }, { unitinstructions: 'Practice boundary' }];
+    const units = ${JSON.stringify(fixtureUnits)};
     const values = { currentTdfId: 'synthetic', currentUnitNumber: 0, currentTdfUnit: units[0],
       currentTdfFile: { tdfs: { tutor: { unit: units } } } };
     export const Session = { get: key => values[key], set(key, value) { values[key] = value; },
+      notify() { for (const fn of listeners) fn(); },
       advance() { values.currentTdfUnit = units[++values.currentUnitNumber]; for (const fn of listeners) fn(); } };
     export const Tracker = { autorun(fn) { listeners.add(fn); fn(); return { stop() { listeners.delete(fn); } }; } };`);
   replacements['meteor/tracker'] = replacements['meteor/session'];
+  stub('meteor/meteor', `export const Meteor = { userId: () => window.fixtureUser === false ? null : 'synthetic' };`);
+  stub('meteor/ostrio:flow-router-extra', `export const FlowRouter = { watchPathChange() {}, current: () => ({ path: window.fixturePath || '/content/synthetic' }) };`);
   stub('unitEngineService', `import { createSkeletonDemoUnitEngine } from ${JSON.stringify(engine)};
     export async function initializeEngine() { return createSkeletonDemoUnitEngine(); }`);
   stub('unitProgression', `import { Session } from 'meteor/session';
@@ -45,18 +50,23 @@ async function buildFixture(syntheticTracking = false) {
   stub('engineManager', 'let engine; export function setEngine(value) { engine = value; } export function getEngine() { return engine; }');
   stub('launchLoading', 'export function finishLaunchLoading() {}');
   stub('contentSurfaceInstance', "import { writable } from 'svelte/store'; export const contentSurfaceRevision = writable(0);");
-  stub('gazeTracking', `import { writable } from 'svelte/store'; export const gazeState = writable({ calibrated: false });
+  if (!cameraSuite) stub('gazeTracking', `import { writable } from 'svelte/store'; export const gazeState = writable({ calibrated: false });
     export const getGazeContext = () => ({}); export function setGazeContext() {} export function cancelGazeCalibration() {}`);
   stub('engineConstructors', `export function resolveUnitEngineTypeForUnit(unit) {
     if (unit.skeletondemosession) return 'skeleton-demo'; throw Error('Unexpected calibration engine'); }`);
   replacements['ContentSurface.svelte'] = write('Practice.svelte', `<script>import { onMount } from 'svelte';
     onMount(() => { window.fixture.practiceMounts++; });</script><p>Practice surface boundary</p>`);
-  replacements['GazeCalibration.svelte'] = replacements['GazeDot.svelte'] = write('Empty.svelte', '<div></div>');
+  if (!cameraSuite) replacements['GazeCalibration.svelte'] = replacements['GazeDot.svelte'] = write('Empty.svelte', '<div></div>');
   const component = path.join(app, 'client/views/experiment/svelte/components/ContentRouteSurface.svelte').replaceAll('\\', '/');
   const entry = write('entry.js', `import { mount, unmount, tick } from 'svelte';
     import Unit from ${JSON.stringify(component)};
+    ${cameraSuite ? `import * as gaze from '${path.join(app, 'client/views/experiment/svelte/services/gazeTracking.ts').replaceAll('\\', '/')}';
+      import { get } from 'svelte/store'; import { Session } from 'meteor/session';` : ''}
     let instance;
-    window.fixture = { completions: 0, practiceMounts: 0, async mount() {
+    window.fixture = { ${cameraSuite ? `gaze, state: () => get(gaze.gazeState), advance: () => Session.advance(),
+      leave() { window.fixturePath = '/dashboard'; Session.notify(); },
+      async calibrate() { gaze.setGazeContext({ lessonId: 'synthetic', unitId: 0, enabled: true });
+        await gaze.startGazeCalibration(); gaze.acceptGazeCalibration(); },` : ''} completions: 0, practiceMounts: 0, async mount() {
       instance = mount(Unit, { target: document.querySelector('#content-root'), props: { tdfId: 'synthetic', unitId: 0, userId: 'synthetic' } }); await tick();
     }, async destroy() { await unmount(instance); await tick(); } };`);
   const compiler = rspack({
@@ -433,4 +443,100 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
   } finally {
     await browser.close(); assert.equal(path.dirname(directory), path.resolve(app, '../tmp')); fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+
+test('real WebGazer and MediaPipe hand off one synthetic camera and return through the gaze calibration UI', { timeout: 120000 }, async () => {
+  assert.equal((await fetch('http://localhost:3200/health')).ok, true, 'Start deploy/hotfix-local.ps1 first');
+  const directory = await buildFixture(false, true);
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  const page = await browser.newPage();
+  const errors = [];
+  const external = [];
+  let holdPoseModel = true;
+  let releasePoseModel;
+  let modelRequested;
+  const waitingModel = new Promise(resolve => { modelRequested = resolve; });
+  const logs = [];
+  page.on('console', message => { if (message.type() === 'error') logs.push(message.text()); });
+  page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => {
+    window.cameraSuite = { streams: [], overlap: false, audio: false };
+    Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', { value: async () => [{ kind: 'videoinput', deviceId: 'synthetic' }] });
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async options => {
+      window.cameraSuite.overlap ||= window.cameraSuite.streams.some(s => s.getTracks().some(t => t.readyState === 'live'));
+      window.cameraSuite.audio ||= options.audio !== undefined && options.audio !== false;
+      const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 480;
+      const ctx = canvas.getContext('2d'); ctx.fillStyle = 'white'; ctx.fillRect(0, 0, 640, 480);
+      const stream = canvas.captureStream(15);
+      window.cameraSuite.streams.push(stream);
+      return stream;
+    } });
+  });
+  await page.route('**/*', route => {
+    const url = new URL(route.request().url());
+    if (url.origin !== 'http://localhost:3200') { external.push(url.origin); return route.abort(); }
+    if (url.pathname === '/mediapipe/pose_landmarker_full.task' && holdPoseModel) {
+      modelRequested();
+      return new Promise(resolve => { releasePoseModel = async () => { holdPoseModel = false; await route.continue(); resolve(); }; });
+    }
+    if (url.pathname === '/__skeleton-fixture') return route.fulfill({ contentType: 'text/html',
+      body: '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src &apos;self&apos; &apos;wasm-unsafe-eval&apos;; worker-src &apos;self&apos;"></head><body><div id="content-root"></div><script src="/__skeleton-fixture/fixture.js"></script></body></html>' });
+    if (url.pathname.startsWith('/__skeleton-fixture/')) return route.fulfill({ contentType: 'text/javascript',
+      headers: { 'Content-Security-Policy': "script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'" },
+      body: fs.readFileSync(path.join(directory, path.basename(url.pathname))) });
+    return route.continue();
+  });
+  try {
+    await page.goto('http://localhost:3200/__skeleton-fixture');
+    // No face/accuracy claim: accept a synthetic session to exercise lifecycle.
+    // Inference itself uses the real pinned WebGazer and MediaPipe libraries.
+    await page.evaluate(() => window.fixture.calibrate());
+    await page.evaluate(() => window.fixture.mount());
+    assert.equal(await page.evaluate(() => window.fixture.state().calibrated), true);
+    assert.equal(await page.locator('#webgazerVideoFeed').count(), 1);
+    await page.evaluate(() => window.fixture.advance()); // Ordinary disabled unit.
+    assert.equal(await page.evaluate(() => window.fixture.state().calibrated), true);
+    assert.equal(await page.evaluate(() => window.cameraSuite.streams.length), 1);
+    await page.evaluate(() => window.fixture.advance()); // Skeleton unit, before user starts it.
+    const firstWorker = page.waitForEvent('worker');
+    await page.getByRole('button', { name: 'Start camera', exact: true }).click();
+    const initializingWorker = await firstWorker;
+    const cancelledWorker = new Promise(resolve => initializingWorker.once('close', resolve));
+    await waitingModel;
+    await page.getByRole('button', { name: 'Stop camera', exact: true }).click();
+    await cancelledWorker;
+    await releasePoseModel();
+    assert.equal(await page.evaluate(() => window.cameraSuite.streams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true, 'Stopping pending models releases the camera');
+    const secondWorker = page.waitForEvent('worker');
+    await page.getByRole('button', { name: 'Start camera', exact: true }).click();
+    const runningWorker = await secondWorker;
+    const stoppedWorker = new Promise(resolve => runningWorker.once('close', resolve));
+    await page.waitForFunction(() => [...document.querySelectorAll('[role=status], [role=alert]')].some(el => /No body detected|unavailable/.test(el.textContent)), { timeout: 45000 });
+    assert.match(await page.locator('body').innerText(), /No body detected/, JSON.stringify({ errors, logs }));
+    assert.equal(await page.evaluate(() => window.fixture.state().calibrated), false);
+    assert.equal(await page.locator('#webgazerVideoFeed').count(), 0);
+    assert.equal(await page.evaluate(() => window.cameraSuite.streams[0].getTracks()[0].readyState), 'ended');
+    assert.equal(await page.evaluate(() => window.cameraSuite.overlap), false);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await stoppedWorker;
+    await page.getByRole('button', { name: 'Start calibration', exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => window.fixture.practiceMounts), 1, 'Return prompts for calibration before remounting practice');
+    assert.equal(await page.evaluate(() => window.cameraSuite.streams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true);
+    await page.getByRole('button', { name: 'Start calibration', exact: true }).click();
+    await page.getByRole('button', { name: 'Calibration target 1', exact: true }).waitFor({ timeout: 45000 });
+    assert.equal(await page.evaluate(() => window.fixture.state().calibrated), false, 'A reacquired camera is not yet calibrated');
+    assert.equal(await page.evaluate(() => window.cameraSuite.streams.length), 4);
+    await page.getByRole('button', { name: 'Continue without tracking', exact: true }).click();
+    assert.equal(await page.evaluate(() => window.fixture.practiceMounts), 2);
+    await page.evaluate(() => { window.fixture.leave(); });
+    assert.equal(await page.evaluate(() => window.cameraSuite.streams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true);
+    assert.equal(await page.locator('#webgazerVideoFeed').count(), 0);
+    assert.equal(await page.evaluate(() => window.cameraSuite.audio), false);
+    await page.evaluate(() => window.fixture.destroy());
+    assert.deepEqual(external, []);
+    assert.deepEqual(errors, []);
+  } catch (error) {
+    throw new Error(`${error.message}\nFixture: ${await page.locator('body').innerText()}\nBrowser: ${JSON.stringify({ errors, logs, external })}`, { cause: error });
+  } finally { await browser.close(); }
 });
