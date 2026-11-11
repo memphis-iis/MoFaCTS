@@ -7,7 +7,7 @@ import { recoveryOperatorInputs, acquireRecoveryOperatorSession } from '../opera
 import { runRecoveryOperatorInventory } from '../run-operator-inventory.mjs';
 import { makeAwsReadClient } from '../sdk-client.mjs';
 import { operatorFixture, operatorWorkspace, clock } from './operator-fixtures.mjs';
-const environmentId = 'e-12345678123412341234123456789012';
+const environmentId = '12345678-abcd-1234-1234-123456789012';
 
 test('temporary operator policies bind one principal, MFA, exact session, three reads and one-hour expiry', () => {
   const f = operatorFixture(), input = recoveryOperatorInputs(f.env, f.runtime, clock);
@@ -25,7 +25,7 @@ test('temporary operator policies bind one principal, MFA, exact session, three 
   for (const deadline of ['2026-11-08T20:10:00.000Z', '2026-11-08T21:00:01.000Z', 'bad']) {
     assert.throws(() => recoveryOperatorPolicies({ ...args, deadline, runId: '1' }, clock));
   }
-  for (const invalid of ['*', '12345678-1234-1234-1234-123456789012', 'e-123',
+  for (const invalid of ['*', 'e-12345678123412341234123456789012', 'e-123',
     environmentId + '/other', environmentId.toUpperCase()]) {
     assert.throws(() => recoveryOperatorPolicies({ ...args, environmentId: invalid }, clock));
   }

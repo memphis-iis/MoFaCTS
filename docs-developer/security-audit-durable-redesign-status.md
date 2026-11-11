@@ -80,12 +80,25 @@ exact npm, so its redundant global reinstall is removed.
 - [x] Render, install and independently compare the CloudShell-only bootstrap
   policy. Its unchanged deadline is 2026-11-11T20:25:04.772Z. The exact immutable
   user, one FIDO association and zero extra associations passed before install.
-- [x] Correct the fixture's UUID assumption to the observed CloudShell e- plus
-  32-hex environment identifier. Terminal session UUIDs are a different identity.
-  All 51 optional cases pass, including rejection of malformed/foreign-format
-  identifiers. No role or backup access was installed during this correction.
-- [ ] Verify the new user environment/runtime, activate the exact read role,
-  verify installed grants and execute the single protected baseline read.
+- [x] Distinguish the public CloudShell environment UUID (IAM resource) from
+  its internal e- compute identifier and terminal-session UUID. The initial
+  7d6fc0d8 correction used the internal identifier incorrectly; AWS denied the
+  environment deletion and returned the actual public resource ARN. Restore
+  UUID validation and explicitly reject internal compute IDs. The expiry is
+  unchanged; no backup read is repeated. All 51 synthetic cases pass after
+  correcting an all-numeric uppercase-test fixture.
+- [x] Verify the actual CloudShell bootstrap on committed source 7d6fc0d8:
+  pinned runtime, clean source and all 51 optional tests pass. Independently
+  acquire/compare the installed IAM documents, immutable IDs and associations.
+- [x] Execute the approved single reader invocation. It passed exact actor,
+  baseline version/bytes/bundle and pre/post version-label validation. Retain
+  the sanitized inventory, encrypted digest, runtime/test log and invocation
+  proof privately with a verified whole-artifact SHA-256. No raw payload,
+  credential, provider/application request or backup mutation was retained/run.
+- [x] Verify cleanup ownership freshly, retain its snapshot and remove the two
+  owned temporary source/runtime directories after evidence retention.
+- [ ] Correct the environment cleanup binding to its actual public UUID with
+  the original expiry, then verify environment deletion and retire IAM access.
 - [ ] Preserve sanitized inventory and source/expiry/read evidence, retire
   only owned temporary resources and verify backup labels remain unchanged.
 
