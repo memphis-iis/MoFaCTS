@@ -11,9 +11,10 @@ function fixture(options = {}) {
   bindings.values['history.learnerA'].sha256 = digest(history);
   const issued = new Map(), pages = []; let closed = false, sequence = 0;
   const browser = { async newContext() { return { async newPage() {
-    const state = { actor: null, path: '/', template: 'publicLanding' };
-    const page = { setDefaultTimeout() {}, async goto(input) {
+    const state = { actor: null, path: '/', template: 'publicLanding', origin: 'https://audit.example' };
+    const page = { setDefaultTimeout() {}, url() { return state.origin + state.path; }, async goto(input) {
       const path = new URL(input).pathname;
+      if (options.foreignRedirect && (!options.routeOnly || path !== '/')) state.origin = 'https://foreign.example';
       if (path === '/profile' && !state.actor) { state.path = '/auth/login'; state.template = 'signIn'; }
       else if (path === '/admin/security-audits' && state.actor !== 'admin' && !options.allowedForbiddenRoute) { state.path = '/home'; state.template = 'home'; }
       else { state.path = path; state.template = { '/profile': 'profile', '/courses': 'courses', '/admin/security-audits': 'adminSecurityAuditsV2' }[path] ?? 'publicLanding'; }
@@ -30,6 +31,7 @@ function fixture(options = {}) {
         } },
         Meteor: { status: () => ({ connected: true }), userId: actorId,
           loginWithPassword(username, password, callback) {
+            assert.equal(state.origin, 'https://audit.example', 'Credentials must remain on the approved target');
             state.actor = Object.keys(bindings.actors).find(name => bindings.actors[name].username === username && bindings.actors[name].password === password);
             callback(state.actor ? null : { error: 403 });
           },
@@ -115,4 +117,14 @@ test('cached sessions are rebound before each case so an expired actor cannot ma
   assert.equal(result.status, 'ERROR');
   assert.equal(result.results.find(row => row.verificationId === 'authz.method.audit-list.learnerB').outcome, 'DOMAIN_REJECTION');
   assert.equal(value.closed(), true);
+});
+
+test('foreign redirects fail before credential entry and cannot become successful route denials', async () => {
+  for (const options of [{ foreignRedirect: true }, { foreignRedirect: true, routeOnly: true }]) {
+    const value = fixture(options);
+    const result = await acquireSelectedAuthorizationV2({ target: 'https://audit.example', bindings: value.bindings }, async () => value.browser);
+    assert.equal(result.status, 'ERROR');
+    assert.equal(value.closed(), true);
+    assert(result.results.some(row => row.outcome === 'DOMAIN_REJECTION'));
+  }
 });

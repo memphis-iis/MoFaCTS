@@ -9,11 +9,13 @@ export async function createAuthorizationBrowserV2({ target, bindings }, launch)
   const origin = auditTargetOrigin(target), config = parseAuthorizationBindingsV2(bindings);
   const browser = await (launch ?? (async () => (await import('playwright')).chromium.launch({ headless: true })))();
   const sessions = new Map(), capabilities = new Map();
+  const targetMatched = page => new URL(page.url()).origin === origin;
   async function session(actor) {
     if (!sessions.has(actor)) sessions.set(actor, (async () => {
       const context = await browser.newContext(), page = await context.newPage();
       page.setDefaultTimeout(15000);
       await page.goto(origin, { waitUntil: 'domcontentloaded' });
+      if (!targetMatched(page)) return { state: 'domain-error' };
       await page.waitForFunction(() => globalThis.Meteor?.status?.().connected === true);
       if (actor !== 'anonymous') {
         const user = config.actors[actor];
@@ -31,6 +33,7 @@ export async function createAuthorizationBrowserV2({ target, bindings }, launch)
       return { page };
     })());
     const active = await sessions.get(actor); if (!active.page) return active;
+    if (!targetMatched(active.page)) return { state: 'domain-error' };
     const binding = await active.page.evaluate(({ userId, alias }) => {
       if (!globalThis.Meteor.status().connected) return 'transport-error';
       if (globalThis.Session.get('authReady') !== true) return 'inconclusive';
@@ -117,6 +120,7 @@ export async function createAuthorizationBrowserV2({ target, bindings }, launch)
       const requestedPath = entry.surfaceId.slice('management-route:'.length);
       const requestedTemplate = entry.expectedPolicy === 'allow' ? entry.template : auditVerification(entry.allowedBaselineIds[0]).template;
       await active.page.goto(new URL(requestedPath, origin).href, { waitUntil: 'domcontentloaded' });
+      if (!targetMatched(active.page)) return { state: 'domain-error' };
       await active.page.waitForFunction(({ path, template, requestedPath, requestedTemplate }) => {
         if (globalThis.Session?.get('authReady') !== true) return false;
         const elements = document.querySelectorAll('body *'); if (elements.length > 20000) return false;

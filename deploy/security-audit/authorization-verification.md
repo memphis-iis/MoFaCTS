@@ -19,6 +19,9 @@ must already have execution permission for the selected HTTPS target. Sessions
 are separate for anonymous, learnerA/B, teacherA/B and admin. Authenticated
 identities and authoritative hydrated role flags must match the source actors.
 Failed login/role binding cannot accidentally run a case as anonymous.
+The browser checks the approved origin after initial navigation, on cached
+sessions and after route navigation. A foreign redirect fails before credential
+entry and cannot supply a successful route-denial observation.
 
 The acquisition owner closes its browser before returning evidence; cleanup
 failure is an execution failure. Only source verification IDs and five finite
