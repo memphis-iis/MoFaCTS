@@ -38,6 +38,46 @@ object, not an entire registry response, CI smoke tuple or new release authority
 The resulting `MoFaCTSReleaseReceiptV2` contains only bounded public identity
 fields and the existing record's SHA-256; it contains no credentials or settings.
 
+#### Deployment-owner identity hook
+
+The root deployment owner can acquire an independent running-image observation
+with `release-receipt.sh observe-image`. This action resolves the actual Docker
+image graph to its configuration digest and reads the revision label. It checks
+that the same running container/image is still selected afterward. It neither
+requires nor selects a receipt and grants no additional restricted-SSH command.
+Do not give this deployment-owner action to the audit account.
+
+The read-only `qualification/observePublishedImage.mjs` helper accepts an
+immutable registry reference and the independently observed image configuration
+and platform. It verifies exact registry blob hashes and, for an index, its
+single matching platform manifest. It cannot build, pull, publish or qualify an
+image. Keep registry-root, platform-manifest, configuration and engine-reference
+identities distinct.
+
+After the existing readiness and participant smoke acceptance has actually
+passed, an extended release candidate can be recorded and projected together:
+
+```sh
+node mofacts/scripts/security-audit/qualification/releaseRecordStore.mjs \
+  write-v2 "$release_record" "$accepted_candidate" \
+  "$published_image_observation" "$running_image_observation" > "$private_transfer"
+```
+
+`write-v2` requires the existing explicit image ID and acceptance fields. It
+checks source/configuration/platform against the independent running observation
+and registry mapping before allocating record files. The existing record owner
+archives prior and accepted bytes, replaces the authority atomically, then
+re-reads its accepted bytes before returning the receipt. A missing observation,
+failed write or changed readback cannot return a successful receipt. A retained
+lock after interruption requires explicit owner recovery as documented below.
+
+This optional evidence hook does not replace ordinary unqualified deployment
+recording or add an application startup/deployment gate. Health alone cannot
+manufacture participant acceptance. No production command-sheet execution or
+installation is implied by these source tools. The image-source reader shared
+with CI can independently verify the embedded source in an immutable local
+image; that observation alone creates no CI proof or release qualification.
+
 At authorized cutover, the root deployment owner saves the current V1 receipt
 and tooling for explicit rollback, removes the old *active* receipt, provisions
 `/etc/mofacts/release` as root:root 0700, and uses `install-v2` on the protected

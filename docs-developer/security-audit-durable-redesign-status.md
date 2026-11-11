@@ -16,7 +16,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The retained Goal objective tracks the remaining written plan.
 
-**Current allowance: 10 total, 3 consumed, 0 reserved, 7 available.**
+**Current allowance: 10 total, 4 consumed, 0 reserved, 6 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -29,7 +29,8 @@ within this allowance. Do not import historical invocations into this counter.
 | 1 | bf37152b2771fe7cd3609e7660429c89c14d4c7b | PASS on 2026-11-11. 1,011 server/1,250 client, zero failures/hooks, 15/seven existing pending. Native receipt retained; cleanup passed. |
 | 2 | 7f873ddd4b1d0baf49c6bdd8f24c0270fa019cc8 | FAIL after start 2026-11-11T21:10:00Z: 1,009 server passes/one failed new HTTP test; 1,249 client passes/zero failures, 15/seven pending, zero hook failures. All nine registered admin-denial cases and the V1 record-preservation case pass. The test incorrectly assumed WebApp exposes a Connect stack; corrected to actual HTTP requests against its public listener. Private failed-run evidence retained at phase1-20261105/native-local-v2-activation-7f873ddd. No successful source-after/native receipt is claimed. |
 | 3 | 19334b49b16c6f95944a06a47d3cc743920e640a | PASS 2026-11-11T21:30:44Z-21:32:17Z: 1,010 server/1,249 client, zero failures/hooks, 15/seven existing pending. Exact source before/after, isolation, resource and cleanup checks pass. Private receipt: phase1-20261105/native-local-v2-activation-19334b49. Local service uptime is a separate observation. |
-| 4-10 | Pending | Available. |
+| 4 | 1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140 | PASS 2026-11-11T22:06:49Z-22:08:23Z: 1,018 server/1,249 client, zero failures/hooks, 15/seven existing pending. Shared catalog/outcome cases and all six registered real-Mongo progress-publication cases pass. Exact source/isolation/resources/cleanup pass. Private receipt: phase1-20261105/native-local-authorization-1c72734b. |
+| 5-10 | Pending | Available. |
 
 Current result: the V2 admin presentation milestone is published and verified.
 P1-13 is complete. Phase 1 has eleven completed and six open deliverables.
@@ -102,8 +103,8 @@ The 17-row Phase 1 table below remains the sole deliverable queue.
   zero failures and eight unchanged conditional skips; final browser cleanup,
   cross-user-success and stale-session regressions pass separately. No live
   authentication/provider request was made by these source/model checks.
-- [ ] Run new shared-contract parity and six real-Mongo registered-publication
-  cases in the next authorized full Meteor milestone. Keep actual browser/DDP
+- [x] Run new shared-contract parity and six real-Mongo registered-publication
+  cases: slot 4 passed on 1c72734b. Keep actual browser/DDP
   staging proof separate from deterministic browser models.
 - [ ] Complete the rest of the authentication producer, exact full fixture
   composition and V2 workflow. Do not change production's pinned V1 fixture or
@@ -385,7 +386,7 @@ that actually needs another check.
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. P1-14 remains open only for staging report ingestion/rollback. Active V1 is restored and unchanged. |
 | P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |
-| P1-08 | V2-only new-ingestion endpoint | [ ] V2 receiver/admin source activation is implemented with one composition and one private V2 collection registration; actual registered-handler Meteor proof is next. Production scanner source remains pinned to its matching V1 receiver. Complete the source-owned authentication intent/adapters/baselines and V2 scanner workflow; implement the approved five progress-privacy replacements and their executed positive baselines. |
+| P1-08 | V2-only new-ingestion endpoint | [ ] V2 receiver/admin activation passes actual registered-handler Meteor proof in slot 3. The source-owned selected-authorization catalog/adapters, positive baselines and approved progress-privacy replacement pass slot 4, including six real-Mongo publication cases. Production scanner remains pinned to its matching V1 receiver. Complete the remaining typed authentication producer/fixture composition and V2 scanner workflow; live selected-case acceptance remains open. |
 | P1-09 | Summary projections, indexes and read-time integrity | [x] Bounded history, independent latest queries, exact-ID summaries and read-time validation are implemented. Real Mongo created the indexes and enforced nonce uniqueness. Tests cover retained V1 exclusion, digest integrity and rejected corrupt records. P1-16 owns the full previous-image rollback trial. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [x] V1 runtime readers, methods, collection registration, admin template and ingestion registration are removed from the candidate. Exact-source Meteor slot 3 passes actual V2 HTTP/admin registrations, V1 get/download exclusion and unchanged complete synthetic V1 storage. No deployed database migration/deletion occurred; staging image round-trip remains P1-14/16. |
 | P1-11 | Truthful temporary security-surface manifest update | [x] V2 replaces V1 in the application HTTP registration and reviewed signed-ingestion classification. Existing admin method/download policies are unchanged. Full typecheck/lint pass; the surface verifier covers 330 surfaces. Actual registered-handler Meteor proof is included in this activation batch. |
@@ -396,6 +397,13 @@ that actually needs another check.
 | P1-16 | Previous-production-image qualification with V2 records | [ ] The actual previous image read and downloaded V1 reports with V2 records in separate storage. Run the full candidate/previous/candidate sequence and verify list, latest and download behavior across the rollback. |
 | P1-17 | Updated operator documentation | [ ] Development and temporary-operator procedures are documented. Finish the operator instructions for the qualified V2 workflow, production cutover and rollback. |
 
+### Release identity hook and candidate preparation (2026-11-11)
+
+- [x] Add the opt-in V2 release-record hook using the existing atomic record/history owner. It rejects missing acceptance or running-image evidence and mismatched source/configuration/platform before writing; receipt readback uses the exact accepted canonical bytes.
+- [x] Add a root deployment-owner image observation without granting the audit account another command. Root permission/identity/replacement/rollback fixtures pass.
+- [x] Add read-only immutable-registry graph observation, preserving root/platform/config identities, and share the existing bounded embedded-source reader without creating CI qualification.
+- [x] Full app typecheck/lint, 46 focused Node cases and the complete security-audit Node regression suite pass (508 passes, eight existing conditional skips, zero failures). The root receipt fixture passes separately. An initial shell exit-code wrapper failed after the tests passed; the corrected wrapper and suite passed. Production commands and deployed receipts are unchanged.
+- [ ] Finish candidate image verification/publication and the isolated candidate/previous/candidate staging2 trial. The committed candidate 1c72734b has accepted Meteor slot 4 proof. Its first Compose preparation failed before compilation because the caller omitted the captured workspace TMPDIR; correct TMPDIR re-verification passed and attempt 2 is recorded separately. No publication/deployment or image qualification is claimed yet.
 ### Worklist reconciliation (2026-11-10, historical)
 
 Eight of 17 deliverables are complete. The review closed P1-07 and P1-09

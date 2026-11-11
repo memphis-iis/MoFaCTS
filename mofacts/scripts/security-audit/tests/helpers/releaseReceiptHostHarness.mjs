@@ -65,6 +65,10 @@ esac
     input: bytes, encoding: 'utf8', timeout: 10000, maxBuffer: 32768,
     env: { ...process.env, PATH: bin + ':' + process.env.PATH },
   });
+  const observedImage = { configDigest: imageId, platform: 'linux/amd64', baseCommit: fixture.baseCommit };
+  const independent = run('observe-image');
+  assert.equal(independent.status, 0); assert.deepEqual(JSON.parse(independent.stdout), observedImage);
+  assert.equal(await fs.stat(receipt).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; }), false);
   let result = run('read');
   assert.equal(JSON.parse(result.stdout).reason, 'not-installed');
   result = run('install', input);
@@ -73,6 +77,7 @@ esac
   assert.equal((await fs.stat(receipt)).mode & 0o777, 0o600);
   assert.equal((await fs.stat(receipt)).uid, 0);
   assert.equal(JSON.parse(run('read').stdout).result, 'MATCH');
+  assert.deepEqual(JSON.parse(run('observe-image').stdout), observedImage);
   for (const kind of ['manifest', 'index']) {
     await imageState(dockerImageFixture(kind));
     assert.equal(JSON.parse(run('read').stdout).result, 'MATCH', 'Engine IDs must resolve to unchanged config identity');

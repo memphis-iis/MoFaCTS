@@ -7,9 +7,12 @@ export const IMAGE_ARCHIVE_LIMITS = Object.freeze({ bytes: 2 * 1024 ** 3, entrie
 const invalid = () => { throw new Error('Docker image identity is unavailable'); };
 const digest = bytes => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const isDigest = value => typeof value === 'string' && value.length === 71 && /^sha256:[a-f0-9]{64}$/.test(value);
-const indices = ['application/vnd.oci.image.index.v1+json', 'application/vnd.docker.distribution.manifest.list.v2+json'];
-const manifests = ['application/vnd.oci.image.manifest.v1+json', 'application/vnd.docker.distribution.manifest.v2+json'];
-const configs = ['application/vnd.oci.image.config.v1+json', 'application/vnd.docker.container.image.v1+json'];
+export const IMAGE_MEDIA_TYPES = Object.freeze({
+  indices: Object.freeze(['application/vnd.oci.image.index.v1+json', 'application/vnd.docker.distribution.manifest.list.v2+json']),
+  manifests: Object.freeze(['application/vnd.oci.image.manifest.v1+json', 'application/vnd.docker.distribution.manifest.v2+json']),
+  configs: Object.freeze(['application/vnd.oci.image.config.v1+json', 'application/vnd.docker.container.image.v1+json']),
+});
+const { indices, manifests, configs } = IMAGE_MEDIA_TYPES;
 
 function json(bytes) {
   try {

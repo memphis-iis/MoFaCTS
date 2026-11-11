@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { parseWorkstationReleaseRecord, classifyReleaseRecordProof } from '../../../common/securityAudit/releaseQualification.ts';
+import { parseWorkstationReleaseRecord, classifyReleaseRecordProof, parseRunningImageObservation } from '../../../common/securityAudit/releaseQualification.ts';
 import { parsePublishedImage, parseReleaseReceipt, parseReleaseReceiptV2 } from '../../../common/securityAudit/releaseReceipt.mjs';
 
 const MAX_BYTES = 16384;
@@ -163,9 +163,29 @@ export function projectReleaseReceiptV2(bytes, publication) {
   return parseReleaseReceiptV2({ ...base, schema: 'MoFaCTSReleaseReceiptV2', publishedImage });
 }
 
+// Post-deployment hook: validate the complete receipt before changing authority,
+// retain history through its existing owner, then bind output to exact readback.
+// This performs no build/deploy/transfer and never invents qualification proof.
+export async function writeReleaseRecordWithReceiptV2(file, bytes, publication, runningImage, dependencies = {}) {
+  const observed = parseRunningImageObservation(runningImage), candidate = parseReleaseBytes(bytes);
+  if (candidate.imageId === undefined) throw new Error('V2 receipt publication requires the recorded image identity and acceptance');
+  if (candidate.baseCommit !== observed.baseCommit || candidate.imageId !== observed.configDigest
+    || parsePublishedImage(publication).platform !== observed.platform) throw new Error('Running image conflicts with the release candidate');
+  projectReleaseReceiptV2(bytes, publication);
+  const written = await writeReleaseRecord(file, bytes, dependencies);
+  const accepted = await readReleaseBytes(path.resolve(file));
+  if (hash(accepted) !== written.recordDigestSha256) throw new Error('Release authority changed before receipt readback');
+  return projectReleaseReceiptV2(accepted, publication);
+}
+
 export async function main(argv) {
-  const [action, file, candidate, ...extra] = argv;
+  const [action, file, candidate, publication, runningImage, ...extra] = argv;
   if (!file || extra.length) invalid();
+  if (action === 'write-v2' && candidate && publication && runningImage) return writeReleaseRecordWithReceiptV2(path.resolve(file),
+    await readReleaseBytes(path.resolve(candidate)),
+    JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await readReleaseBytes(path.resolve(publication)))),
+    JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await readReleaseBytes(path.resolve(runningImage)))));
+  if (publication || runningImage) invalid();
   if (action === 'project-v2' && candidate) return projectReleaseReceiptV2(await readReleaseBytes(path.resolve(file)),
     JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await readReleaseBytes(path.resolve(candidate)))));
   if (action === 'write' && candidate) return writeReleaseRecord(file, await readReleaseBytes(path.resolve(candidate)));
