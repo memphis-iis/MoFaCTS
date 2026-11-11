@@ -16,7 +16,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The active Goal tracks the remaining written plan.
 
-**Current allowance: 10 total, 0 consumed, 0 reserved, 10 available.**
+**Current allowance: 10 total, 1 consumed, 0 reserved, 9 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -26,13 +26,42 @@ within this allowance. Do not import historical invocations into this counter.
 
 | Slot | Source | Execution and result |
 | --- | --- | --- |
-| 1-10 | Pending | Available; no new invocation started under this mandate. |
+| 1 | bf37152b2771fe7cd3609e7660429c89c14d4c7b | PASS on 2026-11-11. 1,011 server/1,250 client, zero failures/hooks, 15/seven existing pending. Native receipt retained; cleanup passed. |
+| 2-10 | Pending | Available. |
 
-Current functional milestone: publish/verify the prepared V2 admin presentation,
-crediting the existing 070a1c9a native baseline. Then continue the remaining
-Phase 1 wiring and qualification until the protected selected-case inventory
-requires the separately reviewed new AWS access. No such access is granted by
-this mandate. The 17-row Phase 1 table below remains its sole deliverable queue.
+Current result: the V2 admin presentation milestone is published and verified.
+P1-13 is complete. Phase 1 has nine completed and eight open deliverables.
+The next dependency is the selected authentication-case inventory. Its
+reviewed procedure creates new temporary AWS access, so that operational
+approval is the next real decision under the standing mandate. The 17-row
+Phase 1 table below remains the sole deliverable queue.
+
+### Accepted admin presentation milestone (2026-11-11)
+
+- [x] Publish the ten intentional plan/admin paths as bf37152b. Pre-commit
+  manifest, staged lint and secret-scan hooks passed. Unrelated camera and
+  simulation working changes were excluded.
+- [x] Execute reserved Meteor slot 1 against its clean committed Linux source.
+  Source before/after, exact resource limits, read-only mounts and no-socket/
+  capability isolation passed. All five actual Blaze rendering cases passed.
+- [x] Retain the native receipt and ten supporting evidence files with a
+  SHA-256 manifest in the existing private operator evidence directory.
+  The private local review ledger retains its exact path and job ownership.
+- [x] Verify removal of the job-owned containers, network and Meteor volume.
+  Existing local containers and images retained their identities. The
+  independent uptime comparison did not pass: localhost and two JEDM service
+  start timestamps changed during the preparation/run window. Localhost
+  restarted before Meteor began; the JEDM worker was already restarting.
+  Retained Docker events did not identify the cause. Preserve that limitation
+  separately from the passing isolated test receipt; do not claim unchanged
+  uptime or repeat the accepted suite because of this observation.
+- [x] Close P1-13 against the split catalog/assembly/ingestion/storage and
+  presentation suites. P1-08/14 still own final route activation and live
+  staging2 rendering/ingestion, and P1-16 owns image rollback qualification.
+
+Preparation recovered from the exact Windows repository ownership check by
+scoping Git upload-pack trust to that named source repository. No global Git
+setting changed and no failed preparation consumed a Meteor invocation.
 
 ## Phase 1 worklist (started 2026-11-05)
 
@@ -200,13 +229,13 @@ that actually needs another check.
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Retire V1 report access at cutover and verify that existing records are preserved. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Update and verify the security-surface manifest when the V2 route replaces the V1 route. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Remove the duplicate control tables and V1 ingestion path with the coordinated V2 replacement. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Catalog, assembly, signed ingestion, storage, download rendering and projected admin response suites are split. The V2 Blaze page and five browser cases are prepared. The adapter and outcome cases have native Meteor acceptance on 070a1c9a (1,011 server/1,245 client passes). The five newer rendered-page cases await execution. GitHub CI remains separately blocked before startup by billing. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [x] Split source suites and actual Meteor server/client coverage pass. The five V2 Blaze cases passed on bf37152b with 1,011 server/1,250 client passes, zero failures/hooks. P1-08/14 own activation and staging2 acceptance; P1-16 owns image rollback. |
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Staging2 passed protected host collector installation, acquisition and restoration. Prove V2 report ingestion, existing-record exclusion and rollback on the coordinated staging2 candidate. |
 | P1-15 | Exact host install/rollback procedure and hashes | [x] Reviewed nine-file cohort, pinned source/controller/baseline hashes, bounded root controller and independent recovery documented/tested. Actual staging2 installation and exact restoration passed; Phase 0 production baseline is retained. No production installation is implied. |
 | P1-16 | Previous-production-image qualification with V2 records | [ ] The actual previous image read and downloaded V1 reports with V2 records in separate storage. Run the full candidate/previous/candidate sequence and verify list, latest and download behavior across the rollback. |
 | P1-17 | Updated operator documentation | [ ] Development and temporary-operator procedures are documented. Finish the operator instructions for the qualified V2 workflow, production cutover and rollback. |
 
-### Worklist reconciliation (2026-11-10)
+### Worklist reconciliation (2026-11-10, historical)
 
 Eight of 17 deliverables are complete. The review closed P1-07 and P1-09
 against their individual requirements in plan Section 12. The exact assembly,

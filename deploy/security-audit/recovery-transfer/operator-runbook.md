@@ -1,16 +1,21 @@
 # Temporary operator preparation and execution review
 
-This is the separately approved design's **source preparation**, not permission
-to install software, create AWS access, read the backup, publish or deploy.
-The active GitHub runner remains strict and inactive. No application dependency,
-production access, provider test or new permanent identity is introduced.
+The design and source preparation are approved. The security-audit standing
+mandate of 2026-11-11 covers intentional publication and its existing Linux
+verification allowance. Creating the temporary AWS identity, preparing its
+CloudShell runtime, reading the protected backup and retiring that access form
+one operational review below. Those steps require the separate approval for
+new security-sensitive access. The GitHub runner remains strict and inactive.
 
 ## Source acceptance before operational approval
 
-Publish only the reviewed intentional cohort after its required checks. Obtain
-fresh Meteor authorization for its new shared-runtime cases; the prior receipt
-is not evidence for changed source. Record the committed checkout SHA separately
-from the original backup-transfer SHA and operation ID.
+The optional operator cohort is published in 070a1c9a. Its unchanged optional
+SDK suite passed 50 cases, and the new shared-runtime outcome cases have native
+Meteor acceptance on that commit (1,011 server and 1,245 client passes). Reuse
+that accepted evidence while its relevant source stays unchanged. The later
+admin presentation uses its own integration milestone under the standing run
+ledger. Record the actual operator checkout SHA separately from the original
+backup-transfer SHA and operation ID.
 
 The optional package reuses the two pinned SDK clients and the existing exact-
 version inventory reader. The new entry point is:
