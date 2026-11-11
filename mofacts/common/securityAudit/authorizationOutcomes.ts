@@ -49,3 +49,28 @@ export function methodAuthorizationOutcome(value: unknown, sourcePolicyDenialCod
   if (state === 'inconclusive') return 'INCONCLUSIVE';
   return invalid();
 }
+
+// Scoped publication isolation is a successful ready snapshot, never a failed
+// subscription. The caller verifies actor/resource/canary bindings; the runner
+// must additionally require the catalog's executed allowed baselines.
+export function publicationAuthorizationOutcome(value: unknown, expected: ExpectedAuthorizationPolicy): AuthorizationOutcomeCategory {
+  if (!['allow', 'deny'].includes(expected)) invalid();
+  const row = proofRecord(value, ['ready', 'readable', 'bindingMatched', 'ownObserved', 'foreignObserved', 'anonymous']);
+  const flags = Object.fromEntries(Object.entries(row).map(([key, flag]) => [key, proofBoolean(flag)]));
+  if (!flags.ready || !flags.readable || !flags.bindingMatched) return 'INCONCLUSIVE';
+  if (expected === 'deny' && flags.foreignObserved) return 'ALLOWED';
+  if (expected === 'allow') return flags.ownObserved ? 'ALLOWED' : 'INCONCLUSIVE';
+  return flags.anonymous || flags.ownObserved ? 'DENIED_BY_POLICY' : 'INCONCLUSIVE';
+}
+
+// A bare 404 is not authorization evidence. Only replay of the exact capability
+// consumed by a successful, content-verified baseline proves one-use denial.
+export function downloadReplayAuthorizationOutcome(value: unknown): AuthorizationOutcomeCategory {
+  const row = proofRecord(value, ['baselineVerified', 'sameCapability', 'status']);
+  const verified = proofBoolean(row.baselineVerified), same = proofBoolean(row.sameCapability);
+  if (!Number.isInteger(row.status) || Number(row.status) < 100 || Number(row.status) > 599) invalid();
+  if (!verified || !same) return 'INCONCLUSIVE';
+  if (row.status === 404) return 'DENIED_BY_POLICY';
+  if (row.status === 200) return 'ALLOWED';
+  return 'DOMAIN_REJECTION';
+}

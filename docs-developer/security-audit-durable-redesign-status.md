@@ -16,7 +16,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The retained Goal objective tracks the remaining written plan.
 
-**Current allowance: 10 total, 2 consumed, 0 reserved, 8 available.**
+**Current allowance: 10 total, 3 consumed, 0 reserved, 7 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -28,15 +28,16 @@ within this allowance. Do not import historical invocations into this counter.
 | --- | --- | --- |
 | 1 | bf37152b2771fe7cd3609e7660429c89c14d4c7b | PASS on 2026-11-11. 1,011 server/1,250 client, zero failures/hooks, 15/seven existing pending. Native receipt retained; cleanup passed. |
 | 2 | 7f873ddd4b1d0baf49c6bdd8f24c0270fa019cc8 | FAIL after start 2026-11-11T21:10:00Z: 1,009 server passes/one failed new HTTP test; 1,249 client passes/zero failures, 15/seven pending, zero hook failures. All nine registered admin-denial cases and the V1 record-preservation case pass. The test incorrectly assumed WebApp exposes a Connect stack; corrected to actual HTTP requests against its public listener. Private failed-run evidence retained at phase1-20261105/native-local-v2-activation-7f873ddd. No successful source-after/native receipt is claimed. |
-| 3-10 | Pending | Available. |
+| 3 | 19334b49b16c6f95944a06a47d3cc743920e640a | PASS 2026-11-11T21:30:44Z-21:32:17Z: 1,010 server/1,249 client, zero failures/hooks, 15/seven existing pending. Exact source before/after, isolation, resource and cleanup checks pass. Private receipt: phase1-20261105/native-local-v2-activation-19334b49. Local service uptime is a separate observation. |
+| 4-10 | Pending | Available. |
 
 Current result: the V2 admin presentation milestone is published and verified.
-P1-13 is complete. Phase 1 has ten completed and seven open deliverables.
+P1-13 is complete. Phase 1 has eleven completed and six open deliverables.
 The approved authentication inventory operation is complete: one successful
 read, sanitized evidence retained, backup labels unchanged and all temporary
 AWS access/environment/workspaces removed. Its 22 selected cases include five
 unresolved publication rows. Phil approved their progress-privacy replacement; implementation continues without another backup read.
-The current work is the coordinated V2 source activation and its native Meteor proof.
+V2 application activation passed native slot 3. Current work is the selected authorization acquisition and remaining full producer/workflow/release composition.
 The 17-row Phase 1 table below remains the sole deliverable queue.
 
 
@@ -56,8 +57,8 @@ The 17-row Phase 1 table below remains the sole deliverable queue.
   conditional skips; source-security 169/172 pass, zero failures, three skips.
   Additional root receipt/isolation fixtures: 17/19 pass, zero failures, two
   CI-only skips. Reuse accepted unchanged CI seal evidence for those conditions.
-- [ ] Execute the added actual-registration Meteor cases and existing V2
-  HTTP/Mongo/Blaze coverage using an allowance slot, then reconcile P1-10.
+- [x] Execute the added actual-registration Meteor cases and existing V2
+  HTTP/Mongo/Blaze coverage: slot 3 passed on 19334b49; P1-10 is complete.
 - [ ] Continue the release/scanner wiring and coordinated staging2 acceptance.
   The five progress-privacy replacements are now approved implementation work.
 
@@ -79,8 +80,35 @@ The 17-row Phase 1 table below remains the sole deliverable queue.
   contract. Full typecheck/lint and explicit deployment-module lint pass.
 - [x] Record Phil's progress-privacy replacement approval in the plan and review.
   No second AWS read or new access is needed. Implement it in the catalog next.
-- [ ] Retry the corrected application milestone within the standing Meteor
-  allowance. The rollback harness is source-tested; no live candidate claim yet.
+- [x] Retry the corrected application milestone within the standing Meteor
+  allowance: slot 3 passed. The rollback harness is source-tested; no live candidate claim yet.
+
+### Selected authorization implementation (2026-11-11)
+
+- [x] Implement the sole source-owned verificationCatalog.ts: 29 selected cases
+  and positive baselines, including all five approved progress-privacy cases.
+  Every server subject resolves to the reviewed surface manifest; every denial
+  references an actual same-surface allowed case. Source owns outcomes/codes,
+  aliases, proof shapes and capability mutation/recovery; fixtures own values.
+- [x] Add exact executed-membership/baseline evaluation and typed publication/
+  download-replay classifiers. Generic errors, unreadable or empty snapshots,
+  unbound 404s and missing baselines remain ERROR. Observed leaked progress,
+  unexpectedly rendered restricted views and valid replay remain FAIL.
+- [x] Implement actual Playwright acquisition for selected methods, scoped
+  publications, rendered Blaze routes and downloads. Revalidate actor identity
+  and authoritative roles before every case, including cached sessions. Keep
+  credentials/IDs/canaries/URLs private; close the browser before returning proof.
+- [x] Full typecheck/lint pass. Complete Linux source suite passes 497/505 with
+  zero failures and eight unchanged conditional skips; final browser cleanup,
+  cross-user-success and stale-session regressions pass separately. No live
+  authentication/provider request was made by these source/model checks.
+- [ ] Run new shared-contract parity and six real-Mongo registered-publication
+  cases in the next authorized full Meteor milestone. Keep actual browser/DDP
+  staging proof separate from deterministic browser models.
+- [ ] Complete the rest of the authentication producer, exact full fixture
+  composition and V2 workflow. Do not change production's pinned V1 fixture or
+  add a second credential store. Prepare any protected binding change concretely
+  before its applicable operational/access boundary.
 ### Protected inventory execution (approved 2026-11-11)
 
 - [x] Record explicit approval for temporary console-only/MFA identity setup,
@@ -359,7 +387,7 @@ that actually needs another check.
 | P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |
 | P1-08 | V2-only new-ingestion endpoint | [ ] V2 receiver/admin source activation is implemented with one composition and one private V2 collection registration; actual registered-handler Meteor proof is next. Production scanner source remains pinned to its matching V1 receiver. Complete the source-owned authentication intent/adapters/baselines and V2 scanner workflow; implement the approved five progress-privacy replacements and their executed positive baselines. |
 | P1-09 | Summary projections, indexes and read-time integrity | [x] Bounded history, independent latest queries, exact-ID summaries and read-time validation are implemented. Real Mongo created the indexes and enforced nonce uniqueness. Tests cover retained V1 exclusion, digest integrity and rejected corrupt records. P1-16 owns the full previous-image rollback trial. |
-| P1-10 | Retire old-format access without rewriting/deleting records | [ ] Retire V1 report access at cutover and verify that existing records are preserved. |
+| P1-10 | Retire old-format access without rewriting/deleting records | [x] V1 runtime readers, methods, collection registration, admin template and ingestion registration are removed from the candidate. Exact-source Meteor slot 3 passes actual V2 HTTP/admin registrations, V1 get/download exclusion and unchanged complete synthetic V1 storage. No deployed database migration/deletion occurred; staging image round-trip remains P1-14/16. |
 | P1-11 | Truthful temporary security-surface manifest update | [x] V2 replaces V1 in the application HTTP registration and reviewed signed-ingestion classification. Existing admin method/download policies are unchanged. Full typecheck/lint pass; the surface verifier covers 330 surfaces. Actual registered-handler Meteor proof is included in this activation batch. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Remove the duplicate control tables and V1 ingestion path with the coordinated V2 replacement. |
 | P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [x] Split source suites and actual Meteor server/client coverage pass. The five V2 Blaze cases passed on bf37152b with 1,011 server/1,250 client passes, zero failures/hooks. P1-08/14 own activation and staging2 acceptance; P1-16 owns image rollback. |

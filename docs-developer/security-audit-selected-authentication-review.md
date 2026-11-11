@@ -68,6 +68,24 @@ separate approval for another narrowly reviewed protected inventory read that
 can identify their subjects safely. The single read approved for this operation
 is consumed, and all temporary AWS access has been retired.
 
-Owner: audit maintainer. P1-08 owns resolution and implementation of this review.
-After approved entries exist, replace this proposal table with links to their
-canonical catalog entries and retain the decision in the existing plan ledger.
+## Implemented source ownership
+
+The [canonical selected catalog](../mofacts/common/securityAudit/verificationCatalog.ts)
+now declares 29 cases: the selected rows and seven required positive baselines.
+The five approved replacements are `authz.publication.progress-private.*`;
+their actual own-progress baselines are `authz.publication.progress-own.*`.
+The [shared evaluator](../mofacts/common/securityAudit/authorizationVerification.ts)
+requires exact executed membership and successful referenced baselines.
+
+The [browser acquisition owner](../mofacts/scripts/security-audit/authentication/browserV2.mjs)
+implements the selected methods, publications, rendered routes and downloads.
+It validates actual actor/role binding, rejects unreadable/empty isolation proof,
+and does not accept a bare download 404. The selected HTTP endpoints use bearer
+capabilities, so their denial proof is an exact replay after a verified positive
+consumes the same capability; this makes no invented cookie/role restriction.
+See [proof and binding details](../deploy/security-audit/authorization-verification.md).
+
+Owner: audit maintainer. The selection decision and source implementation are
+resolved; P1-08 still owns full producer/workflow composition, protected fixture
+bindings and actual execution. Unit browser models are source regressions, not
+live staging acceptance or evidence that the five original names were recovered.
