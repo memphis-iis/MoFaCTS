@@ -1,5 +1,5 @@
 export const PHET_PROTOCOL = 'phet-research' as const;
-export const PHET_PROTOCOL_VERSION = 1 as const;
+export const PHET_PROTOCOL_VERSION = 2 as const;
 export type TraceRecordType = 'catalog' | 'initial' | 'property' | 'event' | 'sample' | 'disposed' | 'detached' | 'checkpoint' | 'monitoring-error';
 export type TraceRecord = {
   sequence: number; type: TraceRecordType; time: number; frame: number; order: number;

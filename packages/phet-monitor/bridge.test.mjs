@@ -22,7 +22,7 @@ function fixture() {
     setTimeout(callback, delay) { const id = ++serial; timers.set(id, { callback, at: clock + delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
   });
-  const envelope = { protocol: 'phet-research', version: 1, buildId: 'test-build', sessionId: '12345678-1234-1234-1234-123456789abc' };
+  const envelope = { protocol: 'phet-research', version: 2, buildId: 'test-build', sessionId: '12345678-1234-1234-1234-123456789abc' };
   return {
     sent, chunks, timers, handlers, parent,
     get stops() { return stops; },
@@ -41,7 +41,7 @@ test('child validates parent, origin, version, build and session before startup'
   const f = fixture();
   f.receive('initialize', {}, {}, { source: {} });
   f.receive('initialize', {}, {}, { origin: 'https://foreign.example' });
-  f.receive('initialize', {}, { version: 2 });
+  f.receive('initialize', {}, { version: 1 });
   f.receive('initialize', {}, { buildId: 'other' });
   f.receive('initialize', {}, { sessionId: 'short' });
   assert.equal(f.sent.length, 0);
@@ -57,7 +57,7 @@ test('child retries identical batches and advances only after exact matching ack
   const f = fixture();
   f.chunks.push([{ sequence: 1, type: 'initial', data: { value: 1 } }], [{ sequence: 2, type: 'sample', data: { value: 2 } }]);
   f.receive('initialize', {});
-  f.advance(100); f.tick();
+  f.tick(); // next task, with no elapsed batching delay
   const first = f.sent.at(-1);
   assert.equal(first.message.kind, 'batch');
   const initialCount = f.sent.length;

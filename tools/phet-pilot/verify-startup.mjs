@@ -28,10 +28,14 @@ try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     try {
       await page.addInitScript(() => {
-        const probe = window.startupProbe = { models: [], beforeFrame: true, begun: false, candidates: new Map(), trace: [] };
+        const probe = window.startupProbe = { models: [], beforeFrame: true, begun: false, candidates: new Map(), trace: [], registrations: new Map() };
         Object.defineProperty(window, 'phetResearchMonitor', { configurable: true, set(monitor) {
           Object.defineProperty(window, 'phetResearchMonitor', { configurable: true, writable: true, value: monitor });
-          const begin = monitor.beginModel, model = monitor.model, emit = monitor.emit, frame = monitor.frame;
+          const begin = monitor.beginModel, model = monitor.model, emit = monitor.emit, frame = monitor.frame, register = monitor.register;
+          monitor.register = (object, descriptor) => {
+            probe.registrations.set(object, descriptor);
+            return register(object, descriptor);
+          };
           let scheduled = false;
           monitor.onRecords(() => {
             if (scheduled) return;
@@ -57,23 +61,21 @@ try {
       await page.waitForFunction(() => window.phetResearchMonitor?.status().frame >= 30 || window.phetResearchMonitor?.status().complete === false, null, { timeout: 60000 });
       const result = await page.evaluate(() => {
         const probe = startupProbe; probe.trace.push(...phetResearchMonitor.drain());
-        function own(object, key) {
-          if (!object || typeof object !== 'object') return undefined;
-          const descriptor = Object.getOwnPropertyDescriptor(object, key);
-          return descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value') ? descriptor.value : undefined;
-        }
         const comparisons = [];
         for (const entry of phetResearchMonitor.snapshot()) {
           if (!['property', 'emitter'].includes(entry.kind)) continue;
-          const parts = entry.path.split('.');
-          let object = probe.models[Number(parts[1])];
+          // Resolve discovery addresses using descriptors and explicit registered readers only.
+          const parts = entry.path.split('.'); let object = probe.models[Number(parts[1])];
           for (const key of parts.slice(3)) {
-            object = key === 'value' && (own(object, 'tinyProperty') || own(object, 'changedEmitter'))
-              ? own(own(object, 'tinyProperty') || object, '_value') : own(object, key);
+            const registration = probe.registrations.get(object);
+            if (key === 'value' && registration?.kind === 'property') object = registration.read();
+            else if (registration?.kind === 'collection' && /^\d+$/.test(key)) object = registration.members[Number(key)];
+            else if (registration?.kind === 'collection' && registration.children) object = registration.children()[key];
+            else object = Object.getOwnPropertyDescriptor(object || {}, key)?.value;
           }
           if (!object) continue;
-          const backend = own(object, 'tinyProperty') || own(object, 'changedEmitter') || own(object, 'tinyEmitter') || object;
-          const expected = probe.candidates.get(backend);
+          const registration = probe.registrations.get(object);
+          const expected = probe.candidates.get(registration?.source || object);
           if (!expected?.length) continue;
           const observed = probe.trace.filter(record => record.frame === 0 && record.data.id === entry.id && ['property', 'event'].includes(record.type))
             .map(record => record.data.args.map(value => value && typeof value === 'object' ? value.undefined ? undefined : value.number ? Number(value.number) : '[object]' : value));

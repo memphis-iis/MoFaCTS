@@ -4,18 +4,13 @@
   function createCollector( options ) {
     options = options || {};
     if ( options.sampling && options.sampling !== 'object-events' ) { throw new Error( 'Only object-events monitoring is supported' ); }
-    var ids = new WeakMap(), metadata = new WeakMap(), owners = new WeakMap();
+    var ids = new WeakMap(), metadata = new WeakMap(), registrations = new WeakMap(), sources = new WeakMap(), excludedTypes = new WeakSet();
     var collections = new WeakMap(), disposed = new WeakSet(), excludedCache = new WeakMap();
     var active = new Map(), roots = [], rootIds = new Set(), candidates = new Set(), discovery = [], pending = [], records = [];
     var sequence = 0, serial = 0, order = 0, frame = 0, inspections = 0;
     var started = false, stopped = false, complete = true, settling = false;
     var notify = null, maximum = options.maximumRecords || 100000, maximumObjects = options.maximumObjects || 20000;
     var clock = options.clock || function() { return performance.now(); };
-    var skipped = /^(listeners|listenersToEmitTo|onBeforeNotify|disposeEmitter|disposeProperty|tandem|phetioType|phetioValueType|valueValidator|validValues|_initialValue|initialValue|tinyProperty|tinyEmitter|changedEmitter|startedCallbacksForChangedEmitter|endedCallbacksForChangedEmitter|callbacksStartedEmitter|callbacksEndedEmitter|_disposeEmitter|_disposer|disposer|view|_view|display|_display|_addedListeners|_removedListeners)$/;
-    function own( object, key ) {
-      var descriptor = Object.getOwnPropertyDescriptor( object, key );
-      return descriptor && Object.prototype.hasOwnProperty.call( descriptor, 'value' ) ? descriptor.value : undefined;
-    }
     function id( object ) {
       var result = ids.get( object );
       if ( !result ) { result = 'o' + ( ++serial ); ids.set( object, result ); }
@@ -37,24 +32,20 @@
       if ( stopped || !complete ) { return; }
       try { action(); } catch( error ) { fail( 'collector-error: ' + error.message ); }
     }
+    function canonical( object ) { return sources.get( object ) || object; }
     function excluded( object ) {
       if ( excludedCache.has( object ) ) { return excludedCache.get( object ); }
-      var phet = global.phet, scenery = phet && phet.scenery, joist = phet && phet.joist;
       var result = object === global || object === global.document ||
-        ( typeof global.Node === 'function' && object instanceof global.Node ) ||
-        ( scenery && typeof scenery.Node === 'function' && object instanceof scenery.Node ) ||
-        ( joist && typeof joist.Screen === 'function' && object instanceof joist.Screen ) ||
-        ( joist && typeof joist.Sim === 'function' && object instanceof joist.Sim ) ||
-        ( typeof own( object, 'phetioID' ) === 'string' && typeof own( object, 'name' ) === 'string' &&
-          Object.prototype.hasOwnProperty.call( object, 'parentTandem' ) ) ||
-        !!( own( object, '_children' ) && own( object, '_parents' ) );
+        ( typeof global.Node === 'function' && object instanceof global.Node );
+      for ( var prototype = Object.getPrototypeOf( object ); prototype && !result; prototype = Object.getPrototypeOf( prototype ) ) {
+        var constructor = Object.getOwnPropertyDescriptor( prototype, 'constructor' );
+        result = !!constructor && excludedTypes.has( constructor.value );
+      }
       excludedCache.set( object, !!result ); return !!result;
     }
     function kind( object ) {
-      if ( collections.has( object ) ) { return 'collection'; }
-      if ( own( object, 'tinyProperty' ) || own( object, 'changedEmitter' ) ||
-        Object.prototype.hasOwnProperty.call( object, '_value' ) && ( own( object, 'listeners' ) || own( object, 'listenersToEmitTo' ) ) ) { return 'property'; }
-      if ( own( object, 'tinyEmitter' ) || own( object, 'listeners' ) ) { return 'emitter'; }
+      var registration = registrations.get( object );
+      if ( registration ) { return registration.kind; }
       if ( Array.isArray( object ) ) { return 'array'; }
       if ( object instanceof Map ) { return 'map'; }
       if ( object instanceof Set ) { return 'set'; }
@@ -62,19 +53,17 @@
       if ( object instanceof Date || object instanceof RegExp || object instanceof WeakMap || object instanceof WeakSet || object instanceof ArrayBuffer || object instanceof DataView ) { return 'unsupported'; }
       return 'object';
     }
-    function backend( object ) { return own( object, 'tinyProperty' ) || own( object, 'changedEmitter' ) || own( object, 'tinyEmitter' ) || object; }
-    function propertyValue( object ) { return own( own( object, 'tinyProperty' ) || object, '_value' ); }
     function value( input ) {
       if ( input === null || typeof input === 'string' || typeof input === 'boolean' ) { return input; }
       if ( typeof input === 'number' ) { return Number.isFinite( input ) ? input : { number: String( input ) }; }
       if ( input === undefined ) { return { undefined: true }; }
-      if ( typeof input === 'object' ) { return excluded( input ) ? { unsupported: 'browser-rendering-or-instrumentation-object' } : { ref: id( input ) }; }
+      if ( typeof input === 'object' ) { input = canonical( input ); return excluded( input ) ? { unsupported: 'browser-rendering-or-instrumentation-object' } : { ref: id( input ) }; }
       return { unsupported: typeof input };
     }
     function catalog( entry ) {
       var observed = entry.kind === 'property' || entry.kind === 'emitter' || entry.kind === 'collection';
-      var tandem = own( entry.object, 'tandem' );
-      add( 'catalog', { id: entry.id, path: entry.path, tandem: tandem && ( own( tandem, 'phetioID' ) || own( tandem, 'id' ) ) || null,
+      var registration = registrations.get( entry.object );
+      add( 'catalog', { id: entry.id, path: entry.path, tandem: registration && registration.tandem || null, contractVersion: 1,
         kind: entry.kind, coverage: observed ? 'observed' : 'unsupported', sampling: 'object-events', pathSemantics: 'discovery-address',
         observation: entry.kind === 'collection' ? 'axon-collection-mutations' : observed ? 'axon-notifications' : 'initial-only',
         limitation: observed ? 'Notifications only. Direct writes that bypass the shared API are unsupported; mutable event references are snapshotted when processed and pre-discovery references resolve later.' :
@@ -93,7 +82,7 @@
         }
         return encoded;
       }
-      if ( type === 'property' ) { state = { value: encode( propertyValue( object ), 'value' ) }; }
+      if ( type === 'property' ) { state = { value: encode( registrations.get( object ).read(), 'value' ) }; }
       else if ( type === 'emitter' ) { state = {}; }
       else if ( type === 'unsupported' ) { state = { unsupported: 'unregistered-internal-state' }; }
       else if ( type === 'map' ) {
@@ -115,7 +104,7 @@
         var keys = Object.keys( source );
         if ( type === 'array' || type === 'collection' ) { keys.push( 'length' ); }
         keys.forEach( function( key ) {
-          if ( skipped.test( key ) || type === 'collection' && key !== 'length' && !/^(0|[1-9][0-9]*)$/.test( key ) ) { return; }
+          if ( type === 'collection' && key !== 'length' && !/^(0|[1-9][0-9]*)$/.test( key ) ) { return; }
           var descriptor = Object.getOwnPropertyDescriptor( source, key );
           if ( descriptor && Object.prototype.hasOwnProperty.call( descriptor, 'value' ) ) {
             fields[ key ] = encode( descriptor.value, key );
@@ -124,10 +113,10 @@
           else { fields[ key ] = { unsupported: 'accessor-not-invoked' }; fieldCoverage[ key ] = 'unsupported-accessor'; }
         } );
         if ( type === 'collection' ) {
-          [ 'lengthProperty', 'elementAddedEmitter', 'elementRemovedEmitter', 'startedCallbacksForItemAddedEmitter',
-            'endedCallbacksForItemAddedEmitter', 'startedCallbacksForItemRemovedEmitter', 'endedCallbacksForItemRemovedEmitter' ].forEach( function( key ) {
-            var child = own( object, key );
-            if ( child && typeof child === 'object' ) { fields[ key ] = encode( child, key ); fieldCoverage[ key ] = 'api-identity'; }
+          var registration = registrations.get( object );
+          var children = registration.children ? registration.children() : {};
+          Object.keys( children ).forEach( function( key ) {
+            fields[ key ] = encode( children[ key ], key ); fieldCoverage[ key ] = 'api-identity';
           } );
         }
         state = { fields: fields, fieldCoverage: fieldCoverage };
@@ -152,12 +141,12 @@
     }
     function discover( object, path ) {
       if ( !object || typeof object !== 'object' || excluded( object ) ) { return null; }
+      object = canonical( object );
       var entry = metadata.get( object );
       if ( entry && active.has( entry.id ) ) { return entry; }
       if ( active.size >= maximumObjects ) { fail( 'discovery-limit' ); return null; }
       entry = { object: object, id: id( object ), path: path, kind: kind( object ), state: null, edges: [], parents: new Set() };
       metadata.set( object, entry ); active.set( entry.id, entry );
-      if ( entry.kind === 'property' || entry.kind === 'emitter' ) { owners.set( backend( object ), entry ); }
       candidates.add( entry.id ); discovery.push( entry );
       return entry;
     }
@@ -188,14 +177,13 @@
         changed = false;
         pending.forEach( function( event ) {
           if ( event.resolved ) { return; }
-          var entry = owners.get( event.object ) || metadata.get( event.object );
+          var entry = metadata.get( canonical( event.object ) );
           if ( entry && active.has( entry.id ) ) { event.resolved = true; recordEvent( event, entry ); changed = true; }
         } );
       }
     }
     function retire( entry ) {
       active.delete( entry.id ); metadata.delete( entry.object );
-      if ( owners.get( backend( entry.object ) ) === entry ) { owners.delete( backend( entry.object ) ); }
       add( 'detached', { id: entry.id } );
     }
     // Trial deletion is restricted to removed/new event subgraphs. Incoming
@@ -258,27 +246,48 @@
         flushDiscovery();
         resolvePending();
       } ); },
-      registerCollection: function( object, array ) { guarded( function() {
-        collections.set( object, array );
-        var entry = metadata.get( object );
-        if ( entry && entry.kind !== 'collection' ) { entry.kind = 'collection'; catalog( entry ); inspect( entry, 'collection-registration' ); flushDiscovery(); }
+      excludeType: function( constructor ) { guarded( function() {
+        if ( typeof constructor !== 'function' || !constructor.prototype ) { throw new Error( 'Invalid excluded type' ); }
+        excludedTypes.add( constructor ); excludedCache = new WeakMap();
+      } ); },
+      register: function( object, descriptor ) { guarded( function() {
+        if ( !object || typeof object !== 'object' || !descriptor || descriptor.version !== 1 ||
+          [ 'property', 'emitter', 'collection' ].indexOf( descriptor.kind ) < 0 ||
+          descriptor.kind === 'property' && typeof descriptor.read !== 'function' ||
+          descriptor.kind === 'collection' && !Array.isArray( descriptor.members ) ||
+          descriptor.source !== undefined && ( !descriptor.source || typeof descriptor.source !== 'object' ) ||
+          descriptor.children !== undefined && typeof descriptor.children !== 'function' ||
+          descriptor.tandem !== undefined && typeof descriptor.tandem !== 'string' ) { throw new Error( 'Invalid registration contract' ); }
+        var previous = registrations.get( object );
+        if ( previous && !( previous.kind === 'emitter' && descriptor.kind === 'property' ) ) { throw new Error( 'Duplicate registration' ); }
+        if ( metadata.has( object ) ) { throw new Error( 'Registration must precede discovery' ); }
+        var source = descriptor.source || object, sourceOwner = sources.get( source );
+        if ( sourceOwner && sourceOwner !== source && sourceOwner !== object ) { throw new Error( 'Notification source already owned' ); }
+        if ( source !== object && metadata.has( source ) ) { throw new Error( 'Source registration must precede discovery' ); }
+        registrations.set( object, { kind: descriptor.kind, read: descriptor.read, children: descriptor.children, tandem: descriptor.tandem } );
+        sources.set( descriptor.source || object, object );
+        if ( descriptor.kind === 'collection' ) { collections.set( object, descriptor.members ); }
       } ); },
       collectionChanged: function( object, array ) { guarded( function() {
+        var registration = registrations.get( object );
+        if ( !registration || registration.kind !== 'collection' || array !== undefined && !Array.isArray( array ) ) { throw new Error( 'Unregistered collection notification' ); }
         if ( array ) { collections.set( object, array ); }
         var entry = metadata.get( object );
         if ( entry && active.has( entry.id ) ) { inspect( entry, 'collection-mutation' ); flushDiscovery(); resolvePending(); }
       } ); },
       emit: function( object, args ) { guarded( function() {
         if ( !started ) { return; }
+        if ( !sources.has( object ) ) { throw new Error( 'Unregistered notification source' ); }
         var event = { object: object, args: Array.prototype.slice.call( args ), time: clock(), order: ++order, frame: frame };
-        var entry = owners.get( object );
+        var entry = metadata.get( canonical( object ) );
         if ( entry && active.has( entry.id ) ) { recordEvent( event, entry ); }
         else if ( pending.length < maximum ) { pending.push( event ); }
         else { fail( 'early-event-queue-overflow' ); }
       } ); },
       dispose: function( object ) { guarded( function() {
+        object = canonical( object );
         if ( !started || disposed.has( object ) ) { return; }
-        var entry = owners.get( object ) || metadata.get( object );
+        var entry = metadata.get( canonical( object ) );
         disposed.add( object );
         var event = { object: object, args: [], disposed: true, time: clock(), order: ++order, frame: frame };
         if ( entry && active.has( entry.id ) ) { recordEvent( event, entry ); }
@@ -305,13 +314,13 @@
         return ready;
       },
       status: function() { return { complete: complete, stopped: stopped, frame: frame, activeObjects: active.size,
-        queuedRecords: records.length, pendingEvents: pending.length, sampling: 'object-events', objectInspections: inspections }; },
+        queuedRecords: records.length, pendingEvents: pending.length, sampling: 'object-events', registrationVersion: 1, objectInspections: inspections }; },
       snapshot: function() { return Array.from( active.values() ).map( function( entry ) {
         return { id: entry.id, path: entry.path, kind: entry.kind, state: entry.state };
       } ); },
       stop: function() {
         stopped = true; notify = null; records = []; pending = []; discovery = []; roots = []; rootIds.clear(); candidates.clear(); active.clear();
-        ids = new WeakMap(); metadata = new WeakMap(); owners = new WeakMap(); collections = new WeakMap(); disposed = new WeakSet(); excludedCache = new WeakMap();
+        ids = new WeakMap(); metadata = new WeakMap(); registrations = new WeakMap(); sources = new WeakMap(); excludedTypes = new WeakSet(); collections = new WeakMap(); disposed = new WeakSet(); excludedCache = new WeakMap();
       }
     };
   }

@@ -4,7 +4,31 @@ This is active source compiled identically into Density, Pendulum Lab, and Circu
 
 Monitoring is object-level and event-based. There is no model-step hook, recurring model scan, polling mode, lower sampling cadence, or full-frame reference collector. One initial breadth-first discovery reads each screen model's own data descriptors without invoking getters. Afterward, only a notified property, an explicitly mutated Axon observable collection, a newly discovered object, or an object explicitly carried by an observed event is inspected. Existing descendants are not recursively rescanned. Shared Joist frame-end callbacks settle captured events, reconcile affected identity edges, and emit checkpoints; they do not inspect model values.
 
-The shared hooks are `beginModel`, `model`, `registerCollection`, `collectionChanged`, `emit`, `dispose`, and `frame`. Axon notifications remain ordered and unthrottled. Observable-array hooks capture membership after the backing mutation and before downstream callbacks, including transient insertions/removals. Candidate notifications begin before the first screen-model factory and resolve when their source becomes model-owned. Module-loading events before that boundary are outside coverage. Primitive arguments are captured at notification time; mutable reference arguments before discovery resolve later and do not establish their earlier field values.
+The shared hooks are `beginModel`, `model`, `register`, `excludeType`, `collectionChanged`, `emit`, `dispose`, and `frame`. Axon notifications remain ordered and unthrottled. Observable-array hooks capture membership after the backing mutation and before downstream callbacks, including transient insertions/removals. Candidate notifications begin before the first screen-model factory and resolve when their source becomes model-owned. Module-loading events before that boundary are outside coverage. Primitive arguments are captured at notification time; mutable reference arguments before discovery resolve later and do not establish their earlier field values.
+
+## Registration and notification contract
+
+The shared declaration is `registration-contract.d.ts`. Each framework-owned observable registers before it can become model-owned:
+
+```javascript
+monitor.register(property, {
+  version: 1,
+  kind: 'property',
+  source: notificationSource,
+  read: property.get.bind(property)
+});
+monitor.register(emitter, { version: 1, kind: 'emitter', source: notificationSource });
+monitor.register(collection, {
+  version: 1, kind: 'collection', members: backingArray,
+  children: () => ({ lengthProperty, elementAddedEmitter, elementRemovedEmitter })
+});
+```
+
+Only explicit registrations grant notification coverage. `source` maps an internal emission object to its logical public owner, so property and wrapper emitters are recorded once. TinyProperty refines its base TinyEmitter registration during construction. Conflicting sources, invalid versions, duplicate or late registration, and notifications from unregistered sources fail explicitly. Registration itself does not make an object model-owned or keep it in the active catalog.
+
+The collector does not recognize objects by `_value`, `listeners`, `tinyProperty`, `changedEmitter`, `tinyEmitter`, or rendering-field lookalikes. The framework supplies public value readers, exact notification-source identities, collection membership, optional Tandem names, and explicitly exposed child handles. Value readers run during discovery or that property's notification, never from idle frames. Ordinary model objects retain descriptor-based initial inventories and remain unsupported for continuous silent writes.
+
+Rendering, Screen, Sim, and Tandem exclusions use explicitly registered constructor identities, including subclasses. There is no private-field exclusion heuristic. Axon/Joist/Scenery/Tandem adapters are maintained by framework generation, with no simulation-model patches. Preparation validates every transformation before writing source; each build records the declaration hash and registration version. Upstream source hooks remain a deliberate maintained extension, not a promise of compatibility with arbitrary framework versions.
 
 ## Coverage contract
 
@@ -34,8 +58,14 @@ Full path/reason inventories are generated in each build's `monitor-probe.json`.
 
 ## Transport and integrity
 
-`onRecords` pushes availability to the bridge. The first notification schedules one 100 ms flush; idle streams have no recurring timer. Each batch contains at most 4,000 records and 1 MiB of UTF-8 JSON. An outstanding immutable batch has a one-second delivery retry and a ten-second acknowledgment deadline. Readiness and active host processing also have one-shot deadlines; a ready idle simulation needs no heartbeat. These deadlines never inspect model state.
+`onRecords` pushes availability to the bridge. The first notification schedules a flush in the next event-loop task after the current notification transaction; idle streams have no recurring timer. Each batch contains at most 4,000 records and 1 MiB of UTF-8 JSON. An outstanding immutable batch has a one-second delivery retry and a ten-second acknowledgment deadline. Readiness and active host processing also have one-shot deadlines; a ready idle simulation needs no heartbeat. These deadlines never inspect model state.
+
+Protocol version 2 gives ACK an explicit browser-receipt meaning. The host validates and reconstructs ordered state, retains the accepted batch in its bounded 32 MiB queue, acknowledges receipt, and dispatches settled facts through the existing SPARC rule path. An independent ordered writer saves research batches. Its database calls never gate observations. Duplicate retries cannot repeat instructional effects.
+
+Research writes retain sequence/evidence identifiers, have a ten-second request deadline, and release queue ownership only after storage. Overflow, failed writes, or incomplete storage stop further dependent instruction and mark the attempt incomplete. Earlier instructional decisions remain in history with their attempt/sequence references; their raw evidence may not yet be durable. Exports must interpret those references with the research attempt status. Normal departure drains accepted writes before closing the attempt; abrupt browser termination can lose unpersisted records, and restart explicitly interrupts the old attempt. There is no durable offline outbox or claim of crash-proof persistence.
 
 Origin, source window, protocol version, build identity, session, sequence, ordering, exact acknowledgments, and authenticated durable ingestion remain mandatory. Missing required bindings, gaps, conflicting retries, overflow, oversized records, or transport failure mark evidence incomplete and stop dependent instruction. The collector never changes model values or listener behavior.
 
 Run `node --test packages/phet-monitor/*.test.mjs mofacts/scripts/simulationResearch.test.cjs`. Browser probes and exact build identities are documented in the [pilot tools](../../tools/phet-pilot/README.md). Successful reconstruction covers recorded state only, not silent mutable state or full physical replay.
+
+Research-only coalescing starts a 100 ms window for each pending storage group. Contiguous receipts are combined into bounded storage batches without changing record sequences. Further writes follow completion of the preceding write and receive their own coalescing window, limiting sustained requests to at most ten per second. No timer runs on an idle queue. This storage scheduling never gates SPARC observation delivery.

@@ -138,7 +138,7 @@ test('host requires explicit start, ignores foreign windows and does not duplica
     assert.equal(decisions[0].evidence.lastSequence, 3);
     await receive('batch', batch(record(5, 'checkpoint', { evidenceComplete: true })));
     assert.equal(statuses.at(-1), 'stopped'); assert.equal(decisions.length, 1);
-  } finally { host.dispose(); delete global.window; }
+  } finally { host.dispose(); await host.traceWork; delete global.window; }
   assert.equal(handlers.size, 0); assert.equal(frameHandlers.size, 0); assert.equal(iframe.src, 'about:blank');
 });
 
@@ -149,6 +149,7 @@ test('a fresh explicit attempt cannot be stopped or blocked by a prior delayed r
     addEventListener: (name, fn) => frameHandlers.set(name, fn), removeEventListener: name => frameHandlers.delete(name) };
   let delayedAttempt, rejectDelayed;
   const delayed = new Promise((_resolve, reject) => { rejectDelayed = reject; });
+  delayed.catch(()=>{});
   Meteor.callAsync = async (name, ...args) => name === 'ingestSimulationResearchBatch' && args[0] === delayedAttempt
     ? delayed : methods[name].call({ userId: 'learner' }, ...args);
   const host = new SimulationResearchHost({ iframe, scope,
@@ -162,7 +163,9 @@ test('a fresh explicit attempt cannot be stopped or blocked by a prior delayed r
     send(prior, 'ready', { evidenceComplete: true, scope: 'initialized-screen-models' }); await host.work;
     send(prior, 'batch', initial());
     await Promise.resolve(); // Let the first ingestion enter its delayed request.
-    const priorWork = host.work;
+    const priorWork = host.work, priorTrace = host.traceWork;
+    await priorWork;
+    assert.equal(decisions.length, 1, 'instruction reacts before research ingestion resolves');
     send(prior, 'error', { reason: 'acknowledgment-timeout', evidenceComplete: false });
     assert.equal(statuses.at(-1), 'stopped', 'child errors interrupt a pending durable request immediately');
     await host.start(); frameHandlers.get('load')();
@@ -173,10 +176,101 @@ test('a fresh explicit attempt cannot be stopped or blocked by a prior delayed r
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(freshReady, true);
     send(fresh, 'batch', initial()); await host.work;
-    assert.equal(decisions.length, 1);
-    rejectDelayed(Error('old transport failure')); await priorWork;
+    assert.equal(decisions.length, 2);
+    rejectDelayed(Error('old transport failure')); await priorTrace; await host.traceWork;
     assert.equal(statuses.at(-1), 'running');
     assert.equal(host.queuedBytes, 0);
     assert.equal(host.pendingBatches.size, 0);
   } finally { rejectDelayed(Error('test cleanup')); host.dispose(); delete global.window; }
+});
+
+function reactiveFixture() {
+  const handlers=new Map(), sent=[], decisions=[], statuses=[];
+  global.window={location:{origin:'https://host.example'},addEventListener:(k,v)=>handlers.set(k,v),removeEventListener:k=>handlers.delete(k)};
+  const iframe={src:'about:blank',contentWindow:{postMessage:m=>sent.push(m)},addEventListener(){},removeEventListener(){}};
+  const host=new SimulationResearchHost({iframe,scope,config:{buildId,bindings:[{name:'mass',address:{path:'screens.0.model.mass'},projection:'value'}]},status:s=>statuses.push(s),observation:async facts=>decisions.push(facts.mass)});
+  return {host,sent,decisions,statuses,send(kind,data){handlers.get('message')({origin:'https://simulation.example',source:iframe.contentWindow,data:{protocol:'phet-research',version:2,buildId,sessionId:host.sessionId,kind,data}});}};
+}
+test('ordered reactive updates and receipt ACKs continue while research storage is blocked; failure stops new decisions',async()=>{
+  const f=reactiveFixture();let rejectWrite;const blocked=new Promise((_resolve,reject)=>rejectWrite=reject);blocked.catch(()=>{});let writes=0;
+  Meteor.callAsync=async(name,...args)=>name==='ingestSimulationResearchBatch'?(writes++,blocked):methods[name].call({userId:'learner'},...args);
+  try {
+    await f.host.initialize();await f.host.start();f.send('ready',{evidenceComplete:true,scope:'initialized-screen-models'});await f.host.work;
+    f.send('batch',initial());await f.host.work;
+    f.send('batch',initial()); // identical retry cannot duplicate a decision or write
+    f.send('batch',batch(record(4,'property',{id:'p',args:[7]}),record(5,'checkpoint',{evidenceComplete:true})));
+    await f.host.work;
+    f.send('batch',batch(record(6,'property',{id:'p',args:[8]}),record(7,'checkpoint',{evidenceComplete:true})));
+    await f.host.work;
+    assert.deepEqual(f.decisions,[5,7,8]);assert.equal(writes,0,'research coalescing never blocks reactive updates');
+    assert.equal(f.sent.at(-1).kind,'ack');assert.equal(f.sent.at(-1).data.sequence,7);
+    assert.ok(f.host.queuedBytes>0,'accepted research remains bounded and retained until storage');
+    rejectWrite(Error('synthetic storage outage'));await f.host.traceWork;
+    assert.equal(f.statuses.at(-1),'stopped');
+    f.send('batch',batch(record(8,'property',{id:'p',args:[9]}),record(9,'checkpoint',{evidenceComplete:true})));await f.host.work;
+    assert.deepEqual(f.decisions,[5,7,8]);assert.equal(f.host.queuedBytes,0);
+  } finally {rejectWrite(Error('cleanup'));f.host.dispose();await f.host.traceWork;delete global.window;}
+});
+test('normal departure drains accepted research before closing the attempt',async()=>{
+  const f=reactiveFixture();let release;const blocked=new Promise(resolve=>release=resolve);const calls=[];
+  Meteor.callAsync=async(name,...args)=>{calls.push(name);if(name==='ingestSimulationResearchBatch'){await blocked;}return methods[name].call({userId:'learner'},...args);};
+  try {
+    await f.host.initialize();await f.host.start();f.send('ready',{evidenceComplete:true,scope:'initialized-screen-models'});await f.host.work;
+    f.send('batch',initial());await f.host.work;f.host.dispose();
+    assert.equal(calls.includes('endSimulationResearchAttempt'),false);
+    release();await f.host.traceWork;await new Promise(resolve=>setImmediate(resolve));
+    const attempt=rows.get(f.host.sessionId);assert.equal(attempt.lastSequence,3);assert.equal(attempt.status,'interrupted');
+  } finally {release();await f.host.traceWork;delete global.window;}
+});
+
+for (const fault of ['conflict','overflow']) test('reactive host stops on '+fault+' while storage is pending',async()=>{
+  const f=reactiveFixture();let release;const blocked=new Promise(resolve=>release=resolve);
+  Meteor.callAsync=async(name,...args)=>{if(name==='ingestSimulationResearchBatch')await blocked;return methods[name].call({userId:'learner'},...args);};
+  try {
+    await f.host.initialize();await f.host.start();f.send('ready',{evidenceComplete:true,scope:'initialized-screen-models'});await f.host.work;
+    f.send('batch',initial());await f.host.work;
+    if(fault==='conflict'){const changed=initial();changed.records[1].data.state.value=6;f.send('batch',changed);}
+    else {f.host.queuedBytes=32*1024*1024;f.send('batch',batch(record(4,'checkpoint',{evidenceComplete:true})));}
+    assert.equal(f.statuses.at(-1),'stopped');assert.deepEqual(f.decisions,[5]);
+    release();await f.host.traceWork;await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(rows.get(f.host.sessionId).status,'incomplete');
+  } finally {release();f.host.dispose();await f.host.traceWork;delete global.window;}
+});
+
+test('research coalesces contiguous receipts without changing evidence sequences or replaying duplicate decisions',async()=>{
+  const f=reactiveFixture();let writes=0;
+  Meteor.callAsync=async(name,...args)=>{if(name==='ingestSimulationResearchBatch')writes++;return methods[name].call({userId:'learner'},...args);};
+  try {
+    await f.host.initialize();await f.host.start();f.send('ready',{evidenceComplete:true,scope:'initialized-screen-models'});await f.host.work;
+    f.send('batch',initial());await f.host.work;
+    const next=batch(record(4,'property',{id:'p',args:[7]}),record(5,'checkpoint',{evidenceComplete:true}));
+    f.send('batch',next);await f.host.work;
+    assert.deepEqual(f.decisions,[5,7]);assert.equal(writes,0);
+    await f.host.traceWork;
+    assert.equal(writes,1);assert.equal(rows.get(f.host.sessionId+':1').batch.lastSequence,5);
+    assert.equal(f.host.queuedBytes,0);
+    f.send('batch',structuredClone(next));await f.host.work;await f.host.traceWork;
+    assert.equal(writes,1);assert.deepEqual(f.decisions,[5,7]);
+  } finally {f.host.dispose();await f.host.traceWork;delete global.window;}
+});
+
+test('continuous research arrivals receive a coalescing window between writes',async()=>{
+  const f=reactiveFixture(),starts=[];
+  Meteor.callAsync=async(name,...args)=>{
+    if(name==='ingestSimulationResearchBatch'){
+      starts.push(performance.now());
+      if(starts.length===1){
+        f.send('batch',batch(record(4,'property',{id:'p',args:[7]}),record(5,'checkpoint',{evidenceComplete:true})));
+        await f.host.work;
+      }
+    }
+    return methods[name].call({userId:'learner'},...args);
+  };
+  try {
+    await f.host.initialize();await f.host.start();f.send('ready',{evidenceComplete:true,scope:'initialized-screen-models'});await f.host.work;
+    f.send('batch',initial());await f.host.work;assert.deepEqual(f.decisions,[5]);
+    await f.host.traceWork;
+    assert.deepEqual(f.decisions,[5,7]);assert.equal(starts.length,2);
+    assert.ok(starts[1]-starts[0]>=90,'sustained writes must coalesce instead of bursting above the server limit');
+  } finally {f.host.dispose();await f.host.traceWork;delete global.window;}
 });

@@ -11,6 +11,7 @@ const activities = JSON.parse(await readFile(process.argv[2],'utf8'));
 const secrets = Object.fromEntries((await readFile(path.join(root,'deploy/local-hotfix/agent-secrets.env'),'utf8')).split(/\r?\n/).filter(line=>line.includes('=')).map(line=>[line.slice(0,line.indexOf('=')),line.slice(line.indexOf('=')+1)]));
 const browser = await chromium.launch({ channel:'chromium', headless:true });
 const results = [];
+const holdResearch = process.argv.includes('--hold-research');
 try {
   const page = await browser.newPage({ viewport:{width:1400,height:1100} });
   const errors=[]; page.on('pageerror', error=>errors.push(error.message));
@@ -40,14 +41,15 @@ try {
   page.on('dialog',dialog=>dialog.accept());
   for (const activity of activities) {
     const title=activity.label.replace(/^Edit TDF settings: /,'');
-    if (process.argv[3] && !new RegExp(process.argv[3]).test(title)) continue;
+    if (process.argv[3] && !process.argv[3].startsWith('--') && !new RegExp(process.argv[3]).test(title)) continue;
     await page.goto('http://localhost:3200/home');
     const row=page.locator('tr').filter({hasText:title});
     await row.getByRole('button',{name:/^(Start|Continue)$/}).click();
     await page.getByRole('button',{name:'Start simulation',exact:true}).waitFor({timeout:60000});
     const iframe=page.locator('.sparc-simulation iframe');
     assert.ok(!await iframe.getAttribute('src') || await iframe.getAttribute('src')==='about:blank');
-    await page.evaluate(()=>{
+    await page.evaluate(holdResearch=>{
+      window.pilotResearchGate = holdResearch ? new Promise(resolve=>{window.releasePilotResearch=resolve;}) : Promise.resolve();
       window.pilotIngests=[];window.pilotAttempt='';window.pilotRuleLatencies=[];window.pilotStops=[];window.pilotChildErrors=[];
       window.pilotCheckpointTimes=new Map();window.pilotChildTimeOrigin=null;
       window.addEventListener('message',event=>{
@@ -60,6 +62,7 @@ try {
       const original=Meteor.callAsync;
       Meteor.callAsync=async function(name,...args){
         if(name==='endSimulationResearchAttempt')window.pilotStops.push(args[1]);
+        if(name==='ingestSimulationResearchBatch') await window.pilotResearchGate;
         const started=performance.now();const result=await original.call(this,name,...args);
         if(name==='startSimulationResearchAttempt')window.pilotAttempt=result.attemptId;
         if(name==='ingestSimulationResearchBatch')window.pilotIngests.push({sequence:result.sequence,complete:result.complete,ms:performance.now()-started});
@@ -77,12 +80,18 @@ try {
         }
         return result;
       };
-    });
+    },holdResearch);
+    const releaseResearch = async text => {
+      if (!holdResearch) return;
+      await page.getByText(text,{exact:false}).waitFor({timeout:8000});
+      assert.equal(await page.evaluate(()=>pilotIngests.length),0,'Feedback must precede the first research write');
+      await page.evaluate(()=>window.releasePilotResearch());
+    };
     await page.getByRole('button',{name:'Start simulation',exact:true}).click();
     await page.waitForFunction(()=>document.querySelector('.sparc-simulation iframe')?.src.startsWith('http://127.0.0.1:3212'),null,{timeout:15000});
     const frame=await (await iframe.elementHandle()).contentFrame();
     await frame.waitForFunction(()=>window.phetResearchMonitor?.status().frame>5,null,{timeout:60000});
-    await page.waitForFunction(()=>window.pilotIngests.length>0,null,{timeout:15000});
+    if(!holdResearch) await page.waitForFunction(()=>window.pilotIngests.length>0,null,{timeout:15000});
     const box=await iframe.boundingBox();
     await page.mouse.click(box.x+box.width*.30,box.y+box.height*.48);
     await page.waitForTimeout(1000);
@@ -100,9 +109,11 @@ try {
         throw new Error(`Density volume slider not identified: ${values}`);
       }
       await sliders.nth(volumeIndex).press('End'); keyboard=true;
+      await releaseResearch('Task complete:');
     } else if(title.startsWith('Pendulum')) {
       // The approved historical launch enables its native keyboard controls.
       await frame.getByRole('slider').first().press('End'); keyboard=true;
+      await releaseResearch('Length change observed.');
       await frame.waitForFunction(()=>phet.joist.sim.screens.find(s=>s.model.pendula).model.pendula[0].lengthProperty.value===1);
       const bob=await frame.evaluate(()=>{
         const screen=phet.joist.sim.screens.find(s=>s.model.pendula);
@@ -117,6 +128,7 @@ try {
       await page.mouse.down();await page.mouse.move(box.x+box.width*.30,box.y+box.height*.44,{steps:15});await page.mouse.up();
       await frame.waitForFunction(()=>phet.joist.sim.screens.find(s=>s.model.circuit).model.circuit.circuitElements.length===1);
       await page.getByText('Component creation observed.',{exact:false}).waitFor({timeout:15000});
+      await releaseResearch('Component creation observed.');
       // Exercise the native focusable component, as a keyboard user does.
       // The embedded historical build did not delete a canvas-only selection
       // while focus remained on BODY; that limitation is retained in the report.
@@ -137,10 +149,14 @@ try {
     await page.getByText('Task complete:',{exact:false}).waitFor({timeout:30000});
     assert.deepEqual(await frame.evaluate(()=>({build:window.phetResearchBuild,started:performance.timeOrigin})),simulationWindow,'instructional updates replaced the simulation');
     const status=await frame.evaluate(()=>window.phetResearchMonitor.status());assert.equal(status.complete,true);assert.equal(status.stopped,false);
+    await page.waitForFunction(()=>pilotIngests.length>0,null,{timeout:15000});
+    const researchTarget=await page.evaluate(()=>Math.max(0,...window.pilotCheckpointTimes.keys()));
+    await page.waitForFunction(target=>window.pilotIngests.some(batch=>batch.sequence>=target),researchTarget,{timeout:15000});
     const telemetry=await page.evaluate(async()=>{
       const result=await Meteor.callAsync('exportSimulationResearchTrace',window.pilotAttempt,0);
       return {status:result.attempt.status,lastSequence:result.attempt.lastSequence,exportedBatches:result.batches.length};
     });
+    assert.ok(telemetry.lastSequence>=researchTarget,'released research must persist through the captured observation boundary');
     const ingests=await page.evaluate(()=>window.pilotIngests);assert.ok(ingests.every(x=>x.complete));
     const ruleLatencies=await page.evaluate(()=>window.pilotRuleLatencies);
     assert.ok(ruleLatencies.length>0,'No observation-linked durable production-rule trace was measured');
@@ -151,10 +167,10 @@ try {
     await page.getByRole('button',{name:'Start simulation',exact:true}).waitFor({timeout:60000});
     const reloaded=page.locator('.sparc-simulation iframe');assert.ok(!await reloaded.getAttribute('src')||await reloaded.getAttribute('src')==='about:blank');
     const interrupted=await page.evaluate(async id=>(await Meteor.callAsync('exportSimulationResearchTrace',id,0)).attempt.status,completedAttempt);
-    assert.equal(interrupted,'interrupted');
+    assert.ok(['interrupted','incomplete'].includes(interrupted),'reload must interrupt or mark unfinished research incomplete');
     await page.locator('[data-node-id="done"]').click();
     await page.getByText('Simulation activity complete.',{exact:false}).waitFor({timeout:20000});
-    const result={title,buildId:simulationWindow.build,telemetry,ingestedBatches:ingests.length,p95IngestMs:ingests.map(x=>x.ms).sort((a,b)=>a-b)[Math.floor(ingests.length*.95)],
+    const result={title,buildId:simulationWindow.build,reactedBeforeResearchWrite:holdResearch,researchPersistedThrough:researchTarget,reloadedResearchStatus:interrupted,telemetry,ingestedBatches:ingests.length,p95IngestMs:ingests.map(x=>x.ms).sort((a,b)=>a-b)[Math.floor(ingests.length*.95)],
       observationToDurableRuleTrace:{samples:ruleLatencies,p95Ms:ruleLatencies.map(x=>x.ms).sort((a,b)=>a-b)[Math.floor(ruleLatencies.length*.95)]},
       keyboard,completion:true,iframePreserved:true,explicitRestartOnReload:true,completedTaskPreserved:true,status};
     results.push(result);console.log(JSON.stringify(result));
@@ -171,7 +187,7 @@ try {
   await writeFile(resultPath,JSON.stringify({browser:browser.version(),authoring,results:combined,errors,
     limitations:['Closed-circuit setup uses public model APIs. Representative native pointer/keyboard controls are tested separately; this is not a complete accessibility audit.',
       'Embedded CCK Delete works with native component keyboard focus. A canvas-only selection with BODY focus did not respond to Delete in this browser.',
-      'Observation-to-durable-rule-trace latency includes transport, ingestion, rule execution and the saved decision trace; it uses iframe and host performance.timeOrigin clocks.',
+      'Observation-to-durable-rule-trace latency includes transport, rule execution and the saved decision trace; research ingestion is independent; it uses iframe and host performance.timeOrigin clocks.',
       'Only the authored demonstration rule firings are timed; sample counts are small and do not establish sustained-load latency.']},null,2)+'\n');
   }
 } finally { await browser.close(); }

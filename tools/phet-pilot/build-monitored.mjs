@@ -14,6 +14,9 @@ if (!pilot) throw new Error('Specify a pilot simulation');
 const workspace = path.join(root, 'tmp/phet-pilot', pilot.simulation, 'monitored');
 const config = JSON.parse(await readFile(path.join(workspace, 'monitor-build.json'), 'utf8'));
 const hash = value => createHash('sha256').update(value).digest('hex');
+if (config.registrationVersion !== 1 || hash((await readFile(path.join(root, 'packages/phet-monitor/registration-contract.d.ts'), 'utf8')).replace(/\r\n/g, '\n')) !== config.registrationContractHash) {
+  throw new Error('Reprepare the shared registration contract before building');
+}
 for (const change of config.changes) {
   const actual = (await readFile(path.join(workspace, change.path), 'utf8')).replace(/\r\n/g, '\n');
   if (hash(actual) !== change.modified) throw new Error(`Modified monitoring source: ${change.path}`);

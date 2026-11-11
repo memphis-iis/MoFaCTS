@@ -1,4 +1,4 @@
-/* Version 1 child bridge. Loaded after collector and build configuration. */
+/* Version 2 child bridge. Loaded after collector and build configuration. */
 (function( global ) {
   'use strict';
   var config = global.phetResearchConfiguration;
@@ -14,7 +14,7 @@
   var retryTimer = null;
 
   function message( kind, data ) {
-    return { protocol: 'phet-research', version: 1, buildId: config.buildId,
+    return { protocol: 'phet-research', version: 2, buildId: config.buildId,
       sessionId: session, kind: kind, data: data };
   }
   function send( kind, data ) {
@@ -31,7 +31,9 @@
   }
   function schedule() {
     if ( session && !failed && !outstanding && timer === null ) {
-      timer = setTimeout( flush, 100 );
+      // Push after the current notification transaction settles. No timed
+      // sampling window or database acknowledgment controls observation flow.
+      timer = setTimeout( flush, 0 );
     }
   }
   function retry() {
@@ -46,7 +48,7 @@
     if ( !session || failed ) { return; }
     if ( outstanding ) { return; }
     // Bound startup snapshots as well as steady-state traffic. Every record
-    // stays queued until its ordered chunk receives a durable acknowledgment.
+    // transfers to the host's bounded queue on browser receipt acknowledgment.
     var records = collector.drain( 4000, 1024 * 1024 );
     if ( records.length ) {
       outstanding = { firstSequence: records[ 0 ].sequence,
@@ -60,7 +62,7 @@
   function receive( event ) {
     if ( event.source !== global.parent || config.hostOrigins.indexOf( event.origin ) < 0 ) { return; }
     var data = event.data;
-    if ( !data || data.protocol !== 'phet-research' || data.version !== 1 || data.buildId !== config.buildId ) { return; }
+    if ( !data || data.protocol !== 'phet-research' || data.version !== 2 || data.buildId !== config.buildId ) { return; }
     if ( data.kind === 'initialize' ) {
       if ( session || typeof data.sessionId !== 'string' || !/^[a-zA-Z0-9-]{16,100}$/.test( data.sessionId ) ) { return; }
       session = data.sessionId;
