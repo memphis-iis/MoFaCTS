@@ -118,7 +118,7 @@ unrelated working-tree changes remain preserved. The standing mandate above
 now governs continued execution and publication. Its run ledger is the sole
 current allowance; counts in dated execution records are historical.
 
-**Current continuation (2026-11-10):** the earlier 42-path source cohort is
+**Historical continuation (2026-11-10; superseded by the standing ledger):** the earlier 42-path source cohort is
 published in 070a1c9a3bedd4061cc9b30420f575e7f39dcf81. Local HEAD and remote
 main match. CI run 42943883147 and Security run 42943883189 both stopped
 before any job steps. The CI annotation reports the account billing lock.
@@ -316,9 +316,9 @@ All Phase 1 exit gates in the plan still apply.
 - [x] Verify the committed client adapter and two outcome parity cases through
   the separate local Meteor receipt for 070a1c9a. It passed 1,011 server and
   1,245 client cases with zero failures/hooks. Receipt inspected 2026-11-11.
-- [ ] Execute the five newer rendered-page cases from the current local batch.
-  P1-08 still needs the protected selected-case inventory, workflow and route
-  wiring. P1-13 still needs the rendered admin view and download checks.
+- [x] Execute the five newer rendered-page cases: all passed on bf37152b in
+  standing Meteor slot 1. P1-13 is closed; P1-08 retains the protected selected-
+  case inventory, workflow and route wiring. Reuse this accepted rendering proof.
 
 ### Native Meteor verification: capacity decision (2026-11-06)
 
@@ -1769,16 +1769,17 @@ its individual image-bridge implementation box, not operational acceptance.
 - [x] Keep the prepared GitHub workflow inactive. Its 42-case source/SDK proof
   remains valid; it cannot establish an available hosted execution lane. Do not
   recreate temporary IAM access for a job known unable to start.
-- [ ] Obtain permission for a read-only AWS CloudShell preflight: account identity,
+- [x] Obtain permission for and complete the read-only AWS CloudShell preflight: account identity,
   Node/AWS CLI versions and AWS credential-variable names only, never values.
   No install, secret read, IAM/backup change or application/provider request.
   This observes the missing runtime/credential-source facts before implementing
   an explicit supported operator lane. Do not impersonate a GitHub runner or
   silently use another account/profile. The optional AWS backup remains outside
   application dependencies and the original recovery acceptance stays complete.
-- [ ] After preflight, prepare/test the applicable operator adapter and obtain
+- [x] After preflight, prepare/test the applicable operator adapter and obtain
   concrete publication/protected-read/runtime/access permissions before execution.
-  No such execution permission is inferred from P1-D8 or 35-path publication.
+  Explicit setup/one-read/cleanup approval was received 2026-11-11. Execution
+  remains owned by the current protected-inventory checklist above; do not repeat preflight.
 
 ### Independent shared outcome layer while preflight is pending (2026-11-08)
 
