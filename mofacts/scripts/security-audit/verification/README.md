@@ -14,7 +14,12 @@ as numbered rows without identifier values, and missing intent is unspecified.
 Nothing in its output is an approved policy, actual runtime-surface proof,
 allowed baseline or passing authentication result.
 
-The selected fixture list is currently in the protected operator backup. The
+The selected fixture list was recovered through the approved single format-only
+read on 2026-11-11. Its 22-row sanitized inventory resolves 17 subjects and leaves
+five publication selections unresolved. See the
+[source-grounded migration review](../../../../docs-developer/security-audit-selected-authentication-review.md).
+The complete fixture stays protected; the read retained no credential, argument,
+canary or resource values. Temporary AWS access was removed after use. The
 [optional read-only inventory preparation](../../../../deploy/security-audit/recovery-transfer/probe-inventory-review.md)
 can use this formatter, with explicit operational approval. AWS is not imported
 here or by the application. Other operators may supply their approved fixture
@@ -56,10 +61,10 @@ ten-row JSON fixture is test ground truth for the decision table, not a second
 verification catalog. No actual actor/surface/scenario entry is invented here.
 
 Six Node cases cover the complete table, false-denial witnesses, positive-match
-requirements, exact criteria and report-counter semantics. The same table has
-two prepared Meteor parity cases under the normal supported test discovery.
-Those cases require a fresh authorized Meteor invocation before this shared
-contract can be qualified/published; none has been run for this candidate.
+requirements, exact criteria and report-counter semantics. Both Meteor parity
+cases passed on 070a1c9a in the retained native Linux run (1,011 server/1,245
+client passes, zero failures/hooks). Reuse that unchanged shared-contract proof;
+actual selected-case adapters still need their own integration milestone.
 
 ```text
 node --test scripts/security-audit/tests/authorizationOutcomes.test.mjs

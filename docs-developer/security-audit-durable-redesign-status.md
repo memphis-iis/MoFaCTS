@@ -14,7 +14,7 @@ invocations including retries on the existing isolated 6 GiB/two-CPU Linux
 worker. Section 0 of the plan defines the standing mandate and real decision
 boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
-records as provenance. The active Goal tracks the remaining written plan.
+records as provenance. The retained Goal objective tracks the remaining written plan.
 
 **Current allowance: 10 total, 1 consumed, 0 reserved, 9 available.**
 Reserve before invocation. Record the committed source, private receipt
@@ -31,10 +31,12 @@ within this allowance. Do not import historical invocations into this counter.
 
 Current result: the V2 admin presentation milestone is published and verified.
 P1-13 is complete. Phase 1 has nine completed and eight open deliverables.
-The selected authentication-case inventory procedure is now explicitly
-approved for setup, one read and owned cleanup (2026-11-11). Execution is
-continuing under that approval. The 17-row Phase 1 table below remains the
-sole deliverable queue.
+The approved authentication inventory operation is complete: one successful
+read, sanitized evidence retained, backup labels unchanged and all temporary
+AWS access/environment/workspaces removed. Its 22 selected cases include five
+unresolved publication rows. The next real decision is their replacement
+selection in [the source-grounded review](security-audit-selected-authentication-review.md).
+The 17-row Phase 1 table below remains the sole deliverable queue.
 
 ### Protected inventory execution (approved 2026-11-11)
 
@@ -69,7 +71,7 @@ exact npm, so its redundant global reinstall is removed.
   corrected, AWS console and independent list/get-MFA API metadata confirmed
   exactly one FIDO registration on the recorded immutable user. Association
   counts remain zero for policies, groups and API keys. Retain the actual
-  registration ARN privately; no expiring grant or protected read has started.
+  registration ARN privately; at this checkpoint no grant/read had started.
 - [x] Correct the cleanup verifier's virtual-MFA-only ARN assumption to the
   documented FIDO/WebAuthn u2f/user namespace and generated suffix, preserving
   exact recorded/current association equality. All 51 optional SDK cases pass,
@@ -97,10 +99,32 @@ exact npm, so its redundant global reinstall is removed.
   credential, provider/application request or backup mutation was retained/run.
 - [x] Verify cleanup ownership freshly, retain its snapshot and remove the two
   owned temporary source/runtime directories after evidence retention.
-- [ ] Correct the environment cleanup binding to its actual public UUID with
-  the original expiry, then verify environment deletion and retire IAM access.
-- [ ] Preserve sanitized inventory and source/expiry/read evidence, retire
-  only owned temporary resources and verify backup labels remain unchanged.
+- [x] Correct the cleanup binding to the exact public UUID without broadening
+  resources or extending expiry. The installed policy and simulation passed;
+  an initial service denial persisted during propagation. The bounded retry
+  succeeded, with MFA-authenticated DeleteEnvironment success recorded by AWS
+  at 2026-11-11T19:48:26Z. Preserve both earlier denied outcomes as failures.
+- [x] Retire the backup-read role first while environment cleanup was pending,
+  then remove the exact temporary user policy, recorded FIDO association,
+  console login and user. Fresh AWS inventories establish user/role absence.
+  Sign out only the retired operator session; preserve the management session.
+- [x] Independently confirm both original backup versions and their exact
+  current/baseline/previous labels after IAM cleanup, using metadata reads only.
+  Exactly one payload read was executed; no backup content/version/label changed.
+- [x] Retain checksum-verified sanitized read and cleanup artifacts privately,
+  including the actual runtime test log and AWS success/final metadata records.
+  Preserve the explicit limitation that two earlier root-shell temporary JSON
+  files were no longer present; their identity observations remain in the
+  private operation ledger and installed/cleanup snapshots. Remove only the
+  owned management metadata folder after retaining its available evidence.
+- [x] Reconcile the recovered 22-row selection against current source and its
+  retained public baseline. Seventeen subjects resolve; five publication rows
+  do not. No named publication was added/removed between those source points.
+  Prepare the concrete privacy-test replacement proposal without guessing the
+  protected names, treating old flags as policy or repeating the backup read.
+- [ ] Obtain the selected-publication decision in the linked review, then
+  author the single source catalog and minimum typed adapters/baselines. This
+  changes the selected test subject and is outside routine source repair.
 
 ### Accepted admin presentation milestone (2026-11-11)
 
@@ -290,7 +314,7 @@ that actually needs another check.
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. P1-14 remains open only for staging report ingestion/rollback. Active V1 is restored and unchanged. |
 | P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |
-| P1-08 | V2-only new-ingestion endpoint | [ ] V2 HTTP and admin handlers passed the real-Mongo Meteor fixture on 603c1233. The V2 assembly command and admin adapter pass source checks, and the separate V2 Blaze page is prepared. Recover the selected authentication cases, verify the new page, wire the scanner workflow and replace the V1 registrations in the coordinated cutover. |
+| P1-08 | V2-only new-ingestion endpoint | [ ] V2 HTTP/admin real-Mongo proof, assembly/admin adapter checks and rendered V2 Blaze proof are accepted. The selected inventory read/cleanup is complete. Decide the five unresolved publication selections, implement source-owned authentication intent/adapters/baselines, then wire the scanner workflow and replace V1 registrations in the coordinated cutover. |
 | P1-09 | Summary projections, indexes and read-time integrity | [x] Bounded history, independent latest queries, exact-ID summaries and read-time validation are implemented. Real Mongo created the indexes and enforced nonce uniqueness. Tests cover retained V1 exclusion, digest integrity and rejected corrupt records. P1-16 owns the full previous-image rollback trial. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Retire V1 report access at cutover and verify that existing records are preserved. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Update and verify the security-surface manifest when the V2 route replaces the V1 route. |

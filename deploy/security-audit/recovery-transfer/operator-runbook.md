@@ -138,6 +138,11 @@ as well. No second backup version or alternate actor is tried.
    instead of deleting unrelated access. Exact inline policy names are checked by
    the same verifier; the newly created environment identity must also be checked
    in the management procedure.
+   Distinguish an installed-policy comparison or IAM simulation from an actual
+   service operation. After an exact resource correction, a definite access
+   denial may be retried only after checking current policy/request metadata and
+   allowing propagation, within the original deadline. Never broaden resources,
+   extend the lease or repeat the protected read to obtain cleanup success.
 9. Remove the owned ephemeral runtime/source workspaces, preserve their non-secret
    receipts outside them, and use the temporary user's CloudShell Actions menu to
    delete **only its new environment** while the exact-environment grant is live.
@@ -147,6 +152,12 @@ as well. No second backup version or alternate actor is tried.
    remove the physical key's other registrations. If cleanup needs recovery after
    expiry, prepare an explicit exact-environment cleanup grant for approval; no
    silent extension or broad administrative grant is permitted.
+   If environment deletion is delayed, the already-verified backup role may be
+   retired first to remove data access. Retain that completed-stage receipt and
+   recheck each remaining immutable object and its associations before removal;
+   do not recreate removed objects to rerun the initial whole-state verifier.
+   Confirm actual environment deletion in the UI and the corresponding successful
+   MFA-authenticated CloudTrail event, then confirm user/role absence and labels.
 
 The approved operation records actual source/policy/receipt hashes, private
 target coordinates, one unused operation ID, activation/expiry window and the
