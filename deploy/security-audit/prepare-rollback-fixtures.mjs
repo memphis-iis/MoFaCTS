@@ -10,14 +10,20 @@ import membership from '../../mofacts/scripts/security-audit/tests/fixtures/v1-m
 import { errorReport } from '../../mofacts/scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
 import { auditDigest } from '../../mofacts/common/securityAudit/canonicalReport.ts';
 import { parseSecurityAuditReportV2 } from '../../mofacts/common/securityAudit/reportV2.ts';
+import { proofRecord } from '../../mofacts/common/securityAudit/proofFields.ts';
+import { readAuditFileV2, parseAuditFileV2 } from '../../mofacts/scripts/security-audit/core/producerFilesV2.mjs';
 assert.equal(process.version,'v24.22.1');
-assert.equal(process.argv.length,4);
+assert.equal(process.argv.length,5);
 const repository=fileURLToPath(new URL('../../',import.meta.url));
 const sourceCommit=execFileSync('git',['rev-parse','--verify','HEAD'],{cwd:repository,encoding:'utf8'}).trim();
 assert.match(sourceCommit,/^[a-f0-9]{40}$/);
 const readSource=file=>fs.readFileSync(path.join(repository,file),'utf8');
 const metadata=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
 assert.equal(metadata.configurationTargetMatched,true);assert.equal(metadata.configurationRootOnly,true);
+const candidate=proofRecord(parseAuditFileV2(await readAuditFileV2(process.argv[4])),['image','configDigest','sourceRevision']);
+assert.match(candidate.image,/^ppavlikmemphis\/mofacts-staging2@sha256:[a-f0-9]{64}$/);
+assert.match(candidate.configDigest,/^sha256:[a-f0-9]{64}$/);
+assert.match(candidate.sourceRevision,/^[a-f0-9]{40}$/);
 const image=name=>{const id=metadata.containers.find(row=>row.name===name)?.image;assert.match(id,/^sha256:[a-f0-9]{64}$/);return id;};
 const mongoImage=image('/staging2-mongodb-1'),redisImage=image('/staging2-redis-1');
 const directory=process.argv[2];assert(directory);
@@ -41,12 +47,13 @@ settings.encryptionKey=crypto.randomBytes(32).toString('base64url');settings.sto
 write('settings.json',JSON.stringify(settings));
 const redisPassword=crypto.randomBytes(32).toString('base64url');write('redis.password',redisPassword);
 const previousImage='ppavlikmemphis/mofacts-mini@sha256:f8784b4afe9a4875fd62c5ccb153bab26796381548d47ded54d9a65d5148cc05';
-write('parameters.json',JSON.stringify({namespace,job,previousImage,previousConfig:'sha256:214793c9cf7534eb4568934fc83843328b202a23b99d108fc323ead2ceafb697'}));
-write('environment',Object.entries({ROLLBACK_NAMESPACE:namespace,ROLLBACK_JOB:job,ROLLBACK_PREVIOUS_IMAGE:previousImage,
+write('parameters.json',JSON.stringify({namespace,job,previousImage,previousConfig:'sha256:214793c9cf7534eb4568934fc83843328b202a23b99d108fc323ead2ceafb697',
+  candidateImage:candidate.image,candidateConfig:candidate.configDigest,candidateRevision:candidate.sourceRevision}));
+write('environment',Object.entries({ROLLBACK_NAMESPACE:namespace,ROLLBACK_JOB:job,ROLLBACK_APPLICATION_IMAGE:candidate.image,
   ROLLBACK_MONGO_IMAGE:mongoImage,ROLLBACK_REDIS_IMAGE:redisImage,ROLLBACK_REDIS_URL:`redis://:${redisPassword}@redis:6379/0`}).map(([key,value])=>key+'='+value).join('\n')+'\n');
 const user={_id:fixture.userId,username:fixture.email,emails:[{address:fixture.email,verified:true}],emailCanonical:fixture.email,emailOriginal:fixture.email,
   profile:{experiment:false,username:fixture.email},services:{resume:{loginTokens:[{hashedToken:crypto.createHash('sha256').update(fixture.resumeToken).digest('base64')}]}}};
-write('seed.mongo.js',`const owned=db.getSiblingDB(${JSON.stringify(namespace)});\nif(owned.users.countDocuments({})!==0||owned.security_audit_reports.countDocuments({})!==0)throw Error('Foreign fixture data');\nconst user=${JSON.stringify(user)};user.createdAt=new Date();user.services.resume.loginTokens[0].when=new Date();owned.users.insertOne(user);\nconst report=${JSON.stringify(v1)};report.ingestNonce=${JSON.stringify(namespace+'-v1-nonce')};report.ingestedAt=new Date();report.expiresAt=new Date(Date.now()+90*86400000);owned.security_audit_reports.insertOne(report);\n`);
+write('seed.mongo.js',`const owned=db.getSiblingDB(${JSON.stringify(namespace)});\nif(owned.users.countDocuments({})!==0||owned.security_audit_reports.countDocuments({})!==0||owned.security_audit_reports_v2.countDocuments({})!==0)throw Error('Foreign fixture data');\nconst user=${JSON.stringify(user)};user.createdAt=new Date();user.services.resume.loginTokens[0].when=new Date();owned.users.insertOne(user);\nfor(const [name,value] of ${JSON.stringify([['security_audit_reports',v1],['security_audit_reports_v2',v2]])}){const report=value;report.ingestNonce=${JSON.stringify(namespace)}+'-'+report.schema;report.ingestedAt=new Date();report.expiresAt=new Date(Date.now()+90*86400000);owned.getCollection(name).insertOne(report);}\n`);
 write('compose.yml',readSource('deploy/security-audit/rollback-runtime.compose.yml').replaceAll('\r\n','\n'));
 write('baseline.mjs',readSource('deploy/security-audit/rollback-runtime-baseline.mjs').replaceAll('\r\n','\n'));
 write('imageArchiveIdentity.mjs',readSource('mofacts/scripts/security-audit/qualification/imageArchiveIdentity.mjs').replaceAll('\r\n','\n'));

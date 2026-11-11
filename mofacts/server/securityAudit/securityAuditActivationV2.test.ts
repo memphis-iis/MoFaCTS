@@ -22,11 +22,21 @@ describe('activated V2 audit application boundaries', function() {
       });
     }
   }
-  it('registers only V2 ingestion and one guarded download route', function() {
-    const routes = (WebApp.connectHandlers as any).stack.map((layer: { route: string }) => layer.route);
-    expect(routes.filter((route: string) => route === '/internal/security-audits/v2')).to.have.length(1);
-    expect(routes.filter((route: string) => route === '/admin/security-audits/download')).to.have.length(1);
-    expect(routes).not.to.include('/internal/security-audits/v1');
+  it('serves the V2 HTTP boundary and excludes V1 on the actual application listener', async function() {
+    const address = WebApp.httpServer.address();
+    if (!address || typeof address === 'string') throw new Error('Application TCP listener is unavailable');
+    const origin = `http://127.0.0.1:${address.port}`;
+    const options = { signal: AbortSignal.timeout(5000) };
+    expect((await fetch(`${origin}/internal/security-audits/v2`, options)).status).to.equal(405);
+    expect((await fetch(`${origin}/internal/security-audits/v2`, { ...options,
+      method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' })).status).to.equal(415);
+    // Unregistered POSTs reach Meteor's default method response, not a V1
+    // authentication/parser path. WebApp is Express-backed in Meteor 3.5.
+    const retired = await fetch(`${origin}/internal/security-audits/v1`, { ...options,
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    expect(retired.status).to.equal(405);
+    expect(retired.headers.get('allow')).to.equal('OPTIONS, GET, HEAD');
+    expect((await fetch(`${origin}/admin/security-audits/download/invalid/name.json`, options)).status).to.equal(404);
   });
 
   it('serves V2 through registered admin methods without reading or changing retained V1 records', async function() {

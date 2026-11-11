@@ -1,5 +1,5 @@
-// Runs inside the approved previous application image, against owned synthetic
-// data only. It neither selects a release nor qualifies the future candidate.
+// Runs inside each selected application image, against owned synthetic data.
+// Image selection and cleanup belong to the staging2 controller.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -69,8 +69,51 @@ export async function openRollbackDdp(Socket = WebSocket) {
   };
 }
 
-export async function runRollbackBaseline(fixture, env = process.env) {
+export async function verifyRollbackReadback({ fixture, phase, database, ddp, request = fetch }) {
+  assert(['candidate', 'previous', 'candidate-restored'].includes(phase));
+  const selected = phase === 'previous' ? fixture.v1 : fixture.v2;
+  const excluded = phase === 'previous' ? fixture.v2 : fixture.v1;
+  const collections = [database.collection('security_audit_reports'), database.collection('security_audit_reports_v2')];
+  const before = [];
+  for (const [index, report] of [fixture.v1, fixture.v2].entries()) {
+    assert.equal(await collections[index].countDocuments({}), 1);
+    const stored = await collections[index].findOne({ reportId: report.reportId });
+    assert.equal(stored?.digestSha256, report.digestSha256); before.push(stored);
+  }
+  const listed = await ddp.call('admin.securityAudits.list');
+  assert.deepEqual(listed.reports.map(row => row.reportId), [selected.reportId]);
+  assert.equal(listed.latestFull.reportId, selected.reportId); assert.equal(listed.latestExposure, null);
+  const summary = await ddp.call('admin.securityAudits.get', [selected.reportId]);
+  assert.equal(summary.digestSha256, selected.digestSha256);
+  if (phase !== 'previous') assert.equal(summary.schema, 'SecurityAuditReportV2');
+  const downloads = {};
+  for (const format of ['json', 'html']) {
+    const issued = await ddp.call('admin.securityAudits.downloadToken', [selected.reportId, format]);
+    assert.match(issued.url, /^\/admin\/security-audits\/download\/[A-Za-z0-9_-]+\//);
+    const url = new URL(issued.url, 'http://127.0.0.1:3000');
+    assert.equal(url.origin, 'http://127.0.0.1:3000');
+    const response = await request(url, { signal: AbortSignal.timeout(10000) });
+    assert.equal(response.status, 200);
+    const body = Buffer.from(await response.arrayBuffer()); assert(body.length < 2097152);
+    assert.equal(response.headers.get('x-content-sha256'), sha(body));
+    if (format === 'json') assert.deepEqual(JSON.parse(body), selected);
+    else { assert(body.includes(Buffer.from(selected.reportId))); assert(body.includes(Buffer.from(selected.digestSha256))); }
+    downloads[`${format}Sha256`] = sha(body);
+  }
+  for (const name of ['admin.securityAudits.get', 'admin.securityAudits.downloadToken']) {
+    await assert.rejects(ddp.call(name, [excluded.reportId, 'json']), error => error.code === 'not-found');
+  }
+  for (const [index, report] of [fixture.v1, fixture.v2].entries()) {
+    assert.equal(await collections[index].countDocuments({}), 1);
+    assert.deepEqual(await collections[index].findOne({ reportId: report.reportId }), before[index]);
+  }
+  return { state: 'rollback-generation-verified', phase, schema: selected.schema,
+    digestSha256: selected.digestSha256, ...downloads, v1Preserved: true, v2Preserved: true, otherGenerationExcluded: true };
+}
+
+export async function runRollbackBaseline(fixture, phase, env = process.env) {
   const namespace = validateRollbackFixture(fixture, env);
+  assert(['candidate', 'previous', 'candidate-restored'].includes(phase));
   baselineStage = 'database-connection';
   const require = createRequire('/opt/bundle/bundle/programs/server/npm/package.json');
   const { MongoClient } = require('meteor/npm-mongo/node_modules/mongodb');
@@ -78,11 +121,6 @@ export async function runRollbackBaseline(fixture, env = process.env) {
   let ddp;
   try {
     await client.connect(); const database = client.db(); assert.equal(database.databaseName, namespace);
-    const reports = database.collection('security_audit_reports');
-    const separate = database.collection('security_audit_reports_v2');
-    assert.equal(await reports.countDocuments({}), 1);
-    assert.equal(await separate.countDocuments({}), 0);
-    assert.equal((await reports.findOne({ reportId: fixture.v1.reportId })).digestSha256, fixture.v1.digestSha256);
     baselineStage = 'ddp-connection';
     ddp = await openRollbackDdp();
     await assert.rejects(ddp.call('admin.securityAudits.list'), error => error.code === 'not-authorized');
@@ -93,61 +131,15 @@ export async function runRollbackBaseline(fixture, env = process.env) {
     assert.equal(root.status, 200); assert.match(await root.text(), /<html[\s>]/i);
     const health = await fetch('http://127.0.0.1:3000/health', { signal: AbortSignal.timeout(10000) });
     assert.equal(health.status, 200);
-    async function download(reportId, format) {
-      const issued = await ddp.call('admin.securityAudits.downloadToken', [reportId, format]);
-      assert.match(issued.url, /^\/admin\/security-audits\/download\/[A-Za-z0-9_-]+\//);
-      const url = new URL(issued.url, 'http://127.0.0.1:3000'); assert.equal(url.origin, 'http://127.0.0.1:3000');
-      const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
-      const body = Buffer.from(await response.arrayBuffer()); assert(body.length < 2097152);
-      if (response.status === 200) assert.equal(response.headers.get('x-content-sha256'), sha(body));
-      return { status: response.status, body };
-    }
-    async function baseline() {
-      const listed = await ddp.call('admin.securityAudits.list');
-      assert.deepEqual(listed.reports.map(row => row.reportId), [fixture.v1.reportId]);
-      assert.equal(listed.latestFull.reportId, fixture.v1.reportId); assert.equal(listed.latestExposure, null);
-      const selected = await ddp.call('admin.securityAudits.get', [fixture.v1.reportId]);
-      assert.equal(selected.digestSha256, fixture.v1.digestSha256);
-      const json = await download(fixture.v1.reportId, 'json'), html = await download(fixture.v1.reportId, 'html');
-      assert.equal(json.status, 200); assert.deepEqual(JSON.parse(json.body), fixture.v1);
-      assert.equal(html.status, 200); assert(html.body.includes(Buffer.from(fixture.v1.reportId)));
-      assert(html.body.includes(Buffer.from(fixture.v1.digestSha256)));
-      return { jsonSha256: sha(json.body), htmlSha256: sha(html.body), digestSha256: selected.digestSha256 };
-    }
-    baselineStage = 'v1-read-download';
-    const initial = await baseline();
-    const now = new Date(), v2 = { ...fixture.v2, ingestNonce: namespace + '-v2-nonce', ingestedAt: now,
-      expiresAt: new Date(now.getTime() + 90 * 86400000) };
-    baselineStage = 'mixed-v2-read';
-    await reports.insertOne(structuredClone(v2));
-    const mixed = await ddp.call('admin.securityAudits.list');
-    const returnedAsCurrent = mixed.latestFull?.reportId === fixture.v2.reportId;
-    const listedAsV1 = mixed.reports.some(row => row.reportId === fixture.v2.reportId);
-    const mixedDownload = await download(fixture.v2.reportId, 'json');
-    const servedUnsupportedSchema = mixedDownload.status === 200 && JSON.parse(mixedDownload.body).schema === 'SecurityAuditReportV2';
-    // Remove only this owned synthetic insertion. Real retained data is never
-    // migrated/deleted by this prequalification; the alternative is tested anew.
-    assert.equal((await reports.deleteOne({ reportId: fixture.v2.reportId, ingestNonce: namespace + '-v2-nonce' })).deletedCount, 1);
-    baselineStage = 'separate-v2-preservation';
-    await separate.insertOne(structuredClone(v2));
-    const isolated = await baseline(); assert.deepEqual(isolated, initial);
-    await assert.rejects(ddp.call('admin.securityAudits.get', [fixture.v2.reportId]), error => error.code === 'not-found');
-    assert.equal((await separate.findOne({ reportId: fixture.v2.reportId })).digestSha256, fixture.v2.digestSha256);
-    const indexes = await reports.listIndexes().toArray();
-    assert(indexes.some(index => index.expireAfterSeconds === 0 && index.key.expiresAt === 1));
-    const oneCollectionUnsafe = returnedAsCurrent || listedAsV1 || servedUnsupportedSchema;
-    return { state: 'previous-image-storage-prequalification', verifiedAt: new Date().toISOString(),
-      baseline: initial, oneCollection: { returnedAsCurrent, listedAsV1, servedUnsupportedSchema, safe: !oneCollectionUnsafe },
-      separateCollection: { v1BytesUnchanged: true, v2Excluded: true, v2DigestPreserved: true },
-      proposedStorage: oneCollectionUnsafe ? 'version-separated' : 'schema-discriminated',
-      limitations: ['Candidate application image not exercised', 'Candidate/previous/candidate qualification remains open'] };
+    baselineStage = 'generation-readback';
+    return await verifyRollbackReadback({ fixture, phase, database, ddp });
   } finally { ddp?.close(); await client.close(); }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    assert.equal(process.argv.length, 3);
+    assert.equal(process.argv.length, 4);
     const fixture = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-    process.stdout.write(JSON.stringify(await runRollbackBaseline(fixture)) + '\n');
-  } catch { process.stderr.write(JSON.stringify({ state: 'previous-image-baseline-failed', stage: baselineStage }) + '\n'); process.exitCode = 1; }
+    process.stdout.write(JSON.stringify(await runRollbackBaseline(fixture, process.argv[3])) + '\n');
+  } catch { process.stderr.write(JSON.stringify({ state: 'rollback-readback-failed', stage: baselineStage }) + '\n'); process.exitCode = 1; }
 }

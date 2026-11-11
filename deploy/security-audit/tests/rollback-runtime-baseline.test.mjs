@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { openRollbackDdp, validateRollbackFixture } from '../rollback-runtime-baseline.mjs';
+import { createHash } from 'node:crypto';
+import { openRollbackDdp, validateRollbackFixture, verifyRollbackReadback } from '../rollback-runtime-baseline.mjs';
 
 function input() {
   const namespace = 'mofacts_audit_rollback_0123456789ab';
@@ -64,4 +65,45 @@ test('rollback DDP retains a denial category and suppresses raw server error det
 test('rollback DDP rejects pending work promptly after channel loss', async () => {
   const ddp = await openRollbackDdp(SyntheticSocket), result = ddp.call('pending');
   ddp.close(); await assert.rejects(result, /channel closed/);
+});
+
+function readback(phase, change = {}) {
+  const { fixture } = input(), selected = phase === 'previous' ? fixture.v1 : fixture.v2;
+  const rows = { security_audit_reports: structuredClone(fixture.v1), security_audit_reports_v2: structuredClone(fixture.v2) };
+  const database = { collection(name) { return {
+    async countDocuments() { return rows[name] ? 1 : 0; },
+    async findOne() { return structuredClone(rows[name]); },
+  }; } };
+  const ddp = { async call(name, args = []) {
+    if (name === 'admin.securityAudits.list') {
+      if (change.mutate) rows.security_audit_reports.extra = true;
+      return { reports: change.mixed ? [fixture.v1, fixture.v2] : [selected], latestFull: selected, latestExposure: null };
+    }
+    if (args[0] !== selected.reportId) { const error = new Error('Synthetic rejection'); error.code = change.wrongDenial ? 'timeout' : 'not-found'; throw error; }
+    if (name === 'admin.securityAudits.get') return selected;
+    assert.equal(name, 'admin.securityAudits.downloadToken');
+    return { url: '/admin/security-audits/download/synthetic-token/' + args[1] };
+  } };
+  const request = async url => {
+    const body = String(url).endsWith('/json') ? JSON.stringify(selected) : `<html>${selected.reportId} ${selected.digestSha256}</html>`;
+    return new Response(body, { status: 200, headers: {
+      'x-content-sha256': change.badDigest ? '0'.repeat(64) : createHash('sha256').update(body).digest('hex'),
+    } });
+  };
+  return { fixture, phase, database, ddp, request };
+}
+test('candidate/previous/candidate readback preserves both records and restores identical candidate downloads', async () => {
+  const results = [];
+  for (const phase of ['candidate', 'previous', 'candidate-restored']) {
+    const result = await verifyRollbackReadback(readback(phase)); results.push(result);
+    assert.equal(result.phase, phase); assert.equal(result.v1Preserved, true); assert.equal(result.v2Preserved, true);
+    assert.equal(result.schema, phase === 'previous' ? 'SecurityAuditReportV1' : 'SecurityAuditReportV2');
+  }
+  for (const key of ['schema', 'digestSha256', 'jsonSha256', 'htmlSha256']) assert.equal(results[0][key], results[2][key]);
+});
+test('rollback readback rejects mixed schemas, changed records, corrupt downloads and non-policy rejections', async () => {
+  for (const change of [{ mixed: true }, { mutate: true }, { badDigest: true }, { wrongDenial: true }]) {
+    await assert.rejects(verifyRollbackReadback(readback('candidate', change)));
+  }
+  await assert.rejects(verifyRollbackReadback(readback('unselected-generation')));
 });

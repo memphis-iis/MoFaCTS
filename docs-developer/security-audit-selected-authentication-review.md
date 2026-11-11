@@ -4,8 +4,9 @@ Review source: the approved single format-only baseline read on 2026-11-11,
 executed with scanner source `7d6fc0d8`. The private receipt and its complete
 checksum-verified execution/cleanup evidence are retained by the operator.
 This document contains public subjects and known actor aliases only. It is a
-migration proposal, not the verification catalog, approved policy or live
-application acceptance. `mofacts/common/securityAudit/verificationCatalog.ts`
+migration review, not the verification catalog or live application acceptance.
+The progress-privacy replacement was approved on 2026-11-11.
+`mofacts/common/securityAudit/verificationCatalog.ts`
 remains the sole planned executable intent owner.
 
 ## Recovered selection and current source
@@ -40,14 +41,14 @@ as a denied download. P1-D8 already authorizes correcting those evidence rules
 and adding the required positive baselines. No application access-rule change
 is proposed here.
 
-## Unapproved selection proposal
+## Approved progress-privacy replacement (2026-11-11)
 
-The proposal below has not been approved. It does not block independent V2
-receiver, presentation, manifest and release work. Keep the five unidentified
-rows explicitly unresolved while that work proceeds. Approval of the execution
-mandate does not turn these unknown subjects into known authorization policies.
+Phil approved the replacement below. The five original subjects remain
+unidentified historical provenance; their policy is not inferred. The approved
+replacement is now implementation work alongside the V2 receiver and release
+cutover. No additional backup operation is needed.
 
-Recommended: replace the five unresolvable publication selections with explicit
+Replace the five unresolvable publication selections with explicit
 current `userExperimentState` privacy scenarios for the same five actors.
 Require that anonymous/other-account callers cannot receive another account's
 synthetic progress, and that authenticated callers can receive their own
@@ -58,7 +59,7 @@ selection and the other resolved subjects in scope.
 This intentionally changes which publication those five rows test. It does not
 claim to recover their unknown original intent, change application permissions,
 authorize another backup read or authorize protected binding publication.
-Source preparation can proceed after this selection is approved; any required
+Source preparation is authorized; any required
 protected binding change must be prepared concretely and handled at its own
 authorized operational boundary.
 

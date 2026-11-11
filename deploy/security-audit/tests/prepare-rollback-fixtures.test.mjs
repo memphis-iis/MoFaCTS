@@ -7,6 +7,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { validateRollbackFixture } from '../rollback-runtime-baseline.mjs';
+import { canonicalAuditJson } from '../../../mofacts/common/securityAudit/canonicalReport.ts';
 
 const script=fileURLToPath(new URL('../prepare-rollback-fixtures.mjs',import.meta.url));
 function fixture(t){
@@ -14,8 +15,9 @@ function fixture(t){
   t.after(()=>{assert.equal(path.dirname(directory),path.resolve(os.tmpdir()));assert.match(path.basename(directory),/^mofacts-rollback-packet-test-/);fs.rmSync(directory,{recursive:true,force:true});});
   const metadata={configurationTargetMatched:true,configurationRootOnly:true,containers:[
     {name:'/staging2-mongodb-1',image:'sha256:'+'a'.repeat(64)},{name:'/staging2-redis-1',image:'sha256:'+'b'.repeat(64)}]};
-  const source=path.join(directory,'metadata.json'),packet=path.join(directory,'packet');
-  return{directory,source,packet,metadata,run(){fs.writeFileSync(source,JSON.stringify(metadata));return spawnSync(process.execPath,[script,packet,source],{cwd:directory,encoding:'utf8',timeout:15000});}};
+  const source=path.join(directory,'metadata.json'),packet=path.join(directory,'packet'),candidateFile=path.join(directory,'candidate.json');
+  const candidate={image:'ppavlikmemphis/mofacts-staging2@sha256:'+'c'.repeat(64),configDigest:'sha256:'+'d'.repeat(64),sourceRevision:'e'.repeat(40)};
+  return{directory,source,packet,metadata,candidate,run(){fs.writeFileSync(source,JSON.stringify(metadata));fs.writeFileSync(candidateFile,canonicalAuditJson(candidate));return spawnSync(process.execPath,[script,packet,source,candidateFile],{cwd:directory,encoding:'utf8',timeout:15000});}};
 }
 test('rollback fixture preparation binds actual HEAD, exact bytes and owned synthetic identities from any cwd',t=>{
   const value=fixture(t),result=value.run();assert.equal(result.status,0,result.stderr);
@@ -29,6 +31,18 @@ test('rollback fixture preparation binds actual HEAD, exact bytes and owned synt
   assert.equal(validateRollbackFixture(synthetic,{MOFACTS_AUDIT_ROLLBACK_NAMESPACE:prepared.namespace,EXPECTED_MONGO_DB_NAME:prepared.namespace,
     ROOT_URL:'http://app:3000',MONGO_URL:`mongodb://mongo:27017/${prepared.namespace}?replicaSet=rollback-rs`}),prepared.namespace);
   assert(!result.stdout.includes(synthetic.resumeToken));
+  const parameters=JSON.parse(fs.readFileSync(value.packet+'/parameters.json'));
+  assert.equal(parameters.candidateImage,value.candidate.image);assert.equal(parameters.candidateConfig,value.candidate.configDigest);
+  assert.equal(parameters.candidateRevision,value.candidate.sourceRevision);
+  assert.match(fs.readFileSync(value.packet+'/seed.mongo.js','utf8'),/security_audit_reports_v2/);
+});
+test('rollback packet rejects mutable, foreign and malformed candidate identities before creating credentials',t=>{
+  for(const field of ['image','configDigest','sourceRevision']){
+    const value=fixture(t);value.candidate[field]='unverified';
+    assert.notEqual(value.run().status,0);assert.equal(fs.existsSync(value.packet),false);
+  }
+  const foreign=fixture(t);foreign.candidate.image=foreign.candidate.image.replace('mofacts-staging2','mofacts-mini');
+  assert.notEqual(foreign.run().status,0);assert.equal(fs.existsSync(foreign.packet),false);
 });
 test('rollback fixture preparation rejects wrong host metadata before creating a credential packet',t=>{
   const value=fixture(t);value.metadata.configurationTargetMatched=false;

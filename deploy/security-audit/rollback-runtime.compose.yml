@@ -1,4 +1,4 @@
-# Optional, disposable previous-image storage prequalification. No host ports,
+# Disposable candidate/previous/candidate storage qualification. No host ports,
 # Docker socket, existing volumes, deployed settings, learner or provider data.
 services:
   mongo:
@@ -35,7 +35,7 @@ services:
         read_only: true
     networks: [qualification]
   app:
-    image: ${ROLLBACK_PREVIOUS_IMAGE:?approved immutable previous platform required}
+    image: ${ROLLBACK_APPLICATION_IMAGE:?reviewed immutable application platform required}
     mem_limit: 1g
     memswap_limit: 1g
     cpus: 1

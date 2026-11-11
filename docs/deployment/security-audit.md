@@ -6,7 +6,11 @@ This assessment intentionally excludes backup, restore, uptime, disk health, cap
 
 The inert V2 collector passed its exact-source Meteor gate and the protected
 staging2 SSH/install/restoration window on 2026-11-07. V1 was restored, including
-its nine PASS controls; no V2 receiver/producer is activated. See the
+its nine PASS controls. That remains the deployed staging2 baseline. The current
+application source activates the V2 receiver/admin candidate, with native
+verification and staging2 release acceptance tracked separately. The production
+scanner stays pinned to its matching V1 source; see the
+[scanner cutover procedure](../../deploy/security-audit/scanner-cutover.md). See the
 [host procedure and exact acceptance](../../deploy/security-audit/host-qualification-review.md).
 The optional [previous-image baseline](../../deploy/security-audit/rollback-runtime.md)
 prepares the separate storage rollback gate using only synthetic private services.
