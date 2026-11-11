@@ -63,6 +63,22 @@ test('operator session uses clean committed source and a narrow container-only C
   assert.equal(aws[1].args.at(aws[1].args.indexOf('--duration-seconds') + 1), '900');
 });
 
+test('CloudShell CLI v2 patch updates preserve the session contract and other versions stop before credentials', async () => {
+  for (const version of ['aws-cli/2.39.3 Python/3.14 Linux\n', 'aws-cli/2.39.6 Python/3.14 Linux\n']) {
+    const f = operatorFixture(), input = recoveryOperatorInputs(f.env, f.runtime, clock);
+    const command = (name, args, ...rest) => args[0] === '--version'
+      ? Buffer.from(version) : f.command(name, args, ...rest);
+    assert.equal((await acquireRecoveryOperatorSession(input, { command, now: f.now })).AccessKeyId, 'synthetic-access');
+  }
+  for (const version of ['aws-cli/1.39.6 Python/3.14 Linux\n', 'aws-cli/3.0.0 Python/3.14 Linux\n', 'aws-cli/2.x.y Linux\n', 'prefix aws-cli/2.39.6 Linux\n']) {
+    const f = operatorFixture(), input = recoveryOperatorInputs(f.env, f.runtime, clock);
+    const command = (name, args, ...rest) => args[0] === '--version'
+      ? Buffer.from(version) : f.command(name, args, ...rest);
+    await assert.rejects(acquireRecoveryOperatorSession(input, { command, now: f.now }));
+    assert.equal(f.calls.some(call => call.name === 'aws'), false);
+  }
+});
+
 test('root, foreign principal/source, expired session and wrong assumed role stop before a backup request', async () => {
   for (const kind of ['root', 'foreign', 'dirty', 'revision', 'expired', 'wrong-role']) {
     const f = operatorFixture(), input = recoveryOperatorInputs(f.env, f.runtime, clock);

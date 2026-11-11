@@ -31,10 +31,29 @@ within this allowance. Do not import historical invocations into this counter.
 
 Current result: the V2 admin presentation milestone is published and verified.
 P1-13 is complete. Phase 1 has nine completed and eight open deliverables.
-The next dependency is the selected authentication-case inventory. Its
-reviewed procedure creates new temporary AWS access, so that operational
-approval is the next real decision under the standing mandate. The 17-row
-Phase 1 table below remains the sole deliverable queue.
+The selected authentication-case inventory procedure is now explicitly
+approved for setup, one read and owned cleanup (2026-11-11). Execution is
+continuing under that approval. The 17-row Phase 1 table below remains the
+sole deliverable queue.
+
+### Protected inventory execution (approved 2026-11-11)
+
+- [x] Record explicit approval for temporary console-only/MFA identity setup,
+  isolated CloudShell runtime, the one restricted baseline read and cleanup.
+- [x] Verify the root management identity against the retained account and
+  independently establish absence of the exact temporary user/role names.
+  Fresh CloudShell preflight observed Node 20.20.2 and AWS CLI 2.39.6 in Ohio.
+- [x] Correct the optional operator check to require the documented AWS CLI
+  v2 interface instead of the obsolete 2.39.3 patch pin. All 51 optional SDK
+  tests, optional-tool lint and full app lint passed. Exact actor, role,
+  session expiry, scoped environment and payload checks remain enforced.
+  This optional-tool-only change needs no additional Meteor invocation.
+- [ ] Render and retain the exact reviewed bootstrap policy and expiry,
+  create the owned temporary identity and complete password/MFA handoff.
+- [ ] Verify the new user environment/runtime, activate the exact read role,
+  verify installed grants and execute the single protected baseline read.
+- [ ] Preserve sanitized inventory and source/expiry/read evidence, retire
+  only owned temporary resources and verify backup labels remain unchanged.
 
 ### Accepted admin presentation milestone (2026-11-11)
 

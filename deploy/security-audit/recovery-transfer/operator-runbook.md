@@ -4,8 +4,9 @@ The design and source preparation are approved. The security-audit standing
 mandate of 2026-11-11 covers intentional publication and its existing Linux
 verification allowance. Creating the temporary AWS identity, preparing its
 CloudShell runtime, reading the protected backup and retiring that access form
-one operational review below. Those steps require the separate approval for
-new security-sensitive access. The GitHub runner remains strict and inactive.
+one operational review below. Phil explicitly approved setup, one read and
+owned cleanup on 2026-11-11. Record and execute only that operation. The GitHub
+runner remains strict and inactive.
 
 ## Source acceptance before operational approval
 
@@ -24,7 +25,7 @@ version inventory reader. The new entry point is:
 node deploy/security-audit/recovery-transfer/aws/run-operator-inventory.mjs <private-workspace>
 ```
 
-It requires Linux, Node 24.22.1, AWS CLI 2.39.3, the CloudShell context in Ohio,
+It requires Linux, Node 24.22.1, AWS CLI v2, the CloudShell context in Ohio,
 the exact new IAM user, clean expected committed source and the configured loopback
 container credential provider. Profiles, static keys, GHA context, Node injection
 and non-loopback/custom-query metadata providers fail before credentials are
@@ -32,6 +33,14 @@ requested. AWS CLI gets a narrow environment with alternate credential/config
 files disabled, EC2 metadata disabled, one attempt and the fixed STS endpoint.
 Its credential output is bounded and remains in memory. No CLI error text is
 classified as a security result; failed commands stop acquisition.
+
+CloudShell automatically updates its installed CLI. The optional tool requires
+the documented CLI v2 interface and validates the account, role and returned
+session fields independently. The live preflight on 2026-11-11 observed 2.39.6;
+the earlier 2.39.3 patch pin incorrectly rejected that managed update. Node/npm
+and SDK package pins retain their existing exact values. See AWS's
+[managed software contract](https://docs.aws.amazon.com/cloudshell/latest/userguide/vm-specs.html)
+and [AssumeRole command](https://docs.aws.amazon.com/cli/latest/reference/sts/assume-role.html).
 
 The existing baseline/target variables remain unchanged. Two new optional-tool
 inputs are necessary: `RECOVERY_OPERATION_ID` is the unique decimal identifier
@@ -48,7 +57,7 @@ After each request boundary, expiry is checked before another operation starts.
 The existing SDK capability independently denies writes; the IAM role must do so
 as well. No second backup version or alternate actor is tried.
 
-## Concrete staged access procedure to approve later
+## Approved staged access procedure (2026-11-11)
 
 1. Confirm the expected account, no existing `mofacts-recovery-operator` user and
    no `mofacts-recovery-restore` role. Read-only name inventories establish absence;
@@ -124,8 +133,7 @@ as well. No second backup version or alternate actor is tried.
    expiry, prepare an explicit exact-environment cleanup grant for approval; no
    silent extension or broad administrative grant is permitted.
 
-Steps 3 onward create/remove security-sensitive access and remain unexecuted.
-The final operational review must contain actual source/policy/receipt hashes,
-private target coordinates, one unused operation ID, activation/expiry window,
-the human password/MFA handoff and the explicit setup/read/cleanup authorization.
-No such permission is implied by this document or passing synthetic tests.
+The approved operation records actual source/policy/receipt hashes, private
+target coordinates, one unused operation ID, activation/expiry window and the
+human password/MFA handoff before its respective boundaries. Source tests are
+retained separately from actual runtime, restricted-session and cleanup proof.

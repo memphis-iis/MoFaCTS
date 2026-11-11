@@ -44,7 +44,9 @@ export async function acquireRecoveryOperatorSession(input, { command = evidence
   const status = await command('git', ['-C', root, 'status', '--porcelain=v1', '--untracked-files=all'], 65536, plainEnv);
   if (source !== sourceCommit || status.length !== 0) fail('operator-source');
   const version = (await command('aws', ['--version'], 1024, plainEnv)).toString();
-  if (!version.startsWith('aws-cli/2.39.3 ')) fail('operator-context');
+  // CloudShell manages CLI patch updates. The documented v2 command contract
+  // is required; every identity and session response is validated below.
+  if (!/^aws-cli\/2\.[0-9]+\.[0-9]+\s/.test(version)) fail('operator-context');
   const aws = async args => parseCiEvidenceJson(await command('aws', [...args, '--region', 'us-east-2',
     '--endpoint-url', 'https://sts.us-east-2.amazonaws.com', '--output', 'json', '--no-cli-pager',
     '--cli-connect-timeout', '10', '--cli-read-timeout', '20'], 32768, commandEnv), 32768);

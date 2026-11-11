@@ -30,7 +30,7 @@ export function operatorFixture() {
   const command = async (name, args, maximum, environment) => {
     calls.push({ name, args, maximum, environment });
     if (name === 'git') return Buffer.from(args.includes('rev-parse') ? env.RECOVERY_EXPECTED_COMMIT + '\n' : '');
-    if (args[0] === '--version') return Buffer.from('aws-cli/2.39.3 Python/3.14.8 Linux exec-env/CloudShell\n');
+    if (args[0] === '--version') return Buffer.from('aws-cli/2.39.6 Python/3.14.8 Linux exec-env/CloudShell\n');
     return Buffer.from(JSON.stringify(args[1] === 'get-caller-identity'
       ? { Account: target.accountId, Arn: `arn:aws:iam::${target.accountId}:user/mofacts-recovery-operator` }
       : { AssumedRoleUser: { Arn: `arn:aws:sts::${target.accountId}:assumed-role/mofacts-recovery-restore/mofacts-inventory-${runId}` },
