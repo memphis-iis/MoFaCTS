@@ -87,8 +87,10 @@ as well. No second backup version or alternate actor is tried.
    window. Its one-hour/MFA/Ohio grant allows only launching the new user's
    CloudShell; it has no role/secret or environment-delete permission. Require
    a fresh MFA sign-in and launch that user's new Ohio CloudShell. Capture
-   the actual environment ID from its visible terminal/tab or AWS metadata; never
-   substitute the root user's environment. This is a new per-user environment.
+   the actual environment ID from its terminal or AWS metadata; never substitute
+   a terminal-session UUID or the root user's environment. The verified CloudShell
+   environment identifier has the form `e-` followed by 32 lowercase hex digits;
+   retain its exact value privately. This is a new per-user environment.
    With separate runtime approval, prepare a clean checkout in its private /tmp
    directory and run prepare-operator-runtime.sh with the reviewed commit once
    there. It uses the package's Node/npm pins, official HTTPS Node archive/exact

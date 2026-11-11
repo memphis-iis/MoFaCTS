@@ -75,8 +75,15 @@ exact npm, so its redundant global reinstall is removed.
   exact recorded/current association equality. All 51 optional SDK cases pass,
   including rejection of root, foreign user/account/name, replacement key,
   virtual MFA, malformed path and oversized identifier. Full app lint passes.
-- [ ] Render and retain the exact reviewed bootstrap policy and expiry after
-  verified credential setup, then attach the expiring CloudShell-only grant.
+- [x] Verify the fresh operator console session and its exact IAM identity in
+  the new Ohio CloudShell. No static/API credentials were created or exported.
+- [x] Render, install and independently compare the CloudShell-only bootstrap
+  policy. Its unchanged deadline is 2026-11-11T20:25:04.772Z. The exact immutable
+  user, one FIDO association and zero extra associations passed before install.
+- [x] Correct the fixture's UUID assumption to the observed CloudShell e- plus
+  32-hex environment identifier. Terminal session UUIDs are a different identity.
+  All 51 optional cases pass, including rejection of malformed/foreign-format
+  identifiers. No role or backup access was installed during this correction.
 - [ ] Verify the new user environment/runtime, activate the exact read role,
   verify installed grants and execute the single protected baseline read.
 - [ ] Preserve sanitized inventory and source/expiry/read evidence, retire

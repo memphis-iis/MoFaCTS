@@ -27,7 +27,7 @@ export function recoveryOperatorBootstrapPolicy({ target, deadline, runId }, now
 export function recoveryOperatorPolicies({ target, deadline, runId, environmentId }, now = new Date()) {
   validateRestoreTarget(target);
   const window = operatorWindow(deadline, runId, now);
-  if (typeof environmentId !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(environmentId)) fail();
+  if (typeof environmentId !== 'string' || !/^e-[a-f0-9]{32}$/.test(environmentId)) fail();
   const operatorArn = `arn:aws:iam::${target.accountId}:user/${RECOVERY_OPERATOR}`;
   const expires = { DateLessThan: { 'aws:CurrentTime': window.deadline } };
   const assume = { ...expires, Bool: { 'aws:MultiFactorAuthPresent': 'true' },
