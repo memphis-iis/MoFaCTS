@@ -60,6 +60,49 @@ surfaces and Linux expanded source gate (308 passes, six conditional skips,
 zero failures) pass. A first test-only RSA KeyObject/PEM mismatch was corrected;
 no runtime crypto change was made. Live committed-source execution/readback is
 next and is not yet accepted. No Meteor invocation is reserved or consumed.
+## Operator workflow acceptance and Phase 1 reconciliation (2026-11-12)
+
+- [x] Source `750523d9` runs the complete exposure file/retention/ingestion
+  sequence against staging2 through existing permissions. An initial private
+  Windows-to-WSL path quoting error stopped before acquisition; its correction
+  reused the same retained fresh host read and did not repeat a scanner/upload.
+- [x] Restricted host carriage and MATCH receipt validated; all eleven internal
+  controls pass. Exact report `staging2-operator-750523d9-20261112` was accepted
+  once (HTTP 201), encrypted and independently recovered with the saved key.
+- [x] Actual admin page/list/get and both guarded downloads pass. Report digest
+  `487daf56e50d316f6be16e501d78519c5d25b2e6136537a1787827a307b89802`;
+  JSON/recovered payload SHA-256
+  `b7bd146447ac58772f176973daf2734b61783c4db1d5e60d80ff307947e19ff2`;
+  HTML SHA-256
+  `e9839d30eec9d408cb2fe381529bbc72cbe5bdbb4bc843c914064084ac0f0c2f`.
+- [x] Encrypted retention SHA-256
+  `98fb1d5451abf3cfb89ad8e0a37f0cedf2d10da346329a270eba18f7eec80f93`.
+  Raw host/producer/report plaintext was removed only after saved-key and admin
+  readbacks passed. Keep encrypted bytes and content-free receipts in private
+  `phase1-20261105/operator-exposure-750523d9-20261112`; workflow acceptance
+  receipt SHA-256 is
+  `44882366c15cdf0d8dd917c510ebc9594b8c9d61dec8fdab377e8ed051f17df2`.
+- [x] Preserve honest incomplete execution: 18 PASS, zero FAIL, five ERROR.
+  Final exit 1 and `executionComplete: false` were expected and retained. UDP
+  lacks conclusive inventory. HTTP redirect/HSTS/CSP/security-header controls
+  timed out; subsequent bounded OS/Node DNS checks confirm worker resolution
+  failure (EAI_AGAIN/ETIMEOUT), not missing served security headers. Windows
+  submission and browser readback succeeded. No application repair or security
+  policy relaxation is indicated by these timeout observations.
+- [x] Reconcile P1-08 as workflow/receiver integrity complete and P1-17 as current
+  operator documentation complete: **16 of 17 deliverables**, with P1-04 and
+  explicit production cutover/acceptance still unexecuted. This does not close
+  Phase 1's production exit gate, qualify all scanner controls, or close the
+  larger audit. Reuse the prior rollback, selected authorization and Meteor
+  proofs; no new Meteor invocation occurred (six remain).
+- [ ] Current operational dependency: recover normal DNS on the dedicated
+  Ubuntu-MoFaCTS worker before another costly scan. Its generated resolver uses
+  the WSL DNS tunnel; no persistent setting was changed. A process-only
+  single-request diagnostic did not fix it and was not adopted. The distro has
+  pre-existing interactive shells and Docker integration; do not terminate it,
+  restart all WSL/Docker or change global DNS without the operator's decision.
+  No restart has occurred. Production observation permission is also still
+  pending and has not been inferred from continuation instructions.
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/
@@ -440,7 +483,7 @@ that actually needs another check.
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. The later live V2 application/host/receipt qualification and rollback/restoration close P1-14; staging2 now runs the accepted V2 pair. Reuse that proof instead of repeating the earlier V1-restoration checkpoint. |
 | P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |
-| P1-08 | V2-only new-ingestion endpoint | [ ] V2 receiver/admin activation passes actual registered-handler Meteor proof in slot 3. The source-owned selected-authorization catalog/adapters, positive baselines and approved progress-privacy replacement pass slot 4, including six real-Mongo publication cases. Production scanner remains pinned to its matching V1 receiver. The selected producer now emits its exact 22-control catalog subset: the live 29-case authorization proof passes, while 21 deferred Phase 2 protocol scenarios remain explicit ERROR. The V2 manual workflow and its existing main-only GitHub environment now have the scoped signing binding and separate operator-owned RSA-3072 key/public variable; saved-key round trips and binding withdrawal pass. Activation source passes lint and 535 Node cases. Fresh end-to-end report-workflow acceptance remains unexecuted. GitHub billing is unavailable; operator Linux execution is the selected replacement, not a billing prerequisite. The four-job repository security gate and live report-workflow acceptance are separate evidence; no paid change or additional Meteor invocation is claimed. |
+| P1-08 | V2-only new-ingestion endpoint | [x] V2 registered-handler, real-Mongo storage, selected authorization and runtime activation passed their recorded Meteor proof. The 29-case live selected authorization proof is accepted; other 21 protocol controls remain Phase 2 ERROR. Fresh operator workflow source 750523d9 now proves actual restricted host/receipt carriage, exact exposure assembly, saved-key encrypted retention, one signed HTTP-201 ingestion, visible admin list/get and exact JSON/HTML download readback. It truthfully retains 18 PASS/five ERROR and exits 1: four HTTP timeout controls were traced to Linux resolver EAI_AGAIN/ETIMEOUT, plus the known incomplete UDP inventory. This completes workflow/receiver integrity, not scanner execution completeness or release qualification. GitHub billing is not required. Production remains independently pinned to V1; no additional Meteor invocation or access grant was made. |
 | P1-09 | Summary projections, indexes and read-time integrity | [x] Bounded history, independent latest queries, exact-ID summaries and read-time validation are implemented. Real Mongo created the indexes and enforced nonce uniqueness. Tests cover retained V1 exclusion, digest integrity and rejected corrupt records. P1-16 owns the full previous-image rollback trial. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [x] V1 runtime readers, methods, collection registration, admin template and ingestion registration are removed from the candidate. Exact-source Meteor slot 3 passes actual V2 HTTP/admin registrations, V1 get/download exclusion and unchanged complete synthetic V1 storage. No deployed database migration/deletion occurred; staging image round-trip remains P1-14/16. |
 | P1-11 | Truthful temporary security-surface manifest update | [x] V2 replaces V1 in the application HTTP registration and reviewed signed-ingestion classification. Existing admin method/download policies are unchanged. Full typecheck/lint pass; the surface verifier covers 330 surfaces. Actual registered-handler Meteor proof is included in this activation batch. |
@@ -449,7 +492,7 @@ that actually needs another check.
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [x] Live paired V2 application/receipt/host qualification passes on 2026-11-11: actual signed report ingestion, admin UI/get/JSON+HTML downloads, V1 rollback exclusion and restored V2 matching hashes. Audit storage remained unchanged, both fixture attempts independently absent, all eleven host controls PASS and receipt MATCH. No SSH/sudo/ACL grant changed. Exposure report truthfully retains one UDP evidence-incomplete ERROR. See live evidence below; the separate sealed P1-16 trial supplies positive V1 and V2 record coverage. |
 | P1-15 | Exact host install/rollback procedure and hashes | [x] Reviewed nine-file cohort, pinned source/controller/baseline hashes, bounded root controller and independent recovery documented/tested. Actual staging2 installation and exact restoration passed; Phase 0 production baseline is retained. No production installation is implied. |
 | P1-16 | Previous-production-image qualification with V2 records | [x] Full sealed staging2 candidate/previous/candidate trial passes on 2026-11-11 using candidate 1c72734b and the selected immutable previous production image. All three phases verify real DDP/admin access, list/latest/get/downloads, other-generation exclusion and unchanged V1/V2 bytes. Candidate/restored download hashes match. Independent cleanup and unchanged original MoFaCTS/JEDM services pass. Exact evidence: phase1-20261105/rollback-roundtrip-1c72734b/attempt1, independent readback SHA-256 8a03c93db239d44081002a478d486361940a5beb6537f9c60b3da2317594fe70. P1-14 still owns live V2 ingestion/cutover. |
-| P1-17 | Updated operator documentation | [ ] Development and temporary-operator procedures are documented. Finish the operator instructions for the qualified V2 workflow, production cutover and rollback. |
+| P1-17 | Updated operator documentation | [x] Current public guide, code-local README, operator Linux repository/exposure procedures, staging2 baseline, standard release-record owner and production cutover/rollback guidance are reconciled. Remove superseded inert/V1-restored claims; preserve immutable historical production setup and dated proof in the ledger. Wiki guidance carries the actual workflow result and DNS limitation. Production execution and complete scanner evidence remain explicitly unverified, not documentation work silently reopened. |
 
 ### Release identity hook and candidate preparation (2026-11-11)
 

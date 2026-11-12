@@ -14,6 +14,13 @@ restricted SSH identity to acquire the no-argument forced command described in
 remote command, substitute a previous measurement or infer a missing receipt.
 The acquisition parser enforces the existing host timestamp and receipt schema.
 
+Check the worker's normal hostname resolution before the costly full-port scan
+(for example, a bounded `getent ahosts staging2.optimallearning.org`). A working
+Windows browser or earlier DNS result does not establish current Linux resolver
+readiness. If resolution fails, retain that boundary and repair the owned worker;
+do not hardcode the target IP, disable certificate checks or change DNS providers
+inside the scanner. Any resulting report controls remain ERROR.
+
 In the existing Linux scanner environment (Nmap and OpenSSL already approved),
 without signing credentials or the private encryption key:
 

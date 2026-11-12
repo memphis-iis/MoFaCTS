@@ -24,8 +24,10 @@ authorized by Section 0's bounded access delegation of 2026-11-12; follow the
 [report-writer procedure](../../../deploy/security-audit/staging2-report-writer-review.md)
 without another approval question when its technical and custody gates pass.
 Its one signing binding and operator-held RSA pair are installed and verified;
-hosted workflow execution remains a separate acceptance gate. No production
-action has been performed. Missing tools,
+GitHub billing is unavailable. The standard
+[operator exposure sequence](../../../deploy/security-audit/operator-exposure-v2.md)
+uses the same owners without hosted execution; actual report acceptance is
+recorded independently. No production action has been performed. Missing tools,
 canaries and protocol acquisitions remain ERROR,
 and the final completion assertion runs after signed storage/encrypted retention.
 
@@ -37,12 +39,13 @@ assembler; no old network/browser acquisition is exposed by the fixture owner.
 Shared canonical JSON/command, scanner parsing and recovery-binding helpers
 remain where V2 and recovery code actually consume them.
 
-## Inert V2 file pipeline
+## V2 file pipeline
 
 The V2 HTTP/admin composition passes supported Meteor verification on
 `603c1233`: 990 server and 1,237 client cases passed, zero failures/hooks.
-That proves the tested source, including the shared test-only collection owner;
-it does not activate a route or qualify a release/deployment.
+That historical checkpoint proves the tested source, including the shared
+test-only collection owner. Later staging2 activation/rollback passed on the
+accepted 1c72734b image; its exact evidence remains in the current worklist.
 
 `core/producerFilesV2.mjs` owns file carriage for the existing producer/report
 contracts. Producers call `writeAuditProducerFileV2` to validate their entire
@@ -59,8 +62,8 @@ files are never replaced.
 `assembleAuditReportFilesV2({ artifactDirectory, outputPath, envelope, env })`
 accepts the existing report envelope fields except `target` and derives that
 field exclusively from required `env.AUDIT_TARGET` (default `process.env`). The
-selected protected environment owns this fixed HTTPS origin. The future workflow
-must supply the actual scanner checkout revision in `scannerSourceRevision`;
+selected protected environment owns this fixed HTTPS origin. Workflow assembly
+supplies the actual scanner checkout revision in `scannerSourceRevision`;
 event metadata is not evidence of the checked-out scanner source. This module
 does not acquire release identity or assert authenticity of input observations.
 
@@ -92,12 +95,11 @@ the store projection, separate freshness windows and HTML/JSON export rendering.
 The prepared Meteor browser cases cover rendered cards, empty history, rejected
 responses, exact download selection, duplicate clicks, focus and view cleanup.
 
-The coordinated cutover must replace the V1 route loader/template and controller
-with this V2 presentation and remove their superseded source, then verify the
-rendered page against the V2 receiver. The V2 template has no registered route
-or automatic network activity until it is rendered. Its import in browser tests
-uses synthetic method responses. Keep its browser execution evidence separate
-from the already accepted V1 page and earlier V2 receiver tests.
+The current application has replaced the V1 route loader/template and controller
+with this V2 presentation and removed their superseded source. Its rendered
+page, actual get/downloads and previous-image exclusion/restoration passed on
+staging2. Browser unit tests still use synthetic method responses; their proof
+is separate from live acceptance. Production retains its pinned V1 pairing.
 
 The host emitter reads the current host envelope and the composite evaluator's
 existing three-count UDP observation input. It writes `internal.json` and

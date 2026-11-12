@@ -1,345 +1,119 @@
 # Periodic Confidentiality and Account-Compromise Audit
 
-MoFaCTS has an observation-only security audit for `https://mofacts.optimallearning.org`. It records evidence about confidentiality, authentication, public and internal exposure, and source security. A red report does not stop services, block traffic, alter a firewall or proxy, deploy code, or change real accounts.
-
-This assessment intentionally excludes backup, restore, uptime, disk health, capacity, and disaster recovery. The scanners remain independent of application deployment, but the application now receives their sanitized reports through one authenticated endpoint so administrators can review them at `/admin/security-audits`.
-
-The inert V2 collector passed its exact-source Meteor gate and the protected
-staging2 SSH/install/restoration window on 2026-11-07. V1 was restored, including
-its nine PASS controls. That remains the deployed staging2 baseline. The current
-application source activates the V2 receiver/admin candidate, with native
-verification and staging2 release acceptance tracked separately. The production
-scanner stays pinned to its matching V1 source; see the
-[scanner cutover procedure](../../deploy/security-audit/scanner-cutover.md). See the
-[host procedure and exact acceptance](../../deploy/security-audit/host-qualification-review.md).
-The optional [previous-image baseline](../../deploy/security-audit/rollback-runtime.md)
-prepares the separate storage rollback gate using only synthetic private services.
-It does not qualify a candidate image or change production.
-
-The P1-D7 receipt source passed the complete Meteor suite on `831ef74b`: 989 server
-and 1,237 client tests, zero failures. A bounded staging2 window then verified the
-host reader, actual read-only app mount, atomic replacement and independent image
-adapter, and restored the original V1 receipt/tooling and Compose configuration.
-The restored restricted auditor passed all nine controls with receipt MATCH.
-No V2 route is active and the default Compose setup remains unchanged. See the
-[projection, permissions and rollback contract](../../deploy/security-audit/release-records.md#inert-v2-receiver-projection-p1-d7).
-
-The next inert source family composes the protected receiver with V2 HTTP and
-the existing three admin method IDs. It defines no automatic registration/index
-job: coordinated cutover must install only `/internal/security-audits/v2`, retire
-V1 new ingestion/access, update producers/client consumers and qualify rollback.
-The callbacks preserve HMAC/body/replay/target protection, bounded projected
-summaries, full-integrity downloads, one-use tokens, admin revalidation, no-store/
-nosniff and sandboxed download CSP. Typed failure categories select constant
-responses; internal error text is never returned. These new callbacks require
-their own Meteor proof and are not qualified by the earlier receipt-only run.
-
-## Schedule and result semantics
-
-The separately authorized [isolated Linux Meteor integration lane](../../deploy/meteor-integration/README.md)
-uses the existing suite without GitHub scheduling. Its local Linux checkpoint
-for commit `92d7d28b` passed 985 server and 1,237 Chromium client tests, zero failed,
-with 15/seven pending. The earlier staging2 attempts exhausted memory and remain
-failed. Native receipts remain unqualified and do not replace GitHub status,
-scheduled audit reports or release/image proof. See the [acceptance record](../../docs-developer/security-audit-durable-redesign-status.md#local-linux-full-suite-acceptance-2026-11-06).
-
-`.github/workflows/production-security-audit.yml` runs:
-
-- Daily at 06:00 UTC: external and host exposure controls.
-- Monday at 06:00 UTC: all four sections, adding production authentication and repository/image controls.
-- Manually with an `exposure` or `full` scope.
-
-The workflow uses the protected `production-security-audit` GitHub environment, has only `contents:read`, and serializes runs without cancelling an active audit. Every run assembles a bounded, sanitized JSON report, sends it to the application, and encrypts it before uploading it as a 90-day recovery artifact. Plaintext reports and raw scanner output remain ephemeral and are removed from the runner.
-
-An audit with security findings still completes successfully. Missing tools, malformed scanner output, or unavailable fixtures are recorded as execution `ERROR` results; the report is stored and the encrypted artifact is uploaded before the workflow fails. UDP silence is resolved against the host's UDP listener, Docker-publication, and firewall evidence: a completed `open|filtered` probe passes only when those protected host facts confirm that no prohibited UDP service is exposed. Missing or contradictory evidence becomes `ERROR` or `FAIL` rather than a guessed result. Failure to store the report also fails the workflow. Public workflow output contains only generic execution messages and encrypted-artifact metadata.
-
-## Protected GitHub environment
-
-Create a protected environment named `production-security-audit`. Restrict its administrators and add these environment secrets:
-
-| Secret | Purpose |
-| --- | --- |
-| `AUDIT_SSH_HOST` | Production host's stable Tailscale MagicDNS name. |
-| `AUDIT_SSH_USER` | Dedicated account whose key is forced to the audit command. |
-| `AUDIT_SSH_PRIVATE_KEY` | Restricted key; it must not be accepted for a shell. |
-| `AUDIT_SSH_KNOWN_HOSTS` | Pinned host-key line, created and reviewed out of band. |
-| `AUDIT_AUTH_FIXTURES_JSON` | Dedicated synthetic tenant/account IDs and deterministic authorization probes. |
-| `AUDIT_IMAPS_PASSWORD` | Password for the dedicated reset-test mailbox only. |
-| `AUDIT_REPORT_INGEST_SECRET` | HMAC key shared only with the production application. |
-| `TS_OAUTH_CLIENT_ID` | Tailscale OAuth client limited to creating `tag:ci` auth keys. |
-| `TS_OAUTH_SECRET` | Secret for the limited Tailscale OAuth client. |
-
-Add `AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY` as a protected environment variable. It is an RSA public key, not a secret. The matching private key must remain solely with authorized operators and must never be placed in GitHub, the production server, the application settings, or source control.
-
-Generate the encryption key pair on an operator-controlled machine:
-
-```powershell
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out mofacts-security-audit-private.pem
-openssl pkey -in mofacts-security-audit-private.pem -pubout -out mofacts-security-audit-public.pem
-```
-
-Copy the complete public PEM into `AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY`. Protect the private key with the same care as an administrative credential. Report encryption uses RSA-OAEP-SHA256 to wrap a random AES-256-GCM content key; the private key is never available to the runner.
-
-Do not put real administrator, teacher, or learner credentials in the protected environment. The browser runner may use only the audit tenant and synthetic identities. The Sidecar is not invoked by the workflow.
-
-Generate the ingestion key on an operator-controlled machine and place the same value in the protected GitHub environment as `AUDIT_REPORT_INGEST_SECRET` and in the production app environment as `MOFACTS_SECURITY_AUDIT_INGEST_SECRET`:
-
-```powershell
-openssl rand -base64 48
-```
-
-Do not put the value in source control, workflow logs, application settings JSON, or shell history. The endpoint accepts only `application/json`, limits requests to 2 MiB, requires an HMAC-SHA256 signature over the timestamp, nonce, and body digest, rejects timestamps outside five minutes, and rejects reused nonces, report IDs, and report digests.
-
-`AUDIT_AUTH_FIXTURES_JSON` must describe two learners, two teachers, a synthetic audit administrator, reset, expiry, and lockout identities; an existing incomplete passwordless-study participant; IMAPS host/user/mailbox; method, publication, route, and download authorization probes; canary values; at least 12 unique connection-throttle identifiers; and at least 21 unique IP-throttle identifiers. The reset identity has two audit-only passwords and alternates between them across runs.
-
-Authorization evidence uses stable actor-and-surface probe IDs. Passwordless containment reports each sealed-target boundary as its own control with impact-specific severity and treats anonymous resume-token issuance as required behavior. Enumeration uses symmetric synthetic identifier buckets and records normalized result categories for each attempt; a rate-limited comparison is inconclusive rather than a pass or vulnerability finding. Reset expiration is tested only with a mailbox token demonstrably older than the configured one-hour lifetime; absence of an old-enough token is inconclusive, not a vulnerability. Throttling evidence recognizes the server's `rate-limit` response category and records bounded final categories without identifiers or credentials.
-
-## Restricted host command
-
-Install the tracked script as a root-owned executable and its configuration as root-only data:
-
-Transfer reviewed source from a clean Linux checkout and verify the transferred
-archive's SHA-256 before installation. Git archive applies checkout conversions;
-Windows exports can differ from the committed Linux bytes. Shell, AWK and jq
-policies require LF endings, pinned in `.gitattributes`; CRLF jq programs can fail
-to compile. Preserve the previous installed files and use the matching source
-revision for the command and all support files.
-
-```bash
-sudo install -d -o root -g root -m 0755 /usr/local/libexec/mofacts-security-audit
-sudo install -o root -g root -m 0644 deploy/security-audit/host-listener-policy.awk /usr/local/libexec/mofacts-security-audit/host-listener-policy.awk
-sudo install -o root -g root -m 0644 deploy/security-audit/host-firewall-policy.awk /usr/local/libexec/mofacts-security-audit/host-firewall-policy.awk
-sudo install -o root -g root -m 0644 deploy/security-audit/host-apache-policy.awk /usr/local/libexec/mofacts-security-audit/host-apache-policy.awk
-sudo install -o root -g root -m 0644 deploy/security-audit/host-sidecar-policy.jq /usr/local/libexec/mofacts-security-audit/host-sidecar-policy.jq
-sudo install -o root -g root -m 0644 deploy/security-audit/host-mongo-roles.js /usr/local/libexec/mofacts-security-audit/host-mongo-roles.js
-sudo install -o root -g root -m 0644 deploy/mongodb/read-default-concern-role.json /usr/local/libexec/mofacts-security-audit/read-default-concern-role.json
-sudo install -o root -g root -m 0755 deploy/security-audit/host-exposure-audit.sh /usr/local/sbin/mofacts-host-exposure-audit
-sudo install -d -o root -g root -m 0700 /etc/mofacts
-sudo install -o root -g root -m 0600 deploy/security-audit/security-audit.conf.example /etc/mofacts/security-audit.conf
-sudoedit /etc/mofacts/security-audit.conf
-```
-
-Replace every example value. Configure the private SSH management interface and tailnet ranges, current container names, the expected MongoDB replica set and database, scoped application credentials, the explicit Sidecar policy below, a MongoDB audit credential, the Redis audit password, and the active enabled Apache HTTPS site. Set the required `MOFACTS_PUBLIC_HOSTNAME` to the target's lowercase public DNS hostname (`mofacts.optimallearning.org` for production or `staging2.optimallearning.org` for staging2), without a scheme, port, wildcard or trailing dot. This is distinct from the private SSH MagicDNS hostname. There is no default or inference from the running server. Update the protected configuration before reinstalling this auditor version; a missing or invalid hostname produces an audit configuration error. Missing settings or tools produce audit errors.
-
-Set the required `MOFACTS_SIDECAR_EXPECTED_STATE` explicitly; it has no default
-and is not inferred from credentials, listeners or containers. The protected
-file must supply it rather than inheriting it from the invoking process.
-
-| State | Required configuration and observations |
-| --- | --- |
-| `absent` | Keep `MOFACTS_MONGO_SIDECAR_USER` as the reserved principal whose absence is checked. Leave `MOFACTS_MONGO_SIDECAR_PASSWORD` and `MOFACTS_MONGO_SIDECAR_ROLE` unset or empty. The principal must not exist, and no known helper container, reserved endpoint declaration/publication or TCP/UDP listener may be present, including loopback and stopped/unpublished helper containers. Selected for staging2; installation and live acceptance are recorded separately. |
-| `configured` | Supply the genuine Sidecar username, `MOFACTS_MONGO_SIDECAR_PASSWORD` and expected database-scoped `MOFACTS_MONGO_SIDECAR_ROLE`. Authentication and the exact one-role set are checked. The existing zero-or-two-loopback-listener rule remains; this mode does not assert service uptime. |
-
-The reserved Sidecar username is required in both modes and must differ from
-the application and audit usernames. Missing/invalid mode data, failed metadata
-queries and unavailable or malformed bounded Docker/socket observations produce
-`ERROR`; observed unexpected presence or permissions produce `FAIL`. Absent mode
-reports explicit absence observations and does not claim a successful Sidecar
-authentication or manufacture a connectivity exit code.
-
-The host command clears every protected setting before loading the configuration.
-It accepts only single-link regular root-owned files with the documented modes
-and non-writable, root-owned ancestor directories; symlinks and writable policy
-files are errors. Mongo reads are time-bounded, and a timeout is an observation
-error. Inventory and observer output retain raw byte bounds before JSON parsing,
-including trailing whitespace and NUL rejection.
-
-The modern application must have exactly its configured database-scoped role
-plus `admin.mofactsReadDefaultConcern`. Provisioning and auditing share the single
-definition in `deploy/mongodb/read-default-concern-role.json`: one cluster
-`getDefaultRWConcern` action and no inherited roles. The auditor checks the actual
-definition as well as the exact user role set; a matching role name alone is
-insufficient. It never loads the mutating provisioning helper or repairs roles.
-The historical `MOFACTS_MONGO_ADMIN_USER` setting names the metadata observer;
-it does not require MongoDB `root`. Its minimum inspection permissions are
-`viewUser` on the application database and `viewRole` on `admin`, without
-collection-reading or user-management powers. Update protected configuration
-and all matching support files from the reviewed commit before upgrading the
-auditor; missing inputs fail visibly instead of selecting an older role profile.
-
-Restrict the dedicated SSH public key to the forced command:
-
-```text
-restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,command="sudo -n /usr/local/sbin/mofacts-host-exposure-audit" ssh-ed25519 PUBLIC_KEY audit
-```
-
-Test that the key cannot open a shell, request a PTY, forward a port, or run another command. The host script reads only whitelisted socket, Docker port/network, active Apache HTTPS virtual-host routing, UFW, MongoDB, Redis, running-image, and connectivity information. The root-owned listener policy recognizes IPv4/IPv6 loopback infrastructure, a concrete-interface UDP 68 listener owned by `systemd-networkd`, and a UDP 546 DHCPv6 client from that process on an explicitly scoped IPv6 link-local address. It also recognizes `tailscaled` UDP 41641 plus peer listeners bound to Tailscale's reserved IPv4/IPv6 ranges. Wildcard/global/unscoped DHCPv6, DHCPv6 servers, other DHCPv6 processes, non-Tailscale processes on UDP 41641, Tailscale-named listeners on public addresses, and internal-service listeners on tailnet addresses remain findings. The DHCPv6 classification changes no firewall rule or permitted management access. The firewall policy reads UFW's canonical saved commands and requires exactly one SSH rule per configured tailnet range on the configured private interface, exactly one public TCP 80 rule and one public TCP 443 rule, active UFW, and default-deny inbound. The Apache policy validates the protected public hostname and compares it literally with the configured site's names and its active single-vhost `apache2ctl -S` entry. Reports identify unexpected listener endpoints and process labels plus stable firewall, MongoDB, and Redis sub-probe outcomes and exit categories. The script does not print container environments or credentials and does not change state. Reinstall the host command and all matching root-owned policies, observer and role-definition data after scanner updates before relying on the new host evidence format.
-
-Production operator and audit SSH use Tailscale; the EC2 public address is not the management endpoint. Enroll the production host with a stable MagicDNS name and enroll the scheduled GitHub runner ephemerally as `tag:ci`. Tailnet grants must allow the operator identity and `tag:ci` to reach only production TCP 22. Before enabling UFW, prove an operator login and the forced audit command through the MagicDNS name while retaining an existing public SSH maintenance session. Stage UFW rules in this order: SSH on `tailscale0` from `100.64.0.0/10` and `fd7a:115c:a1e0::/48`, public TCP 80, and public TCP 443; then enable default-deny inbound. Only close the maintenance session after a second private operator login, a private forced-command audit, HTTPS/WSS checks, and an external port scan all pass.
-
-The production Compose overlay sets `HTTP_FORWARDED_COUNT=1` because Apache is the single trusted proxy in front of the loopback-only Meteor listener. This is required for `connection.clientAddress` and the IP throttle bucket to represent the originating client rather than Docker's private proxy address. Do not set it on a deployment that accepts direct client traffic or has a different number of trusted proxies. Production also disables Meteor inline runtime scripts, serves MoFaCTS bootstrap script/style files from the same origin, and enforces the tracked CSP. Inline scripts and inline style blocks remain prohibited; `style-src-attr 'unsafe-inline'` is the narrow compatibility exception for the application's reviewed dynamic style attributes. External instructional-resource origins are limited to the HTTPS image, media, and frame hosts present in the tracked content inventory; adding a new embedded resource host requires an explicit CSP review.
-
-The production CSP permits WebAssembly compilation for Anki import through the `wasm-unsafe-eval` source in `script-src`; the separate `unsafe-eval` permission remains prohibited. Voice previews require both `https://cloud.google.com` and its redirect destination `https://docs.cloud.google.com` in `media-src` only.
-
-The canonical production Apache policy is `C:\dev\mofacts_config\production\apache\000-default-le-ssl.conf`. Plyr's YouTube provider requires `https://www.youtube.com/iframe_api` and the versioned scripts under `https://www.youtube.com/s/player/` in `script-src`, thumbnails under `https://i.ytimg.com/vi/` in `img-src`, and title metadata from `https://noembed.com/embed` plus control icons from `https://cdn.plyr.io/3.8.4/plyr.svg` in `connect-src`. Review the exact icon URL when upgrading Plyr. The player iframe remains restricted to `https://www.youtube-nocookie.com` in `frame-src`; the parent page does not need YouTube media origins. Allowing only the iframe blocks API initialization and leaves video lessons at “Loading video…”. Keep these permissions limited to the named HTTPS paths; do not add wildcards, inline scripts, or `unsafe-eval`. The [YouTube IFrame API reference](https://developers.google.com/youtube/iframe_api_reference) documents the initial script dependency. After an authorized policy deployment, run Apache's configuration check, verify the served CSP header, and test player readiness, playback, timestamp questions, and the completion gate in a video lesson.
-
-The safe-expression rollout is enforced. Author-provided `calculateProbability` formulas and `adaptiveLogic` rules are validated as bounded data at every write and runtime-load boundary, then executed only by the bounded interpreter. The admin Deployment Readiness `tdf.expressions` check scans live units and unit templates in bounded batches and reports only counts plus bounded TDF IDs/field paths—not formula text or learner data. Require that check to pass before every deployment. Invalid authored formulas fail explicitly: there is no JavaScript execution, legacy execution path, or default-model substitution. The production CSP therefore prohibits dynamic JavaScript evaluation and does not include `unsafe-eval`.
-
-The host must provide `bash`, `jq`, `ss`, Docker, UFW, Apache (`apache2ctl` and its systemd unit), and the active enabled HTTPS site configured by `APACHE_HTTPS_SITE_FILE`. MongoDB and Redis probes execute their clients inside the configured containers. The explicit Sidecar policy above governs its expected principal, containers, publications and listeners; only `configured` permits the existing pair of `127.0.0.1:8931` and `127.0.0.1:8932` listeners.
-
-For the separately authorized staging2 audit target, use its own public hostname,
-private management identity and canonical configuration under
-`C:\dev\mofacts_config\staging2`. Its Apache/Certbot profile preserves
-application-owned CSP and tests real WebSocket upgrades; see the
-[reverse-proxy guidance](reverse-proxy.md). Proxy readiness does not establish
-protected host-reader, release-receipt, database-role or full security-audit
-acceptance. Retain public maintenance access until private operator and
-restricted audit access have both been proved before the firewall cutover.
-
-The workflow classifies a failure before valid host JSON is received as one of `tailnet-connection-failed`, `ssh-identity-configuration-failed`, `ssh-transport-failed`, `forced-command-rejected`, or `host-output-invalid`. Each category produces a complete sanitized internal section with `ERROR` controls; SSH diagnostics and raw host output are never copied into the report. If `tailnet-connection-failed` appears, first confirm that both `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` exist in the protected environment and that the OAuth client may create ephemeral `tag:ci` devices.
-
-## Synthetic production fixtures
-
-Create a dedicated audit tenant with no real learner data. Provision two learners, two teachers, one synthetic audit administrator, reset/session, expiry, and lockout users plus one existing incomplete passwordless-study participant. Assign only the minimum courses, histories, dashboard state, settings, routes, and exports needed by the configured probes. Seed recognizable non-secret canaries in these synthetic records so the runner can detect cross-user payload and logging leakage without retaining raw responses.
-
-The authorization probe matrix must cover anonymous, self, other learner, teacher, and admin-only behavior across methods, publications, routes, downloads, courses, histories, dashboards, experiment state, settings, and admin surfaces. Brute-force probes run last and may affect only the lockout canary and unique synthetic throttle identifiers.
-
-The IMAPS mailbox must be dedicated to the reset identity. It retains the previous run's reset message long enough to test token expiry, while the current message proves one-time use and replay rejection. Never reuse a personal or production-support mailbox.
-
-## Source and scanner contracts
-
-`npm run security:surfaces` compares every discovered Meteor method, publication, HTTP handler, export, and management route with `mofacts/security-surface-contract.json`. The normal `npm run lint` workflow also runs this check. New or removed server surfaces fail until their access classification is reviewed and the contract is updated in the same change. Review the actual server authorization before assigning a classification; discovery does not approve access. Failures list bounded source identifiers for missing classifications, removed surfaces, and invalid access classifications. `npm run security:test:source` tests canonical hashing, redaction, scanner parsers, encryption integrity, malformed/missing evidence handling, and canary detection.
-
-Surface labels describe intended access; they do not enforce it. `public` means intentional anonymous access without a rate-limit claim; `public-rate-limited` additionally requires verified throttling. A passing surface check proves agreement with the current source-discovery patterns, not complete runtime coverage or correct authorization. See the [code-local maintenance notes](../../mofacts/scripts/security-audit/README.md).
-
-An [opt-in build-source capture prototype](../../deploy/security-audit/source-capture.md) is available for separately authorized qualification work. It is not installed in the production command sheet, does not issue release assurance, and has not yet passed real Docker/Windows-to-Linux qualification. Ordinary builds do not require its metadata or tests.
-
-UDP results combine independent external and host evidence without overstating uncertainty. An exact external `open` response is always a finding. A completed scan containing only `closed` or silent `open|filtered` results passes only when the host simultaneously reports zero unexpected UDP listeners, zero Docker UDP publications, active default-deny inbound filtering, and zero unapproved UDP allow rules. Unsafe host evidence is a finding; missing host facts remain `ERROR`. TCP and UDP evidence names the observed address, protocol, port, and state. TLS cipher review parses only enumerated cipher entries and their grades; a normal `compressors: NULL` line is not a weak cipher. Failed reset-token and throttle subprobes use fixed non-secret IDs. Failed authorization probes use deterministic semantic IDs, retain at most 12 sanitized observations, and record how many additional failures were omitted.
-
-Development-only npm advisories remain visible as bounded maintenance evidence but do not fail production posture merely because they exist outside the `--omit=dev` dependency graph. Runtime dependency and built-image controls remain independent security findings. A development advisory becomes a security failure only after its package and advisory ID are added to the strict `development-dependency-exposure.json` policy with a reviewed build/CI exposure rationale. A missing or malformed policy is an audit error rather than an implicit pass.
-
-The regular Security workflow performs a redacted full-history Gitleaks scan, both npm lockfiles' runtime and development-only dependency graphs, and the source contract tests. Gitleaks evidence includes rule, path, line, and abbreviated commit without the secret value. The Monday audit additionally scans an image built from the audited checkout with pinned Trivy and reports installed and fixed package versions. The running production image digest is recorded as informational evidence when the restricted host command can observe it; it does not alter or gate the production deployment.
-
-Exact Gitleaks fingerprints may be added to `.gitleaksignore` only after a value-independent provenance review proves that the occurrence is synthetic, generated vendor content, a false positive, or retired non-production material. Keep the classification visible in this section and never use a path-wide or rule-wide exception.
-
-The two `generic-api-key` detections at `mofacts/.deploy/settings.local.json:4` in commits `403ea082da296f5d7e476cfa99786bfb99ec3015` and `bbb9400da27cc4c74c3024c4d1597a31173a298c` were reviewed on 2026-08-22. They are the same retired local-development encryption key. Historical Compose wiring mounted that file only through `docker-compose.local.yml`; the value differs from the current production, staging, and ignored local encryption keys. It is not an authentication credential, is not used by the deployed application, and cannot be tested against or accepted by a service. No production rotation or history rewrite is required. The two exact fingerprints are ignored so this reviewed local-only material does not obscure new findings; any different commit, line, path, or rule remains reportable.
-
-The report's `sourceRevision` identifies the audit workflow checkout, not a claim that a clean Git tree was deployed to production.
-Production image builds set `MOFACTS_SOURCE_REVISION` to the exact 40-character Git commit and preserve it as the OCI `org.opencontainers.image.revision` label. The production deployment must verify that label against the selected release before recording success. The host audit independently records the running image's immutable SHA-256 identity.
-
-## Review and download reports
-
-Administrators review summaries at `/admin/security-audits`. The page shows the latest exposure and full reports, freshness warnings after 36 hours and eight days respectively, section status, severity counts, target, source revision, production image identity, and the recent 90-day history. The collection is never published; full findings are not sent to the page.
-
-JSON and standalone escaped HTML downloads use five-minute, single-use tokens. Every response uses `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and exact-body SHA-256 headers. The JSON contains the canonical report and its report digest.
-
-The encrypted Actions artifact remains a recovery copy. To inspect that copy, download it from the completed Actions run and decrypt it locally from `mofacts/` into a new file:
-
-```powershell
-node scripts/security-audit/decrypt-report.mjs C:\path\report.encrypted.json C:\path\report.json C:\secure\mofacts-security-audit-private.pem
-```
-
-The decryptor refuses to overwrite an existing output file, authenticates the AES-GCM ciphertext, and verifies the canonical report SHA-256 before writing the plaintext with restrictive permissions where the operating system supports them. Delete decrypted copies when the review is complete.
-
-## First run and interpretation
-
-Do not start the first manual full run until the restricted SSH command works through the stable Tailscale host name, the private-interface UFW policy is active, the encryption public key is configured, and the dedicated mailbox and complete synthetic fixtures exist.
-
-The first strict report may be red. Passwordless experiment sessions are expected to receive anonymous resume tokens; the control tests that those sessions remain contained to the sealed experiment target and cannot reach ordinary-account, cross-user, or administrative surfaces. Other initial findings may include unauthenticated Redis or missing CSP. These are evidence for separately approved remediation; the audit does not change those behaviors.
-
-Treat an `ERROR` as missing authoritative evidence, never as a passing control. The application report history is the primary administrator view; the encrypted artifact is the independent recovery copy. Codex or an operator may interpret findings, but neither path remediates production automatically.
-## V2 contract development checkpoint
-
-The V2 catalog and shared validators are under `mofacts/common/securityAudit/`.
-The initial candidate has 70 full-profile controls and 23 exposure-profile
-controls. Eight mixed-impact V1 checks are split into fixed-impact checks;
-original V1 identities remain unchanged in the characterization fixture.
-Unconfirmed development advisories remain maintenance evidence, and the optional
-Sidecar is not installed or enabled by the catalog.
-
-`npm run security:test:source` now includes the inert V2 catalog, evidence,
-producer-artifact, assembly, signed-parser and report-mutation tests alongside
-the existing source-security suite. Run it from `mofacts/`, together with the
-full `npm run typecheck` and `npm run lint`. Supported Meteor tests additionally
-verify direct TypeScript/JSON imports, the fixed catalog digest, a complete ERROR
-report without identity metadata, and HMAC wire compatibility.
-
-This is a source-development checkpoint. The scheduled workflow still uses V1,
-and the application still exposes its existing V1 ingestion path. The V2 helper
-does not register a route or write reports. Receiver/producer/host cutover,
-staging ingestion, replay-index enforcement, previous-image storage qualification
-and production acceptance remain gates in the written redesign plan.
-
-The receiver helper checkpoint adds projected V2 summaries, independent active
-latest queries, validation before store/read, and canonical JSON/escaped HTML
-exports preserving the no-script CSP. It does not select or create the production
-collection. Node storage tests use synthetic records; supported Meteor adds a
-fresh test-owned Mongo collection for unique-nonce and retained-V1 checks. A
-previous-image compatibility run is still required before the storage/cutover
-choice is accepted. These tests do not authorize production access or deployment.
-
-The inert receiver identity loader reads the existing image-owned
-`/opt/mofacts-source-observation.json` once, with an 8 KiB limit, regular-file and
-opened-file checks, strict UTF-8, and the shared build-identity validator. Missing
-or malformed metadata produces a cached unavailable observation rather than a
-startup failure. It preserves the exact snapshot and dirty-source distinction;
-it does not infer image identity from a tag, configuration digest or scanner
-revision. No path setting, host-receipt access, Docker socket, startup hook or
-live route is added. Runtime composition and independent host/platform-image
-comparison remain cutover work. Node tests cover acquisition and contradictory
-signed revision claims; supported Meteor must verify the new loader case before
-this source checkpoint is considered runtime-verified.
-
-The unreleased V2 UDP composite preserves a confirmed external service response
-as a HIGH failure even if host acquisition is unavailable. Its positive-only
-proof contains exactly the observed/expected/open external counts, with no
-invented host values. Missing host evidence remains visible in the independently
-owned host controls. PASS requires complete external coverage and all five host
-policy measurements; silence alone cannot establish it. The shared validator
-rejects contradictory counts, partial host facts and forged status claims.
-
-This is the approved narrow exception to missing-input composite ERROR handling.
-The candidate catalog membership, fixed severity and digest remain unchanged;
-its evidence validator is still unreleased. Released catalog/evidence contracts
-remain append-only. The pure evaluator is not connected to the scheduled V1
-scanner: external/host acquisition adapters, forced-command qualification and
-coordinated cutover remain required. Node tests cover signed ingestion and
-JSON/HTML integrity; the Meteor proof case and extended real-Mongo fixture pass
-the supported local Linux checkpoint above. Endpoint/host cutover remains open.
-
-The host observation contract and Node evaluator are also inert V2 source.
-`common/securityAudit/catalogs/host-measurements.v1.json` is the single field,
-group, unavailable-reason and byte-limit descriptor for Node, Meteor and the
-future protected host emitter. The envelope carries its schema/digest, acquisition
-timestamp and every declared fact as either an observed scalar or an explicit
-unavailable category. It carries no control title, severity, profile or outcome.
-The installed emitter and its serialization still require Linux qualification;
-the descriptor digest identifies the wire contract, not trusted running code.
-
-Valid current envelopes are evaluated against closed, per-control sufficient
-failure proofs. A partial FAIL must identify every unavailable measurement in
-the existing bounded observations field. Unknown keys and omitted/spoofed markers
-are rejected. PASS needs complete safe facts; failed authenticated-connectivity
-probes alone cannot establish a vulnerability. Invalid or stale envelopes become
-the complete internal ERROR subset, while valid per-fact unavailability affects
-only its dependent controls. The UDP join revalidates the envelope independently.
-
-Transport callers must use the bounded canonical-byte parser before interpreting
-host output: it rejects duplicate keys, invalid UTF-8, extra documents and wrong
-contract versions. Acquisition is accepted within the existing 15-minute upload
-window and five-minute future-skew bound. No protected host command, installed
-file, live scanner, receiver route or startup requirement is changed by these
-helpers. The new shared-runtime cases and real-Mongo fixture pass the supported
-local Linux checkpoint above. This verifies those source contracts, not installed
-host acquisition, runtime binding or deployment.
-
-The separate [V2 host acquisition candidate](../../deploy/security-audit/host-observations.md)
-passes its 26 synthetic Linux fixture cases and the full local source-security
-gate. The approved draft-contract additions preserve the exact app publication
-and independent Apache active/configuration checks. Supported Meteor proof of
-the amended contract also passes on `6a7acc1e`: 986 server and 1,237 Chromium
-cases, zero failed/hooks, 15/seven pending. The later protected staging2 forced-
-command/install/restore and receipt/mount trials passed; exact V1 restoration
-was independently verified. Their hashes and acceptance remain in the
-[current status checklist](../../docs-developer/security-audit-durable-redesign-status.md).
-The active V1 host entry point is restored and unchanged; V2 report ingestion
-and coordinated rollout remain open.
-
-The corrected inert V2 HTTP/admin composition also passes exact-source native
-Meteor verification on `603c1233`: 990 server/1,237 client cases, zero failures/
-hooks, 15/seven pending. This is not GitHub, release-image or deployment proof.
-The [file-pipeline interfaces](../../mofacts/scripts/security-audit/README.md#inert-v2-file-pipeline)
-connect validated host/composite artifacts, exact assembly and a single-request
-V2 uploader without changing the scheduled V1 path. Assembly/upload require the
-same protected `AUDIT_TARGET`; the new Node entry points are unscheduled and
-must not be interpreted as a completed V2 producer/workflow cutover.
+MoFaCTS records evidence about confidentiality, authentication, host/public
+exposure and repository security. Audit findings do not stop services, change
+permissions/firewalls, deploy code or alter real accounts. Backup/recovery and
+application availability remain separate responsibilities.
+
+## Current execution and deployment
+
+GitHub billing is unavailable. The four repository Security jobs use the
+[standard operator Linux executor](../../deploy/security-audit/operator-security-checks.md).
+Its exact-commit result is operator evidence, not a GitHub check or release
+qualification. The optional GitHub Security workflow is manual-only.
+
+Staging2 runs the accepted V2 application revision `1c72734b` with its matching
+protected release receipt and raw-measurement host auditor. Live ingestion,
+admin downloads, 29 selected authorization cases and paired rollback/restoration
+passed. See the exact image/receipt identities and evidence limits in the
+[staging2 operating baseline](../../deploy/security-audit/staging2-v2-operations.md).
+The [operator exposure workflow](../../deploy/security-audit/operator-exposure-v2.md)
+composes the same V2 producers, assembler, encryption, uploader and final
+assertion without GitHub scheduling or new server access.
+
+Production retains the separately pinned V1 scanner/receiver pairing. Its
+workflow selects `09f0c32fc2af6d220c699dd805133df3c0507c2e`; publishing V2 source
+neither upgrades production nor authorizes scanning it. The configured daily
+06:00 UTC exposure/weekly Monday full schedule does not prove execution while
+GitHub is locked. The existing V1 setup is preserved in its
+[immutable operating guide](https://github.com/memphis-iis/MoFaCTS/blob/09f0c32fc2af6d220c699dd805133df3c0507c2e/docs/deployment/security-audit.md).
+Do not install current V2 source into that V1 pairing. Production execution,
+credential changes and cutover require their own explicit authorization.
+
+## Reports and evidence semantics
+
+The V2 report has an independently versioned schema, catalog and evidence
+contracts. Its exact exposure/full profile comes from the shared catalog;
+unknown, duplicate, misclassified or digest-invalid input cannot be ingested.
+Missing producer evidence becomes complete catalog-shaped ERROR controls.
+An external proven violation remains FAIL even when other evidence is missing;
+PASS requires all required safety evidence. A timeout or failed login alone
+cannot establish successful access denial or a vulnerability.
+
+Ingestion uses only `/internal/security-audits/v2` on the V2 application. It
+requires a timestamped HMAC signature, fresh nonce, bounded canonical report,
+matching target and replay/duplicate protection. Its private V2 collection is
+separate from retained V1 records. V1 access is retired in the V2 application;
+existing records are not rewritten/deleted and no historical reader is added.
+
+A security FAIL is a finding, not an execution failure. Missing tools, malformed
+output and incomplete evidence remain ERROR. The workflow encrypts and submits
+the report before its final completeness assertion; accepted storage does not
+turn an ERROR report green. UDP silence alone is not clearance. The accepted
+staging2 exposure baseline contains 22 PASS and one evidence-incomplete UDP
+ERROR. The 29 selected authorization cases prove their one selected control;
+the other 21 authentication protocol controls remain Phase 2 work.
+
+## Private access and retention
+
+Use the existing [restricted no-argument host command](../../deploy/security-audit/staging2-access.md).
+It returns bounded validated host facts and the matching shared release receipt;
+it does not grant a shell, PTY, forwarding or broad administrator access.
+The [host install/restore procedure](../../deploy/security-audit/host-qualification-review.md)
+owns the exact reviewed cohort and recovery hashes. No scanner installs or
+upgrades those files automatically.
+
+Acquisition receives neither a signer nor private encryption key. Only the
+separate uploader receives the existing staging2 HMAC signer. Reports use the
+existing RSA-OAEP-SHA256/AES-256-GCM encryption; the private key stays with the
+operator, outside GitHub/server/application settings. Verify retained encrypted
+bytes by saved-key decryption and exact report identity before removing that
+run's private plaintext. Keep encrypted recovery evidence under the existing
+90-day retention policy. Never commit raw reports, keys, settings or diagnostics.
+
+Administrators review bounded summaries at `/admin/security-audits`, including
+latest exposure/full cards, separate scanner/application/image identity and
+freshness warnings. Full findings are not published to the page. JSON and
+escaped HTML downloads require authenticated admin access and short-lived,
+single-use tokens. Responses have no-store/nosniff, download isolation and
+exact-body SHA-256 protection. Verify report ID/digest through list/get/download
+before retrying an upload whose transport outcome is uncertain.
+
+## Verification and release ownership
+
+From `mofacts/`, lint includes `security-surface-contract.json` verification.
+Discovered surfaces still require human-reviewed source authorization
+classification; a matching manifest is not proof of all runtime registrations.
+The standard repository executor runs both source-security entry points and the
+existing full/runtime dependency policies. Development-only advisories remain
+visible; they block only under the reviewed build-exposure policy. Runtime and
+built-image findings retain their independent gates.
+
+Use the separately authorized [isolated Linux Meteor worker](../../deploy/meteor-integration/README.md)
+for actual Meteor integration and its bounded allowance ledger. Operator checks,
+Meteor proof, accepted image identity and live staging acceptance are distinct.
+Reuse accepted unchanged evidence rather than restarting completed trials.
+The [source-capture owner](../../deploy/security-audit/source-capture.md) and
+[release-record/receipt owner](../../deploy/security-audit/release-records.md)
+retain the supported Compose and standard post-acceptance recording contracts;
+ordinary builds/startup do not require fabricated qualification metadata.
+
+## Coordinated cutover and rollback
+
+Follow the [scanner selection/cutover procedure](../../deploy/security-audit/scanner-cutover.md).
+Before an authorized production change, retain its exact app image, workflow
+selection, host cohort, configuration and release authority. Verify candidate
+source/Meteor and staging2 report/rollback evidence first; obtain any new
+production-specific permission before touching production. Stop the old scanner
+before changing its receiver, and switch app, host/receipt and immutable scanner
+selection as one reviewed pairing. Do not enable dual ingestion or translate
+old-format reports. Verify the new report through actual admin downloads.
+
+If acceptance fails, restore the complete previous app/host/receipt/scanner
+pairing using the recorded owner and retained configuration. Preserve MongoDB,
+Redis, learner records and both report generations. The staging2 live and sealed
+previous-image trials already proved their respective datasets; they need not
+be repeated for unchanged inputs. An operational release record is not a
+ReleaseQualification receipt. Production cutover remains unexecuted and outside
+the staging2 standing mandate. The [current checklist](../../docs-developer/security-audit-durable-redesign-status.md)
+is the authority for completed gates and remaining decisions.
