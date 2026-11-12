@@ -77,6 +77,10 @@ export function runCommittedSecurityChecks(commit, output) {
   try {
     fs.mkdirSync(evidence, { recursive: false, mode: 0o700 });
     scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mofacts-security-'));
+    // The private parent protects the checkout. Git and test fixtures require
+    // ordinary Linux file modes, as in the supported Meteor worker. Explicit
+    // 0700/0600 evidence modes remain private independently of this child mask.
+    process.umask(0o022);
     const source = path.join(scratch, 'source');
     small('git', ['clone', '--quiet', '--no-hardlinks', '--no-checkout', repository, source], scratch);
     small('git', ['checkout', '--quiet', '--detach', commit], source);

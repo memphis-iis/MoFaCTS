@@ -25,6 +25,9 @@ temporary storage and checks out only the named commit. Its own source must
 match that commit. It does not run uncommitted changes, install into the operator
 checkout, copy private settings, or use staging/production application volumes.
 The scratch clone and its temporary dependencies are removed after execution.
+The clone's private parent is 0700; checkout/test files use the normal Linux
+022 creation mask. Evidence files explicitly use 0600. Do not impose a global
+077 mask on tests that verify intentionally readable scanner-file permissions.
 
 The four jobs run sequentially and keep independent outcomes:
 

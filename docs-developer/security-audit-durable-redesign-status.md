@@ -19,8 +19,16 @@ access or Meteor invocation is part of this correction. See
 explicit runner lint, three failure/policy contract tests, Linux source gate
 (169 passes, three conditional skips) and expanded V2 gate (305 passes, six
 conditional skips), zero failures. A native Windows source-gate attempt hit the
-sandbox-hidden WSL distribution; supported Linux reruns passed. Actual committed
-four-job execution remains pending at publication; no Phase 1 deliverable is closed
+sandbox-hidden WSL distribution; supported Linux reruns passed. Committed-source attempt `174125f3` ran all four jobs: gitleaks PASS (868
+commits, no leaks), application dependency policy PASS and Mongo sidecar policy
+PASS. Source contracts failed because the new coordinator inherited umask 077
+into scanner fixtures that require normal 0444 file modes. No real image probe
+was launched by those injected fixtures. The correction retains private 0700
+parents and explicit 0600 evidence, while setting the child checkout/test mask
+to the supported worker normal 022. All 13 affected Linux fixture/runner tests
+and explicit runner lint pass; the failed evidence is retained at the private
+`phase1-20261105/security-174125f3-20261112` directory. The corrected full run is
+pending committed-source execution; no Phase 1 deliverable is closed
 by merely selecting this executor. The six remaining Meteor slots are unchanged.
 ## Standing execution ledger (2026-11-11)
 
