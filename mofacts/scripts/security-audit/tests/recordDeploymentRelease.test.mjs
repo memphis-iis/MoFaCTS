@@ -15,7 +15,11 @@ test('post-acceptance hook records actual configuration, retains authority histo
   const publication = { kind: 'index', digest: candidate.digest, platformManifestDigest: 'sha256:' + 'd'.repeat(64), configDigest: running.configDigest, platform: running.platform };
   const options = { recordPath, candidatePath, evidenceDirectory, sshHost: 'operator@host', sshKey: path.join(root, 'key'), knownHosts: path.join(root, 'hosts'), participantChecksPassed: true };
   let requests = 0;
-  const dependencies = { observe: async () => { requests++; return running; }, publication: async (ref, image) => {
+  const dependencies = { observe: async input => {
+    assert.deepEqual(input, { sshHost: options.sshHost, sshKey: options.sshKey, knownHosts: options.knownHosts,
+      streamOptions: { timeoutMs: 600000 } });
+    requests++; return running;
+  }, publication: async (ref, image) => {
     assert.equal(ref, 'registry.example/mofacts@' + candidate.digest); assert.deepEqual(image, { configDigest: running.configDigest, platform: running.platform }); return publication;
   } };
   await assert.rejects(recordDeploymentRelease({ ...options, participantChecksPassed: false }, dependencies)); assert.equal(requests, 0);

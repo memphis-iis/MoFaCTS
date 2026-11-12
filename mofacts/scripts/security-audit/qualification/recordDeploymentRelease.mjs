@@ -18,7 +18,10 @@ export async function recordDeploymentRelease({ recordPath, candidatePath, sshHo
     try { await fs.lstat(file); throw new Error('Observation destination exists'); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
-  const running = await (dependencies.observe ?? observeDeploymentImage)({ sshHost, sshKey, knownHosts });
+  // The accepted remote read took over five minutes. This owner explicitly
+  // budgets ten minutes; the shared/local observer default remains two minutes.
+  const running = await (dependencies.observe ?? observeDeploymentImage)({ sshHost, sshKey, knownHosts,
+    streamOptions: { timeoutMs: 600000 } });
   if (running.baseCommit !== candidate.baseCommit) throw new Error('Running source differs from the accepted candidate');
   const repository = candidate.image.slice(0, candidate.image.lastIndexOf(':'));
   const published = await (dependencies.publication ?? observePublishedImage)(`${repository}@${candidate.digest}`, { configDigest: running.configDigest, platform: running.platform });

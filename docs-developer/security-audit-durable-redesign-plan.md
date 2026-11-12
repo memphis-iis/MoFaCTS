@@ -205,6 +205,29 @@ acceptance work under its existing mandate and keep unexecuted items open.
    one next action and unresolved dependencies, then continue automatically.
    Use progress messages for information and questions for real decisions.
 
+#### Proposed P1-D9: one final production cutover (pending decision)
+
+The remaining Phase 1 source/staging identity work now has a successful read-only
+production graph observation. Its last live recorder/cutover gate would require
+an actual accepted production release; the older authority must not be backfilled
+from an image label. Phases 1, 2 and 3 currently also require their own production
+acceptance before their exit gates pass.
+
+Recommendation: continue the remaining Phase 2-4 source, local/Meteor, supported
+image and staging2 milestones under the existing mandate, and consolidate only
+their live production gates into one final coordinated cutover/acceptance window.
+Keep P1-04 and each later production gate explicitly pending until that window;
+source/staging completion is not full phase or project completion. Preserve all
+required tests, exact image/source/report bindings, fixture/privacy safeguards,
+provider/access/cost decisions and rollback proof. Do not repeat unchanged proof.
+
+This proposal does not authorize production access, builds/deployment, record
+writes or credential/provider changes. Before final execution, obtain explicit
+approval of the concrete image, receiver/host/scanner pairing, required access,
+synthetic fixtures, rollback and one exposure plus one full report. Those final
+reports must pass every applicable phase's original production criteria with no
+pipeline ERROR. Do not add application startup/build lockouts or waive a gate.
+The current per-phase exit gates remain unchanged until Phil approves P1-D9.
 #### Combined remaining milestones
 
 - Phase 1 prepares the V2 presentation/workflow/release wiring, verifies the

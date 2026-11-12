@@ -149,10 +149,40 @@ next and is not yet accepted. No Meteor invocation is reserved or consumed.
   deadline cleanup, archive rejection, process failure, stderr limit and bad
   options before launch/SSH. All 18 focused Windows cases and full lint pass;
   the Linux V2 gate has 313 passes, seven conditional skips and zero failures.
-- [ ] Execute the one approved attempt from committed source, retain the actual
-  counters/result, and stop if it fails. Do not increase limits or retry again
-  automatically. Production recording/deployment remain excluded. P1-04 stays
-  open, Phase 1 remains 16/17 and six Meteor slots remain available.
+- [x] The one approved attempt completed from committed source `a8cc2559`.
+  Three metadata reads pass; graph validation receives 379,755,008 bytes in
+  310,803 ms (600,000-ms budget), exit 0, zero stderr and confirmed termination.
+  The final read verifies the same running container. No layers were retained;
+  no extra production read/retry, deployment or authority write followed.
+- [x] Actual accepted source `18677291993b66b890a090e55d65f703b45ff653`,
+  configuration
+  `sha256:214793c9cf7534eb4568934fc83843328b202a23b99d108fc323ead2ceafb697`
+  and Linux/amd64 match the already approved November 5 P1-D2 baseline exactly.
+  The older local `bddd0895`/`c0146b89` record mismatch is already reviewed, not
+  a new rollback-selection decision. Preserve both the older authority and
+  unknown later build/acceptance history. Do not fabricate a replacement record.
+- [x] Private receipt root:
+  `phase1-20261105/production-image-observation-a8cc2559-20261112-10min`.
+  Outcome SHA-256:
+  `ea459d485af913f766798b2fda3b40da2f917ceda105971d3a4966d06185878b`;
+  accepted identity SHA-256:
+  `09b4a087a291ce5143d3a6a76bdf72e2d11951027298ead208adc69b88e55709`.
+  Saved comparison and prior-baseline comparison confirm no authority write.
+  Initial local strict-read stability rejection was followed by stable metadata
+  and successful strict parsing/read; no reader guard or path was substituted.
+  No observer-owned SSH process remains.
+- [x] Finish the standard remote recorder's routine compatibility correction:
+  explicitly select the measured ten-minute budget for post-acceptance remote
+  observation. Shared/local and bare observer defaults remain two minutes;
+  archive/metadata/entry bounds and caller interface are unchanged. Nine focused
+  Windows cases, full lint/330 surfaces and Linux V2 gate (313 passes, seven
+  conditional skips, zero failures) pass. No new Meteor invocation or dependency.
+- [ ] P1-04's production recording/cutover acceptance remains open: the safe
+  read-only identity check is complete, but the standard recorder has not run
+  after an actual production deployment. Phase 1 stays 16/17 and six Meteor
+  slots remain. Proposed P1-D9 asks to defer the per-phase live production gates
+  to one final coordinated cutover while continuing source/staging2 work. This
+  sequencing amendment is not yet approved; production writes remain excluded.
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/
@@ -529,7 +559,7 @@ that actually needs another check.
 | P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [x] Candidate 70/23 catalog and direct shared imports pass pinned Windows/Linux Node and actual Meteor server parity, including the fixed digest. This completes the source contract, not V2 cutover. |
 | P1-02 | Active/append-only catalog and evidence-contract registries | [x] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators pass mutation tests and shared-runtime checks. Initial catalog remains unreleased until coordinated cutover; released entries/validators are append-only. |
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
-| P1-04 | Integrated build identity/host-release comparison | [ ] Integrated staging2 release/receiver identity and rollback passed. The permanent post-acceptance hook source now composes actual running configuration, immutable registry mapping and the existing authority/history/receipt owner; its focused tests pass. Phil selected standard verified recording on 2026-11-12. The canonical procedure now checks the pinned project-local runtime before deployment and uses the verified owner after participant acceptance; old engine-reference assignment/direct authority overwrite are removed. Syntax, actual local preflight and existing-record compatibility pass. Unrelated procedure edits are preserved. Live production recording remains unexecuted. The separately approved read-only observation reached valid metadata after the Windows ProgramData repair, but graph validation stayed incomplete; no fingerprint/authority update is accepted. Its proposed expanded stream diagnostic requires a new bounded approval. |
+| P1-04 | Integrated build identity/host-release comparison | [ ] Integrated staging2 release/receiver identity and rollback passed. The permanent post-acceptance hook source now composes actual running configuration, immutable registry mapping and the existing authority/history/receipt owner; its focused tests pass. Phil selected standard verified recording on 2026-11-12. The canonical procedure now checks the pinned project-local runtime before deployment and uses the verified owner after participant acceptance; old engine-reference assignment/direct authority overwrite are removed. Syntax, actual local preflight and existing-record compatibility pass. Unrelated procedure edits are preserved. Read-only production graph/final-container verification now passes under the approved ten-minute observation and matches the existing P1-D2 baseline. The standard recorder explicitly uses the measured remote budget; defaults/bounds elsewhere remain unchanged. Live post-deployment production recording/cutover is still unexecuted, so this item stays open. P1-D9 proposes deferring that operational gate to one final coordinated production cutover; no record backfill or production write is authorized. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. The later live V2 application/host/receipt qualification and rollback/restoration close P1-14; staging2 now runs the accepted V2 pair. Reuse that proof instead of repeating the earlier V1-restoration checkpoint. |
 | P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |

@@ -38,10 +38,13 @@ missing acceptance or output collisions stop recording.
 
 Windows OpenSSH requires the standard `ProgramData` OS path in the helper's
 restricted child environment. The native regression verifies actual local SSH
-configuration expansion without a network connection. The first approved
-production observation reached its metadata reads after this correction, but
-archive validation remained incomplete and no fingerprint/record was accepted.
-See the [read-only observation and proposed follow-up](production-image-observation.md).
+configuration expansion without a network connection. The initial two-minute
+production observation remained incomplete. Its approved ten-minute follow-up
+completed the full graph/final-container check in about five minutes and matched
+the already selected November 5 baseline. The standard remote recorder now
+explicitly selects that ten-minute budget; shared/local defaults and archive
+bounds remain unchanged. No production authority or receipt was written.
+See the [read-only observation acceptance](production-image-observation.md).
 
 The operator approved making this the standard production recording path on
 2026-11-12. The canonical `mofacts_config/deploy production.txt` now checks the
