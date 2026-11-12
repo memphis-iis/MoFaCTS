@@ -68,5 +68,6 @@ values or read the recovery backup merely to populate this interface.
 The reviewed next access scope is described in
 [disposable staging2 qualification](staging2-authorization-fixtures.md): four
 fresh actors with exactly two teacher grants and cleanup, reusing the existing
-administrator. That new credential-bearing access remains pending explicit
-approval; no teacher credential was inferred or existing account reset.
+administrator. The operator explicitly approved that scope on 2026-11-11;
+continue its preparation, verification, execution and cleanup without another
+permission request. No teacher credential is inferred or existing account reset.

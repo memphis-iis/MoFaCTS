@@ -1,7 +1,53 @@
 import { auditTargetOrigin } from '../../../common/securityAudit/reportV2.ts';
-import { parseAuthorizationBindingsV2 } from './bindingsV2.mjs';
-import { auditVerification } from '../../../common/securityAudit/verificationCatalog.ts';
+import { parseAuthorizationBindingsV2, parseAuthorizationActorBindingV2 } from './bindingsV2.mjs';
+import { auditVerification, AUTHORIZATION_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 import { runSelectedAuthorizationV2 } from './selectedCasesV2.mjs';
+
+const targetMatched = (page, origin) => new URL(page.url()).origin === origin;
+
+export async function validateAuthorizationActorPageV2(page, target, actor, userId) {
+  const origin = auditTargetOrigin(target);
+  if (!AUTHORIZATION_VERIFICATIONS.some(row => row.actor === actor)) throw new Error('Invalid authorization actor');
+  if (!targetMatched(page, origin)) return 'domain-error';
+  return page.evaluate(({ userId, alias }) => {
+    if (!globalThis.Meteor.status().connected) return 'transport-error';
+    if (globalThis.Session.get('authReady') !== true) return 'inconclusive';
+    if (globalThis.Meteor.userId() !== userId) return 'domain-error';
+    if (alias === 'anonymous') return 'matched';
+    if (globalThis.Session.get('authRolesHydrated') !== true || globalThis.Session.get('authRolesSyncedUserId') !== userId) return 'inconclusive';
+    const roles = globalThis.Session.get('authRoles');
+    if (!roles || typeof roles.admin !== 'boolean' || typeof roles.teacher !== 'boolean') return 'inconclusive';
+    const matched = alias === 'admin' ? roles.admin : alias.startsWith('teacher') ? roles.teacher && !roles.admin : !roles.admin && !roles.teacher;
+    return matched ? 'matched' : 'domain-error';
+  }, { userId, alias: actor });
+}
+
+// Shared private-session owner for selected cases and fixture preparation.
+// Callers own closing its context/browser. This is inert until explicitly used.
+export async function openAuthorizationActorPageV2({ browser, target, actor, binding }) {
+  const origin = auditTargetOrigin(target);
+  if (!AUTHORIZATION_VERIFICATIONS.some(row => row.actor === actor)) throw new Error('Invalid authorization actor');
+  const user = actor === 'anonymous' ? undefined : parseAuthorizationActorBindingV2(binding);
+  if (actor === 'anonymous' && binding !== undefined) throw new Error('Anonymous actor has credentials');
+  const context = await browser.newContext(), page = await context.newPage();
+  page.setDefaultTimeout(15000);
+  await page.goto(origin, { waitUntil: 'domcontentloaded' });
+  if (!targetMatched(page, origin)) return { state: 'domain-error', context };
+  await page.waitForFunction(() => globalThis.Meteor?.status?.().connected === true);
+  if (user) {
+    const loggedIn = await page.evaluate(({ username, password }) => new Promise(resolve => {
+      const timer = setTimeout(() => resolve(false), 10000);
+      globalThis.Meteor.loginWithPassword(username, password, error => { clearTimeout(timer); resolve(!error); });
+    }), { username: user.username, password: user.password });
+    if (!loggedIn) return { state: 'domain-error', context };
+    await page.waitForFunction(() => globalThis.Session?.get('authReady') === true
+      && globalThis.Session.get('authRolesHydrated') === true
+      && globalThis.Session.get('authRolesSyncedUserId') === globalThis.Meteor.userId());
+  } else {
+    await page.waitForFunction(() => globalThis.Session?.get('authReady') === true);
+  }
+  return { page, context };
+}
 
 // Explicit live acquisition only. Importing launches no browser and reads no
 // credentials. The protected environment owns target approval and bindings.
@@ -9,42 +55,12 @@ export async function createAuthorizationBrowserV2({ target, bindings }, launch)
   const origin = auditTargetOrigin(target), config = parseAuthorizationBindingsV2(bindings);
   const browser = await (launch ?? (async () => (await import('playwright')).chromium.launch({ headless: true })))();
   const sessions = new Map(), capabilities = new Map();
-  const targetMatched = page => new URL(page.url()).origin === origin;
   async function session(actor) {
-    if (!sessions.has(actor)) sessions.set(actor, (async () => {
-      const context = await browser.newContext(), page = await context.newPage();
-      page.setDefaultTimeout(15000);
-      await page.goto(origin, { waitUntil: 'domcontentloaded' });
-      if (!targetMatched(page)) return { state: 'domain-error' };
-      await page.waitForFunction(() => globalThis.Meteor?.status?.().connected === true);
-      if (actor !== 'anonymous') {
-        const user = config.actors[actor];
-        const loggedIn = await page.evaluate(({ username, password }) => new Promise(resolve => {
-          const timer = setTimeout(() => resolve(false), 10000);
-          globalThis.Meteor.loginWithPassword(username, password, error => { clearTimeout(timer); resolve(!error); });
-        }), { username: user.username, password: user.password });
-        if (!loggedIn) return { state: 'domain-error' };
-        await page.waitForFunction(() => globalThis.Session?.get('authReady') === true
-          && globalThis.Session.get('authRolesHydrated') === true
-          && globalThis.Session.get('authRolesSyncedUserId') === globalThis.Meteor.userId());
-      } else {
-        await page.waitForFunction(() => globalThis.Session?.get('authReady') === true);
-      }
-      return { page };
-    })());
-    const active = await sessions.get(actor); if (!active.page) return active;
-    if (!targetMatched(active.page)) return { state: 'domain-error' };
-    const binding = await active.page.evaluate(({ userId, alias }) => {
-      if (!globalThis.Meteor.status().connected) return 'transport-error';
-      if (globalThis.Session.get('authReady') !== true) return 'inconclusive';
-      if (globalThis.Meteor.userId() !== userId) return 'domain-error';
-      if (alias === 'anonymous') return 'matched';
-      if (globalThis.Session.get('authRolesHydrated') !== true || globalThis.Session.get('authRolesSyncedUserId') !== userId) return 'inconclusive';
-      const roles = globalThis.Session.get('authRoles');
-      if (!roles || typeof roles.admin !== 'boolean' || typeof roles.teacher !== 'boolean') return 'inconclusive';
-      const matched = alias === 'admin' ? roles.admin : alias.startsWith('teacher') ? roles.teacher && !roles.admin : !roles.admin && !roles.teacher;
-      return matched ? 'matched' : 'domain-error';
-    }, { userId: actor === 'anonymous' ? null : config.actors[actor].userId, alias: actor });
+    if (!sessions.has(actor)) sessions.set(actor, openAuthorizationActorPageV2({ browser, target: origin, actor,
+      ...(actor === 'anonymous' ? {} : { binding: config.actors[actor] }) }));
+    const active = await sessions.get(actor); if (!active.page) return { state: active.state };
+    const binding = await validateAuthorizationActorPageV2(active.page, origin, actor,
+      actor === 'anonymous' ? null : config.actors[actor].userId);
     return binding === 'matched' ? active : { state: binding };
   }
   async function invoke(page, name, args, proof) {
@@ -120,7 +136,7 @@ export async function createAuthorizationBrowserV2({ target, bindings }, launch)
       const requestedPath = entry.surfaceId.slice('management-route:'.length);
       const requestedTemplate = entry.expectedPolicy === 'allow' ? entry.template : auditVerification(entry.allowedBaselineIds[0]).template;
       await active.page.goto(new URL(requestedPath, origin).href, { waitUntil: 'domcontentloaded' });
-      if (!targetMatched(active.page)) return { state: 'domain-error' };
+      if (!targetMatched(active.page, origin)) return { state: 'domain-error' };
       await active.page.waitForFunction(({ path, template, requestedPath, requestedTemplate }) => {
         if (globalThis.Session?.get('authReady') !== true) return false;
         const elements = document.querySelectorAll('body *'); if (elements.length > 20000) return false;

@@ -68,7 +68,10 @@ function requireTcpTimeout(host, port) {
 async function sshResult(args, extras = [], command = []) {
   try {
     const result = await execute('ssh', [...args, ...extras, ...command], {
-      encoding: 'utf8', timeout: 180000, maxBuffer: 256 * 1024,
+      // The fixed V2 collector/receipt children allow 180s + 150s, plus
+      // bounded termination and connection overhead. Do not cut a valid
+      // acquisition short while leaving its remote read running.
+      encoding: 'utf8', timeout: 360000, maxBuffer: 256 * 1024,
     });
     return { code: 0, ...result };
   } catch (error) {

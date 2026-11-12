@@ -4,8 +4,9 @@ This procedure supplies the live bindings for the already approved selected
 authorization cases. It does not change the cases or application permissions.
 The [verification catalog and binding contract](authorization-verification.md)
 own the 29 cases, expected policies, positive baselines and exact value aliases.
-The procedure is prepared for operator review; no account or teacher grant has
-been created by preparing it.
+The four-account/two-teacher scope was explicitly approved on 2026-11-11.
+Executor preparation and verification must finish before live writes; preparing
+this procedure created no account or teacher grant.
 
 ## Access decision and isolation
 
@@ -22,9 +23,11 @@ used only for the already selected admin baselines and scoped fixture ownership.
 All four new accounts and their teacher assignments are removed after the test.
 They can appear in the staging2 admin user list during the qualification window.
 
-This is new credential-bearing access and requires the explicit approval
-excluded from the standing execution mandate. Staging2 deployment and ordinary
-verification approval alone must not be treated as approval for those grants.
+These disposable learner/teacher fixtures are part of the approved staging2
+synthetic qualification. Do not ask again for this same scope. The standing
+exception for new security-sensitive access must not turn ordinary approved
+fixture work into another per-batch permission boundary. New persistent admin
+identities, existing-account resets and production operations remain excluded.
 No AWS access, production/original-staging access, new provider account, paid
 request, new system dependency, public management port or permanent service is
 part of this procedure.
