@@ -27,3 +27,4 @@ import './tests/recordDeploymentRelease.test.mjs';
 import './tests/standardRecordingRuntime.test.mjs';
 import './tests/operatorSecurityChecks.test.mjs';
 import './tests/operatorExposureV2.test.mjs';
+import './tests/imageStreamDiagnostics.test.mjs';

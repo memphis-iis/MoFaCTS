@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { evidenceCommand } from './collectCiEvidence.mjs';
 import { parseCiEvidenceJson } from './ciEvidence.mjs';
 import { parseDockerImageInspection } from './imageArchiveIdentity.mjs';
-import { streamDockerImageIdentity } from './observeDockerImage.mjs';
+import { imageStreamOptions, streamDockerImageIdentity } from './observeDockerImage.mjs';
 import { parseRunningImageObservation } from '../../../common/securityAudit/releaseQualification.ts';
 import { proofRecord, sourceCommit } from '../../../common/securityAudit/proofFields.ts';
 const invalid = () => { throw new Error('Deployment image observation unavailable'); };
@@ -17,7 +17,8 @@ function container(bytes) {
   if (!/^[a-f0-9]{64}$/.test(value.containerId) || !/^sha256:[a-f0-9]{64}$/.test(value.engineImageReference) || value.running !== true) invalid();
   return value;
 }
-export async function observeDeploymentImage({ sshHost, sshKey, knownHosts }, dependencies = {}) {
+export async function observeDeploymentImage({ sshHost, sshKey, knownHosts, streamOptions = {} }, dependencies = {}) {
+  const stream = imageStreamOptions(streamOptions);
   if (typeof sshHost !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_.@:[\]-]{0,255}$/.test(sshHost)
     || [sshKey, knownHosts].some(file => typeof file !== 'string' || !path.isAbsolute(file))) invalid();
   for (const file of [sshKey, knownHosts]) {
@@ -37,7 +38,7 @@ export async function observeDeploymentImage({ sshHost, sshKey, knownHosts }, de
   const inspection = parseDockerImageInspection({ nativeId: image.nativeId, platform: image.platform, descriptor: image.descriptor });
   if (inspection.nativeId !== before.engineImageReference) invalid();
   const identity = await (dependencies.archive ?? ((value) => streamDockerImageIdentity(value, environment,
-    (_command, _args, options) => spawn('ssh', [...args, `sudo -n docker image save ${value.nativeId}`], options))))(inspection);
+    (_command, _args, options) => spawn('ssh', [...args, `sudo -n docker image save ${value.nativeId}`], options), stream)))(inspection);
   const after = container(await command('ssh', [...args, containerCommand], 16384, environment));
   if (after.containerId !== before.containerId || after.engineImageReference !== before.engineImageReference) invalid();
   return parseRunningImageObservation({ ...identity, baseCommit });

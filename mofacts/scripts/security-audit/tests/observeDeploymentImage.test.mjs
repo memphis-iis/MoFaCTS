@@ -49,7 +49,8 @@ test('replacement races, missing revision and graph failure cannot create runnin
 });
 test('option injection, relative credentials and substituted files fail before SSH', async t => {
   const value = await fixture(t);
-  for (const changed of [{ sshHost: '-oProxyCommand=bad' }, { sshHost: 'host;bad' }, { sshKey: 'relative' }]) {
+  for (const changed of [{ sshHost: '-oProxyCommand=bad' }, { sshHost: 'host;bad' }, { sshKey: 'relative' },
+    { streamOptions: { timeoutMs: 600001 } }]) {
     await assert.rejects(observeDeploymentImage({ ...value.options, ...changed }, value.dependencies));
   }
   assert.equal(value.calls.length, 0);

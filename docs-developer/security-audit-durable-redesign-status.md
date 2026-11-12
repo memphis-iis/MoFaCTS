@@ -138,16 +138,21 @@ next and is not yet accepted. No Meteor invocation is reserved or consumed.
   Private evidence: `phase1-20261105/production-image-observation-a0fab958-20261112`
   (`authorization.json`, `bounded-retry-trace.json`,
   `corrected-observer-source.json`, `corrected-observer-bounded-trace.json`).
-- [ ] Next decision: approve one explicitly bounded ten-minute stream diagnostic
-  with the same two-GiB/32-MiB/entry bounds, fixed metadata commands and no
-  retained image layers. Preserve the existing two-minute default elsewhere;
-  add/test safe byte/time/category diagnostics before that execution. See
-  `deploy/security-audit/production-image-observation.md`. That expanded attempt
-  has not been authorized or executed. The current production observation
-  approval is reconciled as incomplete; do not keep retrying it automatically.
-  P1-04/production cutover stay open, implementation count remains 16/17, and
-  the known UDP evidence gap remains separate. Do not repeat completed Phase 1
-  ingestion, rollback, selected authorization or documentation acceptance.
+- [x] Phil approved one ten-minute image-stream diagnostic on 2026-11-12.
+  Implement the explicit opt-in without changing the two-minute default or the
+  two-GiB/32-MiB/4,096-entry limits. The shared graph owner remains authoritative;
+  no image layer extraction or identity substitution is added.
+- [x] Safe diagnostics now report only byte/elapsed/budget counters, fixed
+  category, exit code and owned-process termination confirmation. Measured
+  streaming preserves backpressure. Timeout-triggered pipe errors cannot mask
+  the deadline category. Tests verify normal identity, default/explicit budget,
+  deadline cleanup, archive rejection, process failure, stderr limit and bad
+  options before launch/SSH. All 18 focused Windows cases and full lint pass;
+  the Linux V2 gate has 313 passes, seven conditional skips and zero failures.
+- [ ] Execute the one approved attempt from committed source, retain the actual
+  counters/result, and stop if it fails. Do not increase limits or retry again
+  automatically. Production recording/deployment remain excluded. P1-04 stays
+  open, Phase 1 remains 16/17 and six Meteor slots remain available.
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/
