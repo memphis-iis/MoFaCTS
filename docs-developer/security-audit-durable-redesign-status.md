@@ -95,14 +95,33 @@ next and is not yet accepted. No Meteor invocation is reserved or consumed.
   Phase 1's production exit gate, qualify all scanner controls, or close the
   larger audit. Reuse the prior rollback, selected authorization and Meteor
   proofs; no new Meteor invocation occurred (six remain).
-- [ ] Current operational dependency: recover normal DNS on the dedicated
-  Ubuntu-MoFaCTS worker before another costly scan. Its generated resolver uses
-  the WSL DNS tunnel; no persistent setting was changed. A process-only
-  single-request diagnostic did not fix it and was not adopted. The distro has
-  pre-existing interactive shells and Docker integration; do not terminate it,
-  restart all WSL/Docker or change global DNS without the operator's decision.
-  No restart has occurred. Production observation permission is also still
-  pending and has not been inferred from continuation instructions.
+- [x] Worker DNS recovery: Phil approved restarting only Ubuntu-MoFaCTS. The
+  targeted restart completed; both DNS APIs and OS lookup resolve normally.
+  No DNS configuration, global WSL shutdown, Docker restart or alternate
+  resolver/IP substitution was used. Retained before/after snapshots verify
+  the same Docker engine and unchanged MoFaCTS/Mongo/JEDM API container
+  identities/start times. The JEDM scheduler continued its already-present
+  restart cycle; no JEDM command or configuration change was issued.
+- [x] Recheck only the four affected HTTP controls: redirect, HSTS, CSP and
+  security headers all PASS through the same actual acquisition/evaluator.
+  The full producer and focused recovery now share one HTTP owner; no Nmap,
+  TLS, host or authorization trial was repeated. Retain `http-recovery.json`
+  separately; the original accepted 18 PASS/five ERROR report stays unchanged.
+  Follow-up evidence SHA-256:
+  `d4de46474cfad8caa918fb82f3931e574a8df91f8c8b54492790dac94fba1c2c`.
+  Tested acquisition-module SHA-256:
+  `1798de1625d94173784465dd84a44bd95b383672db9ec21aba2450c3704b4b59`.
+  `http-recovery-source.json` records the actual base commit and intentional
+  working source rather than falsely calling that live probe a clean commit.
+- [x] Verification: all 25 external probe cases pass on Windows, full app lint
+  and the 330-surface contract pass, and the Linux V2 source suite has 309
+  passes, zero failures and six conditional skips. No TypeScript/schema/app
+  runtime changed; no fresh Meteor invocation is needed or consumed.
+- [ ] Next boundary: P1-04 and production cutover remain unexecuted. The
+  prepared one-use read-only production image observation still needs explicit
+  production authorization; this worker-restart approval did not grant it.
+  Keep the known incomplete UDP evidence visible. Do not reopen completed
+  Phase 1 ingestion, documentation, rollback or authorization milestones.
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/

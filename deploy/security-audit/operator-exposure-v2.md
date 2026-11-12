@@ -21,6 +21,14 @@ readiness. If resolution fails, retain that boundary and repair the owned worker
 do not hardcode the target IP, disable certificate checks or change DNS providers
 inside the scanner. Any resulting report controls remain ERROR.
 
+After recovering a worker, `acquireExternalHttpObservationsV2` in the existing
+external acquisition module can recheck just the four HTTP observations. The
+full producer calls that same owner; a focused check needs no repeat of Nmap,
+TLS or host acquisition. Validate its observations with the shared external
+evaluator and retain the dated follow-up separately. It is not a complete
+exposure producer/report and must not rewrite an earlier stored report or
+combine observations from different runs into a newly claimed green report.
+
 In the existing Linux scanner environment (Nmap and OpenSSL already approved),
 without signing credentials or the private encryption key:
 
