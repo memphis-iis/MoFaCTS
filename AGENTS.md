@@ -29,6 +29,7 @@ Resolve competing instructions in this order:
 - Do not add compatibility fallback paths unless explicitly requested.
 - Docker builds, pushes, deployments, and production-affecting commands require explicit requests. Local Meteor CLI workflows cannot substitute for supported Docker Compose release verification.
 - The optional [CI evidence acquisition helper](deploy/security-audit/ci-evidence.md) may use the GitHub CLI and the operator's existing stored sign-in (explicitly approved). It requires the repository-pinned Node runtime and PowerShell 7; it performs read-only acquisition and cannot issue release qualification or run CI.
+- GitHub billing is unavailable. Run the four repository Security checks through the [standard operator Linux executor](deploy/security-audit/operator-security-checks.md); the optional GitHub Security workflow is manual-only. Keep operator, hosted CI and release-qualification evidence distinct. Do not require billing or repeatedly dispatch blocked hosted jobs.
 - Align Meteor, Node/npm, CI assertions, and Docker runtime pins. Use the release's official DDP/Rspack packages; superseded local copies or dependency replacements must not shadow upstream security fixes.
 
 ## User Intent And Permissions

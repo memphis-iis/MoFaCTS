@@ -6,6 +6,22 @@ auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
 
 
+## GitHub billing unavailable: standard operator security lane (2026-11-12)
+
+Phil reiterated that GitHub billing cannot be used. Security run `43212891467`
+failed all four jobs before execution with the same billing-lock annotation;
+this is no scanner result. The standard executor is now the existing approved
+operator Linux worker, with an exact-commit private clone, unchanged security
+policies, independent job outcomes and hashed retained evidence. GitHub Security
+is manual-only; no billing change, recurring self-hosted runner, production
+access or Meteor invocation is part of this correction. See
+`deploy/security-audit/operator-security-checks.md`. Local verification passed: full application lint (330 classified surfaces),
+explicit runner lint, three failure/policy contract tests, Linux source gate
+(169 passes, three conditional skips) and expanded V2 gate (305 passes, six
+conditional skips), zero failures. A native Windows source-gate attempt hit the
+sandbox-hidden WSL distribution; supported Linux reruns passed. Actual committed
+four-job execution remains pending at publication; no Phase 1 deliverable is closed
+by merely selecting this executor. The six remaining Meteor slots are unchanged.
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/

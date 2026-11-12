@@ -20,6 +20,7 @@ export const TEST_INPUTS = Object.freeze([
   ['deploy/collect-ci-evidence.ps1', 'file'],
   ['deploy/resolve-node-runtime.ps1', 'file'],
   ['deploy/record-deployment-release.ps1', 'file'],
+  ['deploy/security-audit/run-security-checks.mjs', 'file'],
   ['deploy/security-audit/read-ci-evidence-archive.ps1', 'file'],
   ['deploy/security-audit/test-ci-evidence-archive.ps1', 'file'],
   ['deploy/repair-teacher-demo-target.mongosh.js', 'file'],

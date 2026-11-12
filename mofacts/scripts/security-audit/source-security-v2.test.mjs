@@ -25,3 +25,4 @@ import './tests/staging2ReportWorkflowV2.test.mjs';
 import './tests/observeDeploymentImage.test.mjs';
 import './tests/recordDeploymentRelease.test.mjs';
 import './tests/standardRecordingRuntime.test.mjs';
+import './tests/operatorSecurityChecks.test.mjs';

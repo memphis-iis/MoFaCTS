@@ -4,12 +4,9 @@ permissions:
   contents: read
 
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
-  schedule:
-    - cron: "0 6 * * 1"
+  # The operator Linux lane is standard while organization Actions is locked.
+  # Keep this optional executor; do not repeatedly schedule jobs that cannot start.
+  workflow_dispatch:
 
 jobs:
   gitleaks:
@@ -52,7 +49,7 @@ jobs:
 
       - name: Test sanitized report and scanner contracts
         working-directory: mofacts
-        run: node --test scripts/security-audit/source-security.test.mjs
+        run: node --test scripts/security-audit/source-security.test.mjs scripts/security-audit/source-security-v2.test.mjs
 
   dependency-audits:
     name: Dependency audit (${{ matrix.name }})

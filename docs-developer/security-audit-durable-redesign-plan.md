@@ -159,6 +159,19 @@ including its preflight, private custody, round-trip verification and revocation
 No additional permission question is required for that scope. This authorization
 is not evidence that its grant, key generation or acceptance has been executed.
 
+#### Repository security execution without GitHub billing (2026-11-12)
+
+GitHub billing is unavailable, not an operator prerequisite to resolve. The
+standard four-job repository Security gate uses the existing approved operator
+Linux worker and `deploy/security-audit/run-security-checks.mjs`. It retains
+full-history redacted gitleaks, source/surface contracts and both locked
+full/runtime dependency audits with their existing policy checker. Record exact
+committed source and separate job outcomes. The optional hosted Security workflow
+is manual-only to stop repeated blocked push/schedule attempts. Do not dispatch
+it while locked, add spending, or install a persistent self-hosted GitHub runner.
+Operator results remain operator evidence; they do not satisfy a hosted-only
+adapter or create release qualification. Continue the remaining native/staging2
+acceptance work under its existing mandate and keep unexecuted items open.
 #### Execution and verification cycle
 
 1. Select the next incomplete functional milestone from the current worklist.
