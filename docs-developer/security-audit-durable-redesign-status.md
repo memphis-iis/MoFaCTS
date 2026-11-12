@@ -127,7 +127,8 @@ next and is not yet accepted. No Meteor invocation is reserved or consumed.
   and Linux V2 suite (309 passes, seven conditional skips, zero failures) pass.
   No new runtime dependency, application/TypeScript/schema change or Meteor
   invocation occurred. Six Meteor slots remain.
-- [ ] Production image observation remains incomplete. The corrected live
+- [x] Preserve the initially incomplete image observation (resolved by the
+  approved ten-minute follow-up below). The corrected live
   diagnostic received valid JSON with exit 0 from both fixed metadata reads,
   then failed during image streaming/graph validation. It lasted approximately
   123.27 seconds against the existing 120-second stream deadline; byte counters
@@ -232,11 +233,35 @@ protocol control is closed by source tests alone. Six Meteor slots remain.
   extend the fixture rather than exclude it. The corrected complete gate passes:
   321 passes, zero failures, seven conditional skips. Full typecheck and lint/
   330 security surfaces pass. See deploy/security-audit/authentication-comparisons.md.
-- [ ] Complete exact-source Meteor parity and reconcile reserved standing slot 5.
+- [x] Complete exact-source Meteor parity and reconcile standing slot 5: PASS.
+  Source c99de5d9, 1,021 server/1,249 client, zero failures; both new shared
+  comparison cases pass. Source, limits, isolation, cleanup and original local
+  services verified. Five slots remain. No deployment or live mail request.
 - [ ] Connect protocol collection only after qualifying fixture bindings,
   environment lease, reset/session preconditions and cleanup. Live protocol
   controls remain explicit ERROR; no mail/provider request or permission change
   was made by this source foundation.
+
+### Phase 2 live-mail binding decision
+
+The source comparison foundation is accepted, but no live reset/expiry/mailbox
+acceptance is claimed. Existing protected staging2 settings metadata confirms
+email is enabled and its normal SMTP relay is Amazon SES. No SMTP credential
+value was emitted. The approved desktop test-key directory has no dedicated
+staging IMAP binding or inbox credential file. Do not substitute the production
+recovery bundle's mailbox or personal mail. A text question is pending for an
+existing dedicated test inbox and its approved credential location; if none
+exists, prepare a bounded private test-mail design before adding a dependency or
+changing normal staging mail delivery. New provider/recovery access remains
+outside standing authorization. Other source comparison checks are complete and
+must not be repeated merely while this binding decision is pending.
+
+Native slot 5 evidence: phase1-20261105/native-phase2-comparison-c99de5d9.
+Acceptance SHA-256:
+887cb3551cfe233b0ae0bffcc0e0701a3b39d0d5e549c32172b0c79b67a0a36c.
+Native receipt SHA-256:
+a628b24008e625314541f6d1e7377b7704118e3942808fbbe205c79b499be885.
+These are source/runtime proofs, not image qualification or deployment evidence.
 
 ## Standing execution ledger (2026-11-11)
 
@@ -248,7 +273,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 4 consumed, 1 reserved, 5 available.**
+**Current allowance: 10 total, 5 consumed, 0 reserved, 5 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -262,7 +287,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 2 | 7f873ddd4b1d0baf49c6bdd8f24c0270fa019cc8 | FAIL after start 2026-11-11T21:10:00Z: 1,009 server passes/one failed new HTTP test; 1,249 client passes/zero failures, 15/seven pending, zero hook failures. All nine registered admin-denial cases and the V1 record-preservation case pass. The test incorrectly assumed WebApp exposes a Connect stack; corrected to actual HTTP requests against its public listener. Private failed-run evidence retained at phase1-20261105/native-local-v2-activation-7f873ddd. No successful source-after/native receipt is claimed. |
 | 3 | 19334b49b16c6f95944a06a47d3cc743920e640a | PASS 2026-11-11T21:30:44Z-21:32:17Z: 1,010 server/1,249 client, zero failures/hooks, 15/seven existing pending. Exact source before/after, isolation, resource and cleanup checks pass. Private receipt: phase1-20261105/native-local-v2-activation-19334b49. Local service uptime is a separate observation. |
 | 4 | 1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140 | PASS 2026-11-11T22:06:49Z-22:08:23Z: 1,018 server/1,249 client, zero failures/hooks, 15/seven existing pending. Shared catalog/outcome cases and all six registered real-Mongo progress-publication cases pass. Exact source/isolation/resources/cleanup pass. Private receipt: phase1-20261105/native-local-authorization-1c72734b. |
-| 5 | Phase 2 comparison batch; exact source recorded after commit | Reserved before publication for the shared Node/Meteor comparison policy and new evidence contracts. No invocation yet. |
+| 5 | c99de5d971ab2595e831af4c4378ffed7930ddbe | PASS 2026-11-12T21:20:06Z-21:21:17Z: 1,021 server/1,249 client, zero failures/hooks, 15/seven existing pending. Both new registered comparison cases pass. Exact source/isolation/resources/cleanup and unchanged local services verified. Private receipt: phase1-20261105/native-phase2-comparison-c99de5d9. |
 | 6-10 | Pending | Available. |
 
 Current result: the V2 admin presentation milestone is published and verified.
