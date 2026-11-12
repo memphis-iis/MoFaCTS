@@ -27,9 +27,25 @@ was launched by those injected fixtures. The correction retains private 0700
 parents and explicit 0600 evidence, while setting the child checkout/test mask
 to the supported worker normal 022. All 13 affected Linux fixture/runner tests
 and explicit runner lint pass; the failed evidence is retained at the private
-`phase1-20261105/security-174125f3-20261112` directory. The corrected full run is
-pending committed-source execution; no Phase 1 deliverable is closed
-by merely selecting this executor. The six remaining Meteor slots are unchanged.
+`phase1-20261105/security-174125f3-20261112` directory. The corrected full run against
+`dff28386ec380d298df6e472ec64a41025e5925d` completed with exit 0 on pinned
+Node 24.22.1/npm 11.19.1. All four jobs passed:
+
+- [x] Full-history secret scan: 869 commits, no leaks found.
+- [x] Source/security contracts: 483 reported cases, 474 passes, zero failures,
+  nine conditional skips; classified surfaces passed.
+- [x] Application dependency policy: zero high/critical runtime findings,
+  23 development advisory packages, zero confirmed build exposures.
+- [x] Mongo sidecar dependency policy: zero high/critical runtime findings,
+  zero development advisory packages, zero confirmed build exposures.
+
+Private evidence: `phase1-20261105/security-dff28386-20261112` under the existing
+operator release-evidence root. Summary SHA-256:
+`51172ac2e1e9089001660ceeaaa70e11841a1cc71a1ad980d344f6a9de4be493`.
+The full failed first attempt remains separate. This closes the repository
+Security executor correction, not a Phase 1 deliverable or release qualification.
+No Meteor invocation, production access, image build/deploy or new dependency
+installation occurred. The six remaining Meteor slots are unchanged.
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/
@@ -410,7 +426,7 @@ that actually needs another check.
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. The later live V2 application/host/receipt qualification and rollback/restoration close P1-14; staging2 now runs the accepted V2 pair. Reuse that proof instead of repeating the earlier V1-restoration checkpoint. |
 | P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |
-| P1-08 | V2-only new-ingestion endpoint | [ ] V2 receiver/admin activation passes actual registered-handler Meteor proof in slot 3. The source-owned selected-authorization catalog/adapters, positive baselines and approved progress-privacy replacement pass slot 4, including six real-Mongo publication cases. Production scanner remains pinned to its matching V1 receiver. The selected producer now emits its exact 22-control catalog subset: the live 29-case authorization proof passes, while 21 deferred Phase 2 protocol scenarios remain explicit ERROR. The V2 manual workflow and its existing main-only GitHub environment now have the scoped signing binding and separate operator-owned RSA-3072 key/public variable; saved-key round trips and binding withdrawal pass. Activation source passes lint and 535 Node cases. A fresh hosted acceptance remains unexecuted because GitHub reports the account locked for billing; no paid change or additional Meteor run is authorized/claimed. |
+| P1-08 | V2-only new-ingestion endpoint | [ ] V2 receiver/admin activation passes actual registered-handler Meteor proof in slot 3. The source-owned selected-authorization catalog/adapters, positive baselines and approved progress-privacy replacement pass slot 4, including six real-Mongo publication cases. Production scanner remains pinned to its matching V1 receiver. The selected producer now emits its exact 22-control catalog subset: the live 29-case authorization proof passes, while 21 deferred Phase 2 protocol scenarios remain explicit ERROR. The V2 manual workflow and its existing main-only GitHub environment now have the scoped signing binding and separate operator-owned RSA-3072 key/public variable; saved-key round trips and binding withdrawal pass. Activation source passes lint and 535 Node cases. Fresh end-to-end report-workflow acceptance remains unexecuted. GitHub billing is unavailable; operator Linux execution is the selected replacement, not a billing prerequisite. The four-job repository security gate and live report-workflow acceptance are separate evidence; no paid change or additional Meteor invocation is claimed. |
 | P1-09 | Summary projections, indexes and read-time integrity | [x] Bounded history, independent latest queries, exact-ID summaries and read-time validation are implemented. Real Mongo created the indexes and enforced nonce uniqueness. Tests cover retained V1 exclusion, digest integrity and rejected corrupt records. P1-16 owns the full previous-image rollback trial. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [x] V1 runtime readers, methods, collection registration, admin template and ingestion registration are removed from the candidate. Exact-source Meteor slot 3 passes actual V2 HTTP/admin registrations, V1 get/download exclusion and unchanged complete synthetic V1 storage. No deployed database migration/deletion occurred; staging image round-trip remains P1-14/16. |
 | P1-11 | Truthful temporary security-surface manifest update | [x] V2 replaces V1 in the application HTTP registration and reviewed signed-ingestion classification. Existing admin method/download policies are unchanged. Full typecheck/lint pass; the surface verifier covers 330 surfaces. Actual registered-handler Meteor proof is included in this activation batch. |
