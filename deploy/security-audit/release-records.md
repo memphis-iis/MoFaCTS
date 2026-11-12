@@ -10,7 +10,7 @@ release, or close Phase 0. See the [audit status](../../docs-developer/security-
 
 ## Authority and stored data
 
-### Post-acceptance command-sheet hook, source ready
+### Standard post-acceptance command-sheet hook
 
 `qualification/recordDeploymentRelease.mjs` composes the existing record/history
 owner, immutable registry observer and a bounded running-image observer. It
@@ -36,19 +36,43 @@ Its private evidence directory receives only public identity observations and
 the receipt. Missing source, graph/registry disagreement, container replacement,
 missing acceptance or output collisions stop recording.
 
+The operator approved making this the standard production recording path on
+2026-11-12. The canonical `mofacts_config/deploy production.txt` now checks the
+pinned runtime and existing SSH trust file before its first deployment/config
+update. After the unchanged readiness/participant checks, it writes the six-field
+candidate to a new private evidence directory and calls
+`deploy/record-deployment-release.ps1`. Direct overwrite of the authority and the
+native-engine-reference-as-config assignment are removed from that recording
+block. There is no optional or silent replacement recording branch.
+
+The PowerShell entry point requires an explicit absolute `-NodeExecutable`.
+`deploy/resolve-node-runtime.ps1` verifies it against `mofacts/package.json`;
+missing, linked or wrong-version executables stop the procedure before deployment.
+For this Windows operator the project-local runtime is under
+`$env:LOCALAPPDATA\MoFaCTS\tools\node-v24.22.1-win-x64\node.exe`. It was installed
+from the official Node archive with published SHA-256 and a valid Windows
+Authenticode signature. Global PATH and other project runtimes are unchanged.
+Other operators supply their explicitly installed pinned executable; the helper
+does not search coding-app caches or substitute the global Node version.
+
+```powershell
+& .\deploy\record-deployment-release.ps1 -NodeExecutable $PinnedNodeExecutable `
+    -RecordPath $ReleaseRecordPath -CandidatePath $AcceptedCandidatePath `
+    -SshHost $OperatorSshHost -SshKey $OperatorSshKey -KnownHosts $KnownHostsPath `
+    -EvidenceDirectory $PrivateEvidenceDirectory -ParticipantChecksPassed
+```
+
 Focused tests cover classic/containerd graphs, source/replacement mismatch,
 missing acceptance, unchanged dirty-build semantics, record history and receipt
-readback. Live execution of this new SSH composition and integration into the
-canonical production command sheet remain unexecuted. The command sheet has
-unrelated operator changes and was not rewritten or staged by this source work.
-
-The remaining integration choice is explicit: require pinned Node for ordinary
-production release recording, or retain a PowerShell-only ordinary record path
-and make the V2 hook an opt-in evidence step. Do not silently choose a different
-runtime or use a native Docker engine/index reference as a configuration digest.
-The current command sheet stores `.Image` as `imageId`; that is ambiguous on a
-containerd store. This is a source limitation, not a claim about the unqueried
-current production engine or record. See P1-04 in the current checklist.
+readback. Windows tests additionally prove correct runtime selection, wrong-version
+rejection and the participant-acceptance guard. The actual canonical local
+preflight and existing local production-record format pass. Only the intentional
+integration hunks are staged/published; unrelated operator edits are preserved.
+Live execution of the new SSH/recording composition against production remains
+unexecuted and requires production authorization. Standard recording is an
+operational identity/acceptance record, not source/CI/release qualification.
+Source-only generic builds and application startup retain their existing behavior.
+See P1-04 in the current checklist.
 
 ### Inert V2 receiver projection (P1-D7)
 
