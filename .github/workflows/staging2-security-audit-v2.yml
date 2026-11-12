@@ -1,4 +1,6 @@
 name: Staging2 V2 security audit
+# Manual staging2-only report writer, authorized under Section 0's bounded
+# access delegation. Production retains its independently pinned V1 workflow.
 
 on:
   workflow_dispatch:

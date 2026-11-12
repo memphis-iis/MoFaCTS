@@ -1,12 +1,14 @@
 # Staging2 report-writer access review
 
 Status: authorized under the Section 0 bounded access delegation of 2026-11-12;
-**not yet granted or executed**. No further approval is needed for this scope.
-The existing `staging2-security-audit` GitHub environment has only the restricted
-SSH/Tailscale bindings and its denied-peer variable. Metadata inspection found
-neither a report-ingestion signing secret nor an encryption-public-key variable.
-Apply the delegation's technical, custody and verification gates before adding
-the bindings or dispatching the [reviewed workflow](staging2-v2-workflow.yml.review).
+**bindings installed and key custody verified on 2026-11-12**. No further approval
+is needed for this scope. The existing main-only `staging2-security-audit` GitHub
+environment now has the one additional signing binding and public encryption-key
+variable. Its existing SSH/Tailscale bindings and denied-peer variable are intact.
+Saved-key encryption/decryption and binding withdrawal/readback passed; signing
+values were sent through private stdin and were never read back or logged.
+The [manual workflow](../../.github/workflows/staging2-security-audit-v2.yml)
+still needs its distinct hosted execution and independent report acceptance.
 Production and its V1 workflow remain excluded. The initial read-only GitHub
 boundary no longer blocks this explicitly delegated report-writing function.
 
@@ -71,3 +73,22 @@ Disable the staging2 V2 workflow and delete only this environment's
 the existing restricted SSH/Tailscale environment, production environment and
 operator private key. Keep accepted encrypted reports and public-key fingerprint;
 do not destroy their private decryption key as a shortcut to revoking writes.
+
+Binding removal stops new jobs obtaining the credential. Cancel existing jobs
+before withdrawal; a suspected compromise of an already loaded signing value
+requires coordinated staging2 key rotation, not merely deleting the GitHub copy.
+No such compromise or rotation occurred in this setup.
+
+## Setup evidence
+
+The separate operator-held RSA-3072 pair is in the approved Desktop credential
+folder as `staging2-audit-report-private.pem` and `staging2-audit-report-public.pem`.
+Public SPKI SHA-256 is
+`97333d673b88ae8ef32adea7a7bc45514d9adb387bc2ce7c984d61a9a528c17c`.
+The first attempt saved the keys, then stopped at a string/buffer comparison
+in its saved-key check, before creating any GitHub binding. Inspection confirmed
+that state. The corrected owner explicitly resumed those same keys, verified
+saved-byte round trips, and created/deleted/verified absence/recreated the single
+GitHub signing binding before any workflow dispatch. It did not regenerate keys.
+Private finite receipts are retained at `phase1-20261105/report-writer-20261112`.
+Phil owns the continuing staging2 audit function and private key custody.

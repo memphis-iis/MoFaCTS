@@ -2,15 +2,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import yaml from 'js-yaml';
-const template = new URL('../../../../deploy/security-audit/staging2-v2-workflow.yml.review', import.meta.url);
+const template = new URL('../../../../.github/workflows/staging2-security-audit-v2.yml', import.meta.url);
 const text = fs.readFileSync(template, 'utf8'), workflow = yaml.load(text);
-test('report writer remains an inactive reviewed main-only staging2 workflow without production or release operations', () => {
+test('report writer is a manual main-only staging2 workflow without production or release operations', () => {
   assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
   assert.deepEqual(workflow.permissions, { contents: 'read' });
   const job = workflow.jobs.audit;
   assert.equal(job.environment, 'staging2-security-audit'); assert.equal(job.if, "github.ref == 'refs/heads/main'");
   assert.equal(job.env.AUDIT_TARGET, 'https://staging2.optimallearning.org');
-  assert(!fs.existsSync(new URL('../../../../.github/workflows/staging2-security-audit-v2.yml', import.meta.url)));
+  assert(!fs.existsSync(new URL('../../../../deploy/security-audit/staging2-v2-workflow.yml.review', import.meta.url)));
   assert.doesNotMatch(text, /test:ci|docker build|docker compose|production-security-audit|tags: tag:ci/);
 });
 test('workflow scopes credential channels, uploads only encrypted output and asserts complete execution after storage', () => {

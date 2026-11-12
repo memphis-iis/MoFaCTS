@@ -17,14 +17,15 @@ The repository and metadata entry points share the existing V2 owners. Metadata
 completion is stamped after acquisition; no environment revision or tag replaces
 a missing/mismatched protected receipt.
 
-The complete manual staging2 workflow is prepared as an inactive
-[review template](../../../deploy/security-audit/staging2-v2-workflow.yml.review).
+The manual-only staging2 workflow is maintained at
+[staging2-security-audit-v2.yml](../../../.github/workflows/staging2-security-audit-v2.yml).
 Its report-writing binding and separate operator-owned encryption key are now
 authorized by Section 0's bounded access delegation of 2026-11-12; follow the
 [report-writer procedure](../../../deploy/security-audit/staging2-report-writer-review.md)
 without another approval question when its technical and custody gates pass.
-Authorization does not claim execution: no new credential grant, key pair,
-workflow dispatch or production action has been performed. Missing tools,
+Its one signing binding and operator-held RSA pair are installed and verified;
+hosted workflow execution remains a separate acceptance gate. No production
+action has been performed. Missing tools,
 canaries and protocol acquisitions remain ERROR,
 and the final completion assertion runs after signed storage/encrypted retention.
 
