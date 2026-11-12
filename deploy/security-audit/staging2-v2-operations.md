@@ -64,6 +64,9 @@ HTTPS signer checks passed: the valid signer reaches invalid-report validation
 probes. See [setup/custody evidence](staging2-report-writer-review.md).
 
 GitHub currently refuses to start jobs because of an account billing lock.
+Use the [operator exposure workflow](operator-exposure-v2.md) for the existing
+approved Linux/operator lane. It composes the same V2 owners and keeps the final
+incomplete-execution assertion; GitHub billing is not a prerequisite.
 No fresh hosted audit was dispatched into that known block, no paid change was
 made, and no hosted acceptance is claimed. The installed binding is a continuing
 staging2-only audit function; ordinary app and restricted-host access are unchanged.

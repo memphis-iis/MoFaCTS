@@ -169,6 +169,10 @@ full/runtime dependency audits with their existing policy checker. Record exact
 committed source and separate job outcomes. The optional hosted Security workflow
 is manual-only to stop repeated blocked push/schedule attempts. Do not dispatch
 it while locked, add spending, or install a persistent self-hosted GitHub runner.
+The staging2 exposure report sequence uses the same existing owners through
+`deploy/security-audit/operator-exposure-v2.md`, with acquisition and signing in
+separate processes and encrypted retention before its single upload. Missing
+evidence keeps the existing final assertion nonzero after storage.
 Operator results remain operator evidence; they do not satisfy a hosted-only
 adapter or create release qualification. Continue the remaining native/staging2
 acceptance work under its existing mandate and keep unexecuted items open.

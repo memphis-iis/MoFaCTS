@@ -46,6 +46,20 @@ The full failed first attempt remains separate. This closes the repository
 Security executor correction, not a Phase 1 deliverable or release qualification.
 No Meteor invocation, production access, image build/deploy or new dependency
 installation occurred. The six remaining Meteor slots are unchanged.
+## Operator exposure workflow continuation (2026-11-12)
+
+P1-08 continues independently of GitHub billing and the pending production-only
+observation. The standard operator exposure coordinator now composes existing
+host carriage, external/host/composite producers, exact assembly, encryption,
+single signed upload and final complete-execution assertion. Acquisition receives
+no signer or private encryption key. Existing evidence ERROR remains ERROR even
+when encryption/storage succeed. New tests cover independent acquisition failure,
+credential separation, saved encryption, single upload, target rejection and
+retention failure before upload. Three focused Windows cases, full lint/330
+surfaces and Linux expanded source gate (308 passes, six conditional skips,
+zero failures) pass. A first test-only RSA KeyObject/PEM mismatch was corrected;
+no runtime crypto change was made. Live committed-source execution/readback is
+next and is not yet accepted. No Meteor invocation is reserved or consumed.
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/
