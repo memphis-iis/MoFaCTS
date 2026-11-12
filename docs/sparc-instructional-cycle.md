@@ -1,5 +1,16 @@
 # SPARC instructional cycle
 
+## Text-response submission
+
+Submit and Enter use the same empty-response guard. An empty or whitespace-only
+answer leaves the current question and draft unchanged, returns focus through the
+existing desktop/touch response-focus policy, and does not start assessment,
+generation, history writes, or progress changes. Nonempty answers are captured
+before the input clears; failures before acceptance restore the draft. Accepted
+turns retain the existing durable recovery and no-repeat contracts. Menu and
+multiple-choice bindings remain separate, and controller validation still rejects
+malformed submissions.
+
 ## Personas and embedding-based descriptive matching, November 9, 2026
 
 Student and teacher personas guide instructional generation, never target/move

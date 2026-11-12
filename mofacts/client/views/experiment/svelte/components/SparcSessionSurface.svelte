@@ -532,10 +532,7 @@
     ) {
       return false;
     }
-    const learnerText = String(value ?? '').trim();
-    if (!learnerText) {
-      return true;
-    }
+    const learnerText = String(value ?? '');
     nodeValues = {
       ...nodeValues,
       [nodeId]: learnerText,
@@ -822,6 +819,13 @@
 
   async function submitAutoTutorDialogue(detail) {
     if (dialogueSubmitPending) {
+      return;
+    }
+    // Submit and Enter share the same empty-response boundary. Menu and
+    // multiple-choice buttons carry their own bindings and bypass this guard.
+    if (detail?.triggeredBy === 'learner-response-submit'
+      && !String(detail?.submittedNodes?.['learner-response-input'] ?? '').trim()) {
+      focusDialogueControl(surfaceElement?.querySelector('[data-node-id="learner-response-input"]'));
       return;
     }
     const submissionScope = dialogueScope;

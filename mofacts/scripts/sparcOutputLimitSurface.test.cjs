@@ -40,6 +40,7 @@ it('renders inline response controls through choice, text, reload, pending and c
   let coveredExpectations = 0;
   let holdAssessment, initializationFailure = '';
   let assessmentsPrepared = 0;
+  const submittedResults = [];
   let loads = 0, submissions = 0, completed = false, turnCount = 2, ordinaryFailure = false, holdSubmit, holdLoad;
   const stubs = {
     sparcMoveLibraryClient: { sparcMoveLibraryClient: {}, readSparcAdministrativeRemovals: async () => [] },
@@ -47,7 +48,7 @@ it('renders inline response controls through choice, text, reload, pending and c
     sparcController: { resolveSparcControllerDisplay: display => display, resolveSparcControllerResult: (_display, detail) => detail },
     sparcAutoTutorRuleCommit: { isSparcAutoTutorDisplay: () => true,
       commitSparcAutoTutorDocumentLoad: async () => { loads++; if (holdLoad) await holdLoad; return { sparcNodeValues: {} }; },
-      commitSparcAutoTutorSubmit: async params => { submissions++; publishNodeValues = params.onNodeValues; reportActivity?.('assessment'); if (holdSubmit) await holdSubmit; if (ordinaryFailure) throw new Error('Synthetic service failure'); return { sparcNodeValues: {} }; },
+      commitSparcAutoTutorSubmit: async params => { submissions++; submittedResults.push(params.sparcResult); publishNodeValues = params.onNodeValues; reportActivity?.('assessment'); if (holdSubmit) await holdSubmit; if (ordinaryFailure) throw new Error('Synthetic service failure'); return { sparcNodeValues: {} }; },
     },
     sparcControllerDialogueOpenRouter: { createSparcDialogueOpenRouterProvider: options => { reportActivity = options.onActivity; return { prepareAssessment: async currentDisplay => {
       assessmentsPrepared++;
@@ -192,6 +193,44 @@ it('renders inline response controls through choice, text, reload, pending and c
     dom.window.matchMedia = () => ({ matches: false });
     await unmount(app);
     app = mount(wrapper, { target, props: { initial: props } }); await settle();
+    // A blank response must never cross the submission boundary, even after reload.
+    for (const value of ['', '   ']) {
+      for (const method of ['button', 'enter']) {
+        const before = { submissions, assessmentsPrepared, events: runtimeEvents.length };
+        const field = target.querySelector('input');
+        field.value = value;
+        field.dispatchEvent(new window.Event('input', { bubbles: true }));
+        if (method === 'button') target.querySelector('.sparc-auto-tutor-submit button').click();
+        else field.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        await settle();
+        assert.deepEqual({ submissions, assessmentsPrepared, events: runtimeEvents.length }, before, 'Blank answers have no submission side effects');
+        assert.equal(target.querySelector('input').value, value);
+        assert.equal(document.activeElement, target.querySelector('input'));
+        assert.equal(target.querySelector('[role="alert"]'), null);
+        assert.equal(target.querySelector('.sparc-auto-tutor-pending-turn'), null);
+      }
+    }
+    // Input events cover typing/paste, then blur and immediate submission without a render tick.
+    for (const method of ['button', 'enter']) {
+      const answer = `Complete ${method} answer: Species D matches TACCGATGCTAA.`;
+      const field = target.querySelector('input');
+      const button = target.querySelector('.sparc-auto-tutor-submit button');
+      const before = submissions;
+      let release;
+      holdSubmit = new Promise(resolve => { release = resolve; });
+      field.value = answer;
+      field.dispatchEvent(new window.Event('input', { bubbles: true }));
+      field.dispatchEvent(new window.Event('blur'));
+      if (method === 'button') button.click();
+      else field.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      button.click();
+      await settle();
+      assert.equal(submissions, before + 1, 'Repeated activation while pending submits once');
+      assert.equal(submittedResults.at(-1).submittedNodes['learner-response-input'], answer);
+      assert.equal(submittedResults.at(-1).triggeredBy, 'learner-response-submit');
+      release(); await settle(); holdSubmit = null;
+      assert.equal(target.querySelector('[role="alert"]'), null);
+    }
     submissions = 0;
     ordinaryFailure = true;
     const input = target.querySelector('input');
