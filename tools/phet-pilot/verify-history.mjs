@@ -1,5 +1,5 @@
+import { launchLocalPilotBrowser, signInLocalPilot } from './local-app.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -7,16 +7,11 @@ import assert from 'node:assert/strict';
 // Exercise the ordinary Download UI with synthetic localhost fixtures only.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const activities = JSON.parse(await readFile(process.argv[2], 'utf8'));
-const require = createRequire(path.join(root, 'mofacts/package.json'));
-const { chromium } = require('playwright');
-const secrets = Object.fromEntries((await readFile(path.join(root, 'deploy/local-hotfix/agent-secrets.env'), 'utf8')).split(/\r?\n/).filter(line => line.includes('=')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
-const browser = await chromium.launch({ channel: 'chromium', headless: true });
+const browser = await launchLocalPilotBrowser();
 const results = [];
 try {
   const page = await browser.newPage();
-  await page.goto('http://localhost:3200');
-  await page.waitForFunction(() => window.Meteor?.loginWithPassword, null, { timeout: 60000 });
-  await page.evaluate(({ email, password }) => new Promise((resolve, reject) => Meteor.loginWithPassword(email, password, error => error ? reject(Error(error.reason)) : resolve())), { email: secrets.MOFACTS_AGENT_ADMIN_EMAIL, password: secrets.MOFACTS_AGENT_ADMIN_PASSWORD });
+  await signInLocalPilot(page);
   await page.goto('http://localhost:3200/dataDownload');
   const download = async button => {
     const pending = page.waitForEvent('download', { timeout: 60000 });

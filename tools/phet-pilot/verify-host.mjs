@@ -1,24 +1,19 @@
+import { launchLocalPilotBrowser, signInLocalPilot } from './local-app.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const require = createRequire(path.join(root,'mofacts/package.json'));
-const { chromium } = require('playwright');
 if (!process.argv[2]) throw new Error('Specify the local pilot activity-ID file; only localhost:3200 is supported');
 const activities = JSON.parse(await readFile(process.argv[2],'utf8'));
-const secrets = Object.fromEntries((await readFile(path.join(root,'deploy/local-hotfix/agent-secrets.env'),'utf8')).split(/\r?\n/).filter(line=>line.includes('=')).map(line=>[line.slice(0,line.indexOf('=')),line.slice(line.indexOf('=')+1)]));
-const browser = await chromium.launch({ channel:'chromium', headless:true });
+const browser = await launchLocalPilotBrowser();
 const results = [];
 const holdResearch = process.argv.includes('--hold-research');
 try {
   const page = await browser.newPage({ viewport:{width:1400,height:1100} });
   const errors=[]; page.on('pageerror', error=>errors.push(error.message));
   page.on('console', message => { if (message.text().includes('[Simulation] Monitoring stopped:')) console.log(message.text()); });
-  await page.goto('http://localhost:3200');
-  await page.waitForFunction(()=>window.Meteor?.loginWithPassword,null,{timeout:60000});
-  await page.evaluate(({email,password})=>new Promise((resolve,reject)=>Meteor.loginWithPassword(email,password,error=>error?reject(Error(error.reason)):resolve())),{email:secrets.MOFACTS_AGENT_ADMIN_EMAIL,password:secrets.MOFACTS_AGENT_ADMIN_PASSWORD});
+  await signInLocalPilot(page);
   // Exercise the actual authoring palette and fields without saving test edits.
   await page.goto(`http://localhost:3200/sparcEdit/${activities[0].id}`);
   await page.locator('.sparc-palette-item').filter({hasText:'Simulation'}).click({timeout:60000});

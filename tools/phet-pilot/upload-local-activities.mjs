@@ -1,3 +1,4 @@
+import { launchLocalPilotBrowser, signInLocalPilot } from './local-app.mjs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +15,6 @@ if (!directory || !path.isAbsolute(directory) || !/^[a-z0-9-]{1,50}$/.test(run |
 }
 const require = createRequire(path.join(root, 'mofacts/package.json'));
 const JSZip = require('jszip');
-const { chromium } = require('playwright');
 const zip = new JSZip();
 const titles = [];
 for (const simulation of ['density', 'pendulum-lab', 'circuit-construction-kit-dc']) {
@@ -34,16 +34,10 @@ const output = path.join(root, 'tmp/phet-pilot');
 await mkdir(output, { recursive: true });
 const filename = path.join(output, `local-activities-${run}.zip`);
 await writeFile(filename, await zip.generateAsync({ type: 'nodebuffer' }));
-const secrets = Object.fromEntries((await readFile(path.join(root, 'deploy/local-hotfix/agent-secrets.env'), 'utf8'))
-  .split(/\r?\n/).filter(line => line.includes('=')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
-const browser = await chromium.launch({ channel: 'chromium', headless: true });
+const browser = await launchLocalPilotBrowser();
 try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
-  await page.goto('http://localhost:3200');
-  await page.waitForFunction(() => window.Meteor?.loginWithPassword, null, { timeout: 60000 });
-  await page.evaluate(({ email, password }) => new Promise((resolve, reject) =>
-    Meteor.loginWithPassword(email, password, error => error ? reject(Error(error.reason)) : resolve())),
-  { email: secrets.MOFACTS_AGENT_ADMIN_EMAIL, password: secrets.MOFACTS_AGENT_ADMIN_PASSWORD });
+  await signInLocalPilot(page);
   await page.goto('http://localhost:3200/contentUpload');
   await page.locator('#upload-file').waitFor({ state: 'attached', timeout: 60000 });
   async function loadAllFixtureRows() {
