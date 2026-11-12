@@ -11,7 +11,7 @@ function catalog(stream, id, data, type = 'catalog') {
 test('bindings reject ambiguous addresses and reserved event slots',()=>{
   const binding={name:'mass',address:{path:'model.mass'},projection:'value'};
   assert.doesNotThrow(()=>validateSimulationConfig({buildId:'pinned-build',bindings:[binding]}));
-  for(const bad of [{...binding,name:'evidence'}, {...binding,address:{path:'x',tandem:'y'}}, {...binding,projection:'execute'}]) {
+  for(const bad of [{...binding,name:'evidence'}, {...binding,name:'simulationActivity'}, {...binding,address:{path:'x',tandem:'y'}}, {...binding,projection:'execute'}]) {
     assert.throws(()=>validateSimulationConfig({buildId:'pinned-build',bindings:[bad]}));
   }
 });

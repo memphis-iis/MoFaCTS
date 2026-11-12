@@ -1,6 +1,6 @@
 export const PHET_PROTOCOL = 'phet-research' as const;
-export const PHET_PROTOCOL_VERSION = 2 as const;
-export type TraceRecordType = 'catalog' | 'initial' | 'property' | 'event' | 'sample' | 'disposed' | 'detached' | 'checkpoint' | 'monitoring-error';
+export const PHET_PROTOCOL_VERSION = 3 as const;
+export type TraceRecordType = 'catalog' | 'initial' | 'property' | 'event' | 'sample' | 'disposed' | 'detached' | 'checkpoint' | 'monitoring-error' | 'interaction';
 export type TraceRecord = {
   sequence: number; type: TraceRecordType; time: number; frame: number; order: number;
   data: Record<string, unknown>;
@@ -12,7 +12,7 @@ export type BridgeMessage = {
 };
 export const MAX_BATCH_BYTES = 8 * 1024 * 1024;
 export const MAX_BATCH_RECORDS = 50000;
-const recordTypes = new Set<TraceRecordType>(['catalog', 'initial', 'property', 'event', 'sample', 'disposed', 'detached', 'checkpoint', 'monitoring-error']);
+const recordTypes = new Set<TraceRecordType>(['catalog', 'initial', 'property', 'event', 'sample', 'disposed', 'detached', 'checkpoint', 'monitoring-error', 'interaction']);
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -29,6 +29,13 @@ export function validateBatch(input: unknown): ObservationBatch {
       || !Number.isSafeInteger(value.frame) || (value.frame as number) < 0
       || !Number.isSafeInteger(value.order) || (value.order as number) < 1 || !isRecord(value.data)) {
       throw new Error('Invalid observation record');
+    }
+    if (value.type === 'interaction') {
+      const data = value.data;
+      if (typeof data.controlId !== 'string' || !['value', 'reset'].includes(String(data.kind))
+        || !['start', 'complete', 'cancel'].includes(String(data.phase)) || typeof data.trusted !== 'boolean'
+        || !['pointer', 'keyboard', 'programmatic'].includes(String(data.modality))
+        || (data.kind === 'value' ? typeof data.propertyId !== 'string' : data.propertyId !== null)) throw new Error('Invalid interaction record');
     }
   });
   return input as ObservationBatch;

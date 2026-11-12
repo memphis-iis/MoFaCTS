@@ -1103,7 +1103,7 @@ export const asyncMethods: Record<string, unknown> = {
   getTdfById: getTdfByIdPublic,
 
   ...speechMethods,
-  ...createSimulationTelemetryMethods({ getMethodAuthorizationDeps }),
+  ...createSimulationTelemetryMethods({ getMethodAuthorizationDeps, writeHistory: (userId, record) => analyticsMethods.insertHistory.call({ userId }, record) }),
 
   ...createSparcLibraryCurationMethods({ getMethodAuthorizationDeps,
     remove: id => withSparcFigureLibraryLock(() => sparcLibraryCuration.remove(id)), removed: readSparcAdministrativeRemovals }),

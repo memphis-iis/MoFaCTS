@@ -8,6 +8,7 @@ const rows = new Map();
 let failInsert = false;
 const matches = (row, query) => Object.entries(query).every(([key, expected]) => {
   const actual = key.split('.').reduce((value, part) => value?.[part], row);
+  if(expected && typeof expected==='object' && '$exists' in expected)return (actual!==undefined)===expected.$exists;
   return expected && typeof expected === 'object' && '$gt' in expected ? actual > expected.$gt : actual === expected;
 });
 const raw = {
@@ -23,9 +24,14 @@ const raw = {
   }; },
 };
 const buildId = 'synthetic-build';
+const catalogBytes=Buffer.from(JSON.stringify({version:1,buildId,artifactSha256:'0'.repeat(64),protocolVersion:3,addresses:[{path:'screens.0.model.mass',coverage:'observed'}]}));
+const catalog={url:'https://simulation.example/catalog.json',sha256:require('node:crypto').createHash('sha256').update(catalogBytes).digest('hex')};
+global.fetch=async()=>({ok:true,arrayBuffer:async()=>catalogBytes.buffer.slice(catalogBytes.byteOffset,catalogBytes.byteOffset+catalogBytes.byteLength)});
+const lifecycleRows=new Map();
+const writeHistory=async(user,row)=>{const key=row.sparc.simulationActivity.sourceEventId;if(lifecycleRows.has(key))assert.deepEqual(lifecycleRows.get(key),row);else lifecycleRows.set(key,structuredClone(row));};
 const Meteor = {
   Error: class extends Error { constructor(code, message) { super(message); this.error = code; } },
-  settings: { public: { simulationBuilds: [{ id: buildId, url: 'https://simulation.example/sim.html', sha256: '0'.repeat(64) }] } },
+  settings: { public: { simulationBuilds: [{ id: buildId, url: 'https://simulation.example/sim.html', sha256: '0'.repeat(64), catalog }] } },
 };
 const load = Module._load;
 Module._load = function(name, parent, main) {
@@ -43,11 +49,11 @@ const storage = require('../server/lib/simulationTelemetry.ts');
 const { createSimulationTelemetryMethods } = require('../server/methods/simulationTelemetryMethods.ts');
 const { SimulationResearchHost } = require('../client/views/experiment/svelte/services/simulationResearchHost.ts');
 Module._load = load;
-const methods = createSimulationTelemetryMethods({ getMethodAuthorizationDeps: () => ({
+const methods = createSimulationTelemetryMethods({ writeHistory, getMethodAuthorizationDeps: () => ({
   requireSparcLessonAccess: async (user, tdf) => { if (tdf !== 'lesson') throw Error('no lesson access'); },
   userIsInRoleAsync: async user => user === 'admin',
 }) });
-const scope = { tdfId: 'lesson', pageKey: 'page', nodeId: 'simulation', buildId };
+const scope = { tdfId: 'lesson', pageKey: 'page', nodeId: 'simulation', buildId, history:{sessionID:'learning-session',levelUnit:0} };
 const record = (sequence, type, data) => ({ sequence, order: sequence, frame: 1, time: sequence, type, data });
 const batch = (...records) => ({ firstSequence: records[0].sequence, lastSequence: records.at(-1).sequence, records });
 const initial = () => batch(record(1, 'catalog', { id: 'p', path: 'screens.0.model.mass', coverage: 'observed' }),
@@ -55,7 +61,7 @@ const initial = () => batch(record(1, 'catalog', { id: 'p', path: 'screens.0.mod
 
 test('durable duplicate acceptance, conflict rejection, ownership, interruption and rollback', async () => {
   rows.clear();
-  const { attemptId } = await storage.startSimulationAttempt('learner', scope);
+  const { attemptId } = await storage.startSimulationAttempt('learner', scope, writeHistory);
   const first = initial();
   assert.deepEqual(await storage.ingestSimulationBatch('learner', attemptId, first), { sequence: 3, complete: true });
   await storage.ingestSimulationBatch('learner', attemptId, first);
@@ -64,13 +70,13 @@ test('durable duplicate acceptance, conflict rejection, ownership, interruption 
   const conflicting = initial(); conflicting.records[1].data.state.value = 7;
   await assert.rejects(storage.ingestSimulationBatch('learner', attemptId, conflicting), /incomplete/);
   assert.equal(rows.get(attemptId).status, 'incomplete');
-  const fresh = await storage.startSimulationAttempt('learner', scope);
+  const fresh = await storage.startSimulationAttempt('learner', scope, writeHistory);
   failInsert = true;
   await assert.rejects(storage.ingestSimulationBatch('learner', fresh.attemptId, first), /write failure/);
   failInsert = false;
   assert.equal(rows.get(fresh.attemptId).lastSequence, 0);
   await storage.ingestSimulationBatch('learner', fresh.attemptId, first);
-  await storage.interruptSimulationScope('learner', scope);
+  await storage.interruptSimulationScope('learner', scope, writeHistory);
   assert.equal(rows.get(fresh.attemptId).status, 'interrupted');
   assert.ok(rows.has(`${attemptId}:1`));
   await assert.rejects(storage.ingestSimulationBatch('learner', fresh.attemptId, batch(record(4, 'checkpoint', { evidenceComplete: true }))), /incomplete/);
@@ -84,8 +90,8 @@ test('authenticated lesson access and administrator-only research export', async
 });
 
 test('account deletion removes only the selected research owner and preserves other traces', async () => {
-  const selected = await storage.startSimulationAttempt('selected-owner', scope);
-  const other = await storage.startSimulationAttempt('other-owner', scope);
+  const selected = await storage.startSimulationAttempt('selected-owner', scope, writeHistory);
+  const other = await storage.startSimulationAttempt('other-owner', scope, writeHistory);
   await storage.ingestSimulationBatch('selected-owner', selected.attemptId, initial());
   await assert.rejects(storage.removeSimulationResearchUserRecords(''), /Invalid simulation research owner/);
   await storage.removeSimulationResearchUserRecords('selected-owner');
@@ -94,13 +100,13 @@ test('account deletion removes only the selected research owner and preserves ot
 });
 
 test('sequence gaps and terminal collector errors suspend acceptance', async () => {
-  const a = await storage.startSimulationAttempt('learner', scope);
+  const a = await storage.startSimulationAttempt('learner', scope, writeHistory);
   await assert.rejects(storage.ingestSimulationBatch('learner', a.attemptId, batch(record(2, 'checkpoint', { evidenceComplete: true }))), /incomplete/);
-  const b = await storage.startSimulationAttempt('learner', scope);
+  const b = await storage.startSimulationAttempt('learner', scope, writeHistory);
   assert.equal((await storage.ingestSimulationBatch('learner', b.attemptId, batch(record(1, 'monitoring-error', { reason: 'overflow' })))).complete, false);
-  const c = await storage.startSimulationAttempt('learner', scope);
-  await assert.rejects(storage.endSimulationAttempt('learner', c.attemptId, 'arbitrary unbounded diagnostic'), /Invalid simulation stop reason/);
-  await storage.endSimulationAttempt('learner', c.attemptId, 'host-queue-overflow');
+  const c = await storage.startSimulationAttempt('learner', scope, writeHistory);
+  await assert.rejects(storage.endSimulationAttempt('learner', c.attemptId, 'arbitrary unbounded diagnostic', writeHistory), /Invalid simulation stop reason/);
+  await storage.endSimulationAttempt('learner', c.attemptId, 'host-queue-overflow', writeHistory);
   assert.equal(rows.get(c.attemptId).status, 'incomplete');
   assert.equal(rows.get(c.attemptId).reason, 'host-queue-overflow');
 });
@@ -140,6 +146,23 @@ test('host requires explicit start, ignores foreign windows and does not duplica
     assert.equal(statuses.at(-1), 'stopped'); assert.equal(decisions.length, 1);
   } finally { host.dispose(); await host.traceWork; delete global.window; }
   assert.equal(handlers.size, 0); assert.equal(frameHandlers.size, 0); assert.equal(iframe.src, 'about:blank');
+});
+
+test('partial startup omits unavailable metadata on the actual DDP argument shape', async () => {
+ const handlers=new Map(),sent=[],calls=[];
+ global.window={location:{origin:'https://host.example'},addEventListener:(name,fn)=>handlers.set(name,fn),removeEventListener:name=>handlers.delete(name)};
+ const iframe={src:'about:blank',contentWindow:{postMessage:m=>sent.push(m)},addEventListener(){},removeEventListener(){}};
+ Meteor.callAsync=async(name,...args)=>{const wire=JSON.parse(JSON.stringify(args));if(name==='ingestSimulationResearchBatch')calls.push(wire);return methods[name].call({userId:'learner'},...wire);};
+ const host=new SimulationResearchHost({iframe,scope,config:{buildId,bindings:[{name:'mass',address:{path:'screens.0.model.mass'},projection:'value'}]},status(){},observation:async()=>{}});
+ try {
+  await host.initialize();await host.start();host.loaded();const init=sent.at(-1);
+  const receive=async(kind,data)=>{handlers.get('message')({origin:'https://simulation.example',source:iframe.contentWindow,data:{...init,kind,data}});await host.work;};
+  await receive('ready',{evidenceComplete:true,scope:'initialized-screen-models'});
+  await receive('batch',batch(...initial().records.slice(0,2)));await host.traceWork;
+  assert.equal(calls[0].length,2,'DDP must not receive undefined metadata as null');
+  await receive('batch',batch(record(3,'checkpoint',{evidenceComplete:true})));await host.traceWork;
+  assert.equal(calls[1].length,3);assert.equal(calls[1][2].mass.value,5);
+ } finally {host.dispose();await host.traceWork;delete global.window;}
 });
 
 test('a fresh explicit attempt cannot be stopped or blocked by a prior delayed request', async () => {
@@ -189,7 +212,7 @@ function reactiveFixture() {
   global.window={location:{origin:'https://host.example'},addEventListener:(k,v)=>handlers.set(k,v),removeEventListener:k=>handlers.delete(k)};
   const iframe={src:'about:blank',contentWindow:{postMessage:m=>sent.push(m)},addEventListener(){},removeEventListener(){}};
   const host=new SimulationResearchHost({iframe,scope,config:{buildId,bindings:[{name:'mass',address:{path:'screens.0.model.mass'},projection:'value'}]},status:s=>statuses.push(s),observation:async facts=>decisions.push(facts.mass)});
-  return {host,sent,decisions,statuses,send(kind,data){handlers.get('message')({origin:'https://simulation.example',source:iframe.contentWindow,data:{protocol:'phet-research',version:2,buildId,sessionId:host.sessionId,kind,data}});}};
+  return {host,sent,decisions,statuses,send(kind,data){handlers.get('message')({origin:'https://simulation.example',source:iframe.contentWindow,data:{protocol:'phet-research',version:3,buildId,sessionId:host.sessionId,kind,data}});}};
 }
 test('ordered reactive updates and receipt ACKs continue while research storage is blocked; failure stops new decisions',async()=>{
   const f=reactiveFixture();let rejectWrite;const blocked=new Promise((_resolve,reject)=>rejectWrite=reject);blocked.catch(()=>{});let writes=0;
@@ -273,4 +296,28 @@ test('continuous research arrivals receive a coalescing window between writes',a
     assert.deepEqual(f.decisions,[5,7]);assert.equal(starts.length,2);
     assert.ok(starts[1]-starts[0]>=90,'sustained writes must coalesce instead of bursting above the server limit');
   } finally {f.host.dispose();await f.host.traceWork;delete global.window;}
+});
+
+test('lifecycle write recovery preserves one start/interruption and never labels completed attempts interrupted',async()=>{
+ rows.clear();lifecycleRows.clear();let failOnce=true;
+ const writer=async(user,row)=>{if(failOnce){failOnce=false;throw Error('history unavailable');}return writeHistory(user,row);};
+ await assert.rejects(storage.startSimulationAttempt('learner',scope,writer),/history unavailable/);
+ const prior=[...rows.values()][0];assert.equal(prior.lifecycleHistoryPending,true);
+ const fresh=await storage.startSimulationAttempt('learner',scope,writer);
+ assert.equal(rows.get(prior._id).status,'interrupted');assert.equal(lifecycleRows.size,3);
+ await storage.endSimulationAttempt('learner',fresh.attemptId,'completed',writer);
+ await storage.endSimulationAttempt('learner',fresh.attemptId,'left-node',writer);
+ assert.equal(rows.get(fresh.attemptId).status,'ended');assert.equal(lifecycleRows.size,3);
+});
+
+test('initial selected values persist once and conflicting retry metadata marks evidence incomplete',async()=>{
+ rows.clear();const a=await storage.startSimulationAttempt('learner',scope,writeHistory);
+ const values={mass:{value:5,label:'Mass',unit:'kg'}};
+ await storage.ingestSimulationBatch('learner',a.attemptId,initial(),values);
+ await storage.ingestSimulationBatch('learner',a.attemptId,initial(),structuredClone(values));
+ assert.deepEqual(rows.get(a.attemptId).initialValues,values);
+ await assert.rejects(storage.ingestSimulationBatch('learner',a.attemptId,initial(),{mass:{value:6}}),/incomplete/);
+ assert.equal(rows.get(a.attemptId).reason,'initial-state-conflict');
+ await storage.interruptSimulationScope('learner',scope,writeHistory);
+ assert.equal(lifecycleRows.get(a.attemptId+':Monitoring failed').action,'Monitoring failed');
 });

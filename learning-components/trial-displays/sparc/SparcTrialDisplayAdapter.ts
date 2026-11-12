@@ -109,6 +109,7 @@ export interface SparcTrialDisplay {
 }
 
 export interface SparcTrialResult {
+  simulationActivity?: import('../../runtime/simulationActivityHistory').SimulationActivityHistory;
   submittedNodes: Record<string, unknown>;
   triggeredBy?: string;
   focusedNodeId?: string;
@@ -240,6 +241,7 @@ export const sparcTrialDisplayAdapter: TrialDisplayAdapter<SparcTrialDisplay, Sp
     }
     return {
       submittedNodes: normalizeSubmittedNodes(result.submittedNodes),
+        ...(result.simulationActivity !== undefined ? { simulationActivity: result.simulationActivity as NonNullable<SparcTrialResult['simulationActivity']> } : {}),
       ...(typeof result.triggeredBy === 'string' ? { triggeredBy: result.triggeredBy } : {}),
       ...(typeof result.focusedNodeId === 'string' ? { focusedNodeId: result.focusedNodeId } : {}),
       ...(typeof result.eventType === 'string' ? { eventType: result.eventType } : {}),

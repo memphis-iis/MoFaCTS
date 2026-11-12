@@ -24,6 +24,16 @@ export async function archiveBuild(workspace, pilot, prior) {
   }
   const artifact = await readFile(path.join(workspace, pilot.simulation, pilot.buildArtifact));
   if (hash(artifact) !== build.artifactHash) throw new Error(`Cannot archive a modified artifact: ${pilot.simulation}`);
+  const catalog = await optional(path.join(workspace, 'monitor-catalog.json'));
+  if (catalog) {
+    const description = JSON.parse(catalog);
+    const checksum = await readFile(path.join(workspace, 'monitor-catalog.sha256'));
+    if (description.buildId !== build.identity || description.artifactSha256 !== build.artifactHash || hash(catalog) !== checksum.toString().trim()) {
+      throw new Error(`Cannot archive a mismatched build catalog: ${pilot.simulation}`);
+    }
+    await save('monitor-catalog.json', catalog);
+    await save('monitor-catalog.sha256', checksum);
+  }
   await save('simulation.html', artifact);
   await save('monitored-build-result.json', bytes);
   await save('monitor-build.json', await readFile(path.join(workspace, 'monitor-build.json')));

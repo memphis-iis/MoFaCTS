@@ -73,6 +73,7 @@ export const outputFields = [
   'CF (Video Is Playing)',
   'History Schema Version',
   'Event Type',
+  'CF (Simulation Activity)',
 ];
 
 // Map of numeric codes to history field names for DDP payload compression.

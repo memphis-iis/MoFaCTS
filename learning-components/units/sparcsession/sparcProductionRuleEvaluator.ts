@@ -505,6 +505,12 @@ function collectReferencedVariablesFromEffect(
   variables: Set<string>,
 ): void {
   switch (effect.type) {
+    case 'history-event':
+      for (const expression of [effect.selection, effect.action, effect.outcome, ...Object.values(effect.values ?? {})]) {
+        collectReferencedVariablesFromExpression(expression, variables);
+      }
+      collectReferencedVariablesFromTemplateValue(effect.input, variables);
+      break;
     case 'invoke-action':
       for (const expression of Object.values(effect.args ?? {})) {
         collectReferencedVariablesFromExpression(expression, variables);
@@ -838,9 +844,28 @@ function instantiateFiring(
   const credits: string[] = [];
   let terminatesProductionPhase = false;
   let terminalReason: string | undefined;
+  let historyEvent: SparcProductionRuleFiring['historyEvent'];
 
   for (const effect of rule.then) {
     switch (effect.type) {
+      case 'history-event': {
+        if (historyEvent) throw new Error('A rule may emit only one history event');
+        const selection = evaluateSparcRuleExpression(effect.selection, bindings);
+        const action = evaluateSparcRuleExpression(effect.action, bindings);
+        if (typeof effect.input === 'string') for (const match of effect.input.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)) {
+          if (!(match[1]! in bindings)) throw new Error(`Unbound history input variable: ${match[1]}`);
+        }
+        const input = typeof effect.input === 'string' ? interpolateTemplate(effect.input, bindings) : evaluateSparcRuleExpression(effect.input, bindings);
+        const outcome = effect.outcome ? evaluateSparcRuleExpression(effect.outcome, bindings) : 'unknown';
+        if (typeof selection !== 'string' || !selection.trim() || selection.length > 255
+          || typeof action !== 'string' || !action.trim() || action.length > 255
+          || typeof input !== 'string' || input.length > 255 || !['correct', 'incorrect', 'unknown'].includes(String(outcome))) {
+          throw new Error('Invalid or oversized history-event fields');
+        }
+        historyEvent = { selection, action, input, outcome: outcome as 'correct' | 'incorrect' | 'unknown', ...(effect.endsAttempt === true ? { endsAttempt: true } : {}),
+          values: Object.fromEntries(Object.entries(effect.values ?? {}).map(([key, expression]) => [key, evaluateSparcRuleExpression(expression, bindings)])) };
+        break;
+      }
       case 'invoke-action':
         // Matching only describes potential firings. The execution driver owns calls.
         requireNonBlank(effect.actionId, 'SPARC production action id');
@@ -941,6 +966,7 @@ function instantiateFiring(
 
   return {
     ruleId: rule.id,
+    ...(historyEvent ? { historyEvent } : {}),
     bindings,
     assertedFacts,
     persistentAssertedFacts,
@@ -1005,6 +1031,7 @@ export function compileSparcProductionRulePlan(
     if (!Array.isArray(rule.then)) {
       throw new Error(`SPARC production rule "${rule.id}" then must be an array`);
     }
+    if (rule.then.filter(effect => effect.type === 'history-event').length > 1) throw new Error(`SPARC rule "${rule.id}" has multiple history events`);
   }
   return Object.freeze({ sortedRules: Object.freeze(sortedRules) });
 }
@@ -1032,6 +1059,7 @@ type SparcProductionExecutionParams = {
 };
 
 function mergeFirings(left: SparcProductionRuleFiring, right: SparcProductionRuleFiring): SparcProductionRuleFiring {
+  if (left.historyEvent && right.historyEvent) throw new Error('A rule may emit only one history event');
   return {
     ruleId: left.ruleId,
     bindings: left.bindings,
@@ -1043,6 +1071,7 @@ function mergeFirings(left: SparcProductionRuleFiring, right: SparcProductionRul
     modelPracticeObservations: [...left.modelPracticeObservations, ...right.modelPracticeObservations],
     classifications: [...left.classifications, ...right.classifications],
     credits: [...left.credits, ...right.credits],
+    ...((right.historyEvent ?? left.historyEvent) ? { historyEvent: (right.historyEvent ?? left.historyEvent)! } : {}),
     executedActions: [...(left.executedActions ?? []), ...(right.executedActions ?? [])],
     terminatesProductionPhase: left.terminatesProductionPhase || right.terminatesProductionPhase,
     ...((right.terminalReason ?? left.terminalReason) !== undefined

@@ -3,19 +3,23 @@
   "methods": [
     {
       "name": "startSimulationResearchAttempt",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "review": "2026-11-11: Authenticated lesson access and attempt ownership preserved; lifecycle activity writes reuse authorized canonical history ingestion."
     },
     {
       "name": "interruptSimulationResearchActivity",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "review": "2026-11-11: Authenticated lesson access and attempt ownership preserved; lifecycle activity writes reuse authorized canonical history ingestion."
     },
     {
       "name": "ingestSimulationResearchBatch",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "review": "2026-11-11: Attempt owner only; optional bounded initial selected state, ordered deduplicated research batches."
     },
     {
       "name": "endSimulationResearchAttempt",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "review": "2026-11-11: Authenticated lesson access and attempt ownership preserved; lifecycle activity writes reuse authorized canonical history ingestion."
     },
     {
       "name": "exportSimulationResearchTrace",
@@ -218,17 +222,20 @@
     {
       "name": "downloadDataById",
       "access": "authenticated-self",
-      "notes": "Owner and exact condition-family authorization issues a single-use download capability; the HTTP handler revalidates the same scope before reading and before streaming. Projected, bounded history reads exclude historical assessment copies."
+      "notes": "Owner and exact condition-family authorization issues a single-use download capability; the HTTP handler revalidates the same scope before reading and before streaming. Projected, bounded history reads exclude historical assessment copies.",
+      "review": "2026-11-11: Existing export ownership and scope preserved; bounded simulation activity JSON included, internal simulation trace rows omitted."
     },
     {
       "name": "downloadDataByTeacher",
       "access": "authenticated-self",
-      "notes": "Authenticated self-only issuance for owned lessons; a single-use HTTP capability revalidates user existence and the exact owned scope before reading and before streaming. Histories use bounded projected reads and exclude historical assessment copies."
+      "notes": "Authenticated self-only issuance for owned lessons; a single-use HTTP capability revalidates user existence and the exact owned scope before reading and before streaming. Histories use bounded projected reads and exclude historical assessment copies.",
+      "review": "2026-11-11: Existing export ownership and scope preserved; bounded simulation activity JSON included, internal simulation trace rows omitted."
     },
     {
       "name": "downloadOwnHistoryAcrossTdfs",
       "access": "authenticated-self",
-      "notes": "Existing authenticated-self token issuance retained; ordinary exports exclude historical assessment copies."
+      "notes": "Existing authenticated-self token issuance retained; ordinary exports exclude historical assessment copies.",
+      "review": "2026-11-11: Existing export ownership and scope preserved; bounded simulation activity JSON included, internal simulation trace rows omitted."
     },
     {
       "name": "duplicateTheme",
@@ -1206,12 +1213,14 @@
     {
       "name": "/data-download/own-history",
       "access": "single-use-download",
-      "notes": "Existing single-use download token and user scope retained; cursor and TSV writer exclude historical assessment copies. Backpressure waits terminate on connection close, error or request abort; the cursor closes on completion, cancellation and failure. Attachment headers use an ASCII quoted name and the complete RFC 5987 UTF-8 filename; control characters are rejected."
+      "notes": "Existing single-use download token and user scope retained; cursor and TSV writer exclude historical assessment copies. Backpressure waits terminate on connection close, error or request abort; the cursor closes on completion, cancellation and failure. Attachment headers use an ASCII quoted name and the complete RFC 5987 UTF-8 filename; control characters are rejected.",
+      "review": "2026-11-11: Existing one-use capability and authorization preserved; shared backpressure cleanup removes drain listeners from the actual compression emitter, with abort/cursor cleanup tested."
     },
     {
       "name": "/data-download/owned-history",
       "access": "single-use-download",
-      "notes": "Expiring single-use capability binds the issuing user, exact owned lesson IDs, request and filename. Revalidates current authorization before reading and before headers; bounded projected history reads, private temporary sorting, no-store responses, abort cleanup. Attachment headers preserve Unicode filenames using RFC 5987 with a valid ASCII quoted name; control characters are rejected."
+      "notes": "Expiring single-use capability binds the issuing user, exact owned lesson IDs, request and filename. Revalidates current authorization before reading and before headers; bounded projected history reads, private temporary sorting, no-store responses, abort cleanup. Attachment headers preserve Unicode filenames using RFC 5987 with a valid ASCII quoted name; control characters are rejected.",
+      "review": "2026-11-11: Existing one-use capability and authorization preserved; shared backpressure cleanup removes drain listeners from the actual compression emitter, with abort/cursor cleanup tested."
     },
     {
       "name": "/dynamic-assets",

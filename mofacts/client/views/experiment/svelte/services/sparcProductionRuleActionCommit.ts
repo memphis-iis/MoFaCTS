@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { resumeSimulationHostAction } from '../../../../../../learning-components/runtime/simulationActivityHistory';
 import { clientConsole } from '../../../../lib/clientLogger';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type {
@@ -88,11 +89,10 @@ function collectMessageNodeIds(nodes: readonly unknown[] | undefined, ids = new 
 function extractCurrentMessageNodeValues(
   display: SparcActionDisplay,
   evaluations: readonly SparcCommittedProductionRuleEvaluation[] | undefined,
+  preserveExistingMessages = false,
 ): Record<string, unknown> {
   const nodeValues: Record<string, unknown> = {};
-  for (const nodeId of collectMessageNodeIds(display.nodes)) {
-    nodeValues[nodeId] = '';
-  }
+  if (!preserveExistingMessages) for (const nodeId of collectMessageNodeIds(display.nodes)) nodeValues[nodeId] = '';
   for (const evaluation of evaluations ?? []) {
     for (const firing of evaluation.execution?.firings ?? []) {
       for (const message of firing.messages ?? []) {
@@ -111,8 +111,9 @@ function extractSparcNodeValues(
   evaluations: readonly SparcCommittedProductionRuleEvaluation[] | undefined,
   priorHistoryRecords: readonly CanonicalHistoryRecord[],
   replayStateCells: Record<string, { address?: { nodeId?: string }; key?: string; value?: unknown }> = {},
+  preserveExistingMessages = false,
 ): Record<string, unknown> {
-  const nodeValues: Record<string, unknown> = extractCurrentMessageNodeValues(display, evaluations);
+  const nodeValues: Record<string, unknown> = extractCurrentMessageNodeValues(display, evaluations, preserveExistingMessages);
   for (const cell of Object.values(replayStateCells)) {
     const nodeId = nonBlankString(cell.address?.nodeId);
     const key = nonBlankString(cell.key);
@@ -196,6 +197,7 @@ export async function commitSparcProductionRuleAction(params: {
   readonly classifications: readonly string[];
   readonly messages: readonly string[];
   readonly sparcNodeValues: Record<string, unknown>;
+  readonly completedSimulationAttempts?: string[];
 }> {
   const sparcDisplay = resolveSparcActionDisplay(params.currentDisplay);
   if (!sparcDisplay) {
@@ -228,8 +230,18 @@ export async function commitSparcProductionRuleAction(params: {
     display: sparcDisplay,
   });
   const priorHistoryRecords = sparcRuntime.retainedHistoryRecords;
+  let sparcResult = params.sparcResult;
+  if (sparcResult.eventType !== 'simulation-observation' && !sparcResult.simulationActivity) {
+    const simulations = (sparcDisplay.nodes as unknown[]).filter((node): node is Record<string, unknown> => isRecord(node) && node.atomType === 'simulation');
+    if (simulations.length === 1 && isRecord(simulations[0]?.simulation) && typeof simulations[0].simulation.buildId === 'string') {
+      const activity = resumeSimulationHostAction(simulations[0].simulation.buildId,
+        priorHistoryRecords.map(record => isRecord(record.sparc) ? record.sparc.simulationActivity : undefined), crypto.randomUUID());
+      if (activity) sparcResult = { ...sparcResult, simulationActivity: activity };
+    }
+  }
   const startedAt = Date.now();
   let writtenHistoryCount = 0;
+  const completedSimulationAttempts = new Set<string>();
 
   const result = await engine.commitSparcTrialDisplayProductionRuleEvents({
     core: {
@@ -240,13 +252,15 @@ export async function commitSparcProductionRuleAction(params: {
     },
     pageKey: sparcDisplay.pageKey,
     display: sparcDisplay,
-    result: params.sparcResult,
+    result: sparcResult,
     document: sparcRuntime.document,
     replayState: sparcRuntime.replayState,
     priorHistoryRecords,
     history: {
       async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
         await insertCompressedHistory(historyRecord as Record<string, unknown>);
+        const activity = (historyRecord.sparc as { simulationActivity?: { completed?: boolean; attemptId: string } } | undefined)?.simulationActivity;
+        if (activity?.completed) completedSimulationAttempts.add(activity.attemptId);
         rememberSparcRuntimeHistoryRecord(historyRecord);
         writtenHistoryCount += 1;
       },
@@ -278,6 +292,7 @@ export async function commitSparcProductionRuleAction(params: {
   });
 
   return {
+    completedSimulationAttempts: [...completedSimulationAttempts],
     classifications: (result.evaluations ?? []).flatMap((evaluation) => (
       evaluation.execution?.firings ?? []
     ).flatMap((firing) => firing.classifications ?? [])),
@@ -289,6 +304,7 @@ export async function commitSparcProductionRuleAction(params: {
       result.evaluations,
       priorHistoryRecords,
       updatedSparcRuntime.replayState.cells,
+      sparcResult.eventType === 'simulation-observation',
     ),
   };
 }

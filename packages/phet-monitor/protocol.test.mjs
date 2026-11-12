@@ -8,7 +8,7 @@ const batch = (...records) => ({ firstSequence: records[0].sequence, lastSequenc
 test('bridge requires exact origin, source window, version, build and session', () => {
   const source = {};
   const expected = { origin: 'https://sim.example', source, buildId: 'build', sessionId: 'attempt' };
-  const event = { origin: expected.origin, source, data: { protocol: 'phet-research', version: 2, buildId: 'build', sessionId: 'attempt', kind: 'batch' } };
+  const event = { origin: expected.origin, source, data: { protocol: 'phet-research', version: 3, buildId: 'build', sessionId: 'attempt', kind: 'batch' } };
   assert.equal(acceptsBridgeMessage(event, expected), true);
   for (const changed of [{ origin: 'https://other.example' }, { source: {} }, { data: { ...event.data, version: 1 } }, { data: { ...event.data, sessionId: 'old' } }]) {
     assert.equal(acceptsBridgeMessage({ ...event, ...changed }, expected), false);

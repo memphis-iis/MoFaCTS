@@ -10,6 +10,7 @@ const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const collectorHash = hash(await readFile(path.join(root, 'packages/phet-monitor/collector.js')));
 const bridgeHash = hash(await readFile(path.join(root, 'packages/phet-monitor/bridge.js')));
 const host = await read('host-acceptance.json');
+const history = await read('history-acceptance.json');
 const interactions = await read('interaction-acceptance.json');
 const disposal = await read('circuit-construction-kit-dc/disposal-probe.json');
 const results = [];
@@ -24,7 +25,9 @@ for (const simulation of ['density', 'pendulum-lab', 'circuit-construction-kit-d
     || startup.buildId !== build.identity || eventSampling.buildId !== build.identity) {
     throw new Error(`Evidence does not match current sources: ${simulation}`);
   }
-  const activity = host.results.filter(result => result.buildId === build.identity);
+  const activityHistory = history.results.find(result => result.buildId === build.identity);
+  if (!activityHistory || !activityHistory.scopesAgree || !activityHistory.internalRowsExcluded || !activityHistory.noDuplicateActivity) throw new Error(`Missing matching ordinary history/export evidence: ${simulation}`);
+  const activity = host.results.filter(result => result.buildId === build.identity && result.title === activityHistory.lessonTitle);
   if (!activity.length) throw new Error(`Missing host evidence: ${simulation}`);
   const interaction = interactions.results.find(result => result.buildId === build.identity);
   if (!interaction || simulation === 'circuit-construction-kit-dc' && disposal.buildId !== build.identity) {
@@ -46,16 +49,17 @@ for (const simulation of ['density', 'pendulum-lab', 'circuit-construction-kit-d
       maximumFrameGapMs: { baseline: performance.results.baseline.maximumFrameGapMs, monitored: performance.results.monitored.maximumFrameGapMs },
       complete: performance.results.monitored.monitor.complete,
       baselineActions: performance.results.baseline.interactions, monitoredActions: performance.results.monitored.interactions,
-      activeInventory: { first: active[0], last: active.at(-1), minimum: Math.min(...active), maximum: Math.max(...active) },
+      activeInventory: { phase: 'frame-ended listener, before collector settlement', first: active[0], last: active.at(-1),
+        minimum: Math.min(...active), maximum: Math.max(...active), settledAtEnd: performance.results.monitored.monitor.activeObjects },
       errors: [...performance.results.baseline.errors, ...performance.results.monitored.errors] },
     host: activity.map(({ title, completion, iframePreserved, explicitRestartOnReload, completedTaskPreserved, observationToDurableRuleTrace }) =>
-      ({ title, completion, iframePreserved, explicitRestartOnReload, completedTaskPreserved, observationToDurableRuleTrace,
-        durableDecisionLatencyTargetPassed: observationToDurableRuleTrace ? observationToDurableRuleTrace.p95Ms < 500 : null })),
+      ({ title, completion, iframePreserved, explicitRestartOnReload, completedTaskPreserved, observationToDurableRuleTrace })),
     interactions: interaction,
+    ordinaryHistory: activityHistory,
   });
 }
 const summary = { generatedAt: new Date().toISOString(), collectorHash, bridgeHash, results, authoring: host.authoring, hostErrors: host.errors, disposal,
-  acceptance: 'Not established: interpret measured targets and the explicit coverage/interaction limitations together.',
+  acceptance: 'Local feasibility evidence only. Interpret measured targets, ordinary-history checks, the separately recorded Meteor snapshot scope and explicit coverage/interaction limitations together; no deployment qualification.',
   limitations: [
     'One sequential comparison per simulation; these are local feasibility measurements, not deployment qualification.',
     'Ten-minute rendering comparisons use public model API actions and drain locally; host transport and instructional latency are separate browser tests.',

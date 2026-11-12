@@ -1,4 +1,4 @@
-/* Version 2 child bridge. Loaded after collector and build configuration. */
+/* Version 3 child bridge. Loaded after collector and build configuration. */
 (function( global ) {
   'use strict';
   var config = global.phetResearchConfiguration;
@@ -14,7 +14,7 @@
   var retryTimer = null;
 
   function message( kind, data ) {
-    return { protocol: 'phet-research', version: 2, buildId: config.buildId,
+    return { protocol: 'phet-research', version: 3, buildId: config.buildId,
       sessionId: session, kind: kind, data: data };
   }
   function send( kind, data ) {
@@ -62,7 +62,7 @@
   function receive( event ) {
     if ( event.source !== global.parent || config.hostOrigins.indexOf( event.origin ) < 0 ) { return; }
     var data = event.data;
-    if ( !data || data.protocol !== 'phet-research' || data.version !== 2 || data.buildId !== config.buildId ) { return; }
+    if ( !data || data.protocol !== 'phet-research' || data.version !== 3 || data.buildId !== config.buildId ) { return; }
     if ( data.kind === 'initialize' ) {
       if ( session || typeof data.sessionId !== 'string' || !/^[a-zA-Z0-9-]{16,100}$/.test( data.sessionId ) ) { return; }
       session = data.sessionId;

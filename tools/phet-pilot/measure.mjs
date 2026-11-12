@@ -63,29 +63,16 @@ try {
     });
     if (!screenActive) throw new Error('Scripted measurement must enter an initialized simulation screen');
     await page.evaluate(() => {
-      window.measureData = { intervals: [], collectorCosts: [], objects: [], started: performance.now(), hiddenFrames: 0 };
+      window.measureData = { intervals: [], objects: [], started: performance.now(), hiddenFrames: 0 };
       let last = performance.now();
       window.measureListener = () => {
         const now = performance.now(); window.measureData.intervals.push(now - last); last = now;
         if (document.visibilityState !== 'visible') window.measureData.hiddenFrames++;
+        if (window.phetResearchMonitor && window.measureData.intervals.length % 60 === 0) {
+          window.measureData.objects.push(window.phetResearchMonitor.status().activeObjects);
+        }
       };
       window.phet.joist.sim.frameEndedEmitter.addListener(window.measureListener);
-      if (window.phetResearchMonitor) {
-        let depth = 0, cost = 0;
-        for (const method of ['beginModel','model','registerCollection','collectionChanged','emit','dispose','frame','drain']) {
-          const original = window.phetResearchMonitor[method];
-          window.phetResearchMonitor[method] = (...args) => {
-            const start = performance.now(); depth++;
-            try { return original(...args); } finally {
-              if (--depth === 0) cost += performance.now() - start;
-              if (method === 'frame') {
-                window.measureData.collectorCosts.push(cost); cost = 0;
-                if (window.measureData.collectorCosts.length % 60 === 0) window.measureData.objects.push(window.phetResearchMonitor.status().activeObjects);
-              }
-            }
-          };
-        }
-      }
     });
     const started = Date.now();
     let interaction = 0;
@@ -132,12 +119,16 @@ try {
     results[mode] = { ...data, errors, webgl, interactions: interaction, interactionStates,
       maximumFrameGapMs: data.intervals.reduce((maximum,value) => Math.max(maximum,value), 0),
       measurementValid: data.hiddenFrames === 0 && data.intervals.every(value => value < 2000) && data.ended-data.started <= duration+5000,
-      p95FrameMs: quantile(data.intervals.slice(1), 0.95), p95CollectorMs: quantile(data.collectorCosts, 0.95) ?? null };
+      p95FrameMs: quantile(data.intervals.slice(1), 0.95), p95CollectorMs: null };
     console.log(JSON.stringify({ simulation: pilot.simulation, mode, p95FrameMs: results[mode].p95FrameMs, p95CollectorMs: results[mode].p95CollectorMs, complete: data.monitor?.complete }));
     await page.close();
   }
-  const result = { simulation: pilot.simulation, buildId:build.identity, collectorHash:build.collectorHash, browser: browser.version(), durationRequestedMs: duration,
-    qualification: 'Collector/rendering comparison using reproducible public-model API actions; persistence, instructional-rule latency and pointer/keyboard accessibility are measured separately.',
+  const result = { simulation: pilot.simulation, buildId:build.identity, collectorHash:build.collectorHash, bridgeHash:build.bridgeHash,
+    registrationContractHash:build.registrationContractHash, artifactHash:build.artifactHash, baselineArtifactHash:baselineBuild.artifact.sha256,
+    recordedAt: new Date().toISOString(), harnessHash:hash(await readFile(fileURLToPath(import.meta.url))),
+    eventDrainHash:hash(await readFile(new URL('./event-drain.mjs',import.meta.url))),
+    nodeVersion:process.version, platform:process.platform, arch:process.arch, browser: browser.version(), durationRequestedMs: duration,
+    qualification: 'Collector/rendering comparison using reproducible public-model API actions. Collector methods run without profiling wrappers; persistence, instructional-rule latency and pointer/keyboard accessibility are measured separately.',
     p95FrameOverhead: results.monitored.p95FrameMs / results.baseline.p95FrameMs - 1, results };
   await writeFile(path.join(workspace, `performance-${duration}ms.json`), JSON.stringify(result, null, 2) + '\n');
   console.log(JSON.stringify({ simulation: pilot.simulation, p95FrameOverhead: result.p95FrameOverhead }));

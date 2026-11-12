@@ -50,7 +50,7 @@ try {
     assert.ok(!await iframe.getAttribute('src') || await iframe.getAttribute('src')==='about:blank');
     await page.evaluate(holdResearch=>{
       window.pilotResearchGate = holdResearch ? new Promise(resolve=>{window.releasePilotResearch=resolve;}) : Promise.resolve();
-      window.pilotIngests=[];window.pilotAttempt='';window.pilotRuleLatencies=[];window.pilotStops=[];window.pilotChildErrors=[];
+      window.pilotIngests=[];window.pilotAttempt='';window.pilotRuleLatencies=[];window.pilotStops=[];window.pilotChildErrors=[];window.pilotActivityActions=[];
       window.pilotCheckpointTimes=new Map();window.pilotChildTimeOrigin=null;
       window.addEventListener('message',event=>{
         if(event.origin!=='http://127.0.0.1:3212'||event.source!==document.querySelector('.sparc-simulation iframe')?.contentWindow
@@ -64,6 +64,7 @@ try {
         if(name==='endSimulationResearchAttempt')window.pilotStops.push(args[1]);
         if(name==='ingestSimulationResearchBatch') await window.pilotResearchGate;
         const started=performance.now();const result=await original.call(this,name,...args);
+        if(name==='insertHistory'&&args[0]?.['79']?.simulationActivity?.recordRole==='activity')window.pilotActivityActions.push(args[0]['79'].simulationActivity.eventName);
         if(name==='startSimulationResearchAttempt')window.pilotAttempt=result.attemptId;
         if(name==='ingestSimulationResearchBatch')window.pilotIngests.push({sequence:result.sequence,complete:result.complete,ms:performance.now()-started});
         if(name==='insertHistory'&&window.pilotChildTimeOrigin!==null){
@@ -92,11 +93,21 @@ try {
     const frame=await (await iframe.elementHandle()).contentFrame();
     await frame.waitForFunction(()=>window.phetResearchMonitor?.status().frame>5,null,{timeout:60000});
     if(!holdResearch) await page.waitForFunction(()=>window.pilotIngests.length>0,null,{timeout:15000});
-    const box=await iframe.boundingBox();
+    let box=await iframe.boundingBox();
     await page.mouse.click(box.x+box.width*.30,box.y+box.height*.48);
     await page.waitForTimeout(1000);
     const simulationWindow=await frame.evaluate(()=>({build:window.phetResearchBuild,started:performance.timeOrigin}));
     await page.evaluate(origin=>{window.pilotChildTimeOrigin=origin;},simulationWindow.started);
+    // Meaningful activity includes failed checks, repeated hints and reset.
+    await page.locator('[data-node-id="done"]').click();
+    await page.getByText('Complete the simulation task before selecting Done.',{exact:false}).waitFor();
+    for (let hint=0;hint<2;hint++) {
+      await page.locator('[data-node-id="hint"]').click();
+      await page.waitForFunction(count=>pilotActivityActions.filter(action=>action==='Request hint').length===count,hint+1);
+    }
+    await frame.getByRole('button',{name:/Reset All/i}).press('Space');
+    await page.waitForTimeout(250);
+    box=await iframe.boundingBox();
     let keyboard=false;
     if(title.startsWith('Density')) {
       // Native accessible range keyboard events exercise the actual PhET controls.
@@ -121,6 +132,7 @@ try {
         const point=screen.view.localToGlobalPoint(transform.modelToViewPosition(screen.model.pendula[0].positionProperty.value));
         return {x:point.x,y:point.y};
       });
+      box=await iframe.boundingBox();
       await page.mouse.move(box.x+bob.x,box.y+bob.y);await page.mouse.down();
       await page.mouse.move(box.x+bob.x-200,box.y+bob.y-50,{steps:15});await page.mouse.up();
     } else {
@@ -132,7 +144,12 @@ try {
       // Exercise the native focusable component, as a keyboard user does.
       // The embedded historical build did not delete a canvas-only selection
       // while focus remained on BODY; that limitation is retained in the report.
-      await frame.getByRole('application',{name:/^Wire 1 of 1/}).press('Delete');keyboard=true;
+      // This pinned build leaves the component label blank after Reset All.
+      // Select its single native component-edit focus target by declared role.
+      const componentEditor=frame.locator('[role="application"][aria-roledescription="edit options button"]');
+      assert.equal(await componentEditor.count(),1);
+      await componentEditor.press('Delete');
+      keyboard=true;
       await frame.waitForFunction(()=>phet.joist.sim.screens.find(s=>s.model.circuit).model.circuit.circuitElements.length===0);
       await page.getByText('Component removal observed.',{exact:false}).waitFor({timeout:15000});
       await frame.evaluate(()=>{
@@ -146,7 +163,14 @@ try {
         c.circuitElements.push(c.resistorGroup.createNextElement(d,a));
       });
     }
-    await page.getByText('Task complete:',{exact:false}).waitFor({timeout:30000});
+    try { await page.getByText('Task complete:',{exact:false}).waitFor({timeout:30000}); }
+    catch (error) {
+      console.log(JSON.stringify({diagnostic:{title,errors,feedback:await page.locator('[data-node-id="feedback"]').allTextContents(),
+        host:await page.evaluate(()=>({stops:pilotStops,ingests:pilotIngests.length,childErrors:pilotChildErrors,rules:pilotRuleLatencies})),
+        monitor:await frame.evaluate(()=>window.phetResearchMonitor?.status()),
+        circuit:await frame.evaluate(()=>{const c=window.phet?.joist?.sim?.screens.find(s=>s.model.circuit)?.model.circuit;return c?c.circuitElements.map(e=>({type:e.constructor.name,current:e.currentProperty?.value})):null;})}}));
+      throw error;
+    }
     assert.deepEqual(await frame.evaluate(()=>({build:window.phetResearchBuild,started:performance.timeOrigin})),simulationWindow,'instructional updates replaced the simulation');
     const status=await frame.evaluate(()=>window.phetResearchMonitor.status());assert.equal(status.complete,true);assert.equal(status.stopped,false);
     await page.waitForFunction(()=>pilotIngests.length>0,null,{timeout:15000});

@@ -1,5 +1,6 @@
 import { assertModelPracticeHistoryIdentity } from './historyStimulusIdentity';
 import { assertExpectationLogitChanges } from './expectationLogitHistory';
+import { assertSimulationActivityHistory } from './simulationActivityHistory';
 
 export type CanonicalHistoryRecord = Record<string, unknown>;
 
@@ -159,6 +160,7 @@ export function assertCanonicalHistoryEnvelope(
   assertStableEventType(record);
   assertModelPracticeHistoryIdentity(record);
   const sparc = record.sparc as Record<string, unknown> | undefined;
+  if (sparc?.simulationActivity !== undefined) assertSimulationActivityHistory(sparc.simulationActivity);
   if (record.eventType === 'sparc' && sparc?.expectationLogitChanges !== undefined) {
     assertExpectationLogitChanges(sparc.expectationLogitChanges);
     const transition = sparc.stateTransition as { event?: { eventId?: unknown; type?: unknown } } | undefined;

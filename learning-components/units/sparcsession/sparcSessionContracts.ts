@@ -277,6 +277,15 @@ export type SparcProductionRuleTest = {
 
 export type SparcProductionRuleEffect =
   | {
+      readonly type: 'history-event';
+      readonly endsAttempt?: boolean;
+      readonly selection: SparcRuleExpression;
+      readonly action: SparcRuleExpression;
+      readonly input: string | SparcRuleExpression;
+      readonly outcome?: SparcRuleExpression;
+      readonly values?: Readonly<Record<string, SparcRuleExpression>>;
+    }
+  | {
       /** Runtime-registered capability; never evaluated while matching rules. */
       readonly type: 'invoke-action';
       readonly actionId: string;
@@ -385,6 +394,7 @@ export type SparcProductionRule = {
 };
 
 export type SparcProductionRuleFiring = {
+  readonly historyEvent?: { selection: string; action: string; input: string; outcome: SparcOutcome; values: Record<string, unknown>; endsAttempt?: boolean };
   readonly ruleId: string;
   readonly bindings: Readonly<Record<string, unknown>>;
   readonly assertedFacts: readonly SparcWorkingMemoryFact[];
@@ -448,6 +458,7 @@ export type SparcTraceStep = {
 };
 
 export type SparcCanonicalHistoryExtension = {
+  readonly simulationActivity?: import('../../runtime/simulationActivityHistory').SimulationActivityHistory;
   readonly expectationLogitChanges?: readonly import('../../runtime/expectationLogitHistory').ExpectationLogitChange[];
   readonly pageKey: string;
   readonly sourceAddress: SparcDocumentAddress;

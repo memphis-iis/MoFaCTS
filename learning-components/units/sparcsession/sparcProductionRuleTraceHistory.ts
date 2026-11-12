@@ -2,6 +2,7 @@ import {
   assertCanonicalHistoryEnvelope,
   withCanonicalHistorySchemaVersion,
 } from '../../runtime/historyEnvelope';
+import { assertSimulationActivityHistory, simulationHistoryContext } from '../../runtime/simulationActivityHistory';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
 import type {
   SparcAuthoredDocument,
@@ -110,6 +111,11 @@ export function createSparcProductionRuleTraceHistoryRecords(params: {
   }
 
   return params.execution.firings.map((firing, index) => {
+    const activity = firing.historyEvent;
+    const simulation = simulationHistoryContext(params.event, activity ? 'activity' : 'internal');
+    const simulationActivity = simulation ? { ...simulation,
+      ...(activity ? { eventName: activity.action, values: { ...simulation.values, ...activity.values }, ...(activity.endsAttempt ? { completed: true } : {}) } : {}) } : undefined;
+    if (simulationActivity) assertSimulationActivityHistory(simulationActivity);
     const traceStep: SparcTraceStep = {
       traceId: `${params.event.eventId}:production-rule:${index}:${firing.ruleId}`,
       sourceAddress: params.event.source,
@@ -128,6 +134,7 @@ export function createSparcProductionRuleTraceHistoryRecords(params: {
       pageKey: params.event.source.pageKey,
       sourceAddress: params.event.source,
       traceStep,
+      ...(simulationActivity ? { simulationActivity } : {}),
     };
     const record = withCanonicalHistorySchemaVersion({
       TDFId,
@@ -139,12 +146,12 @@ export function createSparcProductionRuleTraceHistoryRecords(params: {
       levelUnitType: 'sparc',
       time: params.event.time,
       problemStartTime: params.event.time,
-      selection: `${params.event.source.pageKey}:${params.event.source.nodeId}`,
-      action: 'sparc-production-rule-trace',
-      outcome: traceStep.outcome,
+      selection: activity?.selection ?? `${params.event.source.pageKey}:${params.event.source.nodeId}`,
+      action: activity?.action ?? 'sparc-production-rule-trace',
+      outcome: activity?.outcome ?? traceStep.outcome,
       typeOfResponse: 'sparc',
       responseValue: '',
-      input: '',
+      input: activity?.input ?? '',
       displayedStimulus: params.event.source,
       eventType: 'sparc',
       sparc: extension,

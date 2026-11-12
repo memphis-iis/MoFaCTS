@@ -225,6 +225,10 @@ function collectReferencedVariablesFromCondition(condition, variables) {
 
 function collectReferencedVariablesFromEffect(effect, variables) {
   switch (effect?.type) {
+    case 'history-event':
+      for (const expression of [effect.selection, effect.action, effect.outcome, ...Object.values(effect.values || {})]) collectReferencedVariablesFromExpression(expression, variables);
+      collectReferencedVariablesFromTemplateValue(effect.input, variables);
+      break;
     case 'assert-fact':
       addVariablesFromTemplate(effect.fact?.factId, variables);
       for (const expression of Object.values(effect.fact?.slots || {})) {
@@ -380,6 +384,14 @@ function validateProductionEffect(effect, label) {
     case 'credit':
       requireNonBlankString(effect.kc, `${label} kc`);
       break;
+    case 'history-event':
+      validateRuleExpression(effect.selection, `${label} selection`);
+      validateRuleExpression(effect.action, `${label} action`);
+      if (typeof effect.input !== 'string') validateRuleExpression(effect.input, `${label} input`);
+      if (effect.outcome !== undefined) validateRuleExpression(effect.outcome, `${label} outcome`);
+      if (effect.endsAttempt !== undefined && typeof effect.endsAttempt !== 'boolean') throw new Error(`${label} endsAttempt must be boolean`);
+      for (const expression of Object.values(effect.values || {})) validateRuleExpression(expression, `${label} selected value`);
+      break;
     case 'model-practice':
       requireNonBlankString(effect.outcome, `${label} outcome`);
       if (effect.clusterIndex && typeof effect.clusterIndex === 'object') validateRuleExpression(effect.clusterIndex, `${label} clusterIndex`);
@@ -440,6 +452,7 @@ function validateRulesBeforeSave(display, label, validClusterIndices) {
     if (!Array.isArray(rule.then)) {
       throw new Error(`${label} productionRules[${index}].then must be an array.`);
     }
+    if (rule.then.filter(effect => effect.type === 'history-event').length > 1) throw new Error(`${label} permits one history event per rule`);
     rule.then.forEach((effect, effectIndex) => {
       validateProductionEffect(effect, `${label} productionRules[${index}].then[${effectIndex}]`);
       if (effect?.type !== 'model-practice') {

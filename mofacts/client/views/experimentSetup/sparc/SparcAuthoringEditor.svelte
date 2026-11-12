@@ -115,6 +115,7 @@
     'message',
     'credit',
     'model-practice',
+    'history-event',
     'append-node',
     'append-node-if-missing',
     'insert-node',

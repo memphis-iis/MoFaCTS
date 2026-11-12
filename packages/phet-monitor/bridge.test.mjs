@@ -22,7 +22,7 @@ function fixture() {
     setTimeout(callback, delay) { const id = ++serial; timers.set(id, { callback, at: clock + delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
   });
-  const envelope = { protocol: 'phet-research', version: 2, buildId: 'test-build', sessionId: '12345678-1234-1234-1234-123456789abc' };
+  const envelope = { protocol: 'phet-research', version: 3, buildId: 'test-build', sessionId: '12345678-1234-1234-1234-123456789abc' };
   return {
     sent, chunks, timers, handlers, parent,
     get stops() { return stops; },

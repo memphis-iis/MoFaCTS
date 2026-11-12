@@ -98,6 +98,24 @@ describe('own history HTTP download lifecycle', () => {
     assert.match(Buffer.concat(f.chunks.slice(1)).toString('utf16le'), /synthetic two/);
   });
 
+  it('releases drain listeners on the compression emitter that owns them', async () => {
+    const f = fixture();
+    const compression = new EventEmitter();
+    const originalOn = f.res.on.bind(f.res);
+    f.res.on = function(event, listener) {
+      return event === 'drain' ? compression.on(event, listener) as typeof f.res : originalOn(event, listener);
+    };
+    f.res.write = function(chunk) {
+      f.chunks.push(chunk);
+      queueMicrotask(() => compression.emit('drain'));
+      return false;
+    };
+    await f.run();
+    assert.equal(f.res.writableEnded, true);
+    assert.equal(compression.listenerCount('drain'), 0);
+    assert.equal(f.counts().closed, 1);
+  });
+
   for (const event of ['close', 'error', 'aborted'] as const) {
     it(`settles and closes the cursor when ${event} interrupts a blocked data write`, async () => {
       const f = fixture(); let writes = 0;

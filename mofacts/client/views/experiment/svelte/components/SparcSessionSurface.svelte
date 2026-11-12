@@ -83,15 +83,19 @@
   export let authoringSelectOnly = false;
 
   let activeNodeId = '';
+  const simulationActivities = new Map();
+  const simulationHosts = new Map();
   setContext(SIMULATION_HOST_CONTEXT, {
+    registerHost(nodeId, host) { if (host) simulationHosts.set(nodeId, host); else { simulationHosts.delete(nodeId); simulationActivities.delete(nodeId); } },
     scope(nodeId, buildId) {
       const current = currentSparcControllerDisplay('[Simulation]');
       if (isSparcAutoTutorDisplay(current) || !Array.isArray(current.productionRules)) throw new Error('Simulation pilot requires authored SPARC production rules');
-      return { tdfId, pageKey: current.pageKey, nodeId, buildId };
+      return { tdfId, pageKey: current.pageKey, nodeId, buildId, history: { sessionID: attemptId, levelUnit: Number(levelUnit) } };
     },
-    async observation(nodeId, facts, evidence) {
+    async observation(nodeId, facts, evidence, activity) {
+      simulationActivities.set(nodeId, activity);
       await handleSparcAction({ eventType: 'simulation-observation', triggeredBy: nodeId,
-        submittedNodes: { [nodeId]: { facts, evidence } }, timestamp: Date.now() });
+        submittedNodes: { [nodeId]: { facts, evidence, activity } }, timestamp: Date.now() });
     },
   });
   let feedbackFadeElement;
@@ -648,7 +652,20 @@
     return resolvedDisplay;
   }
 
+  function withSimulationActivity(detail) {
+    if (detail?.eventType !== 'simulation-observation' && simulationActivities.size === 1) {
+      const activity = [...simulationActivities.values()][0];
+      detail = { ...detail, simulationActivity: { ...activity, origin: 'input', eventName: 'host-action', sourceEventId: `${activity.attemptId}:host:${crypto.randomUUID()}` } };
+    }
+    return detail;
+  }
+
+  function markCompletedSimulations(attempts) {
+    for (const [nodeId, activity] of simulationActivities) if (attempts.includes(activity.attemptId)) simulationHosts.get(nodeId)?.complete();
+  }
+
   async function handleSparcAction(detail) {
+    detail = withSimulationActivity(detail);
     const scope = dialogueScope;
     if (subsetKind !== 'question' && detail?.eventType !== 'simulation-observation') {
       return;
@@ -666,7 +683,7 @@
     if (!sparcResult) {
       throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC action received for non-SPARC display'));
     }
-    const { sparcNodeValues } = await commitSparcProductionRuleAction({
+    const { sparcNodeValues, completedSimulationAttempts = [] } = await commitSparcProductionRuleAction({
       engine,
       currentDisplay,
       sparcResult,
@@ -675,6 +692,7 @@
       attemptId,
       levelUnit,
     });
+    markCompletedSimulations(completedSimulationAttempts);
     if (!mounted || dialogueScope !== scope) return;
     dispatch('runtimewatchedstatechanged');
     dispatchSparcNodeValues(sparcNodeValues, sparcResult.timestamp);
@@ -754,6 +772,7 @@
     if (!sparcResult) {
       throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC submit received for non-SPARC display'));
     }
+    Object.assign(sparcResult, withSimulationActivity(sparcResult));
     const triggeredBy = typeof sparcResult.triggeredBy === 'string' ? sparcResult.triggeredBy : '';
     const submittedNodes = triggeredBy && Object.prototype.hasOwnProperty.call(sparcResult.submittedNodes, triggeredBy)
       ? { [triggeredBy]: sparcResult.submittedNodes[triggeredBy] }
@@ -771,6 +790,7 @@
       levelUnit,
     });
     dispatch('runtimewatchedstatechanged');
+    markCompletedSimulations(result.completedSimulationAttempts || []);
     dispatchSparcNodeValues(result.sparcNodeValues, sparcResult.timestamp);
     return {
       canSubmit: result.classifications.includes('correct'),

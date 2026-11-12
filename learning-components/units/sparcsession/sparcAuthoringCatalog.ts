@@ -1261,6 +1261,19 @@ export const SPARC_RULE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
     },
   },
 }, {
+  id: 'rule.effect.history-event',
+  label: 'Record activity history',
+  category: 'production-rule-effect',
+  description: 'Write a meaningful Selection–Action–Input–Outcome event without automatic grading or KC credit. Configure expressions and selected values in rule JSON.',
+  schema: {
+    type: 'object', required: ['type', 'selection', 'action', 'input'],
+    properties: {
+      type: { const: 'history-event' }, selection: ruleExpressionSchema, action: ruleExpressionSchema,
+      input: { anyOf: [{ type: 'string' }, ruleExpressionSchema] }, outcome: ruleExpressionSchema,
+      values: { type: 'object', additionalProperties: ruleExpressionSchema }, endsAttempt: { type: 'boolean' },
+    },
+  },
+}, {
   id: 'rule.effect.terminate-production-phase',
   label: 'Stop production rules',
   category: 'production-rule-effect',

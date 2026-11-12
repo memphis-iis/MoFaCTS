@@ -55,7 +55,7 @@ try {
         }
         for (const item of capture.snapshot) assert.deepEqual(state.states.get(item.id), item.state, `${simulation}/${label}: ${item.path}`);
         assert.equal(state.states.size, capture.snapshot.length);
-        assert.equal(capture.status.complete, true);
+        assert.equal(capture.status.complete, true, JSON.stringify({ simulation, label, errors: capture.records.filter(record => record.type === 'monitoring-error') }));
         trace.push(...capture.records); checkpoints.push({ label, sequence: state.lastSequence, activeObjects: capture.status.activeObjects });
       };
       const screenIndex = () => page.evaluate(() => {
@@ -109,11 +109,19 @@ try {
       await page.mouse.click(simulation === 'density' ? 640 : simulation === 'pendulum-lab' ? 675 : 690, 860); await page.waitForTimeout(500);
       assert.notEqual(await screenIndex(), initialScreen, 'Navigation pointer did not switch screen');
       await checkpoint('screen-switch');
+      const interactions=trace.filter(record=>record.type==='interaction');
+      assert.equal(interactions.filter(record=>record.data.kind==='reset'&&record.data.phase==='complete').length,1);
+      if (simulation!=='circuit-construction-kit-dc') {
+        const scientificPath=simulation==='density'?'screens.1.model.blockA.volumeProperty':'screens.1.model.pendula.0.lengthProperty';
+        const ids=new Set(trace.filter(record=>record.type==='catalog'&&record.data.path===scientificPath).map(record=>record.data.id));
+        assert.ok(interactions.some(record=>record.data.phase==='complete'&&record.data.modality==='keyboard'&&record.data.trusted===true
+          &&(ids.has(record.data.propertyId)||record.data.properties?.some(property=>ids.has(property.id)))), 'Trusted keyboard interaction must identify the scientific model property');
+      }
       const stopped = await page.evaluate(() => { phetResearchMonitor.stop(); return phetResearchMonitor.status(); });
       assert.equal(stopped.activeObjects, 0); assert.equal(stopped.pendingEvents, 0); assert.equal(stopped.queuedRecords, 0);
       assert.deepEqual(errors, []);
       const result = { simulation, buildId: build.identity, query, keyboard: true, pointer: true, reset: true, screenSwitch: true,
-        reconstruction: true, collectorResourcesReleased: true, checkpoints, errors };
+        reconstruction: true, collectorResourcesReleased: true, explicitReset:true, trustedKeyboardModelBinding:simulation!=='circuit-construction-kit-dc', checkpoints, errors };
       results.push(result);
       await writeFile(path.join(workspace, 'interaction-trace.json.gz'), gzipSync(JSON.stringify({ ...result, trace })));
       console.log(JSON.stringify(result));

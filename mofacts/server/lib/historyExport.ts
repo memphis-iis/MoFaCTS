@@ -4,7 +4,7 @@ import { legacyTrim } from '../../common/underscoreCompat';
 import { isOperationalHistoryRecord } from '../../common/historyEnvelope';
 
 const PROLIFIC_COLUMNS = ['Prolific Participant ID', 'Prolific Study ID', 'Prolific Submission ID'];
-const FIELDSDS: string[] = [...outputFields, ...PROLIFIC_COLUMNS];
+const FIELDSDS: string[] = [...outputFields.filter(field => field !== 'CF (Simulation Activity)'), ...PROLIFIC_COLUMNS, 'CF (Simulation Activity)'];
 
 /** Source contract shared by cursor exports and the formatter/order adapter. */
 export const HISTORY_EXPORT_SOURCE_PROJECTION: Record<string, 0 | 1> = {
@@ -28,6 +28,7 @@ export const HISTORY_EXPORT_SOURCE_PROJECTION: Record<string, 0 | 1> = {
   CFVideoPreviousVolume: 1, CFVideoIsPlaying: 1, historySchemaVersion: 1,
   feedbackText: 1, feedbackType: 1, eventType: 1, dynamicTagFields: 1,
   tdfDeletedAt: 1, modelEvidenceSource: 1,
+  'sparc.simulationActivity': 1,
 };
 
 // Helper to transform our output record into a delimited record
@@ -36,6 +37,11 @@ async function delimitedRecord(rec: any, listOfDynamicStimTags: any[], isHeader 
   let vals: any = new Array(FIELDSDS.length);
   for (let i = 0; i < FIELDSDS.length; ++i) {
     const field = FIELDSDS[i]!;
+    if (field === 'CF (Simulation Activity)') {
+      // Bounded JSON already escapes TSV control characters. Preserve its values exactly.
+      vals[i] = rec[field] ?? '';
+      continue;
+    }
     let charLimit = 255;
     if(field == 'Feedback Text' || field.slice(0,2) == "KC"){
       charLimit = 65535;
@@ -92,6 +98,7 @@ export async function writeHistoryExport(
     const identities = new Map((loadParticipationIdentities ? await loadParticipationIdentities(userIds) : []).map(p => [p.userId, p]));
     for (const raw of batch) {
       if (!isOperationalHistoryRecord(raw)) continue;
+      if (raw.sparc?.simulationActivity?.recordRole === 'internal') continue;
       let record: string;
       try {
         const history = getHistory(raw);

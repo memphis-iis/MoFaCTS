@@ -84,6 +84,48 @@ for (const pilot of manifest.pilots.filter(p => !process.argv[2] || p.simulation
       return replaceOnce(text, anchor, anchor + '\nwindow.phetResearchMonitor.excludeType( ' + name + ' );');
     });
   }
+  // Control contracts use public constructor parameters/callbacks, never view-field discovery.
+  const input = event => "{ trusted: !!(" + event + " && " + event + ".domEvent && " + event + ".domEvent.isTrusted), modality: 'pointer' }";
+  if (oldFramework) {
+    for (const file of ['HSlider', 'HSliderTrack']) await change('sun/js/' + file + '.js', text => {
+      text = replaceOnce(text, 'Node.call( this );', "Node.call( this );\n window.phetResearchMonitor.registerInteraction( this, { version: 1, kind: 'value', property: valueProperty } );");
+      text = replaceOnce(text, 'start: function( event, trail ) {', "start: function( event, trail ) {\n window.phetResearchMonitor.interaction( self, 'start', " + input('event') + ' );');
+      text = replaceOnce(text, 'end: function() {', 'end: function( event ) {');
+      text = replaceOnce(text, 'options.endDrag();\n        }\n      }\n    } );', "options.endDrag();\n        }\n window.phetResearchMonitor.interaction( self, self.enabledProperty.get() && event && event.domEvent ? 'complete' : 'cancel', " + input('event') + ' );\n      }\n    } );');
+      if (file === 'HSlider') {
+        text = replaceOnce(text, 'valueProperty.set( options.constrainValue( newValue ) );\n        }\n      }\n    } );', "window.phetResearchMonitor.interaction( self, 'start', { trusted: event.isTrusted === true, modality: 'keyboard' } );\n valueProperty.set( options.constrainValue( newValue ) );\n window.phetResearchMonitor.interaction( self, 'complete', { trusted: event.isTrusted === true, modality: 'keyboard' } );\n        }\n      }\n    } );");
+      }
+      return text;
+    });
+    await change('scenery-phet/js/buttons/ResetAllButton.js', text => {
+      text = replaceOnce(text, 'this.focusHighlight =', "var researchControl = this;\n window.phetResearchMonitor.registerInteraction( researchControl, { version: 1, kind: 'reset' } );\n this.focusHighlight =");
+      text = replaceOnce(text, 'var disableAlertsListener = function() {', "var disableAlertsListener = function() {\n window.phetResearchMonitor.interaction( researchControl, 'start' );");
+      return replaceOnce(text, 'var enableAlertsListener = function() {', "var enableAlertsListener = function() {\n window.phetResearchMonitor.interaction( researchControl, 'complete' );");
+    });
+  } else {
+    await change('tandem/js/PhetioObject.ts', text => replaceOnce(text,
+      'public addLinkedElement( element: PhetioObject, providedOptions?: LinkedElementOptions ): void {',
+      'public addLinkedElement( element: PhetioObject, providedOptions?: LinkedElementOptions ): void {\n window.phetResearchMonitor.linkInteractionProperties( this, element );'));
+    await change('sun/js/SliderTrack.ts', text => {
+      text = replaceOnce(text, 'super();', "super();\n window.phetResearchMonitor.registerInteraction( this, { version: 1, kind: 'value', property: valueProperty } );");
+      text = replaceOnce(text, 'options.startDrag( event );', "window.phetResearchMonitor.interaction( this, 'start', " + input('event') + ' );\n options.startDrag( event );');
+      return replaceOnce(text, 'options.endDrag( event );', "options.endDrag( event );\n window.phetResearchMonitor.interaction( this, event ? 'complete' : 'cancel', " + input('event') + ' );');
+    });
+    await change('sun/js/Slider.ts', text => {
+      text = replaceOnce(text, 'super( superOptions );', "super( superOptions );\n window.phetResearchMonitor.registerInteraction( this, { version: 1, kind: 'value', property: valueProperty } );");
+      text = replaceOnce(text, 'options.startDrag( event );', "window.phetResearchMonitor.interaction( this, 'start', " + input('event') + ' );\n options.startDrag( event );');
+      return replaceOnce(text, 'this.proposedValue = null;\n      }\n    } );', "this.proposedValue = null;\n window.phetResearchMonitor.interaction( this, this.enabledProperty.get() && event ? 'complete' : 'cancel', " + input('event') + ' );\n      }\n    } );');
+    });
+    await change('sun/js/accessibility/AccessibleValueHandler.ts', text => {
+      text = replaceOnce(text, 'const valueProperty = providedOptions.valueProperty;', "const valueProperty = providedOptions.valueProperty;\n window.phetResearchMonitor.registerInteraction( this, { version: 1, kind: 'value', property: valueProperty } );");
+      text = replaceOnce(text, 'this._startInput( event );', "window.phetResearchMonitor.interaction( this, 'start', { trusted: !!(event && event.domEvent && event.domEvent.isTrusted), modality: 'keyboard' } );\n this._startInput( event );");
+      return replaceOnce(text, 'this._endInput( event );', "this._endInput( event );\n window.phetResearchMonitor.interaction( this, event ? 'complete' : 'cancel', { trusted: !!(event && event.domEvent && event.domEvent.isTrusted), modality: 'keyboard' } );");
+    });
+    await change('scenery-phet/js/buttons/ResetAllButton.ts', text => {
+      const anchor = 'this.pushButtonModel.isFiringProperty.lazyLink( ( isFiring: boolean ) => {';
+      return replaceOnce(text, anchor, "window.phetResearchMonitor.registerInteraction( this, { version: 1, kind: 'reset' } );\n " + anchor + "\n window.phetResearchMonitor.interaction( this, isFiring ? 'start' : 'complete' );");
+    });
+  }
   if (oldFramework) {
     await change('axon/js/Emitter.js', text => {
       text = replaceOnce(text, 'this.listeners = [];', "window.phetResearchMonitor.register( this, { version: 1, kind: 'emitter' } );\n this.listeners = [];");

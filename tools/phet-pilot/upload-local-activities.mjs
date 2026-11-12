@@ -46,9 +46,21 @@ try {
   { email: secrets.MOFACTS_AGENT_ADMIN_EMAIL, password: secrets.MOFACTS_AGENT_ADMIN_PASSWORD });
   await page.goto('http://localhost:3200/contentUpload');
   await page.locator('#upload-file').waitFor({ state: 'attached', timeout: 60000 });
-  for (const title of titles) assert.equal(await page.locator('tr').filter({ hasText: title }).count(), 0, 'Run label already exists; choose a fresh label');
-  await page.locator('#emailInsteadOfAlert').uncheck();
-  await page.locator('#upload-file').setInputFiles(filename);
+  async function loadAllFixtureRows() {
+    while (await page.locator('#load-more-tdfs').count()) {
+      const count = await page.locator('tr').count();
+      await page.locator('#load-more-tdfs').click();
+      await page.waitForFunction(previous => document.querySelectorAll('tr').length > previous || !document.getElementById('load-more-tdfs'), count);
+    }
+  }
+  await loadAllFixtureRows();
+  if (!process.argv.includes('--collect-existing')) {
+    for (const title of titles) assert.equal(await page.locator('tr').filter({ hasText: title }).count(), 0, 'Run label already exists; choose a fresh label');
+    await page.locator('#emailInsteadOfAlert').uncheck();
+    await page.locator('#upload-file').setInputFiles(filename);
+    await page.locator('tr').filter({ hasText: titles[0] }).locator('#tdf-edit-btn').waitFor({ timeout: 60000 });
+    await loadAllFixtureRows();
+  }
   const ids = [];
   for (const title of titles) {
     const row = page.locator('tr').filter({ hasText: title });
@@ -58,5 +70,5 @@ try {
   }
   const idFile = path.join(output, `local-activity-ids-${run}.json`);
   await writeFile(idFile, JSON.stringify(ids, null, 2) + '\n');
-  console.log(`Uploaded three fresh localhost fixtures. Activity IDs: ${idFile}`);
+  console.log(`${process.argv.includes('--collect-existing') ? 'Collected existing' : 'Uploaded three fresh'} localhost fixtures. Activity IDs: ${idFile}`);
 } finally { await browser.close(); }

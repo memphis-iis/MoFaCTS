@@ -1,13 +1,16 @@
 import { Meteor } from 'meteor/meteor';
 import { approvedSimulationBuild } from '../../../../../common/simulationBuildCatalog';
 import { acceptsBridgeMessage, isRecord, ObservedState, validateBatch, type ObservationBatch, type BridgeMessage } from '../../../../../../packages/phet-monitor/protocol';
-import { projectSimulationBindings, validateSimulationConfig } from '../../../../../../packages/phet-monitor/lesson';
+import { validateSimulationConfig } from '../../../../../../packages/phet-monitor/lesson';
 
-export type SimulationEvidence = { attemptId: string; buildId: string; firstSequence: number; lastSequence: number; checkpointSequence: number };
+import { SimulationActivityProjector, type SimulationEvidence } from '../../../../../../packages/phet-monitor/activity';
+import type { SimulationActivityHistory } from '../../../../../../learning-components/runtime/simulationActivityHistory';
+import type { SimulationHistoryScope } from '../../../../../../learning-components/runtime/simulationLifecycleHistory';
+export type { SimulationEvidence } from '../../../../../../packages/phet-monitor/activity';
 export const SIMULATION_HOST_CONTEXT = 'sparc-simulation-host';
 type PendingResearch = { batch: ObservationBatch; release: () => void };
 const newTraceState = () => ({ failed: false, running: false, pending: [] as PendingResearch[] });
-type Scope = { tdfId: string; pageKey: string; nodeId: string; buildId: string };
+type Scope = SimulationHistoryScope;
 export type SimulationHostStatus = 'ready' | 'starting' | 'running' | 'stopped' | 'error';
 export class SimulationResearchHost {
   private readonly build;
@@ -17,7 +20,8 @@ export class SimulationResearchHost {
   private disposed = false;
   private failed = false;
   private ready = false;
-  private lastFacts = '';
+  private completed = false;
+  private projector!: SimulationActivityProjector;
   private queuedBytes = 0;
   private readonly pendingBatches = new Map<string, string>();
   private work: Promise<void> = Promise.resolve();
@@ -29,7 +33,7 @@ export class SimulationResearchHost {
     iframe: HTMLIFrameElement; config: unknown; scope: Scope;
     status(value: SimulationHostStatus): void;
     monitoringError?(reason: string): void;
-    observation(facts: Record<string, number | string | boolean | null>, evidence: SimulationEvidence): Promise<void>;
+    observation(facts: Record<string, number | string | boolean | null>, evidence: SimulationEvidence, activity: SimulationActivityHistory): Promise<void>;
   }) {
     this.config = validateSimulationConfig(options.config);
     this.build = approvedSimulationBuild(Meteor.settings.public?.simulationBuilds, this.config.buildId);
@@ -38,6 +42,16 @@ export class SimulationResearchHost {
     options.iframe.addEventListener('load', this.loaded);
   }
   async initialize(): Promise<void> {
+    const response = await fetch(this.build.catalog.url, { credentials: 'omit', redirect: 'error' });
+    if (!response.ok) throw new Error('Simulation build catalog unavailable');
+    const bytes = await response.arrayBuffer();
+    const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), value => value.toString(16).padStart(2, '0')).join('');
+    if (digest !== this.build.catalog.sha256) throw new Error('Simulation build catalog hash mismatch');
+    const catalog = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
+    if (catalog.version !== 1 || catalog.buildId !== this.build.id || catalog.artifactSha256 !== this.build.sha256 || catalog.protocolVersion !== 3 || !Array.isArray(catalog.addresses)) throw new Error('Simulation build catalog identity mismatch');
+    for (const binding of this.config.bindings) {
+      if (!catalog.addresses.some(entry => isRecord(entry) && entry.coverage === 'observed' && (binding.address.path ? entry.path === binding.address.path : entry.tandem === binding.address.tandem))) throw new Error(`Binding absent from approved build catalog: ${binding.name}`);
+    }
     await Meteor.callAsync('interruptSimulationResearchActivity', this.options.scope);
     if (!this.disposed) this.options.status('ready');
   }
@@ -47,7 +61,7 @@ export class SimulationResearchHost {
     const result = await Meteor.callAsync('startSimulationResearchAttempt', this.options.scope) as { attemptId: string };
     if (this.disposed) { await Meteor.callAsync('endSimulationResearchAttempt', result.attemptId, 'left-node'); return; }
     this.sessionId = result.attemptId;
-    this.failed = false; this.ready = false; this.state = new ObservedState(); this.lastFacts = '';
+    this.failed = false; this.ready = false; this.completed = false; this.state = new ObservedState(); this.projector = new SimulationActivityProjector(this.config.bindings, this.build.id, this.sessionId);
     // An explicit new attempt owns a fresh pipeline. A timed-out request from
     // the previous attempt may still settle, but cannot block or stop this one.
     this.work = Promise.resolve(); this.traceWork = Promise.resolve(); this.traceState = newTraceState(); this.lastReceived = undefined; this.queuedBytes = 0; this.pendingBatches.clear();
@@ -58,7 +72,7 @@ export class SimulationResearchHost {
     this.options.iframe.src = this.build.url;
   }
   private post(kind: 'initialize' | 'ack' | 'stop', data: unknown): void {
-    this.options.iframe.contentWindow?.postMessage({ protocol: 'phet-research', version: 2,
+    this.options.iframe.contentWindow?.postMessage({ protocol: 'phet-research', version: 3,
       buildId: this.build.id, sessionId: this.sessionId, kind, data }, new URL(this.build.url).origin);
   }
   private loaded = (): void => {
@@ -132,24 +146,7 @@ export class SimulationResearchHost {
     // Retain raw evidence even when projection rejects a required binding or
     // the stream contains an explicit terminal monitoring error.
     persist(batch);
-    const observations: { facts: Record<string, number | string | boolean | null>; evidence: SimulationEvidence }[] = [];
-    let start = 0;
-    for (let index = 0; index < batch.records.length; index++) {
-      const record = batch.records[index]!;
-      if (record.type !== 'checkpoint' && index !== batch.records.length - 1) continue;
-      const records = batch.records.slice(start, index + 1);
-      this.state.apply({ firstSequence: records[0]!.sequence, lastSequence: record.sequence, records });
-      start = index + 1;
-      if (record.type === 'checkpoint') {
-        const facts = projectSimulationBindings(this.state, this.config.bindings);
-        const signature = JSON.stringify(facts);
-        if (signature !== this.lastFacts) {
-          this.lastFacts = signature;
-          observations.push({ facts, evidence: { attemptId: this.sessionId, buildId: this.build.id,
-            firstSequence: batch.firstSequence, lastSequence: batch.lastSequence, checkpointSequence: record.sequence } });
-        }
-      }
-    }
+    const observations = this.projector.apply(this.state, batch);
     if (!this.state.complete) throw new Error('Incomplete observation evidence');
     const key = `${this.sessionId}:${batch.firstSequence}`;
     this.lastReceived = { key, serialized: this.pendingBatches.get(key)!, sequence: batch.lastSequence };
@@ -157,11 +154,11 @@ export class SimulationResearchHost {
     this.post('ack', { sequence: batch.lastSequence });
     for (const observation of observations) {
       if (this.disposed || this.failed || sessionId !== this.sessionId) return;
-      await this.options.observation(observation.facts, observation.evidence);
+      await this.options.observation(observation.facts, observation.evidence, observation.activity);
     }
   }
   private persist(batch: ObservationBatch, release: () => void): void {
-    const session = this.sessionId, trace = this.traceState;
+    const session = this.sessionId, trace = this.traceState, projector = this.projector;
     trace.pending.push({ batch, release });
     if (trace.running) return;
     trace.running = true;
@@ -183,7 +180,10 @@ export class SimulationResearchHost {
         let deadline: ReturnType<typeof setTimeout> | undefined;
         try {
           const result = await Promise.race([
-            Meteor.callAsync('ingestSimulationResearchBatch', session, merged) as Promise<{ sequence: number; complete: boolean }>,
+            // DDP represents an explicit undefined array argument as null. Omit
+            // metadata until the first settled checkpoint actually supplies it.
+            Meteor.callAsync('ingestSimulationResearchBatch', session, merged,
+              ...(projector.initialValues === undefined ? [] : [projector.initialValues])) as Promise<{ sequence: number; complete: boolean }>,
             new Promise<never>((_resolve, reject) => { deadline = setTimeout(() => reject(new Error('Research storage deadline exceeded')), 10000); }),
           ]);
           if (!result.complete || result.sequence !== merged.lastSequence) throw new Error('Incomplete durable research evidence');
@@ -203,6 +203,7 @@ export class SimulationResearchHost {
     });
   }
 
+  complete(): void { this.completed = true; }
   stop(reason: string): void {
     if (this.failed) return;
     this.failed = true;
@@ -210,11 +211,11 @@ export class SimulationResearchHost {
     if (this.timer) clearTimeout(this.timer);
     this.post('stop', { reason });
     this.options.iframe.src = 'about:blank';
-    const session = this.sessionId, trace = this.traceState;
+    const session = this.sessionId, trace = this.traceState, completed = this.completed;
     // Flush accepted records on departure before closing their research attempt.
     // Each write has a deadline; failure marks the attempt incomplete.
     if (session) void this.traceWork.then(() => Meteor.callAsync('endSimulationResearchAttempt', session,
-      trace.failed ? 'incomplete-durable-evidence' : reason)).catch(() => {
+      trace.failed ? 'incomplete-durable-evidence' : reason === 'left-node' && completed ? 'completed' : reason)).catch(() => {
       // Durable interruption is also enforced before the next explicit start.
     });
     if (!this.disposed) this.options.status('stopped');
