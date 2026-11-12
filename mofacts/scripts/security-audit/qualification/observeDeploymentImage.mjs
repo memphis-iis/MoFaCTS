@@ -26,7 +26,9 @@ export async function observeDeploymentImage({ sshHost, sshKey, knownHosts }, de
   }
   const args = ['-T', '-i', sshKey, '-o', 'BatchMode=yes', '-o', 'IdentitiesOnly=yes', '-o', 'StrictHostKeyChecking=yes',
     '-o', `UserKnownHostsFile=${knownHosts}`, '-o', 'ConnectTimeout=20', '-o', 'ConnectionAttempts=1', sshHost];
-  const environment = Object.fromEntries(['PATH', 'SystemRoot', 'USERPROFILE', 'HOME', 'TEMP', 'TMP'].filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]]));
+  // Windows OpenSSH exits silently even for local `ssh -G` without ProgramData.
+  // Keep its OS configuration location, without inheriting application secrets.
+  const environment = Object.fromEntries(['PATH', 'SystemRoot', 'ProgramData', 'USERPROFILE', 'HOME', 'TEMP', 'TMP'].filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]]));
   const command = dependencies.command ?? evidenceCommand;
   const before = container(await command('ssh', [...args, containerCommand], 16384, environment));
   const imageCommand = `sudo -n docker image inspect ${before.engineImageReference} --format '{"nativeId":{{json .Id}},"platform":"{{.Os}}/{{.Architecture}}","descriptor":{{json (index . "Descriptor")}},"baseCommit":{{json (index .Config.Labels "org.opencontainers.image.revision")}}}'`;

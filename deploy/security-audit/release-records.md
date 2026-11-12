@@ -36,6 +36,13 @@ Its private evidence directory receives only public identity observations and
 the receipt. Missing source, graph/registry disagreement, container replacement,
 missing acceptance or output collisions stop recording.
 
+Windows OpenSSH requires the standard `ProgramData` OS path in the helper's
+restricted child environment. The native regression verifies actual local SSH
+configuration expansion without a network connection. The first approved
+production observation reached its metadata reads after this correction, but
+archive validation remained incomplete and no fingerprint/record was accepted.
+See the [read-only observation and proposed follow-up](production-image-observation.md).
+
 The operator approved making this the standard production recording path on
 2026-11-12. The canonical `mofacts_config/deploy production.txt` now checks the
 pinned runtime and existing SSH trust file before its first deployment/config

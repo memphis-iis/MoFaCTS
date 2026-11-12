@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import { spawnSync } from 'node:child_process';
 import { dockerImageFixture } from './helpers/dockerImageArchiveFixture.mjs';
 import { readDockerArchiveIdentity } from '../qualification/imageArchiveIdentity.mjs';
 import { observeDeploymentImage } from '../qualification/observeDeploymentImage.mjs';
@@ -52,4 +53,24 @@ test('option injection, relative credentials and substituted files fail before S
     await assert.rejects(observeDeploymentImage({ ...value.options, ...changed }, value.dependencies));
   }
   assert.equal(value.calls.length, 0);
+});
+
+test('Windows SSH can expand local configuration in the observer restricted environment without network access', { skip: process.platform !== 'win32' }, async t => {
+  const value = await fixture(t), original = value.dependencies.command;
+  let checked = false;
+  value.dependencies.command = async (binary, args, maximum, environment) => {
+    if (!checked) {
+      checked = true;
+      assert.equal(environment.ProgramData, process.env.ProgramData);
+      const result = spawnSync('ssh', ['-G', '-F', 'none', '-o', 'CanonicalizeHostname=no', 'localhost'], {
+        env: environment, encoding: 'utf8', timeout: 10000, maxBuffer: 65536, windowsHide: true,
+      });
+      assert.equal(result.status, 0, 'Windows OpenSSH must start with the explicit OS environment');
+      assert.match(result.stdout, /hostname localhost/);
+      assert.equal(Object.hasOwn(environment, 'AUDIT_REPORT_INGEST_SECRET'), false);
+    }
+    return original(binary, args, maximum, environment);
+  };
+  await observeDeploymentImage(value.options, value.dependencies);
+  assert.equal(checked, true);
 });
