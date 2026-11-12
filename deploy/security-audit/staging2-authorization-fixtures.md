@@ -94,3 +94,21 @@ Acceptance requires all 29 selected cases, their required positive baselines,
 successful browser cleanup, unchanged non-fixture records and independent
 fixture/access cleanup. Record honest failed attempts. Source/Meteor model tests
 or a transport-valid report alone do not close live selected-case acceptance.
+
+## Accepted execution, 2026-11-11
+
+The corrected scanner at c79735ff passed all 29 selected cases against the
+Meteor-accepted staging2 application 1c72734b. Real native creation supplied four
+distinct actors and exactly two teacher grants; no account upsert/reset or mail
+request was used. Seven synthetic rows and only the new actors' verified-email
+flags supplied the known positive baselines. The actual committed application
+formatter supplied the expected own-history bytes independently of the download.
+
+The first attempt passed 28 cases and sampled the anonymous profile redirect
+before DDP reconnection, leaving one ERROR. Inspection confirmed the login view,
+anonymous identity and absent profile; the scanner now waits for reconnection.
+That failed observation was retained. Both attempts cleaned all four accounts
+and seven rows. Independent database checks verified both namespaces' accounts,
+role assignments and data absent, before and after live application rollback.
+Private receipts are at phase1-20261105/live-v2-1c72734b; public notes contain no
+fixture identity, credential, capability or raw history value.

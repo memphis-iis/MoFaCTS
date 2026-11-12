@@ -50,7 +50,9 @@ test('staging2 workflow has a manual main-only isolated identity and no release 
   const selection = text.match(/ref: ([a-f0-9]{40})/)[1];
   assert(text.includes('= ' + selection));
   const retained = execFileSync('git', ['show', `${selection}:mofacts/scripts/security-audit/staging2-access-check.mjs`], { encoding: 'utf8' });
-  assert.match(retained, /parseReleaseReceipt\(value.releaseReceipt.receipt\)/);
+  assert.match(retained, /parseHostAuditAcquisitionV2/);
+  assert.match(retained, /evaluateHostObservations/);
+  assert.doesNotMatch(retained, /parseReleaseReceipt\(value.releaseReceipt.receipt\)/);
 });
 
 test('SSH failure categories expose only fixed labels, never diagnostic contents', () => {

@@ -1,0 +1,151 @@
+name: Staging2 V2 security audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      audit_type:
+        description: Audit scope (full retains unacquired Phase 2 scenarios as ERROR)
+        required: true
+        default: exposure
+        type: choice
+        options: [exposure, full]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging2-v2-security-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: staging2-security-audit
+    timeout-minutes: 180
+    env:
+      AUDIT_TARGET: https://staging2.optimallearning.org
+      AUDIT_TYPE: ${{ inputs.audit_type }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.1'
+      - name: Verify source and prepare private workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          audit_dir="$RUNNER_TEMP/mofacts-staging2-v2"
+          install -d -m 700 "$audit_dir" "$audit_dir/producers" "$RUNNER_TEMP/mofacts-v2-retained"
+          printf 'AUDIT_DIR=%s\nAUDIT_STARTED_AT=%s\nAUDIT_REPORT_ID=%s\n' "$audit_dir" \
+            "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" "staging2-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${AUDIT_TYPE}" >> "$GITHUB_ENV"
+      - name: Install existing pinned application tools
+        working-directory: mofacts
+        run: npm ci
+      - name: Prepare the existing perimeter scanner dependencies
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends nmap jq openssh-client
+      - name: Prepare the pinned browser for a selected full run
+        if: env.AUDIT_TYPE == 'full'
+        continue-on-error: true
+        working-directory: mofacts
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Join with the existing restricted staging2 identity
+        continue-on-error: true
+        uses: tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8 # v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:staging2-audit
+          version: 1.102.3
+          hostname: mofacts-staging2-v2-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Acquire only the existing restricted host command
+        continue-on-error: true
+        shell: bash
+        env:
+          AUDIT_SSH_HOST: ${{ secrets.AUDIT_SSH_HOST }}
+          AUDIT_SSH_USER: ${{ secrets.AUDIT_SSH_USER }}
+          AUDIT_SSH_PRIVATE_KEY: ${{ secrets.AUDIT_SSH_PRIVATE_KEY }}
+          AUDIT_SSH_KNOWN_HOSTS: ${{ secrets.AUDIT_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test "$AUDIT_SSH_USER" = mofacts-audit
+          [[ "$AUDIT_SSH_HOST" =~ ^[0-9a-fA-F:.]+$ ]]
+          umask 077
+          printf '%s\n' "$AUDIT_SSH_PRIVATE_KEY" > "$AUDIT_DIR/id_ed25519"
+          printf '%s\n' "$AUDIT_SSH_KNOWN_HOSTS" > "$AUDIT_DIR/known_hosts"
+          unset AUDIT_SSH_PRIVATE_KEY AUDIT_SSH_KNOWN_HOSTS
+          timeout --signal TERM --kill-after 10s 360s ssh -F /dev/null -T -i "$AUDIT_DIR/id_ed25519" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$AUDIT_DIR/known_hosts" -o ConnectTimeout=20 -o ConnectionAttempts=1 \
+            "${AUDIT_SSH_USER}@${AUDIT_SSH_HOST}" > "$AUDIT_DIR/host-acquisition.json" 2>/dev/null
+          node mofacts/scripts/security-audit/internal/hostAcquisitionV2.mjs "$AUDIT_DIR/host-acquisition.json" \
+            "$AUDIT_DIR/host-observations.json" "$AUDIT_DIR/receipt.json"
+      - name: Acquire external V2 observations
+        continue-on-error: true
+        run: node mofacts/scripts/security-audit/emit-external-producer-v2.mjs "$AUDIT_TYPE" "$AUDIT_DIR/producers" "$AUDIT_DIR/udp.json"
+      - name: Emit host and independent UDP composite controls
+        continue-on-error: true
+        run: node mofacts/scripts/security-audit/emit-host-producers-v2.mjs "$AUDIT_TYPE" "$AUDIT_DIR/host-observations.json" "$AUDIT_DIR/udp.json" "$AUDIT_DIR/producers"
+      - name: Prepare independently observed image context
+        run: node mofacts/scripts/security-audit/prepare-metadata-v2.mjs image "$AUDIT_DIR/receipt.json" "$AUDIT_DIR/image-context.json"
+      - name: Acquire selected authorization with prepared value-only bindings
+        if: env.AUDIT_TYPE == 'full'
+        continue-on-error: true
+        shell: bash
+        env:
+          AUDIT_AUTH_BINDINGS_JSON: ${{ secrets.AUDIT_AUTH_BINDINGS_JSON }}
+        run: |
+          set -euo pipefail
+          test -n "$AUDIT_AUTH_BINDINGS_JSON"
+          umask 077
+          printf '%s' "$AUDIT_AUTH_BINDINGS_JSON" > "$AUDIT_DIR/auth-bindings.json"
+          unset AUDIT_AUTH_BINDINGS_JSON
+          node mofacts/scripts/security-audit/run-selected-authorization-v2.mjs "$AUDIT_DIR/auth-bindings.json" "$AUDIT_DIR/selected.json"
+      - name: Emit catalog-complete authentication artifact
+        if: env.AUDIT_TYPE == 'full'
+        continue-on-error: true
+        run: node mofacts/scripts/security-audit/emit-authentication-producer-v2.mjs "$AUDIT_DIR/selected.json" "$AUDIT_DIR/producers"
+      - name: Acquire repository V2 controls with a narrow child environment
+        if: env.AUDIT_TYPE == 'full'
+        continue-on-error: true
+        run: node mofacts/scripts/security-audit/emit-repository-producer-v2.mjs "$AUDIT_DIR/producers" "$AUDIT_DIR/image-context.json" "$AUDIT_DIR/client-canaries.json"
+      - name: Assemble the exact V2 report after acquisition
+        run: |
+          set -euo pipefail
+          node mofacts/scripts/security-audit/prepare-metadata-v2.mjs report "$AUDIT_DIR/receipt.json" "$AUDIT_DIR/metadata.json"
+          node mofacts/scripts/security-audit/assemble-report-v2.mjs "$AUDIT_DIR/metadata.json" "$AUDIT_DIR/producers" "$AUDIT_DIR/report.json"
+      - name: Encrypt report for private recovery retention
+        env:
+          AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY: ${{ vars.AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY }}
+        run: node mofacts/scripts/security-audit/encrypt-report-v2.mjs "$AUDIT_DIR/report.json" "$RUNNER_TEMP/mofacts-v2-retained/report.encrypted.json"
+      - name: Store signed V2 report in staging2
+        env:
+          AUDIT_REPORT_INGEST_SECRET: ${{ secrets.AUDIT_REPORT_INGEST_SECRET }}
+        run: node mofacts/scripts/security-audit/upload-report-v2.mjs "$AUDIT_DIR/report.json"
+      - name: Retain only encrypted report bytes
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: staging2-v2-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mofacts-v2-retained/report.encrypted.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Require complete execution without disguising missing evidence
+        run: node mofacts/scripts/security-audit/assert-execution-complete-v2.mjs "$AUDIT_DIR/report.json"
+      - name: Remove private plaintext and SSH material
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          private_dir="$RUNNER_TEMP/mofacts-staging2-v2"
+          test -n "$RUNNER_TEMP"
+          test "$private_dir" != /
+          rm -rf -- "$private_dir"

@@ -1,5 +1,5 @@
-// Explicit inert-V2 source gate: retain existing coverage and include the new
-// producer/acquisition contracts. Active V1 does not select this entry point.
+// V2 source gate. Production's historical scanner selection remains isolated;
+// staging2 exercises these shared producer and acquisition contracts.
 import './source-security.test.mjs';
 import './tests/externalV2.test.mjs';
 import './tests/repositoryV2.test.mjs';
@@ -13,3 +13,12 @@ import './tests/authorizationOutcomes.test.mjs';
 import './tests/legacyProbeInventory.test.mjs';
 import './tests/reportFilesV2.test.mjs';
 import './tests/reportAdminPresentationV2.test.mjs';
+import './tests/verificationCatalog.test.mjs';
+import './tests/authorizationBrowserV2.test.mjs';
+import './tests/selectedCasesV2.test.mjs';
+import './tests/stagingFixturesV2.test.mjs';
+import './tests/fixtureBrowserV2.test.mjs';
+import './tests/fixtureStorageV2.test.mjs';
+import './tests/authenticationProducerV2.test.mjs';
+import './tests/metadataV2.test.mjs';
+import './tests/staging2ReportWorkflowV2.test.mjs';

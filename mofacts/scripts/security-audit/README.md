@@ -1,6 +1,29 @@
 # Security audit code and tests
 
-The active scanner and receiver still use `SecurityAuditReportV1`. Production setup is documented in [the operator guide](../../../docs/deployment/security-audit.md). Target architecture and progress are in [the plan](../../../docs-developer/security-audit-durable-redesign-plan.md) and [status record](../../../docs-developer/security-audit-durable-redesign-status.md).
+Staging2 runs the qualified V2 application/receipt/host pair; production retains
+its immutable V1 scanner/receiver selection. See the [staging2 baseline](../../../deploy/security-audit/staging2-v2-operations.md),
+[production operator guide](../../../docs/deployment/security-audit.md),
+[plan](../../../docs-developer/security-audit-durable-redesign-plan.md) and
+[current status](../../../docs-developer/security-audit-durable-redesign-status.md).
+
+The selected authorization adapter passes all 29 live cases. Its authentication
+producer validates the complete finite case vector and emits its catalog-owned
+22-control subset: only the selected authorization control can pass from that
+proof; the other 21 protocol scenarios remain explicit Phase 2 ERROR results.
+`run-selected-authorization-v2.mjs` accepts canonical private value-only bindings
+and writes canonical finite observations after browser cleanup.
+`emit-authentication-producer-v2.mjs` consumes only those finite observations.
+The repository and metadata entry points share the existing V2 owners. Metadata
+completion is stamped after acquisition; no environment revision or tag replaces
+a missing/mismatched protected receipt.
+
+The complete manual staging2 workflow is prepared as an inactive
+[review template](../../../deploy/security-audit/staging2-v2-workflow.yml.review).
+The existing GitHub identity has SSH-only authority; adding an ingestion signing
+binding requires the separate [report-writer access decision](../../../deploy/security-audit/staging2-report-writer-review.md).
+No new credential grant, key pair, workflow dispatch or production action has
+been performed. Missing tools, canaries and protocol acquisitions remain ERROR,
+and the final completion assertion runs after signed storage/encrypted retention.
 
 ## Inert V2 file pipeline
 

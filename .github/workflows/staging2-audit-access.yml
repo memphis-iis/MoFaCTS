@@ -22,16 +22,16 @@ jobs:
     environment: staging2-security-audit
     timeout-minutes: 20
     steps:
-      # Keep the deployed V1 host/receipt paired with its accepted checker while
-      # the V2 replacement is prepared. Update only with the staging2 cutover.
-      - name: Check out the reviewed staging2 V1 checker
+      # Qualified staging2 now runs the paired V2 host/receipt. Production keeps
+      # its independently pinned V1 selection in its separate workflow.
+      - name: Check out the reviewed staging2 V2 checker
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: b69d096dadaf391282b10817e26a72c4e9ba88c7
+          ref: c79735ff91e2dcd9109d9dc389c03c6646104152
 
       - name: Verify the selected staging2 checker source
         shell: bash
-        run: test "$(git rev-parse HEAD)" = b69d096dadaf391282b10817e26a72c4e9ba88c7
+        run: test "$(git rev-parse HEAD)" = c79735ff91e2dcd9109d9dc389c03c6646104152
 
       - name: Use the repository-pinned Node runtime
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6

@@ -16,6 +16,16 @@ own-user baselines and six registered real-Mongo publication cases are verified;
 live staging2 selected-case qualification still requires protected synthetic
 bindings. See [authorization verification](authorization-verification.md).
 
+Staging2 subsequently qualified the 1c72734b V2 image, matching protected receipt
+and raw-measurement host wrapper on 2026-11-11. All 29 selected authorization
+cases pass; both disposable fixture attempts are independently cleaned. A real
+23-control exposure report was ingested and read/downloaded through the visible
+admin UI. It contains 22 PASS and one honest UDP evidence-incomplete ERROR.
+Live candidate/previous/candidate rollback preserved the exact accepted record
+and JSON/HTML hashes; the previous V1 app could not read the V2 record.
+Production and its scheduled scanner remain unchanged. See the
+[staging2 operating procedure](staging2-v2-operations.md).
+
 ## Production selection
 
 Production has not been upgraded to this receiver. Its scheduled workflow
