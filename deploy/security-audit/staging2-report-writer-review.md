@@ -1,13 +1,16 @@
 # Staging2 report-writer access review
 
-Status: prepared for the Section 0 access decision; **not granted or executed**.
+Status: authorized under the Section 0 bounded access delegation of 2026-11-12;
+**not yet granted or executed**. No further approval is needed for this scope.
 The existing `staging2-security-audit` GitHub environment has only the restricted
 SSH/Tailscale bindings and its denied-peer variable. Metadata inspection found
 neither a report-ingestion signing secret nor an encryption-public-key variable.
-Do not dispatch the [reviewed workflow](staging2-v2-workflow.yml.review) or add
-these bindings before approval. Production and its V1 workflow remain excluded.
+Apply the delegation's technical, custody and verification gates before adding
+the bindings or dispatching the [reviewed workflow](staging2-v2-workflow.yml.review).
+Production and its V1 workflow remain excluded. The initial read-only GitHub
+boundary no longer blocks this explicitly delegated report-writing function.
 
-## Proposed permission and custody
+## Authorized permission and custody
 
 Allow this existing main-only GitHub environment to submit signed reports to the
 existing staging2 HTTPS `/internal/security-audits/v2` endpoint. Reuse staging2's
@@ -33,7 +36,7 @@ verify an in-memory synthetic encrypt/decrypt round trip through the existing
 RSA-OAEP-SHA256/AES-256-GCM report implementation. Record only public fingerprints
 and finite results. No AWS resource, charge or production access is proposed.
 
-## Execution after approval
+## Execution under the bounded delegation
 
 1. Revalidate repository/environment/main restriction, current staging2 release
    digest and Desktop key name/length without logging any value. Read only the

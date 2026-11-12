@@ -61,7 +61,7 @@ These decisions record Phil's explicit answers to the nine-question design revie
 | Staging2 Sidecar absence - approved 2026-11-03 | Phil selected keeping the optional database-tooling Sidecar absent and explicitly auditing that condition. Require a protected `MOFACTS_SIDECAR_EXPECTED_STATE=absent`; do not infer absence from missing credentials or skip checks. Retain a reserved Sidecar username for an authenticated absence query, but no password, role or unused service account. Verify no known helper container, reserved endpoint declaration/publication or listener, including stopped/unpublished and loopback cases. Unexpected presence is a finding; unavailable evidence is `ERROR`. The separately selected `configured` policy retains genuine scoped-role/authentication checks and the existing loopback contract without claiming service uptime. No helper service/account is authorized merely to make the audit pass. |
 | 6. Scanner isolation - approved conditional design | Prefer inert V2 development with the active V1 path unchanged. If that is insufficient, use a reviewed immutable scanner checkout with tested selection, update and rollback procedures without reopening the design choice. Workflow publication, dispatch and disable/enable actions retain their operational authorization requirements. |
 | Staging2 disposable authorization fixtures - approved 2026-11-11 | Phil explicitly approved four disposable staging2 accounts (two learners/two teachers), only the two existing teacher-role assignments, reuse of the existing administrator and exact owned cleanup. This is ordinary synthetic qualification within the staging2 mandate; do not ask again for the same reviewed fixture scope. No new admin grant, existing-account reset, production access or provider request is authorized. Follow deploy/security-audit/staging2-authorization-fixtures.md. |
-| Staging2 V2 report writer - prepared, approval pending | The existing GitHub staging2 identity was explicitly limited to restricted host reads and excluded report ingestion. A reviewed manual V2 workflow now needs one additional report-signing binding and a separate operator-owned staging2 encryption key/public variable. This grants report-write authority and remains excluded from standing authorization until Phil approves. No grant/key/dispatch has occurred. See deploy/security-audit/staging2-report-writer-review.md. |
+| Staging2 V2 report writer - delegated 2026-11-12 | The prepared staging2-only report-signing binding, separate operator-owned encryption key/public variable and reviewed manual V2 workflow fall within the bounded access delegation below. Proceed after its technical, custody and verification gates; no separate access approval is required. The initial GitHub host-read-only boundary is superseded only for this scoped audit function. Authorization is not an execution claim. See deploy/security-audit/staging2-report-writer-review.md. |
 | 8. Policy review - Phil | Prepare one consolidated list of genuinely ambiguous access classifications and proposed permission changes for Phil. Clear classifications that preserve established behavior may proceed without asking; retain traceable policy review and characterization evidence. Do not infer new permissions, waive required policy review, or automatically classify ambiguous surfaces. |
 | 9. Engineering discretion - approved within boundaries | Resolve routine implementation choices without asking when they follow the approved design and do not change scope, security boundaries, cost, ownership, retention or application behavior. Report failed acceptance checks; never waive them. For a new unavoidable design conflict, report the evidence and recommendation instead of silently deciding. |
 | Staging2 registry publication - approved 2026-11-03 | Phil approved the separate public Docker Hub repository `ppavlikmemphis/mofacts-staging2` using the existing Docker sign-in, with candidate verification before publication and runtime-only credentials/settings. This excludes changing production repository tags/configuration and does not waive exact image/config identity or release qualification. The published `630eabdb` candidate and the containerd identity incompatibility are recorded in status. |
@@ -87,14 +87,76 @@ deployment, synthetic checks and application rollback may proceed when their
 technical prerequisites pass. Preserve the current branch and unrelated work.
 
 Continue until the written acceptance conditions are met or a real decision is
-required. Ask for a consequential change to the approved design, new security-
-sensitive access, new spending, destructive data changes, production operations,
-exhaustion of the ten-run allowance, or a blocker remaining after reasonable
-diagnosis. Existing approved identities and permissions may be reused within
-their scope. The proposed new AWS operator/access remains such a decision.
+required. The 2026-11-12 bounded access delegation below permits necessary new
+security-sensitive access within its conditions without per-change approval.
+Ask for a consequential design change, access outside those conditions, new
+spending, destructive data changes, production operations, exhaustion of the
+ten-run allowance, or a blocker remaining after reasonable diagnosis. Existing
+approved identities and permissions may be reused within their scope. Additional
+AWS/IAM/recovery-store access and protected backup reads remain separately bounded;
+this delegation does not renew a consumed one-use authorization.
 User sign-in, MFA and hardware-key prompts remain user actions. No new package
 or system dependency is currently planned; existing dependency approval rules
 continue to apply if implementation discovers one is required.
+
+#### Bounded access delegation (approved 2026-11-12)
+
+Phil authorized the agent to create or adjust necessary security-sensitive access
+for this project's approved non-production work when **all** conditions below
+hold. This supersedes earlier blanket prohibitions on new access for this scope,
+including the initial GitHub host-read-only boundary. Do not turn an eligible
+change into another approval question. Apply and verify the conditions, record
+the permission delta, and continue under the standing execution mandate.
+
+1. **Necessary work:** the access directly serves a named requirement or acceptance
+   test in the existing written audit plan. Do not create access for speculative
+   convenience, unrelated work or an unapproved architecture/product change.
+2. **Explicit target:** restrict it to staging2, its synthetic fixtures, the existing
+   main-only `staging2-security-audit` GitHub environment, and the approved private
+   Desktop credential folder. Do not extend it to production, original staging,
+   unrelated services/accounts, AWS/IAM or recovery-store permissions, protected
+   backup reads, real learner data or production/provider credentials.
+3. **Minimum authority:** grant only the specific actor, action and resource needed.
+   Prefer existing scoped identities and established application interfaces.
+   No new broad administrator/root/cloud role, unrestricted shell/SSH/sudo access,
+   public management port, blanket network grant or cross-environment credential
+   reuse is delegated. Existing separately approved operator/admin access stays
+   within its original purpose; it does not authorize creating equivalent accounts.
+4. **Credential custody:** use purpose-specific credentials or a necessary scoped
+   deployment copy of an existing staging2 credential. Use approved secret stores
+   and private transfer channels; never log values, pass them in command arguments,
+   commit them or send a whole environment file. Keep operator private encryption
+   keys in the approved Desktop folder; only their public parts may go to GitHub.
+5. **Lifetime and revocation:** use temporary access with expiry where supported,
+   otherwise a bounded owner-controlled job and explicit cleanup/recovery. Never
+   claim automatic expiry that the system does not implement. Persistent access
+   is allowed only for a documented continuing staging2 audit function, with a
+   named owner, minimum resource scope, reason for persistence and a documented
+   revocation procedure verified as part of access qualification. Do not rotate/delete existing working access merely to create a new
+   identity or destroy decryption keys needed by retained encrypted evidence.
+6. **Preparation and verification:** prepare the concrete change, failure recovery
+   and revocation before granting access. Preserve the last usable configuration;
+   verify the actual permission delta and required allowed/denied behavior. Clean
+   up or revoke a failed grant and verify recovery. Do not weaken application
+   authorization or CSP to obtain a passing test, invent evidence or bypass
+   required verification.
+7. **Traceable execution:** record the sanitized identity, purpose, target/resource,
+   permissions, lifetime, owner, cleanup/revocation and actual verification result
+   in the current status/evidence record. Report the access change in progress
+   updates; do not stop merely to obtain approval already delegated here.
+8. **Unchanged exclusions:** no new spending/paid upgrade, destructive durable-data
+   operation, production action or new system/package dependency is authorized
+   by this delegation. Preserve the existing dependency-approval rules, explicit
+   user sign-in/MFA actions and bounded Meteor invocation ledger.
+
+The prepared staging2 report-writer scope qualifies under this delegation:
+copy only the existing staging2 ingestion signing value to its protected GitHub
+report-writer binding; create one separate operator-owned staging2 encryption key
+pair and publish only its public key; enable/test the reviewed manual staging2
+V2 workflow. Follow `deploy/security-audit/staging2-report-writer-review.md`,
+including its preflight, private custody, round-trip verification and revocation.
+No additional permission question is required for that scope. This authorization
+is not evidence that its grant, key generation or acceptance has been executed.
 
 #### Execution and verification cycle
 
@@ -130,8 +192,9 @@ continue to apply if implementation discovers one is required.
 - Phase 1 prepares the V2 presentation/workflow/release wiring, verifies the
   changed source, and joins V2 activation, V1 retirement, staging2 ingestion
   and candidate/previous/candidate rollback in one coordinated qualification
-  sequence. Selected authentication inventory still depends on separately
-  approved protected access. Keep all 17 deliverable IDs as acceptance owners.
+  sequence. Reuse the completed selected inventory and 29-case evidence; do not
+  repeat a protected read from old pending wording. Additional protected reads
+  remain separately authorized. Keep all 17 deliverable IDs as acceptance owners.
 - Phase 2 joins source-owned authorization expectations, typed probe execution
   and its actor/resource scenarios into functional verification milestones.
 - Phase 3 joins runtime registration, policy descriptors, coverage and removal
