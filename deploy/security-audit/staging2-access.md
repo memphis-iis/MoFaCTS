@@ -5,6 +5,48 @@ root-owned staging2 host auditor through its forced-command SSH account. It does
 not deploy, run Meteor, create a production report, ingest data, or qualify a
 release. It requires an explicit accepted release-record digest for each run.
 
+## Coordinated V2 replacement
+
+The deployed V1 checker remains selected at immutable source
+`b69d096dadaf391282b10817e26a72c4e9ba88c7` while the V2 replacement is prepared.
+Checkout and runtime equality assertions must change together only with the
+staging2 host/receipt cutover. Publishing V2 source does not activate it on the
+host or dispatch this manual workflow. Production uses its separate selection.
+
+The V2 forced-command source is `deploy/security-audit/host-audit-v2.sh`.
+At cutover it occupies the existing `/usr/local/sbin/mofacts-host-exposure-audit`
+entry point. Its raw measurement collector is installed as root:root 0755 at
+`/usr/local/libexec/mofacts-security-audit/host-observations.sh`; the existing
+protected receipt tool remains root:root 0755. Save original files and receipt
+before installation. No SSH, sudo, forwarding or network permission is added.
+
+The command accepts no arguments or `SSH_ORIGINAL_COMMAND`. It invokes only the
+two fixed protected children with bounded output/time, returning one canonical
+`MoFaCTSHostAuditAcquisitionV2` transport object containing `hostObservations`
+and `releaseReceipt`. The nested measurement schema/descriptor digest remains
+unchanged. The receipt is the same V2 identity used by the application; an
+unavailable or mismatched receipt stays explicit. Node validates both contracts
+before writing separate measurement/receipt files. V1 verdicts/receipts, duplicate
+JSON keys and extra fields are rejected.
+
+```sh
+node mofacts/scripts/security-audit/internal/hostAcquisitionV2.mjs \
+  "$private_acquisition" "$private_host_observations" "$private_receipt_observation"
+```
+
+The V2 access checker derives its internal subset from the canonical catalog,
+evaluates the raw facts independently, and requires every applicable exposure
+control to pass plus an exact accepted receipt match. It retains only fixed
+statuses and public identity fields. Existing tagged-runner identity, terminal,
+forwarding and denied-peer checks remain required. A transport-valid envelope
+alone cannot pass access acceptance, and a PC operator cannot impersonate the
+separately tagged runner to manufacture its network proof.
+
+The replacement has Node and root permission/argument/bounds fixtures. Its live
+installation, paired application receipt, actual restricted SSH and workflow
+selection are still a coordinated acceptance gate; do not repeat the completed
+raw measurement qualification as a substitute.
+
 ## Identity and ownership
 
 - GitHub environment: `staging2-security-audit`, limited to the `main` branch.

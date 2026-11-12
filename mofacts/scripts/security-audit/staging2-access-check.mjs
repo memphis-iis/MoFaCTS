@@ -5,8 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { INTERNAL_CONTROL_DEFINITIONS } from './internal-audit-contract.mjs';
-import { parseReleaseReceipt } from '../../common/securityAudit/releaseReceipt.mjs';
+import { ACTIVE_AUDIT_CATALOG, readAuditCatalog } from '../../common/securityAudit/catalogRegistry.ts';
+import { parseHostAuditAcquisitionV2 } from './internal/hostAcquisitionV2.mjs';
+import { evaluateHostObservations } from './internal/evaluateHost.mjs';
 
 const execute = promisify(execFile);
 const tag = 'tag:staging2-audit';
@@ -26,22 +27,19 @@ export function sshFailureCategory(stderr) {
 
 // Return only fixed control IDs/statuses and the already public image identity.
 // Raw host output, tool diagnostics and connection coordinates are never retained.
-export function acceptHostObservation(value, expectedRecordDigest) {
-  if (!digestPattern.test(expectedRecordDigest ?? '') || value?.sectionId !== 'internal'
-    || value.status !== 'PASS' || !Array.isArray(value.controls)
-    || value.controls.length !== INTERNAL_CONTROL_DEFINITIONS.length) invalid();
-  const expected = new Set(INTERNAL_CONTROL_DEFINITIONS.map(([id]) => id));
-  for (const control of value.controls) {
-    if (!expected.delete(control?.controlId) || control.status !== 'PASS') invalid();
-  }
-  if (expected.size || value.releaseReceipt?.state !== 'observed'
-    || value.releaseReceipt.result !== 'MATCH') invalid();
-  const receipt = parseReleaseReceipt(value.releaseReceipt.receipt);
+export async function acceptHostObservation(bytes, expectedRecordDigest, now = new Date()) {
+  if (!digestPattern.test(expectedRecordDigest ?? '')) invalid();
+  const value = await parseHostAuditAcquisitionV2(bytes, now);
+  if (value.releaseReceipt.state !== 'observed' || value.releaseReceipt.result !== 'MATCH') invalid();
+  const receipt = value.releaseReceipt.receipt;
   if (receipt.recordDigestSha256 !== expectedRecordDigest
     || receipt.includedUncommittedLocalChanges
     || !receipt.image.startsWith('ppavlikmemphis/mofacts-staging2:')) invalid();
+  const catalog = await readAuditCatalog(ACTIVE_AUDIT_CATALOG, 'ingestion');
+  const artifact = await evaluateHostObservations(catalog, 'exposure', value.hostObservations, now);
+  if (artifact.controls.some(control => control.status !== 'PASS')) invalid();
   return {
-    controls: INTERNAL_CONTROL_DEFINITIONS.map(([controlId]) => ({ controlId, status: 'PASS' })),
+    controls: artifact.controls.map(({ controlId, status }) => ({ controlId, status })),
     receipt: { recordDigestSha256: receipt.recordDigestSha256,
       baseCommit: receipt.baseCommit, configDigest: receipt.imageId },
   };
@@ -117,11 +115,11 @@ export async function runStaging2AccessCheck(outputFile, expectedRecordDigest, e
       invalid();
     }
     stage = 'host-result-validation';
-    const accepted = acceptHostObservation(JSON.parse(normal.stdout), expectedRecordDigest);
+    const accepted = await acceptHostObservation(Buffer.from(normal.stdout), expectedRecordDigest);
     stage = 'forced-command';
     const arbitrary = await sshResult(args, ['-T', target], ['printf __MOFACTS_SHELL_PROBE__']);
     if (arbitrary.stdout.includes('__MOFACTS_SHELL_PROBE__')) invalid();
-    if (arbitrary.code === 0) acceptHostObservation(JSON.parse(arbitrary.stdout), expectedRecordDigest);
+    if (arbitrary.code === 0) await acceptHostObservation(Buffer.from(arbitrary.stdout), expectedRecordDigest);
     else if (![64, 69, 77].includes(arbitrary.code)) invalid();
     stage = 'terminal-denial';
     const pty = await sshResult(args, ['-tt', target]);

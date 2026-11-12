@@ -64,3 +64,9 @@ store or a replacement for the full production V1 configuration. Full V2 fixture
 composition, protected binding preparation and live staging2 execution remain
 separate work. Do not publish bindings, alter production secrets, infer missing
 values or read the recovery backup merely to populate this interface.
+
+The reviewed next access scope is described in
+[disposable staging2 qualification](staging2-authorization-fixtures.md): four
+fresh actors with exactly two teacher grants and cleanup, reusing the existing
+administrator. That new credential-bearing access remains pending explicit
+approval; no teacher credential was inferred or existing account reset.

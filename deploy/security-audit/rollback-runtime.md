@@ -7,7 +7,8 @@ and the same candidate again against one persistent synthetic database. It does
 not alter the deployed database or select a production release. Keep the pinned
 production scanner and deployed services running. Execution requires the
 applicable staging2/Docker permission; these tools grant none. The extended
-source/fixtures are tested; live round-trip acceptance remains open.
+source/fixtures are tested; the live round-trip accepted on 2026-11-11 is
+recorded below.
 
 The selected Linux/amd64 previous-production platform is
 `ppavlikmemphis/mofacts-mini@sha256:f8784b4afe9a4875fd62c5ccb153bab26796381548d47ded54d9a65d5148cc05`,
@@ -163,4 +164,33 @@ The private acceptance receipt is retained under
 Earlier setup attempts remain recorded as failed/incomplete: native-ID/config
 confusion, controller stdin consumption, and the undersized Mongo tmpfs. None was
 accepted as compatibility evidence. Their cleanup preserved original services.
-Full candidate/previous/candidate qualification remains open.
+Full candidate/previous/candidate qualification remained open at this checkpoint.
+
+## Accepted full round trip: 2026-11-11
+
+The clean Meteor-accepted candidate `1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140`
+was built once through captured-source Compose, independently checked against
+its embedded source and configuration, and published to the approved staging2
+repository. Registry graph verification selected platform manifest
+`sha256:1e8503c49c1ba74fb7a3832384f6bbd3c0f0dbf39fab121ea101a6ac78609ace`
+with configuration
+`sha256:82da247e1a5f45178d44717ec710e664f3265f684dbc0952a7929b6a40413f39`.
+
+The sealed staging2 trial passed candidate, selected previous production image,
+and restored-candidate readbacks against the same persistent synthetic database.
+Each phase passed actual anonymous denial/admin DDP access, supported-generation
+list/latest/get and JSON/HTML downloads, exact other-generation rejection and
+unchanged V1/V2 records. The restored candidate's report and download hashes
+equal its initial hashes. The controller reached `accepted-roundtrip`, with
+operation and cleanup exits zero and original MoFaCTS containers unchanged.
+An independent readback confirmed no owned containers, network or Mongo data
+directory remained. Separate before/after metadata confirmed the unrelated JEDM
+container was unchanged.
+
+Private evidence is retained under
+`phase1-20261105/rollback-roundtrip-1c72734b/attempt1`; the independent readback
+SHA-256 is `8a03c93db239d44081002a478d486361940a5beb6537f9c60b3da2317594fe70`.
+This closes P1-16's version-separated storage rollback gate. It does not claim
+live V2 report ingestion, a deployed staging2 application cutover or production
+qualification. No new Meteor invocation was needed; the exact source proof was
+reused.

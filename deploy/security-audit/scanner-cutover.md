@@ -10,8 +10,11 @@ candidate. No database migration or record deletion accompanies activation.
 This is source activation, not evidence that an image has been deployed or a
 scanner has completed against it. The status ledger separately tracks native
 Meteor proof, staging2 ingestion and candidate/previous/candidate qualification.
-Five protected publication selections remain unidentified and must not be
-guessed, silently replaced or treated as passing authorization evidence.
+The operator approved replacing the five unidentified publication selections
+with explicit progress-privacy cases. Their source-owned intent, successful
+own-user baselines and six registered real-Mongo publication cases are verified;
+live staging2 selected-case qualification still requires protected synthetic
+bindings. See [authorization verification](authorization-verification.md).
 
 ## Production selection
 
