@@ -180,9 +180,64 @@ next and is not yet accepted. No Meteor invocation is reserved or consumed.
 - [ ] P1-04's production recording/cutover acceptance remains open: the safe
   read-only identity check is complete, but the standard recorder has not run
   after an actual production deployment. Phase 1 stays 16/17 and six Meteor
-  slots remain. Proposed P1-D9 asks to defer the per-phase live production gates
-  to one final coordinated cutover while continuing source/staging2 work. This
-  sequencing amendment is not yet approved; production writes remain excluded.
+  slots remain. Phil approved P1-D9 on 2026-11-12: defer the per-phase live production gates
+  to one final coordinated cutover while continuing source/staging2 work. The
+  original acceptance criteria remain; production writes are still excluded.
+## P1-D9 adopted; Phase 2 active queue (2026-11-12)
+
+Phil approved one final production cutover instead of repeated production windows
+at the phase boundaries. The plan now requires each phase's source/staging proof
+before advancing implementation and retains its production criteria as pending
+final acceptance. P1-04 remains 16/17's outstanding operational item; do not rerun
+its accepted graph, receipt, rollback or selected-case proof. Source/staging
+implementation advances to Phase 2. Production access, recovery/provider changes,
+spending and destructive operations retain their explicit permission boundaries.
+
+| ID | Phase 2 deliverable | Current state / next evidence |
+| --- | --- | --- |
+| P2-01 | Source-owned verification intent for all authorization controls | Selected 29 cases complete under P1-D8; 21 protocol controls remain. Extend the single planned catalog without changing the accepted selected subset. |
+| P2-02 | Exact value-only protected fixture binding contract | Selected binding parser complete; protocol actor/mail/session/lockout values and validation remain. No protected source read is implied. |
+| P2-03 | Transport, scenario and evaluator decomposition | Existing selected method/publication/route/download adapters complete. Protocol families remain; keep acquisition separate from pure evaluation. |
+| P2-04 | Positive baselines paired with denials | Selected cases complete. Add verified protocol baselines; failed login, timeout or missing resource cannot prove safety. |
+| P2-05 | Exact policy denial categories | Shared closed outcome union/decision table complete. Protocol-specific classifications and complete expected vectors remain. |
+| P2-06 | Scoped publication canaries/store isolation | Selected own/other/anonymous progress cases and six real-Mongo cases accepted. Reuse proof; expand only for newly required protocol/registry scenarios. |
+| P2-07 | Download mint/fetch/content/replay | Selected own-history/admin report issuance/content/replay accepted. Reuse these exact capabilities; newly declared surfaces require their own cases. |
+| P2-08 | Reset/session preconditions and unused aged token | Not implemented for V2. Current app reset lifetime is one hour; real mailbox proof and unused aged-token precondition required. |
+| P2-09 | Run lock/namespace/idempotent cleanup/recovery | Existing selected synthetic ownership/cleanup accepted; add mutation contracts and recovery for every protocol family. |
+| P2-10 | Positive lower and upper session-lifetime bounds | Current app config is 30 days. Existing one-snapshot evidence cannot be relabeled as two-bound proof; preserve append-only contracts. |
+| P2-11 | Exact Phase 2 control coverage | 22 authentication controls: one selected authorization control acquired, 21 currently explicit ERROR. No whole-runtime coverage claim before Phase 3. |
+| P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
+| P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
+
+Current next milestone: source-owned enumeration/timing protocol evaluation and
+shared acquisition intent, without live mail/provider requests or changing app
+permissions. Trace actual auth behavior and reuse existing timing math; no live
+protocol control is closed by source tests alone. Six Meteor slots remain.
+### Phase 2 comparison foundation (2026-11-12)
+
+- [x] Preserve the accepted selected 29-case catalog and add four source-owned
+  login/reset comparison qualifications, one verified-login baseline and a shared
+  five-login/two-reset paired sample vector. This advances P2-01/03/04/05; it
+  does not complete their remaining protocol families.
+- [x] Separate bounded wire-response capture, pure classification and sanitized
+  proof projection. Compare public response equality without retaining messages,
+  identifiers, response bodies or hashes. Rate limits, unrelated domain errors,
+  missing baselines/leases and transport failures cannot prove a successful denial.
+- [x] Reuse the existing robust timing math in a shared Node/Meteor module.
+  Append enumeration/timing v2 evidence contracts with exact per-family sample
+  counts and independently checked timing bounds/direction counts. Existing v1
+  contracts, active catalog version/digest and saved report meanings are unchanged.
+- [x] Focused Windows qualification: 16 cases pass. Initial complete Linux gate
+  found the proof-shape inventory fixture lacked the two appended contracts;
+  extend the fixture rather than exclude it. The corrected complete gate passes:
+  321 passes, zero failures, seven conditional skips. Full typecheck and lint/
+  330 security surfaces pass. See deploy/security-audit/authentication-comparisons.md.
+- [ ] Complete exact-source Meteor parity and reconcile reserved standing slot 5.
+- [ ] Connect protocol collection only after qualifying fixture bindings,
+  environment lease, reset/session preconditions and cleanup. Live protocol
+  controls remain explicit ERROR; no mail/provider request or permission change
+  was made by this source foundation.
+
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/
@@ -193,7 +248,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 4 consumed, 0 reserved, 6 available.**
+**Current allowance: 10 total, 4 consumed, 1 reserved, 5 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -207,7 +262,8 @@ within this allowance. Do not import historical invocations into this counter.
 | 2 | 7f873ddd4b1d0baf49c6bdd8f24c0270fa019cc8 | FAIL after start 2026-11-11T21:10:00Z: 1,009 server passes/one failed new HTTP test; 1,249 client passes/zero failures, 15/seven pending, zero hook failures. All nine registered admin-denial cases and the V1 record-preservation case pass. The test incorrectly assumed WebApp exposes a Connect stack; corrected to actual HTTP requests against its public listener. Private failed-run evidence retained at phase1-20261105/native-local-v2-activation-7f873ddd. No successful source-after/native receipt is claimed. |
 | 3 | 19334b49b16c6f95944a06a47d3cc743920e640a | PASS 2026-11-11T21:30:44Z-21:32:17Z: 1,010 server/1,249 client, zero failures/hooks, 15/seven existing pending. Exact source before/after, isolation, resource and cleanup checks pass. Private receipt: phase1-20261105/native-local-v2-activation-19334b49. Local service uptime is a separate observation. |
 | 4 | 1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140 | PASS 2026-11-11T22:06:49Z-22:08:23Z: 1,018 server/1,249 client, zero failures/hooks, 15/seven existing pending. Shared catalog/outcome cases and all six registered real-Mongo progress-publication cases pass. Exact source/isolation/resources/cleanup pass. Private receipt: phase1-20261105/native-local-authorization-1c72734b. |
-| 5-10 | Pending | Available. |
+| 5 | Phase 2 comparison batch; exact source recorded after commit | Reserved before publication for the shared Node/Meteor comparison policy and new evidence contracts. No invocation yet. |
+| 6-10 | Pending | Available. |
 
 Current result: the V2 admin presentation milestone is published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
@@ -559,7 +615,7 @@ that actually needs another check.
 | P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [x] Candidate 70/23 catalog and direct shared imports pass pinned Windows/Linux Node and actual Meteor server parity, including the fixed digest. This completes the source contract, not V2 cutover. |
 | P1-02 | Active/append-only catalog and evidence-contract registries | [x] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators pass mutation tests and shared-runtime checks. Initial catalog remains unreleased until coordinated cutover; released entries/validators are append-only. |
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
-| P1-04 | Integrated build identity/host-release comparison | [ ] Integrated staging2 release/receiver identity and rollback passed. The permanent post-acceptance hook source now composes actual running configuration, immutable registry mapping and the existing authority/history/receipt owner; its focused tests pass. Phil selected standard verified recording on 2026-11-12. The canonical procedure now checks the pinned project-local runtime before deployment and uses the verified owner after participant acceptance; old engine-reference assignment/direct authority overwrite are removed. Syntax, actual local preflight and existing-record compatibility pass. Unrelated procedure edits are preserved. Read-only production graph/final-container verification now passes under the approved ten-minute observation and matches the existing P1-D2 baseline. The standard recorder explicitly uses the measured remote budget; defaults/bounds elsewhere remain unchanged. Live post-deployment production recording/cutover is still unexecuted, so this item stays open. P1-D9 proposes deferring that operational gate to one final coordinated production cutover; no record backfill or production write is authorized. |
+| P1-04 | Integrated build identity/host-release comparison | [ ] Integrated staging2 release/receiver identity and rollback passed. The permanent post-acceptance hook source now composes actual running configuration, immutable registry mapping and the existing authority/history/receipt owner; its focused tests pass. Phil selected standard verified recording on 2026-11-12. The canonical procedure now checks the pinned project-local runtime before deployment and uses the verified owner after participant acceptance; old engine-reference assignment/direct authority overwrite are removed. Syntax, actual local preflight and existing-record compatibility pass. Unrelated procedure edits are preserved. Read-only production graph/final-container verification now passes under the approved ten-minute observation and matches the existing P1-D2 baseline. The standard recorder explicitly uses the measured remote budget; defaults/bounds elsewhere remain unchanged. Live post-deployment production recording/cutover is still unexecuted, so this item stays open. Approved P1-D9 defers that operational gate to the final coordinated production window while source/staging work proceeds; no record backfill or production write is authorized. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. The later live V2 application/host/receipt qualification and rollback/restoration close P1-14; staging2 now runs the accepted V2 pair. Reuse that proof instead of repeating the earlier V1-restoration checkpoint. |
 | P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |

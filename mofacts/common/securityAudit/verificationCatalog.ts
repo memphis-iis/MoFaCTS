@@ -1,5 +1,58 @@
 import type { ExpectedAuthorizationPolicy } from './authorizationOutcomes.ts';
 
+// The shared sample vector is acquired once for both comparison properties.
+// Four reset requests leave one of the app's five-per-IP/hour requests for the
+// separate current-token scenario. Throttle probes run last under their lease.
+export const AUTHENTICATION_COMPARISON_POLICY = Object.freeze({
+  login: Object.freeze({ sampleCount: 5, minimumBoundMs: 150, relativeBound: 0.5 }),
+  reset: Object.freeze({ sampleCount: 2, minimumBoundMs: 250, relativeBound: 0.75 }),
+  directionFraction: 0.8,
+  maximumAttemptMs: 15000,
+  credentialRejectionCode: '403',
+  credentialRejectionReasons: Object.freeze([
+    'Something went wrong. Please check your credentials.', 'Incorrect password', 'User not found',
+  ]),
+  rateLimitCodes: Object.freeze(['rate-limit', 'too-many-requests']),
+});
+export const AUTHENTICATION_COMPARISON_BASELINE = Object.freeze({
+  verificationId: 'authn.baseline.password-login', kind: 'publicPositiveProbe' as const,
+  surfaceId: 'framework:accounts-password:password-login', lane: 'remote' as const,
+  actor: 'learnerA' as const, proofShape: 'authenticated-bound-user' as const,
+  mutation: 'authentication-comparison' as const,
+});
+export const AUTHENTICATION_COMPARISON_SAMPLES = Object.freeze((['login', 'reset'] as const).flatMap(sampleSet =>
+  Array.from({ length: AUTHENTICATION_COMPARISON_POLICY[sampleSet].sampleCount }, (_, index) => Object.freeze({
+    sampleId: `authn.comparison.${sampleSet}.${index + 1}`, sampleSet, existingFirst: index % 2 === 0,
+  }))),
+);
+
+export type AuditProtocolQualification = Readonly<{
+  verificationId: string; surfaceId: string; kind: 'protocolQualification'; lane: 'remote';
+  controlId: 'authentication.enumeration' | 'authentication.timing';
+  sampleSet: 'login' | 'reset'; mutation: 'authentication-comparison';
+  requiredBaselineIds: readonly string[];
+}>;
+export const AUTHENTICATION_PROTOCOL_VERIFICATIONS: readonly AuditProtocolQualification[] = Object.freeze(
+  (['enumeration', 'timing'] as const).flatMap(property => (['login', 'reset'] as const).map(sampleSet => Object.freeze({
+    verificationId: `authn.${property}.${sampleSet}`,
+    surfaceId: sampleSet === 'login' ? 'framework:accounts-password:password-login' : 'method:requestPasswordReset',
+    kind: 'protocolQualification' as const, lane: 'remote' as const,
+    controlId: `authentication.${property}` as const, sampleSet, mutation: 'authentication-comparison' as const,
+    requiredBaselineIds: Object.freeze([AUTHENTICATION_COMPARISON_BASELINE.verificationId]),
+  }))),
+);
+
+export const AUTHENTICATION_PROTOCOL_MUTATIONS = Object.freeze({
+  'authentication-comparison': Object.freeze({
+    mutates: true, owner: 'audit-runner',
+    preconditions: Object.freeze(['synthetic-bindings-verified', 'environment-lease-held', 'fresh-throttle-window', 'successful-login-baseline', 'fresh-anonymous-connection-per-pair']),
+    setup: 'bind-owned-existing-and-absent-identifiers',
+    postconditions: Object.freeze(['one-shared-paired-vector', 'bounded-login-and-reset-attempts']),
+    cleanup: 'close-owned-sessions-remove-only-owned-fixtures',
+    interruptedRunRecovery: 'reconcile-run-journal-wait-unowned-throttle-window-expiry',
+  }),
+});
+
 export type AuditActorAlias = 'anonymous' | 'learnerA' | 'learnerB' | 'teacherA' | 'teacherB' | 'admin';
 export type AuthorizationProofShape = 'own-settings-v1' | 'self-performance-v1' | 'audit-summary-v2'
   | 'progress-snapshot-v1' | 'settings-snapshot-v1' | 'rendered-route-v1' | 'single-use-download-v1';
@@ -109,6 +162,13 @@ for (const entry of entries) {
   }
 }
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
+// One catalog owner, with the accepted selected subset kept stable for its
+// existing runner. Protocol qualifications are not retrofitted into its vector.
+export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS,
+  AUTHENTICATION_COMPARISON_BASELINE, ...AUTHENTICATION_PROTOCOL_VERIFICATIONS]);
+if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
+  throw new Error('Duplicate audit verification ID');
+}
 export function auditVerification(id: string): AuditAuthorizationScenario {
   const entry = byId.get(id);
   if (!entry) throw new Error('Unknown audit verification ID');

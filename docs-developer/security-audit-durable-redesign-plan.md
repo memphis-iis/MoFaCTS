@@ -205,7 +205,7 @@ acceptance work under its existing mandate and keep unexecuted items open.
    one next action and unresolved dependencies, then continue automatically.
    Use progress messages for information and questions for real decisions.
 
-#### Proposed P1-D9: one final production cutover (pending decision)
+#### P1-D9: one final production cutover (approved 2026-11-12)
 
 The remaining Phase 1 source/staging identity work now has a successful read-only
 production graph observation. Its last live recorder/cutover gate would require
@@ -213,7 +213,7 @@ an actual accepted production release; the older authority must not be backfille
 from an image label. Phases 1, 2 and 3 currently also require their own production
 acceptance before their exit gates pass.
 
-Recommendation: continue the remaining Phase 2-4 source, local/Meteor, supported
+Approved execution sequence: continue the remaining Phase 2-4 source, local/Meteor, supported
 image and staging2 milestones under the existing mandate, and consolidate only
 their live production gates into one final coordinated cutover/acceptance window.
 Keep P1-04 and each later production gate explicitly pending until that window;
@@ -221,13 +221,13 @@ source/staging completion is not full phase or project completion. Preserve all
 required tests, exact image/source/report bindings, fixture/privacy safeguards,
 provider/access/cost decisions and rollback proof. Do not repeat unchanged proof.
 
-This proposal does not authorize production access, builds/deployment, record
+This sequencing approval does not authorize production access, builds/deployment, record
 writes or credential/provider changes. Before final execution, obtain explicit
 approval of the concrete image, receiver/host/scanner pairing, required access,
 synthetic fixtures, rollback and one exposure plus one full report. Those final
 reports must pass every applicable phase's original production criteria with no
 pipeline ERROR. Do not add application startup/build lockouts or waive a gate.
-The current per-phase exit gates remain unchanged until Phil approves P1-D9.
+The per-phase production clauses below are deferred to that final window. Required source/staging gates still apply before advancing implementation; deferred production acceptance remains visibly pending and is not a completed phase/project claim.
 #### Combined remaining milestones
 
 - Phase 1 prepares the V2 presentation/workflow/release wiring, verifies the
@@ -1334,7 +1334,7 @@ Exit gates:
 - V1 new ingestion and old-format access are unavailable after cutover; existing records are not rewritten/deleted and rollback remains safe.
 - The exact host observation producer passes non-production forced-command qualification and its production install/rollback hashes are recorded.
 - The chosen storage model has passed the previous-image rollback qualification.
-- Local checks, authorized CI, staging, and production cutover gates pass.
+- Local checks, authorized supported Linux/Meteor verification and staging gates pass before advancing implementation. P1-D9 defers production cutover/standard recording acceptance to the final coordinated window; it remains pending.
 - Existing source build, startup, health, login and learner behavior remain unchanged when audit identity/proof is absent; normal build/deploy commands retain their established options and defaults.
 
 Phase 1 may deploy independently. It proves report completeness and evidence shape; P1-D8 additionally requires correct typed outcomes and baselines for the existing selected authorization cases. It does not qualify the remaining authorization scenarios or the current whole-runtime surface checker. Phase 0 should freeze evidence shapes broad enough for the planned Phase 2/3 observations. If either later phase changes a control's claimed property, profile membership, or evidence-contract shape, it requires a new catalog/evidence-contract version and another coordinated receiver/workflow cutover; a scanner-only deploy is allowed only when those contracts remain unchanged. Admin and operator language must preserve these distinctions until phases 2 and 3 finish.
@@ -1362,7 +1362,7 @@ Exit gates:
 - No domain error, timeout, missing route, 404, unreadable store, or missing canary can pass a denial probe.
 - Every required actor/surface/resource case has one validated scenario binding.
 - The staging-only synthetic tenant, mailbox, and provider bindings complete every Phase 2 authorization scenario and produce a catalog-complete authentication artifact without fixture execution errors.
-- One staged authentication-section qualification and one explicitly authorized manual full production audit validate the new runner; the staged section is not mislabeled as a complete four-section report.
+- The staged authentication-section qualification validates the new runner before advancing implementation; it is not a complete four-section report. Under P1-D9 its explicitly authorized full production audit is joined to the final production window and remains pending until it passes.
 
 ### Phase 3 — Runtime-coupled surface registry
 
@@ -1390,7 +1390,7 @@ Exit gates:
 - Before/after characterization proves allow/deny, invocation context, synchronous collection rules, publication readiness/lifecycle, middleware order/fallthrough and enabled login/provider behavior are preserved.
 - Every protected surface has documented policy review and required verification scenarios; Phil reviews the consolidated ambiguous/proposed-change list, while clear behavior-preserving mappings follow Section 0.
 - The remote runner proves it is testing the sealed registry from the deployed application revision rather than source checkout alone.
-- Full app typecheck, lint, authorized Meteor CI, staging, and a manual full production audit pass without registry or fixture `ERROR` results.
+- Full app typecheck, lint, authorized supported Meteor verification and staging pass without registry or fixture `ERROR` results before advancing implementation. P1-D9 defers the manual full production audit to the final window, with the same no-ERROR criteria and no early completion claim.
 
 ### Phase 4 — Closure and organization
 
@@ -1556,7 +1556,7 @@ Do not delete or rewrite reports to simplify rollback. Any production record rem
 
 Later phases use the same exact-revision, authorized-CI, staging-first discipline:
 
-- **Phase 2:** if the protected fixture schema or values change, obtain applicable operational permissions and disable the production audit workflow. Verify the selected AWS Secrets Manager source contains complete current/candidate documents, their non-secret versions/digests, and a last accepted rollback version pinned by the dedicated retained label; moving `AWSPREVIOUS` alone is insufficient. Confirm account/MFA recovery and staging2-tested restoration of current and retained rollback versions. Publish and pass CI on the exact runner revision, apply the matching candidate as the GitHub environment-secret deployment copy, deploy any required server fixture support, then re-enable and run one authorized manual `full` audit from that revision. Phil remains accountable for recovery. Roll back runner, full binding document and any server support as one unit. If the report/evidence contract changed, repeat the Phase 1 catalog/receiver cutover. No new runtime integration, static credential or automatic rotation is implied.
+- **Phase 2 / P1-D9 final production window:** source and staging2 fixture work may proceed under their existing permissions. Before changing the production protected fixture schema or values, obtain applicable production/recovery permissions and disable the production audit workflow. Verify the selected AWS Secrets Manager source contains complete current/candidate documents, their non-secret versions/digests, and a last accepted rollback version pinned by the dedicated retained label; moving `AWSPREVIOUS` alone is insufficient. Confirm account/MFA recovery and staging2-tested restoration of current and retained rollback versions. Publish and pass CI on the exact runner revision, apply the matching candidate as the GitHub environment-secret deployment copy, deploy any required server fixture support, then re-enable and run one authorized manual `full` audit from that revision. Phil remains accountable for recovery. Roll back runner, full binding document and any server support as one unit. If the report/evidence contract changed, repeat the Phase 1 catalog/receiver cutover. No new runtime integration, static credential or automatic rotation is implied.
 - **Phase 3:** retain active-scanner isolation while preparing/publishing the exact registry/runner revision, passing supported source CI, and using the workstation build-once qualification/push path. Keep dispatch disabled only during the incompatible activation window. Deploy the fully migrated image through the existing script; re-enable to fetch the sealed inventory/bundle and join it to the release receipt, actual scanner checkout, host image mapping and environment evidence in the manual `full` report. Rollback restores the previous matched image/runner/host/receipt contract, including a pre-bundle Phase 2 image when applicable. There is no bundle-based startup enforcement to add or remove. Never mix partial registration wiring or proof from another image.
 
 Neither phase may rely on a production run to discover basic fixture, import, registry, or contract incompatibility; those belong in the non-production lanes first.

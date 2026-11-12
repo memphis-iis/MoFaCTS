@@ -131,6 +131,14 @@ test('V2 evidence: every released proof shape accepts complete observations and 
     'mongodb-scoped-roles-v1': { authenticatedConnectivity: true, replicaSetMatched: true, applicationGrantsMatched: true, readConcernRoleMatched: true, sidecarAccountStateMatched: true },
     'redis-policy-v1': { unauthenticatedCommandAccepted: false, auditConnectivity: true, applicationConnectivity: true, hostPublicationCount: 0 },
   };
+  const comparison = { loginPairCount: 5, resetPairCount: 2, baselineVerified: true, bindingsVerified: true,
+    environmentLeaseHeld: true, rateLimitedAttemptCount: 0, domainRejectionCount: 0,
+    transportErrorCount: 0, inconclusiveCaseCount: 0 };
+  samples['enumeration-observations-v2'] = { ...comparison, loginResponseMatch: true, resetResponseMatch: true };
+  samples['timing-observations-v2'] = { ...comparison, loginExistingMedianMs: 900, loginMissingMedianMs: 900,
+    loginDifferentialMs: 0, loginApprovedBoundMs: 450, loginDominantDirectionCount: 0, loginRequiredDirectionCount: 4,
+    resetExistingMedianMs: 300, resetMissingMedianMs: 300, resetDifferentialMs: 0,
+    resetApprovedBoundMs: 250, resetDominantDirectionCount: 0, resetRequiredDirectionCount: 2 };
   assert.deepEqual(Object.keys(samples).sort(), [...AUDIT_EVIDENCE_CONTRACT_IDS].sort());
   for (const [id, metrics] of Object.entries(samples)) {
     const evidence = { summary: 'Complete bounded observations.', metrics };

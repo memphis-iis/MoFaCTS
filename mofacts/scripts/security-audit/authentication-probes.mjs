@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { authenticationTimingMetric, authenticationTimingStatus } from '../../common/securityAudit/authenticationTiming.ts';
 
 function safeSlug(value) {
   return String(value || '')
@@ -70,56 +71,11 @@ export function classifyEnumeration(existingResults, missingResults, resetShapeM
   };
 }
 
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[middle - 1] + sorted[middle]) / 2
-    : sorted[middle];
-}
-
-function timingMetrics(existingSamples, missingSamples, minimumBoundMs, relativeBound) {
-  const existingMedianMs = median(existingSamples);
-  const missingMedianMs = median(missingSamples);
-  const differentialMs = Math.abs(existingMedianMs - missingMedianMs);
-  const approvedBoundMs = Math.max(minimumBoundMs, Math.min(existingMedianMs, missingMedianMs) * relativeBound);
-  const directions = existingSamples.map((value, index) => Math.sign(value - missingSamples[index]));
-  const positiveDirectionCount = directions.filter((direction) => direction > 0).length;
-  const negativeDirectionCount = directions.filter((direction) => direction < 0).length;
-  const dominantDirectionCount = Math.max(positiveDirectionCount, negativeDirectionCount);
-  const requiredDirectionCount = Math.ceil(existingSamples.length * 0.8);
-  const exceedsBound = differentialMs > approvedBoundMs;
-  return {
-    existingMedianMs,
-    missingMedianMs,
-    differentialMs,
-    approvedBoundMs,
-    dominantDirectionCount,
-    requiredDirectionCount,
-    status: !exceedsBound ? 'PASS' : dominantDirectionCount >= requiredDirectionCount ? 'FAIL' : 'ERROR',
-  };
-}
-
 export function classifyAuthenticationTiming(existingLoginMs, missingLoginMs, existingResetMs, missingResetMs) {
-  const sampleSets = [existingLoginMs, missingLoginMs, existingResetMs, missingResetMs];
-  if (sampleSets.some((samples) => !Array.isArray(samples)
-    || samples.some((value) => !Number.isFinite(value) || value < 0))
-    || existingLoginMs.length < 5 || existingResetMs.length < 2
-    || existingLoginMs.length !== missingLoginMs.length
-    || existingResetMs.length !== missingResetMs.length) {
-    throw new Error('authentication timing samples are invalid');
-  }
-  const login = timingMetrics(existingLoginMs, missingLoginMs, 150, 0.5);
-  const reset = timingMetrics(existingResetMs, missingResetMs, 250, 0.75);
-  return {
-    status: [login.status, reset.status].includes('FAIL')
-      ? 'FAIL'
-      : [login.status, reset.status].includes('ERROR') ? 'ERROR' : 'PASS',
-    login,
-    reset,
-  };
+  const login = authenticationTimingMetric(existingLoginMs, missingLoginMs, 'login');
+  const reset = authenticationTimingMetric(existingResetMs, missingResetMs, 'reset');
+  return { status: authenticationTimingStatus(login.status, reset.status), login, reset };
 }
-
 export function expectedDeniedRoute(actor) {
   return actor === 'anonymous' ? '/auth/login' : '/home';
 }

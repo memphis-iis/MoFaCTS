@@ -28,3 +28,4 @@ import './tests/standardRecordingRuntime.test.mjs';
 import './tests/operatorSecurityChecks.test.mjs';
 import './tests/operatorExposureV2.test.mjs';
 import './tests/imageStreamDiagnostics.test.mjs';
+import './tests/authenticationComparisonV2.test.mjs';

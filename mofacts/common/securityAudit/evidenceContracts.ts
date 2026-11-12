@@ -1,5 +1,7 @@
 import { proofMeasurements as auditMeasurements, proofRecord, type ProofMeasurementKind } from './proofFields.ts';
 import { HOST_EVIDENCE_FIELDS, hasHostEvidenceContract, parseHostEvidenceMeasurements } from './hostAuditPolicy.ts';
+import { AUTHENTICATION_COMPARISON_POLICY as comparisonPolicy } from './verificationCatalog.ts';
+import { authenticationTimingMetricStatus, authenticationTimingStatus, type AuthenticationTimingMetric } from './authenticationTiming.ts';
 
 export type AuditControlStatus = 'PASS' | 'FAIL' | 'ERROR';
 export const AUDIT_ERROR_CATEGORIES = Object.freeze([
@@ -18,6 +20,14 @@ export type AuditEvidence = {
 // Released entries are append-only. These are proof-shape requirements, not
 // acquisition or a claim that the producer classified the observations correctly.
 type Field = ProofMeasurementKind;
+const comparisonFields = { loginPairCount: 'count', resetPairCount: 'count', baselineVerified: 'boolean',
+  bindingsVerified: 'boolean', environmentLeaseHeld: 'boolean', rateLimitedAttemptCount: 'count',
+  domainRejectionCount: 'count', transportErrorCount: 'count', inconclusiveCaseCount: 'count' } as const;
+const timingMetricKeys = ['existingMedianMs', 'missingMedianMs', 'differentialMs', 'approvedBoundMs',
+  'dominantDirectionCount', 'requiredDirectionCount'] as const;
+const timingComparisonFields: Record<string, Field> = Object.fromEntries((['login', 'reset'] as const).flatMap(family =>
+  timingMetricKeys.map(key => [`${family}${key[0]!.toUpperCase()}${key.slice(1)}`,
+    key.endsWith('Count') ? 'count' : 'number'] as const)));
 const udpExternalFields = { observedResultCount: 'count', expectedResultCount: 'count', openSelectedUdpPortCount: 'count' } as const;
 const udpHostFields = { unexpectedUdpListenerCount: 'count', unexpectedUdpAllowRuleCount: 'count', unexpectedUdpPublicationCount: 'count', firewallActive: 'boolean', defaultDenyInbound: 'boolean' } as const;
 export type UdpExternalMeasurements = { observedResultCount: number; expectedResultCount: number; openSelectedUdpPortCount: number };
@@ -38,6 +48,8 @@ const contracts: Readonly<Record<string, Readonly<Record<string, Field>>>> = {
   'timing-observations-v1': { loginDifferentialMs: 'number', loginApprovedBoundMs: 'number', resetDifferentialMs: 'number', resetApprovedBoundMs: 'number', sampleCountPerIdentifier: 'count' },
   'reset-expiration-v1': { ageMinutes: 'number', configuredLifetimeMinutes: 'number', accepted: 'boolean' },
   'session-lifetime-v1': { lifetimeDays: 'number', authenticated: 'boolean' },
+  'enumeration-observations-v2': { ...comparisonFields, loginResponseMatch: 'boolean', resetResponseMatch: 'boolean' },
+  'timing-observations-v2': { ...comparisonFields, ...timingComparisonFields },
   'verification-observations-v1': { expectedCaseCount: 'count', completedCaseCount: 'count', matchedCaseCount: 'count', domainRejectionCount: 'count', transportErrorCount: 'count', inconclusiveCaseCount: 'count' },
   ...HOST_EVIDENCE_FIELDS,
 };
@@ -112,6 +124,28 @@ export function parseAuditEvidence(id: string, status: AuditControlStatus, value
     : hasHostEvidenceContract(id) ? parseHostEvidenceMeasurements(id, status, record.metrics, record.observations)
       : auditMeasurements(record.metrics, fields);
   const result: AuditEvidence = { summary: auditText(record.summary, 500), metrics };
+  if (id === 'enumeration-observations-v2' || id === 'timing-observations-v2') {
+    if (metrics.loginPairCount !== comparisonPolicy.login.sampleCount || metrics.resetPairCount !== comparisonPolicy.reset.sampleCount
+        || metrics.baselineVerified !== true || metrics.bindingsVerified !== true || metrics.environmentLeaseHeld !== true
+        || ['rateLimitedAttemptCount', 'domainRejectionCount', 'transportErrorCount', 'inconclusiveCaseCount'].some(key => metrics[key] !== 0)) {
+      throw new Error('Incomplete authentication comparison proof');
+    }
+    let expected: AuditControlStatus;
+    if (id === 'enumeration-observations-v2') {
+      expected = metrics.loginResponseMatch === true && metrics.resetResponseMatch === true ? 'PASS' : 'FAIL';
+    } else {
+      const states = (['login', 'reset'] as const).map(family => {
+        const metric = Object.fromEntries(timingMetricKeys.map(key => [key,
+          Number(metrics[`${family}${key[0]!.toUpperCase()}${key.slice(1)}`])])) as unknown as AuthenticationTimingMetric;
+        if (metric.existingMedianMs > comparisonPolicy.maximumAttemptMs || metric.missingMedianMs > comparisonPolicy.maximumAttemptMs) {
+          throw new Error('Authentication timing proof exceeds the operation bound');
+        }
+        return authenticationTimingMetricStatus(metric, family, comparisonPolicy[family].sampleCount);
+      });
+      expected = authenticationTimingStatus(states[0]!, states[1]!);
+    }
+    if (status !== expected) throw new Error('Authentication comparison proof contradicts status');
+  }
   if ((id === 'finding-inventory-v1' || id === 'image-findings-v1')
     && (Number(metrics.findingCount) > Number(metrics.evaluatedCount)
       || (status === 'PASS' ? metrics.findingCount !== 0 : metrics.findingCount === 0))) {
