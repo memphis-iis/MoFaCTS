@@ -9,9 +9,9 @@ const digest = value => createHash('sha256').update(value).digest('hex');
 function fixture(options = {}) {
   const bindings = authorizationBindingsFixture(), history = 'synthetic-history-row';
   bindings.values['history.learnerA'].sha256 = digest(history);
-  const issued = new Map(), pages = []; let closed = false, sequence = 0;
+  const issued = new Map(), pages = []; let closed = false, sequence = 0, disconnectedRouteWaits = 0;
   const browser = { async newContext() { return { async newPage() {
-    const state = { actor: null, path: '/', template: 'publicLanding', origin: 'https://audit.example' };
+    const state = { actor: null, path: '/', template: 'publicLanding', origin: 'https://audit.example', connected: true };
     const page = { setDefaultTimeout() {}, url() { return state.origin + state.path; }, async goto(input) {
       const path = new URL(input).pathname;
       if (options.foreignRedirect && (!options.routeOnly || path !== '/')) state.origin = 'https://foreign.example';
@@ -29,7 +29,7 @@ function fixture(options = {}) {
           if (key === 'authRolesSyncedUserId') return actorId();
           if (key === 'authRoles') return { admin: state.actor === 'admin' || options.wrongActorRole === state.actor, teacher: state.actor?.startsWith('teacher') === true };
         } },
-        Meteor: { status: () => ({ connected: true }), userId: actorId,
+        Meteor: { status: () => ({ connected: state.connected }), userId: actorId,
           loginWithPassword(username, password, callback) {
             assert.equal(state.origin, 'https://audit.example', 'Credentials must remain on the approved target');
             state.actor = Object.keys(bindings.actors).find(name => bindings.actors[name].username === username && bindings.actors[name].password === password);
@@ -75,11 +75,24 @@ function fixture(options = {}) {
       });
       try { return await fn(args); }
       finally { for (const key of keys) { const descriptor = saved.get(key); if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; } }
-    }, async waitForFunction(fn, args) { assert.equal(await this.evaluate(fn, args), true, 'Synthetic browser wait must observe its specified condition'); } };
+    }, async waitForFunction(fn, args) {
+      if (options.disconnectDuringRouteWait && args?.requestedPath) {
+        state.connected = false;
+        assert.equal(await this.evaluate(fn, args), false, 'Rendered route must wait for DDP reconnection');
+        disconnectedRouteWaits++; state.connected = true;
+      }
+      assert.equal(await this.evaluate(fn, args), true, 'Synthetic browser wait must observe its specified condition');
+    } };
     pages.push(page); return page;
   } }; }, async close() { closed = true; } };
-  return { bindings, browser, pages, closed: () => closed };
+  return { bindings, browser, pages, closed: () => closed, disconnectedRouteWaits: () => disconnectedRouteWaits };
 }
+
+test('route hydration waits for a real DDP reconnection before classifying rendered authorization', async () => {
+  const value = fixture({ disconnectDuringRouteWait: true });
+  const result = await acquireSelectedAuthorizationV2({ target: 'https://audit.example', bindings: value.bindings }, async () => value.browser);
+  assert.equal(result.status, 'PASS'); assert.equal(value.disconnectedRouteWaits(), 6); assert.equal(value.closed(), true);
+});
 test('browser adapter executes all selected proof families with separate actor sessions and no retained private values', async () => {
   const value = fixture(), adapter = await createAuthorizationBrowserV2({ target: 'https://audit.example', bindings: value.bindings }, async () => value.browser);
   try {

@@ -138,7 +138,7 @@ export async function createAuthorizationBrowserV2({ target, bindings }, launch)
       await active.page.goto(new URL(requestedPath, origin).href, { waitUntil: 'domcontentloaded' });
       if (!targetMatched(active.page, origin)) return { state: 'domain-error' };
       await active.page.waitForFunction(({ path, template, requestedPath, requestedTemplate }) => {
-        if (globalThis.Session?.get('authReady') !== true) return false;
+        if (globalThis.Session?.get('authReady') !== true || globalThis.Meteor?.status?.().connected !== true) return false;
         const elements = document.querySelectorAll('body *'); if (elements.length > 20000) return false;
         for (const element of elements) {
           const view = globalThis.Blaze?.getView(element);
