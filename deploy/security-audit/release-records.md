@@ -10,6 +10,46 @@ release, or close Phase 0. See the [audit status](../../docs-developer/security-
 
 ## Authority and stored data
 
+### Post-acceptance command-sheet hook, source ready
+
+`qualification/recordDeploymentRelease.mjs` composes the existing record/history
+owner, immutable registry observer and a bounded running-image observer. It
+requires the repository-pinned Node runtime and explicit completed participant
+acceptance. Its candidate is the existing ordinary six-field record, including
+the existing clean/dirty flag. It adds the actual configuration digest and
+operator acceptance, then writes the existing authority/history and credential-free
+V2 receipt; it never invents ReleaseQualification proof.
+
+```sh
+node mofacts/scripts/security-audit/qualification/recordDeploymentRelease.mjs \
+  "$release_record" "$six_field_candidate" "$ssh_host" "$ssh_key" \
+  "$known_hosts" "$existing_private_evidence_directory" --participant-checks-passed
+```
+
+The observer uses strict existing SSH host trust and the deployment owner's
+existing identity. It reads only the fixed `mofacts` container/image metadata,
+streams the Docker image archive through the one bounded graph reader to resolve
+the configuration digest, and rechecks the exact running container afterward.
+Image layers are discarded, not extracted or retained. The observation is not a
+code/source test or an application request and cannot install, build or restart.
+Its private evidence directory receives only public identity observations and
+the receipt. Missing source, graph/registry disagreement, container replacement,
+missing acceptance or output collisions stop recording.
+
+Focused tests cover classic/containerd graphs, source/replacement mismatch,
+missing acceptance, unchanged dirty-build semantics, record history and receipt
+readback. Live execution of this new SSH composition and integration into the
+canonical production command sheet remain unexecuted. The command sheet has
+unrelated operator changes and was not rewritten or staged by this source work.
+
+The remaining integration choice is explicit: require pinned Node for ordinary
+production release recording, or retain a PowerShell-only ordinary record path
+and make the V2 hook an opt-in evidence step. Do not silently choose a different
+runtime or use a native Docker engine/index reference as a configuration digest.
+The current command sheet stores `.Image` as `imageId`; that is ambiguous on a
+containerd store. This is a source limitation, not a claim about the unqueried
+current production engine or record. See P1-04 in the current checklist.
+
 ### Inert V2 receiver projection (P1-D7)
 
 The single standalone parser now lives at

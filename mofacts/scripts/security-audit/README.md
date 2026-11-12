@@ -29,6 +29,14 @@ action has been performed. Missing tools,
 canaries and protocol acquisitions remain ERROR,
 and the final completion assertion runs after signed storage/encrypted retention.
 
+Current source no longer contains the superseded V1 scanner/assembler/upload
+executables or duplicate control tables. Production remains on its immutable
+historical checkout until separately authorized cutover. Test-only Phase 0
+witnesses retrieve that exact Git revision and run only its synthetic file
+assembler; no old network/browser acquisition is exposed by the fixture owner.
+Shared canonical JSON/command, scanner parsing and recovery-binding helpers
+remain where V2 and recovery code actually consume them.
+
 ## Inert V2 file pipeline
 
 The V2 HTTP/admin composition passes supported Meteor verification on

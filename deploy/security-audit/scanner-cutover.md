@@ -26,6 +26,17 @@ and JSON/HTML hashes; the previous V1 app could not read the V2 record.
 Production and its scheduled scanner remain unchanged. See the
 [staging2 operating procedure](staging2-v2-operations.md).
 
+The current checkout now contains only V2 producer/assembly/ingestion entry
+points. The ten superseded V1 scanner files and their duplicate control
+tables are removed. Shared parsing, recovery-binding validation and crypto
+utilities retain their actual V2/recovery owners; they are not V1 ingestion.
+Phase 0 defect witnesses load the exact immutable V1 Git source in private
+test-only temporary files. They cannot launch the old network/browser producers,
+and cleanup removes their synthetic assembler support. This preserves historical
+evidence without a maintained V1 runtime copy or old-report reader.
+The production workflow still checks out its full reviewed historical source;
+removing files from the current checkout does not alter that pinned execution.
+
 ## Production selection
 
 Production has not been upgraded to this receiver. Its scheduled workflow

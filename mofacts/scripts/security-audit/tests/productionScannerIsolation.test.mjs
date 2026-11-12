@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { TEST_INPUTS } from '../qualification/testInputs.mjs';
 import test from 'node:test';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -38,4 +39,24 @@ test('scanner update/rollback requires matching immutable selection and runtime 
   const changed = workflow.replaceAll(retained, 'a'.repeat(40));
   assert.equal(selected(changed), 'a'.repeat(40));
   assert.equal(selected(changed.replaceAll('a'.repeat(40), retained)), retained);
+});
+
+test('current source has no V1 producer tables or report-ingestion executables; historical production still resolves its own files', () => {
+  const retired = ['external-audit.mjs', 'production-auth-audit.mjs', 'repository-audit.mjs', 'assemble-report.mjs',
+    'internal-audit-contract.mjs', 'composite-exposure.mjs', 'write-internal-execution-error.mjs',
+    'upload-report.mjs', 'encrypt-report.mjs', 'assert-execution-complete.mjs'];
+  for (const name of retired) {
+    assert.equal(fs.existsSync(new URL(`../${name}`, import.meta.url)), false, `Retired V1 entry point remains: ${name}`);
+    assert(source(retained, `mofacts/scripts/security-audit/${name}`).length > 0);
+  }
+  const utility = fs.readFileSync(new URL('../audit-lib.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(utility, /function (?:control|section|finalizeReport|calculateCounts)|SECTION_IDS/);
+});
+
+test('supported source proof includes referenced V2 workflow/wrapper inputs and retains immutable Git fixture history', () => {
+  for (const required of ['.github/workflows/staging2-audit-access.yml', '.github/workflows/staging2-security-audit-v2.yml', 'deploy/security-audit/host-audit-v2.sh']) {
+    assert(TEST_INPUTS.some(([file, kind]) => file === required && kind === 'file'));
+  }
+  const ci = fs.readFileSync(new URL('../../../../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  assert.match(ci, /name: Checkout[\s\S]*?fetch-depth: 0/);
 });

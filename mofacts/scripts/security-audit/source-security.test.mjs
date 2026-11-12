@@ -29,7 +29,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-import {
+import { historicalScannerSource, historicalScannerModule } from './tests/helpers/historicalScanner.mjs';
+const {
   canonicalJson,
   control,
   finalizeReport,
@@ -37,17 +38,17 @@ import {
   sanitizedMetrics,
   sanitizedText,
   section,
-} from './audit-lib.mjs';
-import { resolveCompositeUdpExposure } from './composite-exposure.mjs';
+} = await historicalScannerModule('audit-lib.mjs');
+const { resolveCompositeUdpExposure } = await historicalScannerModule('composite-exposure.mjs');
 import {
   boundedBuildExposureObservations,
   classifyDevelopmentDependencyPosture,
 } from './dependency-posture.mjs';
-import {
+const {
   INTERNAL_CONTROL_DEFINITIONS,
   INTERNAL_EXECUTION_CATEGORIES,
   internalExecutionError,
-} from './internal-audit-contract.mjs';
+} = await historicalScannerModule('internal-audit-contract.mjs');
 import {
   boundedGitleaksObservations,
   boundedNpmAuditObservations,
@@ -736,7 +737,7 @@ test('encrypted report retention round-trips and detects tampering', () => {
 });
 
 test('production authentication probes honor session-scoped credentials and fail closed', () => {
-  const source = fs.readFileSync(new URL('./production-auth-audit.mjs', import.meta.url), 'utf8');
+  const source = historicalScannerSource('production-auth-audit.mjs');
   assert.match(source, /sessionStorage\.getItem\('Meteor\.loginToken'\)/);
   assert.match(source, /sessionStorage\.setItem\('Meteor\.loginToken', stored\.token\)/);
   assert.doesNotMatch(source, /localStorage\.(?:getItem|setItem)\('Meteor\.(?:loginToken|userId|loginTokenExpires)'/);
@@ -754,8 +755,8 @@ test('production authentication probes honor session-scoped credentials and fail
 });
 
 test('external UDP probes retain raw uncertainty and assembly resolves it with bounded host facts', () => {
-  const source = fs.readFileSync(new URL('./external-audit.mjs', import.meta.url), 'utf8');
-  const assembly = fs.readFileSync(new URL('./assemble-report.mjs', import.meta.url), 'utf8');
+  const source = historicalScannerSource('external-audit.mjs');
+  const assembly = historicalScannerSource('assemble-report.mjs');
   const host = fs.readFileSync(new URL('../../../deploy/security-audit/host-exposure-audit.sh', import.meta.url), 'utf8');
   assert.match(source, /'-sU', '--reason', '-p', udpPorts/);
   assert.doesNotMatch(source, /'-sV'|'--max-retries'/);

@@ -54,6 +54,20 @@ PASS and receipt MATCH. Arbitrary commands did not execute and PTYs were denied.
 The earlier tagged-runner/44-negative-connection proof is retained for unchanged
 access rules; a fresh tagged-runner execution is not claimed.
 
+The separate manual V2 report workflow is now published as
+`.github/workflows/staging2-security-audit-v2.yml`. Its existing main-only GitHub
+environment has the additional staging2 report-signing binding and public
+RSA-3072 encryption-key variable. The private key stays in the approved operator
+Desktop folder. Saved-key encryption/decryption, binding withdrawal and actual
+HTTPS signer checks passed: the valid signer reaches invalid-report validation
+(400), while an incorrect signer receives 401; no report was accepted by these
+probes. See [setup/custody evidence](staging2-report-writer-review.md).
+
+GitHub currently refuses to start jobs because of an account billing lock.
+No fresh hosted audit was dispatched into that known block, no paid change was
+made, and no hosted acceptance is claimed. The installed binding is a continuing
+staging2-only audit function; ordinary app and restricted-host access are unchanged.
+
 ## Rollback and retained evidence
 
 The live rehearsal saved exact root-private previous environment, active V1
