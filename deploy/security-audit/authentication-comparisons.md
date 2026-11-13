@@ -42,6 +42,41 @@ Meteor tests exercise the same timing and evidence validators on both runtimes.
 These prove source contracts only. Mailbox acquisition, unused aged-token proof,
 session lifetime bounds, lease/recovery and live staging qualification remain open.
 
+## Reset and lifetime source qualification
+
+Six reset qualifications in the same source catalog cover original-password
+baselines, verified current reset, same-capability replay denial, and rejection
+of an owned unused aged token with the original password unchanged. Current-use
+and replay controls share one acquired vector. `resetProtocol.ts` reuses the
+selected authorization decision table and complete-vector evaluator; only the
+source-reviewed `invalid-token` code proves reset policy denial. A generic error
+or a returned success without a verified new-password login is insufficient.
+
+Ownership and unused flags describe the pre-attempt record snapshot. Expiry
+requires its coherent age/lifespan/remaining duration and the application's
+existing one-hour lifespan. A used token cannot be relabeled as expiry evidence.
+The mutation contract requires separate current/expiry actors in remote runs,
+an environment lease, private recovery journal and scoped cleanup. The registered
+Meteor qualification deliberately seeds an aged synthetic record in isolated
+MongoDB, then exercises the real application reset method and native password
+checker. It also checks current-token consumption, replay denial and removal of
+stored native session tokens. It does not claim live mailbox/wall-clock expiry,
+live-session disconnection or logout qualification.
+
+`sessionLifetime.ts` enforces `0 < lifetimeDays <= 30` without changing the app's
+existing 30-day setting. The append-only `session-lifetime-v2` proof requires a
+newly issued, identity-verified positive session baseline. Epochs remain transient;
+only the duration and verified flags are retained. Existing v1 reports retain
+their earlier interpretation. Native expiration generation is checked separately
+from actual DDP login/resume and does not substitute for that baseline.
+
+The old leakage-check titles were broader than their implementation. Original
+scanner revisions `2d018ee6`/`0e121478` read normal account session storage for
+session tests while inspecting page text, URL, cookies, console and request
+metadata for unintended disclosure. Preserve that intent; this trace establishes
+neither a defective Daybreak finding nor approval to weaken a check. Do not
+introduce a blanket exclusion for credential-bearing URLs or network traffic.
+
 The operator approved reuse of the existing inbox on 2026-11-12. Configuration
 inspection confirms the retained staging learner aliases route to the operator's
 connected Gmail inbox. It is a mixed personal inbox, not a dedicated mailbox.

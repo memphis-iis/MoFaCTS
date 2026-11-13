@@ -2,6 +2,7 @@ import { proofMeasurements as auditMeasurements, proofRecord, type ProofMeasurem
 import { HOST_EVIDENCE_FIELDS, hasHostEvidenceContract, parseHostEvidenceMeasurements } from './hostAuditPolicy.ts';
 import { AUTHENTICATION_COMPARISON_POLICY as comparisonPolicy } from './verificationCatalog.ts';
 import { authenticationTimingMetricStatus, authenticationTimingStatus, type AuthenticationTimingMetric } from './authenticationTiming.ts';
+import { sessionLifetimeStatus } from './sessionLifetime.ts';
 
 export type AuditControlStatus = 'PASS' | 'FAIL' | 'ERROR';
 export const AUDIT_ERROR_CATEGORIES = Object.freeze([
@@ -48,6 +49,7 @@ const contracts: Readonly<Record<string, Readonly<Record<string, Field>>>> = {
   'timing-observations-v1': { loginDifferentialMs: 'number', loginApprovedBoundMs: 'number', resetDifferentialMs: 'number', resetApprovedBoundMs: 'number', sampleCountPerIdentifier: 'count' },
   'reset-expiration-v1': { ageMinutes: 'number', configuredLifetimeMinutes: 'number', accepted: 'boolean' },
   'session-lifetime-v1': { lifetimeDays: 'number', authenticated: 'boolean' },
+  'session-lifetime-v2': { lifetimeDays: 'number', authenticated: 'boolean', freshSessionVerified: 'boolean' },
   'enumeration-observations-v2': { ...comparisonFields, loginResponseMatch: 'boolean', resetResponseMatch: 'boolean' },
   'timing-observations-v2': { ...comparisonFields, ...timingComparisonFields },
   'verification-observations-v1': { expectedCaseCount: 'count', completedCaseCount: 'count', matchedCaseCount: 'count', domainRejectionCount: 'count', transportErrorCount: 'count', inconclusiveCaseCount: 'count' },
@@ -124,6 +126,10 @@ export function parseAuditEvidence(id: string, status: AuditControlStatus, value
     : hasHostEvidenceContract(id) ? parseHostEvidenceMeasurements(id, status, record.metrics, record.observations)
       : auditMeasurements(record.metrics, fields);
   const result: AuditEvidence = { summary: auditText(record.summary, 500), metrics };
+  if (id === 'session-lifetime-v2' && (metrics.authenticated !== true || metrics.freshSessionVerified !== true
+      || status !== sessionLifetimeStatus(Number(metrics.lifetimeDays)))) {
+    throw new Error('Session lifetime evidence cannot establish the claimed status');
+  }
   if (id === 'enumeration-observations-v2' || id === 'timing-observations-v2') {
     if (metrics.loginPairCount !== comparisonPolicy.login.sampleCount || metrics.resetPairCount !== comparisonPolicy.reset.sampleCount
         || metrics.baselineVerified !== true || metrics.bindingsVerified !== true || metrics.environmentLeaseHeld !== true

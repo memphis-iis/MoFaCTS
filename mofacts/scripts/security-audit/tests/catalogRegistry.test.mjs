@@ -119,6 +119,7 @@ test('V2 evidence: every released proof shape accepts complete observations and 
     'timing-observations-v1': { loginDifferentialMs: 5, loginApprovedBoundMs: 50, resetDifferentialMs: 8, resetApprovedBoundMs: 50, sampleCountPerIdentifier: 10 },
     'reset-expiration-v1': { ageMinutes: 65, configuredLifetimeMinutes: 60, accepted: false },
     'session-lifetime-v1': { lifetimeDays: 30, authenticated: true },
+    'session-lifetime-v2': { lifetimeDays: 30, authenticated: true, freshSessionVerified: true },
     'verification-observations-v1': { expectedCaseCount: 2, completedCaseCount: 2, matchedCaseCount: 2, domainRejectionCount: 0, transportErrorCount: 0, inconclusiveCaseCount: 0 },
     'host-configuration-v1': { requiredSettingCount: 3, presentSettingCount: 3, rootOwned: true, rootOnly: true },
     'host-listeners-v1': { inspectedListenerCount: 5, unexpectedListenerCount: 0, unexpectedUdpListenerCount: 0 },

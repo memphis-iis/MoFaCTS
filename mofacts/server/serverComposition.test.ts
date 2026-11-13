@@ -9,6 +9,10 @@ import { expect } from 'chai';
 import { compressHistoryRecord } from '../common/historyCompression';
 import { SERVER_VERBOSITY_SETTING } from '../common/loggingSettings';
 import { encryptData } from './lib/encryption';
+import { Accounts } from 'meteor/accounts-base';
+import { createHash, randomBytes } from 'node:crypto';
+import { unusedExpiredResetPrecondition, resetAttemptOutcome } from '../common/securityAudit/resetProtocol';
+import { sessionLifetimeStatus } from '../common/securityAudit/sessionLifetime';
 
 const MeteorAny = Meteor as any;
 const MeteorUsersAny = Meteor.users as any;
@@ -158,6 +162,63 @@ describe('server auth and session methods', function() {
 
     expect(result).to.have.property('success', true);
     expect(result).to.not.have.property('token');
+  });
+
+  it('rejects an unused aged reset token and verifies current reset, replay denial and stored-session revocation', async function() {
+    const email = `reset-protocol-${Random.id()}@example.com`;
+    const originalPassword = `Original-${Random.secret()}-Aa7!`;
+    const nextPassword = `Changed-${Random.secret()}-Aa7!`;
+    const replayPassword = `Replay-${Random.secret()}-Aa7!`;
+    const { userId } = await methods.signUpUser.call({}, email, originalPassword);
+    const accounts = Accounts as any;
+    const passwordMatches = async (password: string) => {
+      const user = await MeteorUsersAny.findOneAsync(userId);
+      const checked = await accounts._checkPasswordAsync(user, password);
+      return checked.userId === userId && !checked.error;
+    };
+    expect(await passwordMatches(originalPassword)).to.equal(true);
+    const nativeStamp = accounts._generateStampedLoginToken();
+    const nativeExpiry = accounts._tokenExpiration(nativeStamp.when);
+    // Check native duration generation, not an unexecuted DDP login baseline.
+    expect(sessionLifetimeStatus((nativeExpiry.getTime() - nativeStamp.when.getTime()) / 86400000)).to.equal('PASS');
+    expect(accounts._getTokenLifetimeMs()).to.equal(30 * 86400000);
+    const now = Date.now(), lifetimeMs = 3600000;
+    const expired = randomBytes(32).toString('hex'), current = randomBytes(32).toString('hex');
+    const expiredId = await PasswordResetTokensAny.insertAsync({ userId, email,
+      tokenHash: createHash('sha256').update(expired).digest('hex'), used: false,
+      createdAt: new Date(now - 3900000), expiresAt: new Date(now - 300000) });
+    // Synthetic record age in isolated Mongo, not a live mailbox/wall-clock claim.
+    expect(unusedExpiredResetPrecondition({ owned: true, unused: true,
+      ageMs: 3900000, lifetimeMs, remainingMs: -300000 })).to.equal(true);
+    let expiredCode: unknown;
+    try { await methods.resetPasswordWithToken.call({}, email, expired, nextPassword); }
+    catch (error: any) { expiredCode = error.error; }
+    expect(expiredCode).to.equal('invalid-token');
+    expect((await PasswordResetTokensAny.findOneAsync(expiredId)).used).to.equal(false);
+    expect(await passwordMatches(originalPassword)).to.equal(true);
+    expect(await passwordMatches(nextPassword)).to.equal(false);
+
+    const currentId = await PasswordResetTokensAny.insertAsync({ userId, email,
+      tokenHash: createHash('sha256').update(current).digest('hex'), used: false,
+      createdAt: new Date(now), expiresAt: new Date(now + lifetimeMs) });
+    await MeteorUsersAny.updateAsync(userId, { $set: { 'services.resume.loginTokens': [
+      { hashedToken: createHash('sha256').update(Random.secret()).digest('base64'), when: new Date(now) },
+    ] } });
+    expect((await MeteorUsersAny.findOneAsync(userId)).services.resume.loginTokens.length).to.equal(1);
+    expect(await methods.resetPasswordWithToken.call({}, email, current, nextPassword)).to.deep.equal({ success: true });
+    expect(await passwordMatches(nextPassword)).to.equal(true);
+    expect(await passwordMatches(originalPassword)).to.equal(false);
+    const used = await PasswordResetTokensAny.findOneAsync(currentId);
+    expect(used.used).to.equal(true);
+    expect((await MeteorUsersAny.findOneAsync(userId)).services.resume.loginTokens ?? []).to.have.length(0);
+    let replayCode: unknown;
+    try { await methods.resetPasswordWithToken.call({}, email, current, replayPassword); }
+    catch (error: any) { replayCode = error.error; }
+    expect(replayCode).to.equal('invalid-token');
+    expect(resetAttemptOutcome({ state: 'rejected', code: String(replayCode) })).to.equal('DENIED_BY_POLICY');
+    expect(await PasswordResetTokensAny.findOneAsync(currentId)).to.deep.equal(used);
+    expect(await passwordMatches(nextPassword)).to.equal(true);
+    expect(await passwordMatches(replayPassword)).to.equal(false);
   });
 
   it('logs canonical email changes when populateSSOProfile updates the account email', async function() {

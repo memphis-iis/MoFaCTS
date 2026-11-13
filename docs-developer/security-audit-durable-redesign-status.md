@@ -201,8 +201,8 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-03 | Transport, scenario and evaluator decomposition | Existing selected method/publication/route/download adapters complete. Protocol families remain; keep acquisition separate from pure evaluation. |
 | P2-04 | Positive baselines paired with denials | Selected cases complete. Add verified protocol baselines; failed login, timeout or missing resource cannot prove safety. |
 | P2-05 | Exact policy denial categories | Shared closed outcome union/decision table complete. Protocol-specific classifications and complete expected vectors remain. |
-| P2-06 | Scoped publication canaries/store isolation | Selected own/other/anonymous progress cases and six real-Mongo cases accepted. Reuse proof; expand only for newly required protocol/registry scenarios. |
-| P2-07 | Download mint/fetch/content/replay | Selected own-history/admin report issuance/content/replay accepted. Reuse these exact capabilities; newly declared surfaces require their own cases. |
+| P2-06 | Scoped publication canaries/store isolation | [x] Complete for Phase 2: accepted selected own/other/anonymous progress cases and six real-Mongo cases. Reuse proof; new registry scenarios belong to Phase 3. |
+| P2-07 | Download mint/fetch/content/replay | [x] Complete for Phase 2: accepted selected own-history/admin report issuance/content/replay. Reuse these exact capabilities; newly declared registry surfaces belong to Phase 3. |
 | P2-08 | Reset/session preconditions and unused aged token | Not implemented for V2. Current app reset lifetime is one hour; real mailbox proof and unused aged-token precondition required. |
 | P2-09 | Run lock/namespace/idempotent cleanup/recovery | Existing selected synthetic ownership/cleanup accepted; add mutation contracts and recovery for every protocol family. |
 | P2-10 | Positive lower and upper session-lifetime bounds | Current app config is 30 days. Existing one-snapshot evidence cannot be relabeled as two-bound proof; preserve append-only contracts. |
@@ -210,10 +210,11 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
 | P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
 
-Current next milestone: source-owned enumeration/timing protocol evaluation and
-shared acquisition intent, without live mail/provider requests or changing app
-permissions. Trace actual auth behavior and reuse existing timing math; no live
-protocol control is closed by source tests alone. Six Meteor slots remain.
+Current next milestone: qualify reset preconditions/current-use/replay and session
+lifetime bounds, then complete protocol acquisition, leases and exact coverage.
+Enumeration/timing source and fresh selected-inbox delivery are already accepted;
+do not repeat those proofs. P2-06/07 are complete. Five Meteor slots remain before
+the newly reserved integration milestone below; no live reset-control closure is claimed.
 ### Phase 2 comparison foundation (2026-11-12)
 
 - [x] Preserve the accepted selected 29-case catalog and add four source-owned
@@ -314,6 +315,40 @@ The failed and recovered request receipts remain separate. Permission lifetime
 was one owner-controlled temporary job, not automatic account expiry. Recovery
 and revocation were completed and verified; no fixture credential remains.
 
+### Phase 2 reset/session source qualification in progress (2026-11-12)
+
+- [x] Reconcile P2-06 and P2-07 against their already accepted selected-case,
+  real-Mongo and content/replay proofs. Check off those two Phase 2 deliverables
+  in both plan and queue; do not reopen them for future Phase 3 registry additions.
+- [x] Trace leakage-check provenance before treating its title as a new decision.
+  Original scanner commits 2d018ee6/0e121478 already read session storage for
+  session tests while checking page text/URL/cookies/console/request metadata
+  for disclosure. The proposed literal browser-visibility interpretation was
+  overbroad and is withdrawn. No evidence establishes that Daybreak was wrong.
+  Preserve original intent; no user approval to weaken a claim is assumed.
+- [x] Add six source-owned reset cases with successful password/current-reset
+  baselines, exact invalid-token denial and shared complete-vector evaluation.
+  Require coherent owned/unused expired-record age and lifespan, fresh owned
+  current-token preconditions, verified bindings and an environment lease.
+  A rejected used token cannot stand in for expired-token evidence.
+- [x] Add positive lower and upper session-duration validation: strictly greater
+  than zero and at most the existing 30-day maximum, from a newly issued,
+  identity-verified session. Append session-lifetime-v2; preserve all v1 meanings
+  and the current catalog version/digest. No application lifetime policy changed.
+- [x] Full local typecheck, lint/330 surfaces and Linux source-security gate pass
+  (331 passes, zero failures, seven conditional skips). Two TypeScript narrowing
+  diagnostics in the new unknown-input parser were corrected; no failure is waived.
+- [ ] Complete one reserved supported Meteor run. The native
+  Accounts/real-Mongo case uses an explicitly aged synthetic reset record in the
+  disposable integration database; it is not live wall-clock/mailbox expiry proof.
+  It verifies unchanged password and unused record on expiry denial, successful
+  current reset, exact same-capability replay denial, native password validity,
+  stored-session-token removal and the configured native session duration.
+- [ ] Wire these source-qualified observations to the complete protocol owner and
+  later versioned catalog/receiver candidate. Live reset/session transport and
+  unused aged mailbox-token acceptance remain open; no new staging mutation,
+  mail request, production access, dependency or image build was made in this batch.
+
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/
@@ -324,7 +359,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 5 consumed, 0 reserved, 5 available.**
+**Current allowance: 10 total, 5 consumed, 1 reserved, 4 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -339,7 +374,8 @@ within this allowance. Do not import historical invocations into this counter.
 | 3 | 19334b49b16c6f95944a06a47d3cc743920e640a | PASS 2026-11-11T21:30:44Z-21:32:17Z: 1,010 server/1,249 client, zero failures/hooks, 15/seven existing pending. Exact source before/after, isolation, resource and cleanup checks pass. Private receipt: phase1-20261105/native-local-v2-activation-19334b49. Local service uptime is a separate observation. |
 | 4 | 1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140 | PASS 2026-11-11T22:06:49Z-22:08:23Z: 1,018 server/1,249 client, zero failures/hooks, 15/seven existing pending. Shared catalog/outcome cases and all six registered real-Mongo progress-publication cases pass. Exact source/isolation/resources/cleanup pass. Private receipt: phase1-20261105/native-local-authorization-1c72734b. |
 | 5 | c99de5d971ab2595e831af4c4378ffed7930ddbe | PASS 2026-11-12T21:20:06Z-21:21:17Z: 1,021 server/1,249 client, zero failures/hooks, 15/seven existing pending. Both new registered comparison cases pass. Exact source/isolation/resources/cleanup and unchanged local services verified. Private receipt: phase1-20261105/native-phase2-comparison-c99de5d9. |
-| 6-10 | Pending | Available. |
+| 6 | Reset/session source batch; exact source recorded after commit | Reserved for the registered real-Mongo/native Accounts reset case and shared contract tests. No invocation yet. |
+| 7-10 | Pending | Available. |
 
 Current result: the V2 admin presentation milestone is published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.

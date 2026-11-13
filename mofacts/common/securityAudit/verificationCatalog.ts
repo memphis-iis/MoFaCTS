@@ -43,6 +43,14 @@ export const AUTHENTICATION_PROTOCOL_VERIFICATIONS: readonly AuditProtocolQualif
 );
 
 export const AUTHENTICATION_PROTOCOL_MUTATIONS = Object.freeze({
+  'password-reset': Object.freeze({
+    mutates: true, owner: 'audit-runner',
+    preconditions: Object.freeze(['synthetic-bindings-verified', 'environment-lease-held', 'successful-password-baselines', 'separate-current-and-expiry-actors', 'owned-unused-reset-records']),
+    setup: 'mint-current-and-unused-aged-tokens-for-owned-actors',
+    postconditions: Object.freeze(['new-password-verified', 'same-capability-replay-rejected', 'expired-unused-token-rejected-with-password-unchanged']),
+    cleanup: 'remove-only-owned-actors-reset-records-and-sessions',
+    interruptedRunRecovery: 'reconcile-owned-records-and-token-consumption-from-private-run-journal',
+  }),
   'authentication-comparison': Object.freeze({
     mutates: true, owner: 'audit-runner',
     preconditions: Object.freeze(['synthetic-bindings-verified', 'environment-lease-held', 'fresh-throttle-window', 'successful-login-baseline', 'fresh-anonymous-connection-per-pair']),
@@ -52,6 +60,21 @@ export const AUTHENTICATION_PROTOCOL_MUTATIONS = Object.freeze({
     interruptedRunRecovery: 'reconcile-run-journal-wait-unowned-throttle-window-expiry',
   }),
 });
+
+export const AUTHENTICATION_RESET_POLICY = Object.freeze({ lifetimeMs: 3600000, denialCodes: Object.freeze(['invalid-token']) });
+export const AUTHENTICATION_SESSION_POLICY = Object.freeze({ maximumLifetimeDays: 30 });
+export const RESET_PROTOCOL_VERIFICATIONS = Object.freeze([
+  { verificationId: 'authn.reset.current.password-before', expectedPolicy: 'allow', allowedBaselineIds: [] },
+  { verificationId: 'authn.reset.current.accepted', expectedPolicy: 'allow', allowedBaselineIds: ['authn.reset.current.password-before'] },
+  { verificationId: 'authn.reset.current.replay', expectedPolicy: 'deny', allowedBaselineIds: ['authn.reset.current.password-before', 'authn.reset.current.accepted'] },
+  { verificationId: 'authn.reset.expired.password-before', expectedPolicy: 'allow', allowedBaselineIds: [] },
+  { verificationId: 'authn.reset.expired.rejected', expectedPolicy: 'deny', allowedBaselineIds: ['authn.reset.expired.password-before', 'authn.reset.current.accepted'] },
+  { verificationId: 'authn.reset.expired.password-unchanged', expectedPolicy: 'allow', allowedBaselineIds: ['authn.reset.expired.password-before'] },
+].map(row => Object.freeze({ ...row, expectedPolicy: row.expectedPolicy as ExpectedAuthorizationPolicy,
+  allowedBaselineIds: Object.freeze(row.allowedBaselineIds), kind: 'protocolQualification' as const,
+  lane: 'remote' as const, mutation: 'password-reset' as const,
+  surfaceId: row.verificationId.endsWith('accepted') || row.expectedPolicy === 'deny'
+    ? 'method:resetPasswordWithToken' : 'framework:accounts-password:password-login' })));
 
 export type AuditActorAlias = 'anonymous' | 'learnerA' | 'learnerB' | 'teacherA' | 'teacherB' | 'admin';
 export type AuthorizationProofShape = 'own-settings-v1' | 'self-performance-v1' | 'audit-summary-v2'
@@ -165,7 +188,7 @@ export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
 export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS,
-  AUTHENTICATION_COMPARISON_BASELINE, ...AUTHENTICATION_PROTOCOL_VERIFICATIONS]);
+  AUTHENTICATION_COMPARISON_BASELINE, ...AUTHENTICATION_PROTOCOL_VERIFICATIONS, ...RESET_PROTOCOL_VERIFICATIONS]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

@@ -1348,8 +1348,8 @@ Deliverables:
 - Decomposed transport, scenario, and evaluator modules.
 - Positive baselines paired with denials.
 - Exact policy-denial categories.
-- Scoped publication canaries and store isolation.
-- Token-mint/fetch/content/replay download scenarios.
+- [x] Scoped publication canaries and store isolation (accepted P1-D8 selected progress cases and real-Mongo proof; new registry cases belong to Phase 3).
+- [x] Token-mint/fetch/content/replay download scenarios (accepted selected own-history/admin-report issuance, content and replay proof; no unchanged rerun).
 - Correct reset/session preconditions and an unused aged-token expiration scenario.
 - Environment lock, unique run namespace, idempotent cleanup, and interrupted-run recovery for every stateful scenario.
 - Positive lower and upper session-lifetime bounds.

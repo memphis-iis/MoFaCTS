@@ -30,3 +30,5 @@ import './tests/operatorExposureV2.test.mjs';
 import './tests/imageStreamDiagnostics.test.mjs';
 import './tests/authenticationComparisonV2.test.mjs';
 import './tests/resetMailboxV2.test.mjs';
+import './tests/resetProtocolV2.test.mjs';
+import './tests/sessionLifetimeV2.test.mjs';
