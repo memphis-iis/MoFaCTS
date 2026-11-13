@@ -165,11 +165,12 @@ describe('server auth and session methods', function() {
   });
 
   it('rejects an unused aged reset token and verifies current reset, replay denial and stored-session revocation', async function() {
-    const email = `reset-protocol-${Random.id()}@example.com`;
+    const email = `reset-protocol-${Random.id()}@example.com`.toLowerCase();
     const originalPassword = `Original-${Random.secret()}-Aa7!`;
     const nextPassword = `Changed-${Random.secret()}-Aa7!`;
     const replayPassword = `Replay-${Random.secret()}-Aa7!`;
     const { userId } = await methods.signUpUser.call({}, email, originalPassword);
+    expect((await MeteorUsersAny.findOneAsync(userId)).email_canonical).to.equal(email);
     const accounts = Accounts as any;
     const passwordMatches = async (password: string) => {
       const user = await MeteorUsersAny.findOneAsync(userId);
@@ -187,6 +188,10 @@ describe('server auth and session methods', function() {
     const expiredId = await PasswordResetTokensAny.insertAsync({ userId, email,
       tokenHash: createHash('sha256').update(expired).digest('hex'), used: false,
       createdAt: new Date(now - 3900000), expiresAt: new Date(now - 300000) });
+    const eligibleExpired = await PasswordResetTokensAny.findOneAsync({ userId, email,
+      tokenHash: createHash('sha256').update(expired).digest('hex'), used: false });
+    expect(eligibleExpired?._id).to.equal(expiredId);
+    expect(eligibleExpired.expiresAt.getTime()).to.be.lessThan(now);
     // Synthetic record age in isolated Mongo, not a live mailbox/wall-clock claim.
     expect(unusedExpiredResetPrecondition({ owned: true, unused: true,
       ageMs: 3900000, lifetimeMs, remainingMs: -300000 })).to.equal(true);

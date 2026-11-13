@@ -349,6 +349,31 @@ and revocation were completed and verified; no fixture credential remains.
   unused aged mailbox-token acceptance remain open; no new staging mutation,
   mail request, production access, dependency or image build was made in this batch.
 
+### Reset fixture failure and correction (2026-11-12)
+
+Standing slot 6 is consumed and failed, not accepted or repeated uncounted.
+The registered combined reset test rejected its supposedly current token because
+the test seeded Random.id's mixed-case email while the application correctly
+queried its lowercase canonical identity. The negative expired-token attempt
+alone would have been insufficient; the mandatory successful current-token
+baseline exposed the fixture defect. Correct the test address before seeding,
+assert the created account's canonical identity, then confirm the exact owned,
+unused token record is eligible independently of expiry before attempting it.
+No application reset code or password policy changes; no test is skipped.
+
+The failed run retained 1,023 server passes/one failure and 1,249 client passes,
+zero hook failures, 15/seven existing pending. Its three shared contract cases
+and native token-expiration generator ran; the combined reset case is not accepted.
+The job's containers, network and cache are absent. Do not claim a successful
+source-after/native verification receipt for a failed run. Private meteor-run.json
+SHA-256: ef1743b94aad0e605c64a0dcd947e6812cdd354a0f2bee2a08ea8c228034e5f4.
+
+Full corrected typecheck/lint pass. The working Linux source gate passes 333
+cases with zero failures and seven conditional skips, including two new logout
+adapter cases that remain local until this native correction passes. Reserve
+slot 7 before publishing this correction under the standing retest exception.
+New staging operations remain blocked until the applicable native proof passes.
+
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/
@@ -359,7 +384,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 5 consumed, 1 reserved, 4 available.**
+**Current allowance: 10 total, 6 consumed, 1 reserved, 3 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -374,8 +399,9 @@ within this allowance. Do not import historical invocations into this counter.
 | 3 | 19334b49b16c6f95944a06a47d3cc743920e640a | PASS 2026-11-11T21:30:44Z-21:32:17Z: 1,010 server/1,249 client, zero failures/hooks, 15/seven existing pending. Exact source before/after, isolation, resource and cleanup checks pass. Private receipt: phase1-20261105/native-local-v2-activation-19334b49. Local service uptime is a separate observation. |
 | 4 | 1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140 | PASS 2026-11-11T22:06:49Z-22:08:23Z: 1,018 server/1,249 client, zero failures/hooks, 15/seven existing pending. Shared catalog/outcome cases and all six registered real-Mongo progress-publication cases pass. Exact source/isolation/resources/cleanup pass. Private receipt: phase1-20261105/native-local-authorization-1c72734b. |
 | 5 | c99de5d971ab2595e831af4c4378ffed7930ddbe | PASS 2026-11-12T21:20:06Z-21:21:17Z: 1,021 server/1,249 client, zero failures/hooks, 15/seven existing pending. Both new registered comparison cases pass. Exact source/isolation/resources/cleanup and unchanged local services verified. Private receipt: phase1-20261105/native-phase2-comparison-c99de5d9. |
-| 6 | Reset/session source batch; exact source recorded after commit | Reserved for the registered real-Mongo/native Accounts reset case and shared contract tests. No invocation yet. |
-| 7-10 | Pending | Available. |
+| 6 | f3d21e7403cb3bc54db144aec5b729d38956ddc5 | FAIL: 1,023 server passes/one new reset-fixture failure, 1,249 client passes; 15/seven pending, zero hook failures. Mixed-case fixture email did not match the canonical lowercase reset query. Owned resources removed. Failed evidence: phase1-20261105/native-phase2-reset-f3d21e74-failed. |
+| 7 | Canonical reset-fixture correction; exact source recorded after commit | Reserved for one corrected exact-source native run; no invocation yet. |
+| 8-10 | Pending | Available. |
 
 Current result: the V2 admin presentation milestone is published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
