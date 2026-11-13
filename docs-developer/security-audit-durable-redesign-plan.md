@@ -1340,11 +1340,14 @@ Exit gates:
 Phase 1 may deploy independently. It proves report completeness and evidence shape; P1-D8 additionally requires correct typed outcomes and baselines for the existing selected authorization cases. It does not qualify the remaining authorization scenarios or the current whole-runtime surface checker. Phase 0 should freeze evidence shapes broad enough for the planned Phase 2/3 observations. If either later phase changes a control's claimed property, profile membership, or evidence-contract shape, it requires a new catalog/evidence-contract version and another coordinated receiver/workflow cutover; a scanner-only deploy is allowed only when those contracts remain unchanged. Admin and operator language must preserve these distinctions until phases 2 and 3 finish.
 
 ### Phase 2 — Authorization evidence
-P2-D1 approved 2026-11-13: [optional standalone mailbox reader](../deploy/security-audit/mailbox-reader/README.md).
-The exact ImapFlow dependency and locked transitive resolution are approved only
-in that optional tool. Source/real TLS qualification is complete; live use still
-needs an approved credential source. This grants no new provider credential,
-production/recovery read or background access to personal mail.
+P2-D1 superseded by Phil's explicit direction on 2026-11-13: remove the optional
+IMAP reader and use the existing connected Gmail access. No new mail credential,
+provider grant or recovery read is required or authorized. Follow the
+[connected-mail procedure](../deploy/security-audit/connected-mail.md) for exact
+synthetic-recipient metadata/body selection and private transient handoff.
+Operator-assisted Gmail evidence can qualify live staging2 scenarios; it does
+not establish unattended mailbox acquisition. Keep that operational limitation
+visible without blocking unrelated Phase 2 implementation.
 
 Deliverables:
 

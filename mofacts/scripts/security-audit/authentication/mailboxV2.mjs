@@ -23,7 +23,7 @@ export function parseResetMailboxBindingV2(value) {
 }
 
 // Provider adapters expose this bounded metadata envelope before any body read.
-// Read-only Gmail or IMAP transport owns actual mailbox I/O and MIME decoding.
+// Existing connected Gmail access owns actual mailbox I/O and MIME decoding.
 export function resetMailboxMessageMatchesV2(binding, value) {
   const scope = parseResetMailboxBindingV2(binding);
   const row = proofRecord(value, ['messageId', 'recipients', 'receivedAtMs']);

@@ -210,8 +210,8 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
 | P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
 
-Current next milestone: approved mailbox credential source for the qualified
-standalone reader, then remaining protocol acquisition, leases and exact control coverage.
+Current next milestone: connected-Gmail live reset/session orchestration; no new
+mailbox credential is requested. The former standalone-reader prerequisite is superseded.
 Source/native reset and session-bound checks, fresh selected-inbox delivery and
 the live logout subcase are accepted; do not repeat them unchanged. P2-06/07 are
 complete. Three Meteor invocations remain; live reset/expiry and complete
@@ -422,7 +422,7 @@ whole messages. The recommended maintained client, ImapFlow 2.11.0 (MIT), would
 live only in a separate optional audit-tool package with pinned transitive
 resolution, verified TLS and read-only, exact-recipient selected-body access.
 No dependency is installed and no provider/recovery access is granted by this
-proposal. Review deploy/security-audit/mailbox-reader-review.md. Existing root
+proposal. The former review is preserved in commit 317b3249 and superseded below. Existing root
 rules require explicit approval before adding a dependency; keep that distinct
 from the already approved inbox choice and ordinary staging fixture access.
 
@@ -505,6 +505,32 @@ only; its explicit mailbox/provider/production/recovery-access exclusions remain
 P2-D1 software decision is closed; P2-02/03/08/13 and complete Phase 2 coverage
 remain partially open. The earlier connected-inbox delivery, selected cases,
 native reset and live logout proofs stay accepted. Three Meteor slots remain.
+
+### Connected Gmail selected; IMAP reader removed (2026-11-13)
+
+Phil explicitly rejected IMAP and directed removal of the reader and plan update.
+This supersedes P2-D1's implementation and credential prerequisite above. Historical
+qualification remains a record of what ran, not a reason to retain unused code.
+
+- [x] Remove the complete optional reader, package/lockfile, local installed
+  dependency tree and tests; remove its Docker exclusion and six supplemental
+  input selections. No application dependency or runtime transport is changed.
+- [x] Replace the root-guide and Phase 2 instructions with the existing connected
+  Gmail approach; publish deploy/security-audit/connected-mail.md. Preserve exact
+  recipient/time/body limits and existing accepted delivery/logout/native proofs.
+- [x] Remove the obsolete dependency review; its history remains in 317b3249.
+- [x] Verify affected lint/source checks: full lint passes (330 surfaces); Linux
+  source-security passes 335 cases, zero failures and seven existing skips.
+  Publish the intentional removal and
+  update the canonical wiki. No Meteor run is needed for deleting this optional
+  Node tool and its supplemental selections.
+- [ ] Continue live current-reset/replay/password-reset session invalidation with
+  private connected-Gmail handoff and owned synthetic-account cleanup. This is
+  operator-assisted evidence, not an unattended scanner mailbox qualification.
+
+No new mailbox credential, provider access, production/recovery read or spending
+is proposed. The earlier request for a vault item/path is withdrawn. Three Meteor
+runs remain; full Phase 2 and the final production gates are still open.
 
 ## Standing execution ledger (2026-11-11)
 
