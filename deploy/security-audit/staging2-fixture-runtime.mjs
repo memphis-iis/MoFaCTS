@@ -8,16 +8,26 @@ import { parseAuditFileV2 } from '../../mofacts/scripts/security-audit/core/prod
 import { fixtureNamespaceV2 } from '../../mofacts/scripts/security-audit/authentication/stagingFixturesV2.mjs';
 import { requireStagingFixtureRuntimeV2, requireUnusedFixtureNamesV2, findOwnedFixtureActorsV2,
   requireOwnedFixtureActorV2, seedStagingFixtureDataV2, removeStagingFixtureDataV2 } from '../../mofacts/scripts/security-audit/authentication/fixtureStorageV2.mjs';
+import { requireUnusedPasswordlessFixtureV2, seedPasswordlessFixtureV2, inspectPasswordlessFixtureV2,
+  removePasswordlessFixtureDataV2, assertProtocolNamespaceEmptyV2 } from '../../mofacts/scripts/security-audit/authentication/passwordlessFixturesV2.mjs';
 
-const actions = ['operator', 'preflight', 'inspect', 'seed', 'cleanup'];
+export const STAGING_FIXTURE_STORAGE_ACTIONS_V2 = Object.freeze(['operator', 'preflight', 'inspect', 'seed', 'cleanup',
+  'passwordless-preflight', 'passwordless-seed', 'passwordless-inspect', 'passwordless-cleanup', 'protocol-empty']);
 const invalid = () => { throw new Error('Staging fixture runtime rejected'); };
 export async function runStagingFixtureStorageActionV2(action, payload, runtime) {
-  if (!actions.includes(action)) invalid();
-  const value = proofRecord(payload, action === 'operator' ? ['namespace', 'expectedRuntime', 'username']
-    : ['namespace', 'expectedRuntime', 'adminUserId', 'startedAt', 'historyNow', 'actors']);
+  if (!STAGING_FIXTURE_STORAGE_ACTIONS_V2.includes(action)) invalid();
+  const value = proofRecord(payload, action === 'protocol-empty' ? ['namespace', 'expectedRuntime']
+    : action === 'operator' ? ['namespace', 'expectedRuntime', 'username']
+    : action.startsWith('passwordless-') ? ['namespace', 'expectedRuntime', 'adminUserId', 'startedAt', 'historyNow', 'foreignActor']
+      : ['namespace', 'expectedRuntime', 'adminUserId', 'startedAt', 'historyNow', 'actors']);
   proofRecord(runtime, ['database', 'mongoOptions', 'environment']); fixtureNamespaceV2(value.namespace);
   const input = { ...value, ...runtime };
   requireStagingFixtureRuntimeV2(input);
+  if (action === 'protocol-empty') return assertProtocolNamespaceEmptyV2(input);
+  if (action === 'passwordless-preflight') { await requireUnusedPasswordlessFixtureV2(input); return { state: 'fixture-passwordless-names-unused' }; }
+  if (action === 'passwordless-seed') return seedPasswordlessFixtureV2(input);
+  if (action === 'passwordless-inspect') return inspectPasswordlessFixtureV2(input);
+  if (action === 'passwordless-cleanup') return removePasswordlessFixtureDataV2(input);
   if (action === 'operator') {
     const username = proofString(value.username, /^[^\s@]+@[^\s@]+\.[^\s@]+$/, 254).toLowerCase();
     const user = await runtime.database.collection('users').findOne({ username }, { projection: { _id: 1 } });
@@ -39,7 +49,7 @@ export async function runStagingFixtureStorageActionV2(action, payload, runtime)
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let client, result, succeeded = false;
   try {
-    if (process.argv.length !== 3 || !actions.includes(process.argv[2])) invalid();
+    if (process.argv.length !== 3 || !STAGING_FIXTURE_STORAGE_ACTIONS_V2.includes(process.argv[2])) invalid();
     const chunks = []; let size = 0;
     for await (const chunk of process.stdin) { size += chunk.length; if (size > 65536) invalid(); chunks.push(chunk); }
     const payload = parseAuditFileV2(Buffer.concat(chunks));

@@ -39,3 +39,6 @@ import './tests/authenticationLeaseV2.test.mjs';
 import './tests/passwordlessProtocolV2.test.mjs';
 import './tests/materialThrottleV2.test.mjs';
 import './tests/protocolBindingsV2.test.mjs';
+import './tests/passwordlessFixturesV2.test.mjs';
+import './tests/passwordlessBrowserV2.test.mjs';
+import './tests/fixtureChildEnvironmentV2.test.mjs';

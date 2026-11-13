@@ -66,3 +66,21 @@ export async function removeFixtureAccountV2({ page, target, adminUserId, namesp
   const result = await administrativeCall(page, origin, adminUserId, 'userAdminDeleteUser', [owned.userId]);
   if (result?.RESULT !== 'SUCCESS' || result.targetUserId !== owned.userId) invalid();
 }
+
+// The participant has no ordinary-account password/email or mandatory markers.
+// Ownership is the pre-recorded synthetic ID/name/creator/time tuple, checked
+// by the datastore owner, rather than inferred from experiment flags/history.
+export async function removePasswordlessFixtureParticipantV2({ page, target, adminUserId, namespace, participant, ownership }) {
+  fixtureNamespaceV2(namespace); const origin = auditTargetOrigin(target);
+  proofRecord(participant, ['userId', 'username']);
+  if (origin !== 'https://staging2.optimallearning.org' || participant.userId !== `${namespace}-participant`
+      || participant.username !== `AUDIT_${namespace.slice(-12).toUpperCase()}`
+      || participant.userId === adminUserId || typeof ownership !== 'function') invalid();
+  await requireAdmin(page, origin, adminUserId);
+  const state = await ownership(participant);
+  if (state === 'absent') return { state: 'fixture-participant-already-absent' };
+  if (state !== 'owned') invalid();
+  const result = await administrativeCall(page, origin, adminUserId, 'userAdminDeleteUser', [participant.userId]);
+  if (result?.RESULT !== 'SUCCESS' || result.targetUserId !== participant.userId || await ownership(participant) !== 'absent') invalid();
+  return { state: 'fixture-participant-removed' };
+}

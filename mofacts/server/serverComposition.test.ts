@@ -949,6 +949,39 @@ describe('public TDF and stimulus method authorization', function() {
     expect(stimuli[0].stimulusKC).to.equal(4);
   });
 
+  it('resumes a progress-backed participant without a password or explicit experiment markers', async function() {
+    const userId = Random.id(), progressId = Random.id();
+    await TdfsAny.insertAsync({ _id: 'progress-return-root', ownerId: 'researcher', tdfAvailability: 'available',
+      content: { tdfs: { tutor: { setspec: { lessonname: 'Progress return', experimentTarget: 'progress-return', userselect: 'false' }, unit: [{}] } } } });
+    await MeteorUsersAny.insertAsync({ _id: userId, username: 'AUDIT-PROGRESS-RETURN', createdAt: new Date(), profile: {} });
+    await GlobalExperimentStatesAny.insertAsync({ _id: progressId, userId, TDFId: 'progress-return-root',
+      experimentState: { currentUnitNumber: 0, lastUnitCompleted: -1, lastActionTimeStamp: Date.now() } });
+    const before = await GlobalExperimentStatesAny.findOneAsync({ _id: progressId });
+    const first = await methods.provisionExperimentUser.call({}, 'progress-return', 'AUDIT-PROGRESS-RETURN');
+    const second = await methods.provisionExperimentUser.call({}, 'progress-return', 'AUDIT-PROGRESS-RETURN');
+    expect(first.userExists).to.equal(true); expect(first.userId).to.equal(userId); expect(second.userId).to.equal(userId);
+    expect(first.loginToken).to.be.a('string').and.not.equal(''); expect(second.loginToken).not.to.equal(first.loginToken);
+    const after = await MeteorUsersAny.findOneAsync({ _id: userId });
+    expect(after.services?.password).to.equal(undefined); expect(after.emails).to.equal(undefined);
+    expect(after.profile.experimentTarget).to.equal('progress-return');
+    expect(after.services.resume.loginTokens.some((row: any) => row.hashedToken === (Accounts as any)._hashLoginToken(first.loginToken))).to.equal(true);
+    expect(after.services.resume.loginTokens.some((row: any) => row.hashedToken === (Accounts as any)._hashLoginToken(second.loginToken))).to.equal(true);
+    expect(await GlobalExperimentStatesAny.findOneAsync({ _id: progressId })).to.deep.equal(before);
+  });
+
+  it('retains the recorded experiment binding when a progress-backed participant tries another target', async function() {
+    const userId = Random.id();
+    for (const target of ['progress-original', 'progress-other']) await TdfsAny.insertAsync({ _id: target, ownerId: 'researcher',
+      tdfAvailability: 'available', content: { tdfs: { tutor: { setspec: { experimentTarget: target, userselect: 'false' }, unit: [{}] } } } });
+    await MeteorUsersAny.insertAsync({ _id: userId, username: 'AUDIT-BOUND-RETURN', profile: { experimentTarget: 'progress-original' } });
+    await GlobalExperimentStatesAny.insertAsync({ userId, TDFId: 'progress-original', experimentState: { lastUnitCompleted: -1 } });
+    const baseline = await methods.provisionExperimentUser.call({}, 'progress-original', 'AUDIT-BOUND-RETURN');
+    expect(baseline.userId).to.equal(userId); expect(baseline.loginToken).to.be.a('string').and.not.equal('');
+    try { await methods.provisionExperimentUser.call({}, 'progress-other', 'AUDIT-BOUND-RETURN'); expect.fail('Expected target mismatch'); }
+    catch (error: any) { expect(error.error).to.equal('experiment-target-mismatch'); }
+    expect((await MeteorUsersAny.findOneAsync({ _id: userId })).profile.experimentTarget).to.equal('progress-original');
+  });
+
   it('resolves shared audio keys for a new experiment participant before any history or profile audio setup', async function() {
     await TdfsAny.insertAsync({
       _id: 'audio-root', ownerId: 'researcher', tdfAvailability: 'available',

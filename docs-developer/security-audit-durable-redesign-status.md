@@ -710,6 +710,37 @@ production acceptance remain open. Eight Meteor slots consumed, two available.
 This is a documentation correction, with diff/link review only. No Meteor run is
 needed or consumed; two remain. No production action or account-data change.
 
+### Progress-backed return implementation resumed (2026-11-13)
+
+- [x] Add two real-Mongo/Meteor cases for marker-free/password-free progress-backed
+  return, repeated native token issuance with the same participant/progress, and
+  preservation of an already recorded experiment binding against another target.
+  These are tests of current behavior; no login gate is changed.
+- [x] Prepare insert-only source-owned participant/TDF/progress/history fixtures,
+  native learner ownership checks, collision rejection, partial-seed recovery and
+  admin-guarded participant removal with independent absence confirmation.
+- [x] Implement browser acquisition for the twelve passwordless controls and five
+  required baselines, marker-or-owned-progress eligibility, actual reload/resume,
+  typed denials and bounded disclosure capture. Missing/stalled observations stay
+  ERROR; late values cannot turn finished evidence green.
+- [x] Require an actual owning lease callback before acquisition/issuance and after
+  cleanup. No provider or mailbox credential is acquired. Document the required
+  host window, recovery and next-catalog title/claim boundary in
+  deploy/security-audit/progress-return-qualification.md.
+- [x] Full typecheck/lint (330 surfaces) and explicit runtime/launcher lint pass.
+  Linux source gate passes 377 cases, zero failures and seven existing skips;
+  17 focused Windows cases pass. The final Gmail-namespace absence assertion
+  also passes separately. Root host-window bash syntax passes.
+- [ ] Publish intentional source only and execute the two new native cases with
+  reserved slot 9. Integrate/qualify the remote
+  fixture window and live adapter afterward; no live acceptance is claimed yet.
+
+Unrelated gaze-tracking/Rspack/harness/docs edits appeared during this work and
+are preserved/excluded. Tests of this working tree can include them; the supported
+native run will use the exact clean committed audit source. P2-01/06/07/10 remain
+closed. The old catalog's literal flag claim is not silently reinterpreted; the
+new observation is gated on the planned next catalog version.
+
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/
@@ -720,7 +751,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 8 consumed, 0 reserved, 2 available.**
+**Current allowance: 10 total, 8 consumed, 1 reserved, 1 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -738,7 +769,8 @@ within this allowance. Do not import historical invocations into this counter.
 | 6 | f3d21e7403cb3bc54db144aec5b729d38956ddc5 | FAIL: 1,023 server passes/one new reset-fixture failure, 1,249 client passes; 15/seven pending, zero hook failures. Mixed-case fixture email did not match the canonical lowercase reset query. Owned resources removed. Failed evidence: phase1-20261105/native-phase2-reset-f3d21e74-failed. |
 | 7 | efa3bd73a75b9df1172e01347498f06a1c5ff3b1 | PASS 2026-11-13T01:25:14Z-01:26:48Z (November 12 local): 1,024 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered reset/session cases pass. Source/isolation/resources/cleanup and unchanged original services verified. Private receipt: phase1-20261105/native-phase2-reset-efa3bd73. |
 | 8 | fe08499c7d3ed4b415d181445b0b05c257a079a2 | PASS 2026-11-13T13:41:02Z-13:42:18Z: 1,027 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered passwordless/catalog cases pass. Exact clean source, actual 6-GiB/two-CPU isolation, original-service uptime and owned-resource cleanup verified. Private: phase1-20261105/native-phase2-protocol-fe08499c. |
-| 9-10 | Pending | Available. |
+| 9 | Reserved: next committed progress-return source | One full supported 6-GiB/two-CPU run for the two new registered laboratory return cases. Not invoked yet; record exact SHA before invocation and reconcile its marker. |
+| 10 | Pending | Available. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
