@@ -210,8 +210,8 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
 | P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
 
-Current next milestone: P2-D1 optional standalone mailbox-reader dependency
-decision, then remaining protocol acquisition, leases and exact control coverage.
+Current next milestone: approved mailbox credential source for the qualified
+standalone reader, then remaining protocol acquisition, leases and exact control coverage.
 Source/native reset and session-bound checks, fresh selected-inbox delivery and
 the live logout subcase are accepted; do not repeat them unchanged. P2-06/07 are
 complete. Three Meteor invocations remain; live reset/expiry and complete
@@ -455,6 +455,56 @@ from the already approved inbox choice and ordinary staging fixture access.
 Current Phase 2 deliverable closure: P2-06/07 complete; other rows retain their
 specific remaining acceptance work. Seven Meteor invocations consumed (including
 one honestly failed fixture run), three remain. No app Goal was recreated.
+
+### P2-D1 approved and optional reader qualified (2026-11-13)
+
+Phil approved the prepared ImapFlow dependency decision. This adds the software
+only; its explicit mailbox/provider/production/recovery-access exclusions remain.
+
+- [x] Install exact ImapFlow 2.11.0 with a separate private package/lockfile,
+  pinned Node 24.22.1/npm 11.19.1, engine enforcement and disabled lifecycle
+  scripts. Twenty-five installed packages include its locked transitive tree.
+  Application dependencies/lockfile are unchanged. Exclude the optional package
+  from the application Docker context, and explicitly capture executable/test
+  files as supplemental test inputs without copying node_modules or credentials.
+- [x] Implement the existing mailbox observation contract using read-only
+  EXAMINE, stable UID SEARCH/FETCH and unchanged UIDVALIDITY. Cap metadata at ten,
+  recheck exact recipient/provider timestamp before body retrieval, then stream
+  only the selected inline plain-text MIME part. Reuse source-owned limits;
+  retain no duplicate policy or raw message representation.
+- [x] Require verified TLS, disabled protocol logs, bounded IMAP responses,
+  acquisition/cleanup deadlines and observed connection closure. Oversize,
+  truncation, unsupported/ambiguous MIME, malformed UTF-8, provider errors and
+  cleanup failures cannot publish a positive receipt. Requests use the unique
+  recipient rather than timezone-dependent SINCE; exact milliseconds are checked
+  afterward. No flag change, deletion, EXPUNGE or mailbox CLOSE operation exists.
+- [x] Optional tests: Windows 13 pass/one explicit OpenSSL-dependent skip; Linux
+  14 pass, zero skips/failures, including a fresh npm ci --ignore-scripts install
+  and real pinned-client TLS/IMAP exchanges on loopback with synthetic mail.
+  Wire proof covers EXAMINE/UID/PEEK, decoded base64, oversized-body rejection,
+  successful logout and rejection of an untrusted certificate. Generated private
+  test certificate/key files were removed after ownership/path checks.
+- [x] Correct initial new-code mailbox-name validation, two explicit lint issues
+  and the synthetic server's missing standard PLAIN challenge exchange. No check,
+  TLS validation or input bound was relaxed. Final explicit tool lint and full
+  application lint pass (330 reviewed surfaces); source-security passes 335
+  cases with zero failures and seven existing conditional skips, including the
+  supplemental input contract. These checks include the uncommitted batch on
+  base bb5d53ae; they are not a clean-commit image qualification.
+- [x] Optional dependency audit: zero advisories in the complete locked runtime
+  dependency tree. No application or Mongo lockfile change. No Meteor invocation,
+  application build/deploy, live mail connection, provider or production access.
+- [ ] Live standalone credential source: filename and field-presence checks found
+  no IMAP credential in the approved Desktop test directory, current staging2
+  settings/env or operator variables. Outbound SMTP is configured, but it is not
+  an inbox-reading credential. The existing connected Gmail tool does not expose
+  its login to this Node process. Ask only for an existing approved vault-item
+  name/path, not a password. Creating a new provider credential or reading the
+  production recovery backup remains a separate approval boundary.
+
+P2-D1 software decision is closed; P2-02/03/08/13 and complete Phase 2 coverage
+remain partially open. The earlier connected-inbox delivery, selected cases,
+native reset and live logout proofs stay accepted. Three Meteor slots remain.
 
 ## Standing execution ledger (2026-11-11)
 

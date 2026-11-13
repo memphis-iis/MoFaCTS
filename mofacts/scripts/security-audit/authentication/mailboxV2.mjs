@@ -3,8 +3,7 @@ import { proofRecord } from '../../../common/securityAudit/proofFields.ts';
 import { fixtureNamespaceV2 } from './stagingFixturesV2.mjs';
 
 const invalid = () => { throw new Error('Audit reset mailbox evidence is invalid'); };
-const maximumDeliveryWindowMs = 120000;
-const maximumBodyBytes = 16384;
+export const RESET_MAILBOX_LIMITS_V2 = Object.freeze({ deliveryWindowMs: 120000, bodyBytes: 16384, messageCount: 10 });
 
 // Value bindings only. Expected actor permissions and scenario policy stay in
 // the source catalog. A run-specific recipient is mandatory even on a shared
@@ -17,7 +16,7 @@ export function parseResetMailboxBindingV2(value) {
       || !['reset', 'expiry'].some(actor => row.recipient.split('@')[0].endsWith(`+${row.namespace}-${actor}`))
       || !Number.isSafeInteger(row.requestedAtMs) || row.requestedAtMs < 0
       || !Number.isSafeInteger(row.deadlineMs) || row.deadlineMs <= row.requestedAtMs
-      || row.deadlineMs - row.requestedAtMs > maximumDeliveryWindowMs) invalid();
+      || row.deadlineMs - row.requestedAtMs > RESET_MAILBOX_LIMITS_V2.deliveryWindowMs) invalid();
   const target = auditTargetOrigin(row.target);
   if (target !== 'https://staging2.optimallearning.org' || target !== row.target) invalid();
   return { ...row, target };
@@ -41,7 +40,7 @@ export function resetMailboxMessageMatchesV2(binding, value) {
 export function readResetMailboxMessageV2(binding, metadata, plainText) {
   const scope = parseResetMailboxBindingV2(binding);
   if (!resetMailboxMessageMatchesV2(scope, metadata)) invalid();
-  if (typeof plainText !== 'string' || Buffer.byteLength(plainText) > maximumBodyBytes) invalid();
+  if (typeof plainText !== 'string' || Buffer.byteLength(plainText) > RESET_MAILBOX_LIMITS_V2.bodyBytes) invalid();
   const candidates = [...plainText.matchAll(/https?:\/\/[^\s<>"']+/g)].map(match => match[0]);
   const resetLinks = [];
   for (const candidate of candidates) {
@@ -65,7 +64,7 @@ export async function acquireResetMailboxMessageV2({ binding, listMetadata, read
   const scope = parseResetMailboxBindingV2(binding);
   if (typeof listMetadata !== 'function' || typeof readPlainText !== 'function') invalid();
   const messages = await listMetadata(scope);
-  if (!Array.isArray(messages) || messages.length > 10) invalid();
+  if (!Array.isArray(messages) || messages.length > RESET_MAILBOX_LIMITS_V2.messageCount) invalid();
   const matches = messages.filter(message => resetMailboxMessageMatchesV2(scope, message));
   if (new Set(messages.map(message => message.messageId)).size !== messages.length) invalid();
   if (matches.length === 0) return { state: 'not-observed' };

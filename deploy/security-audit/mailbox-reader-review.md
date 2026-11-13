@@ -1,6 +1,8 @@
 # Standalone mailbox reader: dependency decision
 
-Status: prepared for review, not installed or granted mailbox credentials.
+Status: software dependency approved 2026-11-13; implemented and tested in the
+[optional package](mailbox-reader/README.md). No mailbox credential or live
+provider/recovery access was granted by that approval.
 
 The existing operator Gmail connection demonstrated fresh staging2 reset-mail
 delivery without copying a production IMAP password. That connection belongs to
@@ -25,7 +27,7 @@ parser to the audit's security-sensitive code.
 
 ## Recommended bounded change
 
-Approve `imapflow` **2.11.0**, MIT licensed, as one direct dependency with its
+Approved `imapflow` **2.11.0**, MIT licensed, as one direct dependency with its
 locked transitive dependencies in a separate optional audit-tool package under
 `deploy/security-audit/`. The official package metadata requires Node >=20;
 use this repository's pinned Node 24.22.1/npm 11.19.1. Do not add it to the Meteor
@@ -63,6 +65,6 @@ read-only filter is not an account-level permission restriction. Inspect any
 existing credential source within its permission boundary before using it;
 bring genuinely new provider/recovery access back for explicit review.
 
-Until this decision is made, keep the already accepted connected-inbox delivery
+The software decision is complete. Keep the already accepted connected-inbox delivery
 proof. Do not relabel it as a standalone acquisition implementation or claim the
 remaining reset/expiry/session suite is complete.
