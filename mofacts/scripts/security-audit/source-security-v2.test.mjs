@@ -33,3 +33,6 @@ import './tests/resetMailboxV2.test.mjs';
 import './tests/resetProtocolV2.test.mjs';
 import './tests/sessionLifetimeV2.test.mjs';
 import './tests/sessionRevocationV2.test.mjs';
+import './tests/currentResetV2.test.mjs';
+import './tests/connectedGmailV2.test.mjs';
+import './tests/authenticationLeaseV2.test.mjs';

@@ -26,6 +26,12 @@ or interrupted caller requires recovery of that same job before another starts.
    `resetMailboxMessageMatchesV2`. Require one exact recipient and one matching
    fresh message before reading its body. Zero matches is missing evidence;
    duplicate matches are ambiguous. Neither is a passing control.
+   `connectedGmailMetadataV2` selects the single Gmail `X-Received` ingestion
+   timestamp. The observed connector's `internal_date` is rounded to a second
+   and can precede a request in that same second. Missing/malformed/duplicate
+   ingestion headers fail; do not shift the request window or select another
+   clock. Recheck that same metadata in the full response using
+   `connectedGmailResetMessageV2` before the private handoff.
 4. Read only that message's plain-text part. Use
    `readResetMailboxMessageV2` to enforce the 16-KiB bound, staging2 HTTPS origin,
    reset path, exact email, one 64-hex token and exact query shape. Reject missing,
@@ -46,6 +52,16 @@ invalidation and unused aged-token expiry are distinct observations. A previous
 delivery receipt proves none of the later mutations. Use real wall-clock aging
 for the live expiry case; changing stored dates qualifies only a synthetic test.
 Retain preconditions, typed outcomes and independent cleanup confirmation.
+
+`captureCurrentResetV2` drives the source-owned current-reset cases and requires
+two successful independent pre-reset sessions with distinct capabilities.
+Both old sessions must lose their guarded method access and fail fresh token
+resume. The fixture owner supplies the private browser/transport callbacks,
+selected mail, environment lease and cleanup; the helper itself grants no access.
+`withAuthenticationLeaseV2` owns the shared per-environment lease file. Never
+override a stale lease based on time alone. Explicit recovery requires confirming
+the previous job stopped and independently verifying owned cleanup. Its recorded
+deadline is enforced by the caller's bounded job, not automatic account expiry.
 
 The connected tool supports operator-assisted acquisition during this audit.
 It does not provide a reusable credential or prove unattended acquisition by the

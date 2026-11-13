@@ -205,13 +205,14 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-07 | Download mint/fetch/content/replay | [x] Complete for Phase 2: accepted selected own-history/admin report issuance/content/replay. Reuse these exact capabilities; newly declared registry surfaces belong to Phase 3. |
 | P2-08 | Reset/session preconditions and unused aged token | Source/native aged/current/replay/password/storage qualification accepted on efa3bd73; fresh inbox delivery accepted. Live unused aged-token and complete session-transport/lease acceptance remain. |
 | P2-09 | Run lock/namespace/idempotent cleanup/recovery | Existing selected synthetic ownership/cleanup accepted; add mutation contracts and recovery for every protocol family. |
-| P2-10 | Positive lower and upper session-lifetime bounds | Source/native bound validation accepted: strictly positive and at most 30 days. Append-only v2 evidence added; fresh identity-bound live session measurement still required. |
+| P2-10 | Positive lower and upper session-lifetime bounds | [x] Source/native validation and fresh identity-bound live staging2 measurement pass: strictly positive and at most 30 days. Append-only v2 proof is accepted; complete authentication report/catalog wiring remains P2-11. |
 | P2-11 | Exact Phase 2 control coverage | 22 authentication controls: one selected authorization control acquired, 21 currently explicit ERROR. No whole-runtime coverage claim before Phase 3. |
 | P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
 | P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
 
-Current next milestone: connected-Gmail live reset/session orchestration; no new
-mailbox credential is requested. The former standalone-reader prerequisite is superseded.
+Current next milestone: complete protocol ownership/coverage and live unused aged-token
+expiry. Connected-Gmail current reset/replay, two-session invalidation and fresh
+session lifetime pass; no mailbox credential is requested.
 Source/native reset and session-bound checks, fresh selected-inbox delivery and
 the live logout subcase are accepted; do not repeat them unchanged. P2-06/07 are
 complete. Three Meteor invocations remain; live reset/expiry and complete
@@ -531,6 +532,54 @@ qualification remains a record of what ran, not a reason to retain unused code.
 No new mailbox credential, provider access, production/recovery read or spending
 is proposed. The earlier request for a vault item/path is withdrawn. Three Meteor
 runs remain; full Phase 2 and the final production gates are still open.
+
+### Connected-Gmail current reset and two-session acceptance (2026-11-13)
+
+- [x] Add source-owned current-reset orchestration and the existing connected-tool
+  metadata/body adapter; no new dependency, provider credential or raw-mail path.
+  Ten focused cases cover exact mail gating, timestamp precision, malformed and
+  foreign bodies, successful/reset-replay decisions, failures and redaction.
+- [x] Record the initial one-session observation separately (private suffix a).
+  It passed its current-reset/replay/password/lifetime scope and removed its
+  account; it did not prove the plan's two-independent-session requirement.
+- [x] Extend the scenario to require two independently logged-in sessions and
+  distinct capabilities before mutation, then guarded-method and fresh-token
+  denial for both. The full live suffix-b observation passes all three current
+  reset cases, new-password login, old-password denial and both session denials.
+  Fresh identity-bound remaining lifetime is 29.999981550925927 days (PASS).
+- [x] Check source-owned Gmail ingestion time rather than rounding the request
+  window: the observed internal_date has second precision. One X-Received
+  ingestion timestamp is required. Correct the new adapter's SMTP-id grammar to
+  accept the actual hyphenated identifier, add that fixture and retain the
+  initial metadata rejection honestly. No body was read before metadata passed.
+- [x] Consume and remove the ACL-protected private body/capability handoff; close
+  browser contexts/sessions and remove both new ordinary accounts and owned
+  reset state. A separate fresh admin session independently verifies both exact
+  account identities absent. No existing account password/roles/content changed.
+- [x] P2-10's source/native/live lifetime acceptance is complete. Current reset,
+  replay and password-reset session invalidation subcases are complete; unused
+  genuinely aged-token expiry and full authentication artifact remain open.
+- [x] Add the shared environment-lease/recovery owner and its focused tests:
+  exclusive creation, no time-based stale takeover, exact namespace recovery,
+  previous-job-stopped confirmation and independently verified cleanup. Missing,
+  replaced or malformed ownership cannot release the lease.
+- [x] Final full lint passes (330 reviewed surfaces); the pinned Linux source
+  gate passes 349 cases with zero failures and seven existing conditional skips.
+  Four focused lease cases and ten connected-mail/reset cases pass on Windows.
+  Publish this verified source/lease batch under standing authorization.
+- [ ] Integrate the lease/manifest/minimal-process owner across the remaining
+  protocol families; its source tests do not close every family's live recovery.
+
+Private receipts: phase1-20261105/live-current-reset-20261113-a and -b. The live
+checks ran base b1a47d79 plus these local source additions, not a clean-commit
+image qualification. Suffix-b current-reset receipt SHA-256:
+9ed3309c6b215f9c592f227c82bf3a8f8e9f2e4b9de1c5e065f524441a7d54ed.
+Independent cleanup SHA-256:
+97d23afebc86680d5437474dd73be3ef1b92c21e8f884d28e1305f9ce0520c1e.
+No Meteor invocation, Docker build/deploy, production/recovery access or new
+provider authorization occurred. Three Meteor runs remain. The active report
+still marks unintegrated protocols ERROR; these receipts do not silently turn
+its remaining controls green.
 
 ## Standing execution ledger (2026-11-11)
 

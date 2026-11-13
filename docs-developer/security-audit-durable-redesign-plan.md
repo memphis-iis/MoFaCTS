@@ -912,7 +912,7 @@ Stateful probes run under an environment-scoped concurrency lock and unique run 
 #### Session lifetime
 
 - Require successful login and a parseable expiration.
-- Require `0 < lifetimeDays <= 30.05`.
+- Require `0 < lifetimeDays <= AUTHENTICATION_SESSION_POLICY.maximumLifetimeDays` (currently 30, shared with the accepted source/native validator).
 - A missing, invalid, or already-expired value is `ERROR`, not `PASS` or an inferred vulnerability.
 
 ### 7.4 Behavioral tests
@@ -1360,7 +1360,7 @@ Deliverables:
 - [x] Token-mint/fetch/content/replay download scenarios (accepted selected own-history/admin-report issuance, content and replay proof; no unchanged rerun).
 - Correct reset/session preconditions and an unused aged-token expiration scenario.
 - Environment lock, unique run namespace, idempotent cleanup, and interrupted-run recovery for every stateful scenario.
-- Positive lower and upper session-lifetime bounds.
+- [x] Positive lower and upper session-lifetime bounds (source/native and fresh identity-bound live staging2 proof accepted 2026-11-13; report wiring remains separate).
 - Exact coverage of the Phase 2 authorization controls, linked to stable surface IDs without claiming whole-runtime completeness.
 - Behavioral tests for every outcome class.
 - Minimal child-process environment exposure.
