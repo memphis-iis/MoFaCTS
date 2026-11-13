@@ -39,10 +39,11 @@ allowlist; authentication children receive only their scenario's actor/value
 subset through private input, with no provider, signing or mailbox credential.
 Unknown variables and Node injection/filter flags fail at that shared boundary.
 
-P2-D2's [passwordless identity review](../../../deploy/security-audit/passwordless-identity-review.md)
-records a separate existing history-only identity inference. Its proposed login
-gate change is pending approval; source characterization does not establish that
-affected accounts exist in a deployed database. No account migration is implied.
+P2-D2's [passwordless requirement correction](../../../deploy/security-audit/passwordless-identity-review.md)
+preserves progress-backed return as an intentional laboratory experiment path.
+Do not require passwords, identifying information or new account markers. The
+stricter-gate proposal is withdrawn. Prolific-specific validation is a separate
+possible improvement using its existing integration, not an audit prerequisite.
 
 The repository and metadata entry points share the existing V2 owners. Metadata
 completion is stamped after acquisition; no environment revision or tag replaces

@@ -210,15 +210,14 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
 | P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
 
-Current decision: P2-D2, existing history-only passwordless identity inference.
-Review deploy/security-audit/passwordless-identity-review.md before changing
-login eligibility. Source/binding/process work below is complete to its stated
-boundary; no mailbox credential is requested. Full protocol ownership/coverage
-and live unused aged-token expiry remain open.
-Source/native reset and session-bound checks, fresh selected-inbox delivery and
-the live logout subcase are accepted; do not repeat them unchanged. P2-06/07 are
-complete. Three Meteor invocations remain; live reset/expiry and complete
-session-revocation/report qualification remain open.
+Current next milestone: continue protocol acquisition/ownership and live unused
+aged-token expiry under the clarified progress-backed passwordless requirement.
+P2-D2 is resolved: the stricter marker gate is withdrawn. Prolific-specific
+validation is a separate improvement candidate, not an audit prerequisite.
+P2-01/06/07/10 remain complete. Current reset/replay, both prior-session denials
+and fresh session lifetime are accepted; do not rerun them unchanged. Two Meteor
+invocations remain in the sole ledger. Full protocol/artifact coverage remains open.
+
 ### Phase 2 comparison foundation (2026-11-12)
 
 - [x] Preserve the accepted selected 29-case catalog and add four source-owned
@@ -673,7 +672,8 @@ slots remain; no additional run is reserved for the Node-only binding work.
   target, whereas the same account without progress is denied. The initial VM
   harness had a cross-realm String check error, corrected before characterization.
   No production record was read and no deployed-account prevalence is claimed.
-- [ ] P2-D2: approve or reject replacing history-only inference with an explicit
+- [x] P2-D2 resolved by the subsequent laboratory requirement clarification below.
+  The following proposal is historical and withdrawn: replace history-only inference with an explicit
   experiment marker and stored matching target for existing passwordless resume.
   Recommend the stricter gate, preserve all histories/accounts, and require
   explicit operator repair for missing markers. This changes login eligibility,
@@ -688,6 +688,27 @@ so the specific source risk concerns matching non-email historical usernames.
 Modern ordinary email sign-ins and valid explicitly bound participants are not
 claimed broken. P2-01/06/07/10 stay checked off; complete Phase 2 and final
 production acceptance remain open. Eight Meteor slots consumed, two available.
+
+### P2-D2 resolved: laboratory passwordless requirement (2026-11-13)
+
+- [x] Record Phil's correction: learning progress intentionally grants return
+  access in temporary laboratory experiments. Participants must not need a
+  remembered password or personal identifying information.
+- [x] Withdraw the stricter explicit-marker/target-gate recommendation and its
+  inferred vulnerability label. The source characterization did not establish
+  a defect against this requirement. No gate, account or migration was changed.
+- [x] Correct the normative plan, review, current queue and operator guidance.
+  Missing markers alone are not failed security acceptance. Preserve the
+  progress-backed positive baseline and test the actual intended access bounds.
+- [x] Inspect the existing Prolific start/resume, participation and server API
+  owners. Phil's suggestion is recorded as a separate possible improvement for
+  genuine Prolific entry, not a replacement for general laboratory experiments.
+  No provider call, credential request, account linking or implementation occurs.
+- [ ] Resume the remaining protocol acquisition/ownership/expiry work under this
+  clarified requirement. Accepted P2-01/06/07/10 and native slot 8 remain closed.
+
+This is a documentation correction, with diff/link review only. No Meteor run is
+needed or consumed; two remain. No production action or account-data change.
 
 ## Standing execution ledger (2026-11-11)
 
