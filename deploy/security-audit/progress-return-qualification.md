@@ -58,3 +58,15 @@ remaining protocol controls ERROR until that coordinated qualification passes.
 
 No production acceptance, paid provider call, new credential or app deployment is
 implied. Reserve supported Meteor invocations only in the standing ledger.
+
+## Interrupted window recovery
+
+The controller's explicit `recover` mode requires the same root-owned job,
+namespace, archive checksum and application container. Acquiring the shared host
+lock proves the previous critical section ended; the retained lease must match.
+Recovery permits ownership inspection and cleanup only. It cannot seed records
+or start another acquisition. The exact archive file manifest is checked inside
+the container before any database operation. Completion independently checks the
+entire protocol namespace is absent before removing its temporary public tools
+and releasing the recovery marker. EOF, timeout or failed verification retains
+the marker for named recovery; it never silently takes over or expires accounts.

@@ -3,8 +3,8 @@
 set -euo pipefail
 umask 077
 export LC_ALL=C
-job=${1:?owned job}; packet=${2:?public archive sha256}; expected_container=${3:?container id}
-[[ $# == 3 && $(id -u) == 0 && $job =~ ^/var/tmp/mofacts-authentication\.[a-f0-9]{12}$
+job=${1:?owned job}; packet=${2:?public archive sha256}; expected_container=${3:?container id}; mode=${4:-run}
+[[ ( $# == 3 || $# == 4 ) && ( $mode == run || $mode == recover ) && $(id -u) == 0 && $job =~ ^/var/tmp/mofacts-authentication\.[a-f0-9]{12}$
    && $packet =~ ^[a-f0-9]{64}$ && $expected_container =~ ^[a-f0-9]{64}$ ]]
 [[ -d $job && ! -L $job && $(realpath "$job") == "$job" && $(stat -c '%u:%g:%a' "$job") == 0:0:700 ]]
 [[ $(sha256sum "$job/source.tar" | cut -d' ' -f1) == "$packet" ]]
@@ -20,9 +20,17 @@ if [[ -e $lockdir/qualification.lock || -L $lockdir/qualification.lock ]]; then
 fi
 exec 9>> "$lockdir/qualification.lock"; flock -n 9
 lease=$lockdir/authentication-lease.json
-[[ ! -e $lease && ! -L $lease ]]
-(set -o noclobber; jq -cn --arg job "$job" --arg namespace "$namespace" --arg source "$packet" \
-  '{job:$job,namespace:$namespace,packetSha256:$source}' > "$lease")
+if [[ $mode == run ]]; then
+  [[ ! -e $lease && ! -L $lease ]]
+  (set -o noclobber; jq -cn --arg job "$job" --arg namespace "$namespace" --arg source "$packet" \
+    '{job:$job,namespace:$namespace,packetSha256:$source}' > "$lease")
+else
+  # Acquiring qualification.lock proves the earlier critical section ended.
+  # Recovery is explicit, namespace/source bound and cannot create new fixtures.
+  [[ -f $lease && ! -L $lease && $(stat -c '%u:%g:%a:%h' "$lease") == 0:0:600:1 ]]
+  jq -e --arg job "$job" --arg namespace "$namespace" --arg source "$packet" \
+    'keys==["job","namespace","packetSha256"] and .job==$job and .namespace==$namespace and .packetSha256==$source' "$lease" >/dev/null
+fi
 finished=0
 tool="/tmp/mofacts-authentication-${namespace##*_}"
 on_exit() {
@@ -40,9 +48,16 @@ check_container() {
   [[ $actual == "\"$expected_container\" true \"staging2\" \"healthy\"" ]]
 }
 check_container
-docker exec --user 0 mofacts test ! -e "$tool"
-docker exec --user 0 mofacts mkdir -m 700 "$tool"
-docker cp "$job/source/." "mofacts:$tool/" >/dev/null
+if [[ $mode == run ]]; then docker exec --user 0 mofacts test ! -e "$tool"; fi
+if ! docker exec --user 0 mofacts test -e "$tool"; then
+  docker exec --user 0 mofacts mkdir -m 700 "$tool"
+  docker cp "$job/source/." "mofacts:$tool/" >/dev/null
+  printf '{"state":"authentication-source-materialized"}\n' > "$job/tool-state.json"
+fi
+docker exec --user 0 mofacts test ! -L "$tool"
+docker exec --user 0 mofacts test -d "$tool"
+(cd "$job/source" && find . -type f -print0 | sort -z | xargs -0 sha256sum) > "$job/source-files.sha256"
+docker exec --user 0 --workdir "$tool" -i mofacts sha256sum -c --quiet < "$job/source-files.sha256"
 invoke() {
   local action=$1 payload=$2 raw output
   raw=$(printf '%s' "$payload" | base64 -d | timeout --signal TERM --kill-after 5s 40 \
@@ -54,6 +69,7 @@ invoke() {
   printf '%s\n' "$output"
 }
 deadline=$(( $(date +%s) + 7200 ))
+if [[ $mode == recover ]]; then deadline=$(( $(date +%s) + 300 )); fi
 printf '{"state":"authentication-window-ready"}\n'
 while true; do
   remaining=$(( deadline - $(date +%s) )); (( remaining > 45 ))
@@ -80,5 +96,8 @@ while true; do
     operator|preflight|inspect|passwordless-preflight|passwordless-seed|passwordless-inspect|passwordless-cleanup|protocol-empty) ;;
     *) exit 2 ;;
   esac
+  if [[ $mode == recover ]]; then
+    case "$action" in operator|inspect|passwordless-inspect|passwordless-cleanup|protocol-empty) ;; *) exit 2 ;; esac
+  fi
   invoke "$action" "$payload"
 done

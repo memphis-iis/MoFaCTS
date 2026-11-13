@@ -751,7 +751,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 8 consumed, 1 reserved, 1 available.**
+**Current allowance: 10 total, 9 consumed, 0 reserved, 1 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -769,7 +769,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 6 | f3d21e7403cb3bc54db144aec5b729d38956ddc5 | FAIL: 1,023 server passes/one new reset-fixture failure, 1,249 client passes; 15/seven pending, zero hook failures. Mixed-case fixture email did not match the canonical lowercase reset query. Owned resources removed. Failed evidence: phase1-20261105/native-phase2-reset-f3d21e74-failed. |
 | 7 | efa3bd73a75b9df1172e01347498f06a1c5ff3b1 | PASS 2026-11-13T01:25:14Z-01:26:48Z (November 12 local): 1,024 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered reset/session cases pass. Source/isolation/resources/cleanup and unchanged original services verified. Private receipt: phase1-20261105/native-phase2-reset-efa3bd73. |
 | 8 | fe08499c7d3ed4b415d181445b0b05c257a079a2 | PASS 2026-11-13T13:41:02Z-13:42:18Z: 1,027 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered passwordless/catalog cases pass. Exact clean source, actual 6-GiB/two-CPU isolation, original-service uptime and owned-resource cleanup verified. Private: phase1-20261105/native-phase2-protocol-fe08499c. |
-| 9 | Reserved: next committed progress-return source | One full supported 6-GiB/two-CPU run for the two new registered laboratory return cases. Not invoked yet; record exact SHA before invocation and reconcile its marker. |
+| 9 | 9accf938a85d75abdee89ecd821d69ffe7c987b3 | IN PROGRESS: exclusive invocation marker verified on the supported 6-GiB/two-CPU worker. Two new laboratory return cases; final result/cleanup pending. |
 | 10 | Pending | Available. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
