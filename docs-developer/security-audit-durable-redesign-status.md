@@ -1,8 +1,8 @@
 # Security Audit Durable Redesign Status
 
 Last baseline with passing CI, Security and image checks: `251022369812dd07417cc4d248e91a1c1f1d8b6a`.
-Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
-auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
+Selected deployed staging2 application: `1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140` (reobserved 2026-11-12);
+retained auditor-policy baseline: `c7444b4e`. Their evidence and image identities remain separate.
 
 
 
@@ -210,11 +210,12 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
 | P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
 
-Current next milestone: qualify reset preconditions/current-use/replay and session
-lifetime bounds, then complete protocol acquisition, leases and exact coverage.
-Enumeration/timing source and fresh selected-inbox delivery are already accepted;
-do not repeat those proofs. P2-06/07 are complete. Five Meteor slots remain before
-the newly reserved integration milestone below; no live reset-control closure is claimed.
+Current next milestone: P2-D1 optional standalone mailbox-reader dependency
+decision, then remaining protocol acquisition, leases and exact control coverage.
+Source/native reset and session-bound checks, fresh selected-inbox delivery and
+the live logout subcase are accepted; do not repeat them unchanged. P2-06/07 are
+complete. Three Meteor invocations remain; live reset/expiry and complete
+session-revocation/report qualification remain open.
 ### Phase 2 comparison foundation (2026-11-12)
 
 - [x] Preserve the accepted selected 29-case catalog and add four source-owned
@@ -424,6 +425,36 @@ No dependency is installed and no provider/recovery access is granted by this
 proposal. Review deploy/security-audit/mailbox-reader-review.md. Existing root
 rules require explicit approval before adding a dependency; keep that distinct
 from the already approved inbox choice and ordinary staging fixture access.
+
+### Live logout subcase accepted; P2-D1 pending (2026-11-12 local)
+
+- [x] Run committed operator adapter 524aec55 against the reobserved unchanged
+  staging2 application 1c72734b. Bind the existing synthetic learner ID through
+  an exact, escaped, bounded admin publication lookup; never use a guessed ID.
+- [x] Verify the original password session and the exact-capability clone through
+  the real guarded own-settings method. Complete original logout, then observe
+  explicit 401 policy denial on the clone and the reviewed native 403/reason on
+  a separate same-token resume. Verify a new password login still works.
+- [x] Both denial observations pass; all five positive/scope prerequisites are
+  true. Zero domain/transport/inconclusive outcomes. Log out owned sessions,
+  close every private context and browser, and retain no capability/credential.
+  No password, role, account, content, provider or production change occurred;
+  existing synthetic-account normal login timestamps/audit records may advance.
+- [x] Private live receipt: phase1-20261105/live-logout-524aec55/logout-receipt.json;
+  SHA-256: 6c5234c3401e12a7aefced8b704b9060ab9347adc9a47ac060b070800dbd2b15.
+  The native Docker image ID remains a native engine observation, not a newly
+  qualified platform/config digest. No application build/deploy was done.
+- [ ] The complete session-revocation control still needs live password-reset
+  session invalidation; the isolated native test proves stored-token removal,
+  not that live transport subcase. No active report/control was marked green.
+- [ ] P2-D1 dependency approval requested after preparing the complete review.
+  Recommend ImapFlow 2.11.0 only in an optional audit package. No dependency has
+  been installed. Approval would not copy/grant mailbox credentials, read the
+  production recovery backup, change app/mail configuration or add spending.
+
+Current Phase 2 deliverable closure: P2-06/07 complete; other rows retain their
+specific remaining acceptance work. Seven Meteor invocations consumed (including
+one honestly failed fixture run), three remain. No app Goal was recreated.
 
 ## Standing execution ledger (2026-11-11)
 
