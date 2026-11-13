@@ -1340,6 +1340,13 @@ Exit gates:
 Phase 1 may deploy independently. It proves report completeness and evidence shape; P1-D8 additionally requires correct typed outcomes and baselines for the existing selected authorization cases. It does not qualify the remaining authorization scenarios or the current whole-runtime surface checker. Phase 0 should freeze evidence shapes broad enough for the planned Phase 2/3 observations. If either later phase changes a control's claimed property, profile membership, or evidence-contract shape, it requires a new catalog/evidence-contract version and another coordinated receiver/workflow cutover; a scanner-only deploy is allowed only when those contracts remain unchanged. Admin and operator language must preserve these distinctions until phases 2 and 3 finish.
 
 ### Phase 2 — Authorization evidence
+P2-D2 pending 2026-11-13: [explicit passwordless identity](../deploy/security-audit/passwordless-identity-review.md).
+The current public method can infer experiment identity from any prior progress.
+A source-only synthetic characterization confirms the branch; deployed account
+prevalence is unknown and production was not inspected. Replacing this with an
+explicit marker and stored matching target changes existing login eligibility,
+so obtain the decision before that repair. Preserve accounts/history; no automatic
+migration or history-derived repair is authorized. Other accepted items stay closed.
 P2-D1 superseded by Phil's explicit direction on 2026-11-13: remove the optional
 IMAP reader and use the existing connected Gmail access. No new mail credential,
 provider grant or recovery read is required or authorized. Follow the
@@ -1351,7 +1358,7 @@ visible without blocking unrelated Phase 2 implementation.
 
 Deliverables:
 
-- Source-controlled authorization entries in the verification catalog with explicit outcomes and baselines.
+- [x] Source-controlled authorization entries in the verification catalog with explicit outcomes and baselines (22 authentication controls/68 source entries; Node and Meteor slot 8 accepted 2026-11-13; acquisition remains separate).
 - Versioned exact protected fixture-binding contract containing values only.
 - Decomposed transport, scenario, and evaluator modules.
 - Positive baselines paired with denials.

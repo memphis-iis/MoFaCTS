@@ -10,7 +10,8 @@ import { parseImageObservation } from '../../../common/securityAudit/releaseQual
 import { parseCiEvidenceJson } from '../qualification/ciEvidence.mjs';
 import { readCiFile } from '../qualification/collectCiEvidence.mjs';
 import { observeDockerImage, streamDockerImageIdentity } from '../qualification/observeDockerImage.mjs';
-import { runRepositoryCommandV2, repositoryToolEnvironmentV2 } from './commandV2.mjs';
+import { runRepositoryCommandV2 } from './commandV2.mjs';
+import { auditToolEnvironmentV2 } from '../core/childEnvironmentV2.mjs';
 import { parseClientBundleCanariesV2 } from './clientBundleCanariesV2.mjs';
 
 const ownerLabel = 'org.mofacts.security-audit.repository-canary.owner';
@@ -72,7 +73,7 @@ function readScanResult(result) {
 // qualification. This export performs Docker operations only when explicitly
 // invoked in an approved lane. Tests replace both Docker/identity I/O boundaries.
 export async function observeImageCanariesV2({ runtimeImage, canaries, environment }, dependencies = {}) {
-  const env = repositoryToolEnvironmentV2(environment);
+  const env = auditToolEnvironmentV2(environment);
   if (Object.keys(dependencies).some(key => !['run', 'archive'].includes(key))) invalid();
   const run = Object.hasOwn(dependencies, 'run') ? dependencies.run : runRepositoryCommandV2;
   const archive = Object.hasOwn(dependencies, 'archive') ? dependencies.archive : (inspection => streamDockerImageIdentity(inspection, env));

@@ -7,7 +7,8 @@ import { proofRecord } from '../../../common/securityAudit/proofFields.ts';
 import { parseCiEvidenceJson } from '../qualification/ciEvidence.mjs';
 import { readCiFile, realDirectory } from '../qualification/collectCiEvidence.mjs';
 import { writeAuditProducerFileV2 } from '../core/producerFilesV2.mjs';
-import { repositoryToolEnvironmentV2 } from './commandV2.mjs';
+
+import { auditToolEnvironmentV2 } from '../core/childEnvironmentV2.mjs';
 import { parseClientBundleCanariesV2 } from './clientBundleCanariesV2.mjs';
 import { repositoryFindingGroups } from './findingTiers.mjs';
 import { repositoryImageAvailabilityV2, evaluateRepositoryObservationsV2 } from './observationsV2.mjs';
@@ -47,7 +48,7 @@ export async function writeRepositoryProducerFileV2({ profile, artifactDirectory
 }) {
   proofRecord(dependencies, ['tools', 'source', 'image']);
   if (Object.values(dependencies).some(value => typeof value !== 'function')) invalid();
-  const env = repositoryToolEnvironmentV2(environment), context = capturedImageContext(imageContext);
+  const env = auditToolEnvironmentV2(environment), context = capturedImageContext(imageContext);
   let selectedCanaries;
   try { selectedCanaries = parseClientBundleCanariesV2(canaries); }
   catch { /* The single canary control owns missing/invalid subset configuration. */ }

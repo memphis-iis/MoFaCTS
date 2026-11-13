@@ -26,6 +26,24 @@ fresh-scope attribution. These source helpers grant no access and acquire no
 provider credentials. Live remaining protocols, complete fixture/lease ownership,
 new evidence-contract catalog activation and a complete authentication artifact
 remain pending. The immutable historical boolean helper is test-only.
+
+`authentication/protocolBindingsV2.mjs` owns the value-only
+`MoFaCTSAuditProtocolBindingsV1` preparation/validation and child projections.
+It generates seven fresh scoped credentials, accepts the existing operator as
+the eighth actor, rejects policy/role/unused IMAP blocks and projects the accepted
+selected schema. A credential plan does not create an account or establish its
+server ownership/role; the fixture owner must verify both before acquisition.
+`core/childEnvironmentV2.mjs` owns the shared explicit Linux-tool and Windows-
+browser environment profiles. Repository callers use the unchanged Linux
+allowlist; authentication children receive only their scenario's actor/value
+subset through private input, with no provider, signing or mailbox credential.
+Unknown variables and Node injection/filter flags fail at that shared boundary.
+
+P2-D2's [passwordless identity review](../../../deploy/security-audit/passwordless-identity-review.md)
+records a separate existing history-only identity inference. Its proposed login
+gate change is pending approval; source characterization does not establish that
+affected accounts exist in a deployed database. No account migration is implied.
+
 The repository and metadata entry points share the existing V2 owners. Metadata
 completion is stamped after acquisition; no environment revision or tag replaces
 a missing/mismatched protected receipt.

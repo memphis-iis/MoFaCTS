@@ -4,7 +4,8 @@ import { parseCiEvidenceJson } from '../qualification/ciEvidence.mjs';
 import { readCiFile, realDirectory } from '../qualification/collectCiEvidence.mjs';
 import { countPotentialSensitiveLogStatements } from '../scanner-parsers.mjs';
 import { proofRecord } from '../../../common/securityAudit/proofFields.ts';
-import { runRepositoryCommandV2, repositoryToolEnvironmentV2 } from './commandV2.mjs';
+import { runRepositoryCommandV2 } from './commandV2.mjs';
+import { auditToolEnvironmentV2 } from '../core/childEnvironmentV2.mjs';
 import { parseNodeSourceTestObservationV2 } from './observationsV2.mjs';
 
 const invalid = () => { throw new Error('Source inspection did not complete'); };
@@ -88,7 +89,7 @@ export async function observeSensitiveLoggingV2(serverDirectory) {
 export async function acquireRepositorySourceObservationsV2({ repositoryDirectory, environment },
   dependencies = { run: runRepositoryCommandV2 }) {
   if (!dependencies || Object.keys(dependencies).length !== 1 || typeof dependencies.run !== 'function') invalid();
-  const toolEnvironment = repositoryToolEnvironmentV2(environment);
+  const toolEnvironment = auditToolEnvironmentV2(environment);
   const root = await realDirectory(repositoryDirectory), app = await realDirectory(path.join(root, 'mofacts'));
   const run = async args => {
     try { return await dependencies.run({ command: process.execPath, args, cwd: app, environment: toolEnvironment,

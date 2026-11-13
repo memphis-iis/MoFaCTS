@@ -196,7 +196,7 @@ spending and destructive operations retain their explicit permission boundaries.
 
 | ID | Phase 2 deliverable | Current state / next evidence |
 | --- | --- | --- |
-| P2-01 | Source-owned verification intent for all authorization controls | Selected 29 cases complete under P1-D8; 21 protocol controls remain. Extend the single planned catalog without changing the accepted selected subset. |
+| P2-01 | Source-owned verification intent for all authorization controls | [x] Exact source references for all 22 controls and 68 unique verification entries pass Node and Meteor slot 8. The accepted 29-case subset is unchanged. This closes intent, not live acquisition or whole-runtime coverage. |
 | P2-02 | Exact value-only protected fixture binding contract | Selected binding parser complete; protocol actor/mail/session/lockout values and validation remain. No protected source read is implied. |
 | P2-03 | Transport, scenario and evaluator decomposition | Existing selected method/publication/route/download adapters complete. Protocol families remain; keep acquisition separate from pure evaluation. |
 | P2-04 | Positive baselines paired with denials | Selected cases complete. Add verified protocol baselines; failed login, timeout or missing resource cannot prove safety. |
@@ -210,9 +210,11 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
 | P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
 
-Current next milestone: complete protocol ownership/coverage and live unused aged-token
-expiry. Connected-Gmail current reset/replay, two-session invalidation and fresh
-session lifetime pass; no mailbox credential is requested.
+Current decision: P2-D2, existing history-only passwordless identity inference.
+Review deploy/security-audit/passwordless-identity-review.md before changing
+login eligibility. Source/binding/process work below is complete to its stated
+boundary; no mailbox credential is requested. Full protocol ownership/coverage
+and live unused aged-token expiry remain open.
 Source/native reset and session-bound checks, fresh selected-inbox delivery and
 the live logout subcase are accepted; do not repeat them unchanged. P2-06/07 are
 complete. Three Meteor invocations remain; live reset/expiry and complete
@@ -606,14 +608,86 @@ its remaining controls green.
   gate passes 359 cases, zero failures and seven existing conditional skips.
   Twenty affected focused cases pass. Initial new TS narrowing errors were
   corrected before qualification; no failure is waived.
-- [ ] Publish the intentional batch and execute three new registered
-  shared-contract Meteor cases using reserved slot 8.
-  P2-01 remains pending that supported proof; live passwordless, disclosure,
+- [x] Publish fe08499c and execute the three registered shared-contract cases:
+  slot 8 passes. P2-01 is complete; live passwordless, disclosure,
   comparison/throttle attribution, aged expiry and full artifact remain open.
 
 No live test, new credential, application permission, dependency, deployment or
 production action is introduced by this source batch. Prepare one clean committed
 source on the existing 6-GiB/two-CPU Linux worker. Do not dispatch hosted Actions.
+
+### Slot 8 accepted; protocol fixture bindings continue (2026-11-13)
+
+- [x] Native full suite on clean committed fe08499c passes: 1,027 server and
+  1,249 client tests, zero failures/hooks, 15/seven existing pending. The three
+  registered passwordless/catalog tests individually passed their required IDs.
+- [x] Verify source before/after equality, actual 6-GiB/two-CPU worker and
+  384-MiB/0.25-CPU Mongo limits, no OOM, read-only/capability-free isolation,
+  unchanged original local services and removal of all owned Docker resources.
+- [x] Retain and byte-verify all 26 proof files in the approved private evidence
+  directory. The Windows UNC copy did not materialize files; explicit Linux-owner
+  copying with exclusive creation/hash verification corrected that transfer.
+  No second Meteor invocation or evidence substitution occurred.
+- [x] P2-01 source intent is closed. P2-06/07 and P2-10 stay closed. Remaining
+  transport/fixture/coverage work must not reopen these unchanged proofs.
+- [ ] Continue the source-only value binding/projection and minimal child-input
+  work. The new parser generates seven scoped credentials, validates eight actor
+  identities including the existing operator, rejects unused/legacy IMAP/policy
+  blocks and projects the accepted selected schema rather than storing two copies.
+  Its three focused Node tests pass; final full checks/integration remain pending.
+
+Native acceptance SHA-256:
+ac1f5445e30a031466ff980900f46dcc97b5031b026fa008ca54f9ad6016d8aa.
+Native receipt SHA-256:
+a5bc9a867196edb7722d2747e5bfd2bdbbaaf10c312b16f67d7850c451e295ed.
+This is supported Meteor/source evidence, not GitHub or release/image acceptance.
+No staging2 account or application change was made by the native run. Two Meteor
+slots remain; no additional run is reserved for the Node-only binding work.
+
+### Protocol binding/process batch complete; P2-D2 decision (2026-11-13)
+
+- [x] Finish the value-only protocol binding contract and selected projection.
+  Eight exact distinct actor IDs/usernames/passwords are required; only seven
+  fresh credentials are generated because the operator already exists. Source
+  owns the two target names, participant ID and per-scope attempt budgets.
+  Policy flags, extra credential blocks and IMAP data are rejected.
+- [x] Project each child to its required actors/values: selected five; comparison
+  learner; reset/expiry pair; passwordless operator/two learners; throttle canary.
+  No mailbox authorization or unrelated provider/signing data enters a child.
+- [x] Extract the existing environment validator into its shared core owner.
+  Linux's allowlist is unchanged; the explicit Windows browser profile adds only
+  required OS/bootstrap paths. Remove the old named export and update all actual
+  callers, rather than leaving a re-export or duplicate validator.
+- [x] Final full lint/330 surfaces and pinned Linux source gate pass: 364 cases,
+  zero failures, seven existing conditional skips. Five focused Windows binding/
+  environment cases pass. Three initial source regressions asserted the old
+  repository-owned environment error text; update them to the new core boundary
+  while preserving exact rejection and no-tool-call assertions. No failure waived.
+- [x] Canonical config/wiki paths verified; bounded dependent public-source search
+  finds no consumer of the new operator schema. No app/TDF field, migration or
+  public-facing control changes. Native slot 8 remains the shared-TS proof;
+  this later Node-only batch needs no additional Meteor invocation.
+- [x] Review the actual passwordless method before live fixture wiring. A source-
+  only injected-factory characterization confirms that an explicitly false
+  account with prior progress reaches token issuance and gets a caller-selected
+  target, whereas the same account without progress is denied. The initial VM
+  harness had a cross-realm String check error, corrected before characterization.
+  No production record was read and no deployed-account prevalence is claimed.
+- [ ] P2-D2: approve or reject replacing history-only inference with an explicit
+  experiment marker and stored matching target for existing passwordless resume.
+  Recommend the stricter gate, preserve all histories/accounts, and require
+  explicit operator repair for missing markers. This changes login eligibility,
+  so it is outside routine standing implementation authority. No gate/migration
+  change has been made. Review deploy/security-audit/passwordless-identity-review.md.
+
+Source witness SHA-256:
+7871447731068da1ed9eb1517f9ba8e4d458543d4d162a8d2fb7a50b12f5c183.
+Its four cases use synthetic records/dependency callbacks; they are not native
+Meteor or live login acceptance. The relevant participation grammar excludes @,
+so the specific source risk concerns matching non-email historical usernames.
+Modern ordinary email sign-ins and valid explicitly bound participants are not
+claimed broken. P2-01/06/07/10 stay checked off; complete Phase 2 and final
+production acceptance remain open. Eight Meteor slots consumed, two available.
 
 ## Standing execution ledger (2026-11-11)
 
@@ -625,7 +699,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 7 consumed, 1 reserved, 2 available.**
+**Current allowance: 10 total, 8 consumed, 0 reserved, 2 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -642,10 +716,10 @@ within this allowance. Do not import historical invocations into this counter.
 | 5 | c99de5d971ab2595e831af4c4378ffed7930ddbe | PASS 2026-11-12T21:20:06Z-21:21:17Z: 1,021 server/1,249 client, zero failures/hooks, 15/seven existing pending. Both new registered comparison cases pass. Exact source/isolation/resources/cleanup and unchanged local services verified. Private receipt: phase1-20261105/native-phase2-comparison-c99de5d9. |
 | 6 | f3d21e7403cb3bc54db144aec5b729d38956ddc5 | FAIL: 1,023 server passes/one new reset-fixture failure, 1,249 client passes; 15/seven pending, zero hook failures. Mixed-case fixture email did not match the canonical lowercase reset query. Owned resources removed. Failed evidence: phase1-20261105/native-phase2-reset-f3d21e74-failed. |
 | 7 | efa3bd73a75b9df1172e01347498f06a1c5ff3b1 | PASS 2026-11-13T01:25:14Z-01:26:48Z (November 12 local): 1,024 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered reset/session cases pass. Source/isolation/resources/cleanup and unchanged original services verified. Private receipt: phase1-20261105/native-phase2-reset-efa3bd73. |
-| 8 | Reserved: next committed protocol source batch | One supported 6-GiB/two-CPU Linux invocation for the three registered passwordless/coverage cases. No invocation yet; record exact SHA before run and reconcile the invocation marker. |
+| 8 | fe08499c7d3ed4b415d181445b0b05c257a079a2 | PASS 2026-11-13T13:41:02Z-13:42:18Z: 1,027 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered passwordless/catalog cases pass. Exact clean source, actual 6-GiB/two-CPU isolation, original-service uptime and owned-resource cleanup verified. Private: phase1-20261105/native-phase2-protocol-fe08499c. |
 | 9-10 | Pending | Available. |
 
-Current result: the V2 admin presentation milestone is published and verified.
+Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
 The approved authentication inventory operation is complete: one successful
 read, sanitized evidence retained, backup labels unchanged and all temporary
