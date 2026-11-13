@@ -1340,6 +1340,10 @@ Exit gates:
 Phase 1 may deploy independently. It proves report completeness and evidence shape; P1-D8 additionally requires correct typed outcomes and baselines for the existing selected authorization cases. It does not qualify the remaining authorization scenarios or the current whole-runtime surface checker. Phase 0 should freeze evidence shapes broad enough for the planned Phase 2/3 observations. If either later phase changes a control's claimed property, profile membership, or evidence-contract shape, it requires a new catalog/evidence-contract version and another coordinated receiver/workflow cutover; a scanner-only deploy is allowed only when those contracts remain unchanged. Admin and operator language must preserve these distinctions until phases 2 and 3 finish.
 
 ### Phase 2 — Authorization evidence
+P2-D1 dependency review: [standalone mailbox reader](../deploy/security-audit/mailbox-reader-review.md).
+The existing inbox is approved and delivery is verified. Adding the optional
+IMAP client remains pending explicit dependency approval; this is not authority
+to create/copy mailbox credentials or recover protected production values.
 
 Deliverables:
 

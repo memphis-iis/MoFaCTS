@@ -203,9 +203,9 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-05 | Exact policy denial categories | Shared closed outcome union/decision table complete. Protocol-specific classifications and complete expected vectors remain. |
 | P2-06 | Scoped publication canaries/store isolation | [x] Complete for Phase 2: accepted selected own/other/anonymous progress cases and six real-Mongo cases. Reuse proof; new registry scenarios belong to Phase 3. |
 | P2-07 | Download mint/fetch/content/replay | [x] Complete for Phase 2: accepted selected own-history/admin report issuance/content/replay. Reuse these exact capabilities; newly declared registry surfaces belong to Phase 3. |
-| P2-08 | Reset/session preconditions and unused aged token | Not implemented for V2. Current app reset lifetime is one hour; real mailbox proof and unused aged-token precondition required. |
+| P2-08 | Reset/session preconditions and unused aged token | Source/native aged/current/replay/password/storage qualification accepted on efa3bd73; fresh inbox delivery accepted. Live unused aged-token and complete session-transport/lease acceptance remain. |
 | P2-09 | Run lock/namespace/idempotent cleanup/recovery | Existing selected synthetic ownership/cleanup accepted; add mutation contracts and recovery for every protocol family. |
-| P2-10 | Positive lower and upper session-lifetime bounds | Current app config is 30 days. Existing one-snapshot evidence cannot be relabeled as two-bound proof; preserve append-only contracts. |
+| P2-10 | Positive lower and upper session-lifetime bounds | Source/native bound validation accepted: strictly positive and at most 30 days. Append-only v2 evidence added; fresh identity-bound live session measurement still required. |
 | P2-11 | Exact Phase 2 control coverage | 22 authentication controls: one selected authorization control acquired, 21 currently explicit ERROR. No whole-runtime coverage claim before Phase 3. |
 | P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
 | P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
@@ -362,8 +362,8 @@ unused token record is eligible independently of expiry before attempting it.
 No application reset code or password policy changes; no test is skipped.
 
 The failed run retained 1,023 server passes/one failure and 1,249 client passes,
-zero hook failures, 15/seven existing pending. Its three shared contract cases
-and native token-expiration generator ran; the combined reset case is not accepted.
+zero hook failures, 15/seven existing pending. Its two shared contract cases passed
+and the native token-expiration generator ran; the combined reset case is not accepted.
 The job's containers, network and cache are absent. Do not claim a successful
 source-after/native verification receipt for a failed run. Private meteor-run.json
 SHA-256: ef1743b94aad0e605c64a0dcd947e6812cdd354a0f2bee2a08ea8c228034e5f4.
@@ -373,6 +373,57 @@ cases with zero failures and seven conditional skips, including two new logout
 adapter cases that remain local until this native correction passes. Reserve
 slot 7 before publishing this correction under the standing retest exception.
 New staging operations remain blocked until the applicable native proof passes.
+
+### Corrected reset/session native acceptance (2026-11-12 local)
+
+- [x] Standing slot 7 passes on efa3bd73: 1,024 server/1,249 client, zero failures
+  or hook failures, 15/seven existing pending. All three required registered
+  cases pass, including the actual registered reset method/native Accounts case.
+  The slot-6 failure remains retained and consumes its own allowance slot.
+- [x] Verify exact committed source before/after, read-only source mounts,
+  capability-free worker, 6-GiB/two-CPU caps, no OOM, removed owned resources
+  and unchanged original local services. Three authorized runs remain.
+- [x] Retain independent acceptance and native receipts under private
+  phase1-20261105/native-phase2-reset-efa3bd73. Acceptance SHA-256:
+  ea2ff0c33bae8a3ef13191d01e375a48e11315aa3591387960ba413cc05c72cd;
+  native receipt SHA-256:
+  7decb3f5cd295cc35f17e7141b363dcaf27120b0ca531fff38cba07807edc31c.
+- [x] Reset source/native qualification is complete for the registered synthetic
+  aged/current/replay/stored-session behaviors. P2-08 and P2-10 still require
+  live transport/fixture/lease observations; do not turn this into mailbox
+  wall-clock expiry, live logout or an application image/deployment claim.
+
+### Logout acquisition prepared; standalone mailbox decision P2-D1
+
+The new operator-only browser adapter owns private original/clone/replay/relogin
+contexts and captures only finite typed outcomes. It requires two positive
+sessions, exact capability cloning, completed logout, a source-reviewed native
+resume denial and an actual guarded-method denial, plus a fresh password login
+afterward. Initialization/cleanup failures block acceptance; neither a timeout
+nor an arbitrary 403 proves revocation. Four focused Node tests and full lint
+pass; the complete Linux source gate passes 335 cases, zero failures, seven skips.
+This does not introduce an application method, alter authentication or require
+another Meteor run for the Node-only transport adapter. The corrected native
+proof remains bound to efa3bd73, not the forthcoming operator-helper commit.
+
+A bounded current staging2 read confirms revision 1c72734b still running. Its
+Docker .Image value is native image ID
+sha256:a3d9bdca33831351a042fc4ba4bbcd466887b4776aea1a214d783b9be630dae9;
+do not call that a verified platform/config digest or repeat graph qualification.
+Only the revision/native-ID metadata was read; no secret settings or learner
+record was retrieved. The new live logout observation remains pending.
+
+P2-D1 is the next concrete dependency decision: the existing connected Gmail
+operator lane proves delivery but does not implement a portable standalone IMAP
+reader. No IMAP client exists in current package/optional-tool lockfiles. The
+retired curl helper mixed sequence SEARCH results with UID fetch and fetched
+whole messages. The recommended maintained client, ImapFlow 2.11.0 (MIT), would
+live only in a separate optional audit-tool package with pinned transitive
+resolution, verified TLS and read-only, exact-recipient selected-body access.
+No dependency is installed and no provider/recovery access is granted by this
+proposal. Review deploy/security-audit/mailbox-reader-review.md. Existing root
+rules require explicit approval before adding a dependency; keep that distinct
+from the already approved inbox choice and ordinary staging fixture access.
 
 ## Standing execution ledger (2026-11-11)
 
@@ -384,7 +435,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 6 consumed, 1 reserved, 3 available.**
+**Current allowance: 10 total, 7 consumed, 0 reserved, 3 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -400,7 +451,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 4 | 1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140 | PASS 2026-11-11T22:06:49Z-22:08:23Z: 1,018 server/1,249 client, zero failures/hooks, 15/seven existing pending. Shared catalog/outcome cases and all six registered real-Mongo progress-publication cases pass. Exact source/isolation/resources/cleanup pass. Private receipt: phase1-20261105/native-local-authorization-1c72734b. |
 | 5 | c99de5d971ab2595e831af4c4378ffed7930ddbe | PASS 2026-11-12T21:20:06Z-21:21:17Z: 1,021 server/1,249 client, zero failures/hooks, 15/seven existing pending. Both new registered comparison cases pass. Exact source/isolation/resources/cleanup and unchanged local services verified. Private receipt: phase1-20261105/native-phase2-comparison-c99de5d9. |
 | 6 | f3d21e7403cb3bc54db144aec5b729d38956ddc5 | FAIL: 1,023 server passes/one new reset-fixture failure, 1,249 client passes; 15/seven pending, zero hook failures. Mixed-case fixture email did not match the canonical lowercase reset query. Owned resources removed. Failed evidence: phase1-20261105/native-phase2-reset-f3d21e74-failed. |
-| 7 | Canonical reset-fixture correction; exact source recorded after commit | Reserved for one corrected exact-source native run; no invocation yet. |
+| 7 | efa3bd73a75b9df1172e01347498f06a1c5ff3b1 | PASS 2026-11-13T01:25:14Z-01:26:48Z (November 12 local): 1,024 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered reset/session cases pass. Source/isolation/resources/cleanup and unchanged original services verified. Private receipt: phase1-20261105/native-phase2-reset-efa3bd73. |
 | 8-10 | Pending | Available. |
 
 Current result: the V2 admin presentation milestone is published and verified.
