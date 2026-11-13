@@ -42,9 +42,28 @@ Meteor tests exercise the same timing and evidence validators on both runtimes.
 These prove source contracts only. Mailbox acquisition, unused aged-token proof,
 session lifetime bounds, lease/recovery and live staging qualification remain open.
 
-A dedicated SMTP/IMAP test mailbox would allow protocol qualification without
-personal provider access. Any such tool must have its dependency approved,
-an immutable image pin, private networking, resource limits, synthetic recipients,
-bounded retention and verified cleanup. It must not replace staging2's normal
-mail configuration. Isolated qualification and actual deployed-target acceptance
-remain distinct; production mail and recovery access require separate approval.
+The operator approved reuse of the existing inbox on 2026-11-12. Configuration
+inspection confirms the retained staging learner aliases route to the operator's
+connected Gmail inbox. It is a mixed personal inbox, not a dedicated mailbox.
+Use the existing authorized connection for targeted operator acquisition; do not
+recover/copy the production IMAP password or grant a background runner general
+mailbox access merely to obtain reset evidence. Existing SMTP delivery stays
+unchanged. No new mail service or application dependency is required for this
+operator lane. This metadata inspection does not prove fresh mail delivery.
+
+`authentication/mailboxV2.mjs` owns the bounded mailbox observation contract.
+Each reset/expiry run binds an exact new recipient alias containing its fixture
+namespace, staging2 origin and a request window of at most two minutes. A provider
+adapter lists at most ten metadata records, selects exactly one fresh single-
+recipient match, then reads only that message's plain-text body (at most 16 KiB).
+Unrelated/stale/ambiguous messages cannot trigger a body read. The selected reset
+link must have the exact staging2 HTTPS origin/path, the bound email, one valid
+token and no extra query parameters, fragments or URL credentials. Capabilities
+stay in transient private runner input. Only the sanitized delivery receipt can
+enter retained evidence; it proves neither token validity nor expiry/replay.
+
+The pure adapter contract and its injected-transport tests do not implement
+unattended mailbox access or close live reset controls. Fresh delivery must be
+observed through the real provider adapter, with owned fixtures, the environment
+lease and cleanup/recovery prepared first. If a future unattended executor needs
+different mailbox credentials or permissions, review that access separately.

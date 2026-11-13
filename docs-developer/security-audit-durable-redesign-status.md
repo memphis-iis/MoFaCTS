@@ -263,6 +263,57 @@ Native receipt SHA-256:
 a628b24008e625314541f6d1e7377b7704118e3942808fbbe205c79b499be885.
 These are source/runtime proofs, not image qualification or deployment evidence.
 
+### Existing-inbox reuse and bounded delivery inspection (2026-11-12)
+
+Phil approved checking and reusing the existing inbox. The prior pending mailbox
+question is resolved for the operator lane; no new inbox/service or production
+IMAP-password recovery is needed. The existing staging learner credential
+metadata uses plus-recipient aliases of the connected operator Gmail account.
+That inbox is mixed personal mail, not a dedicated testing mailbox. Reuse the
+existing connected mail authorization for narrowly targeted operator acquisition;
+this grants no general background-runner credential copy or new provider access.
+
+- [x] Inspect only profile/configuration and bounded relevant message metadata.
+  No production host/backup access, settings change or existing-account reset.
+- [x] Add a provider-independent reset-mail observation boundary with exact
+  per-run recipient, two-minute request window, ten-message metadata bound,
+  body-read gating, 16-KiB plain-text limit and exact staging2 link checks.
+  Node tests reject unrelated/stale/duplicate/multi-recipient messages and
+  foreign origins, recipients, tokens, extra query parameters and fragments.
+- [x] Qualified source checks: full lint/330 surfaces and the complete Linux
+  V2 source gate pass (325 passes, zero failures, seven conditional skips).
+  No app TypeScript/runtime, package dependency or Meteor invocation changed;
+  five standing Meteor runs remain. The previous Meteor proof remains separate.
+- [x] Execute one temporary ordinary-account mail inspection on staging2 under
+  bounded access delegation. Scope: one unpredictable run-owned recipient,
+  public signUpUser, one requestPasswordReset, no teacher/admin role grant,
+  no content/history/provider changes. Credentials used private stdin and a
+  DPAPI-protected recovery file; the existing admin remained the cleanup owner.
+- [x] Preserve the failed first observation honestly: account creation succeeded,
+  but the operator lookup used the plus address as an unescaped regex. No reset
+  had been requested. Repair the exact-address lookup with RegExp.escape and
+  recover the same recorded account; do not create or reset another account.
+- [x] The recovered same-fixture request succeeded once. Its reset email was
+  selected by exact recipient, provider timestamp within the request window
+  and reset subject. Only that message body was read for acceptance. Check the
+  actual link's staging2 HTTPS origin/path, exact email and 64-hex capability;
+  retain only booleans/counts, never the raw message or capability. Do not follow
+  the link or change a password. The separate verification message body was not read.
+- [x] Guarded userAdminDeleteUser removed only the newly recorded account and
+  its owned reset state. Exact bounded admin publication lookup verified account
+  absence; the DPAPI credential file was removed. No permanent access was added.
+  The test messages remain in the inbox; no mailbox deletion/filter change occurred.
+- [ ] Integrate the qualified mailbox adapter with the complete protocol runner,
+  prepared environment lease, unused aged-token and reset/replay/session cases.
+  This delivery inspection advances P2-02/03/08; it does not close a complete
+  Phase 2 deliverable, turn an unacquired control green, prove token validity,
+  supply unattended mailbox credentials or qualify an application image.
+
+Private receipts: phase1-20261105/mailbox-mofacts_audit_fixture_a148f300d755.
+The failed and recovered request receipts remain separate. Permission lifetime
+was one owner-controlled temporary job, not automatic account expiry. Recovery
+and revocation were completed and verified; no fixture credential remains.
+
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/

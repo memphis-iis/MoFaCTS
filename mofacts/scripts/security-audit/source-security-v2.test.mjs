@@ -29,3 +29,4 @@ import './tests/operatorSecurityChecks.test.mjs';
 import './tests/operatorExposureV2.test.mjs';
 import './tests/imageStreamDiagnostics.test.mjs';
 import './tests/authenticationComparisonV2.test.mjs';
+import './tests/resetMailboxV2.test.mjs';
