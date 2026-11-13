@@ -581,6 +581,40 @@ provider authorization occurred. Three Meteor runs remain. The active report
 still marks unintegrated protocols ERROR; these receipts do not silently turn
 its remaining controls green.
 
+### Remaining protocol source intent and typed evaluation (2026-11-13)
+
+- [x] Extend the sole verification catalog to 68 unique source entries and exact
+  references for all 22 authentication controls. Keep the accepted 29 selected
+  cases unchanged. Catalog membership is source intent, not acquired coverage.
+- [x] Define twelve passwordless controls plus five required positive baselines.
+  Structural observed violations are FAIL; missing identity/store/hooks and
+  transport errors are ERROR. Method denials require exact source-reviewed
+  codes, including experiment-account-restricted for ordinary settings.
+- [x] Remove the unused current boolean passwordless helper; its test imports
+  only the existing immutable V1 historical fixture. There is one current policy
+  owner, not two tables maintained alongside each other.
+- [x] Add five bounded unintended-disclosure channel observations and three
+  exact-code throttle dimensions. No hook-less empty capture can pass. A dirty
+  window, unrelated limiter or incomplete budget cannot prove a throttle.
+  Own login storage/expected handoff are outside unintended-disclosure inputs,
+  consistent with the inspected original scanner; no auth permission changes.
+- [x] Reuse the exact comparison wire classifier and shared private canary parser;
+  share reset-control group membership from the catalog rather than repeating it.
+  Define mutation preconditions/cleanup/recovery for provisioning, logout and
+  throttling. Do not clear unowned limiter state to obtain a passing run.
+- [x] Full application typecheck/lint pass (330 surfaces); pinned Linux source
+  gate passes 359 cases, zero failures and seven existing conditional skips.
+  Twenty affected focused cases pass. Initial new TS narrowing errors were
+  corrected before qualification; no failure is waived.
+- [ ] Publish the intentional batch and execute three new registered
+  shared-contract Meteor cases using reserved slot 8.
+  P2-01 remains pending that supported proof; live passwordless, disclosure,
+  comparison/throttle attribution, aged expiry and full artifact remain open.
+
+No live test, new credential, application permission, dependency, deployment or
+production action is introduced by this source batch. Prepare one clean committed
+source on the existing 6-GiB/two-CPU Linux worker. Do not dispatch hosted Actions.
+
 ## Standing execution ledger (2026-11-11)
 
 Phil approved completion of the remaining written plan with intentional commits/
@@ -591,7 +625,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 7 consumed, 0 reserved, 3 available.**
+**Current allowance: 10 total, 7 consumed, 1 reserved, 2 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -608,7 +642,8 @@ within this allowance. Do not import historical invocations into this counter.
 | 5 | c99de5d971ab2595e831af4c4378ffed7930ddbe | PASS 2026-11-12T21:20:06Z-21:21:17Z: 1,021 server/1,249 client, zero failures/hooks, 15/seven existing pending. Both new registered comparison cases pass. Exact source/isolation/resources/cleanup and unchanged local services verified. Private receipt: phase1-20261105/native-phase2-comparison-c99de5d9. |
 | 6 | f3d21e7403cb3bc54db144aec5b729d38956ddc5 | FAIL: 1,023 server passes/one new reset-fixture failure, 1,249 client passes; 15/seven pending, zero hook failures. Mixed-case fixture email did not match the canonical lowercase reset query. Owned resources removed. Failed evidence: phase1-20261105/native-phase2-reset-f3d21e74-failed. |
 | 7 | efa3bd73a75b9df1172e01347498f06a1c5ff3b1 | PASS 2026-11-13T01:25:14Z-01:26:48Z (November 12 local): 1,024 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered reset/session cases pass. Source/isolation/resources/cleanup and unchanged original services verified. Private receipt: phase1-20261105/native-phase2-reset-efa3bd73. |
-| 8-10 | Pending | Available. |
+| 8 | Reserved: next committed protocol source batch | One supported 6-GiB/two-CPU Linux invocation for the three registered passwordless/coverage cases. No invocation yet; record exact SHA before run and reconcile the invocation marker. |
+| 9-10 | Pending | Available. |
 
 Current result: the V2 admin presentation milestone is published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.

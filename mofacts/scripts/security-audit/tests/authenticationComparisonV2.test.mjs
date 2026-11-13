@@ -50,8 +50,8 @@ test('versioned proofs preserve independent results and reject forged readiness,
 test('comparison catalog preserves selected 29 and owns four exact protocol qualifications and one shared sample policy', () => {
   assert.equal(AUTHORIZATION_VERIFICATIONS.length, 29);
   assert.equal(AUTHENTICATION_PROTOCOL_VERIFICATIONS.length, 4);
-  assert.equal(AUDIT_VERIFICATIONS.length, 40);
-  assert.equal(new Set(AUDIT_VERIFICATIONS.map(row => row.verificationId)).size, 40);
+  assert.equal(AUDIT_VERIFICATIONS.length, 68);
+  assert.equal(new Set(AUDIT_VERIFICATIONS.map(row => row.verificationId)).size, 68);
   assert.equal(new Set(AUTHENTICATION_PROTOCOL_VERIFICATIONS.map(row => row.verificationId)).size, 4);
   for (const row of AUTHENTICATION_PROTOCOL_VERIFICATIONS) {
     assert.equal(row.kind, 'protocolQualification');

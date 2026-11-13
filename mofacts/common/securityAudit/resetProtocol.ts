@@ -1,4 +1,4 @@
-import { AUTHENTICATION_RESET_POLICY, RESET_PROTOCOL_VERIFICATIONS } from './verificationCatalog.ts';
+import { AUTHENTICATION_RESET_POLICY, RESET_PROTOCOL_VERIFICATIONS, RESET_PROTOCOL_CONTROL_CASES } from './verificationCatalog.ts';
 import { AUTHORIZATION_OUTCOME_CATEGORIES, methodAuthorizationOutcome, type AuthorizationOutcomeCategory, type MethodAuthorizationObservation } from './authorizationOutcomes.ts';
 import { evaluateSourceVerificationVector } from './authorizationVerification.ts';
 import { proofBoolean, proofRecord } from './proofFields.ts';
@@ -52,7 +52,7 @@ export function evaluateResetProtocol(value: unknown) {
       transportErrorCount: cases.filter(entry => entry.outcome === 'TRANSPORT_OR_RUNNER_ERROR').length,
       inconclusiveCaseCount: cases.filter(entry => entry.outcome === 'INCONCLUSIVE').length }, results: cases };
   };
-  const currentIds = RESET_PROTOCOL_VERIFICATIONS.filter(entry => entry.verificationId.startsWith('authn.reset.current.')).map(entry => entry.verificationId);
-  return { current: group(currentIds), replay: group(currentIds),
-    expired: group(RESET_PROTOCOL_VERIFICATIONS.filter(entry => !entry.verificationId.endsWith('.replay')).map(entry => entry.verificationId)) };
+  return { current: group(RESET_PROTOCOL_CONTROL_CASES['authentication.reset-token.current-single-use']),
+    replay: group(RESET_PROTOCOL_CONTROL_CASES['authentication.reset-token.replay-rejected']),
+    expired: group(RESET_PROTOCOL_CONTROL_CASES['authentication.reset-token.expired-rejected']) };
 }

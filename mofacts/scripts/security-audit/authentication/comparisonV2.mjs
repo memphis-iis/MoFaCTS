@@ -44,6 +44,13 @@ function response(sampleSet, value) {
   return { category: 'observed', elapsedMs, fingerprint: canonicalAuditJson([code, row.reason, row.details]) };
 }
 
+// Reuse the exact login/reset wire classifier for throttle attribution while
+// discarding its private comparison fingerprint before returning any evidence.
+export function classifyAuthenticationAttemptV2(sampleSet, value) {
+  const { category, elapsedMs } = response(sampleSet, value);
+  return { category, elapsedMs };
+}
+
 export function captureAuthenticationComparisonPairV2(sampleId, existing, missing) {
   const sample = AUTHENTICATION_COMPARISON_SAMPLES.find(row => row.sampleId === sampleId);
   if (!sample) invalid();

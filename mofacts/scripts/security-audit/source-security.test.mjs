@@ -40,6 +40,8 @@ const {
   section,
 } = await historicalScannerModule('audit-lib.mjs');
 const { resolveCompositeUdpExposure } = await historicalScannerModule('composite-exposure.mjs');
+// Historical V1 behavior only; current passwordless policy lives in the source catalog.
+const { passwordlessContainmentOutcomes } = await historicalScannerModule('authentication-probes.mjs');
 import {
   boundedBuildExposureObservations,
   classifyDevelopmentDependencyPosture,
@@ -74,7 +76,6 @@ import {
   assertUniqueSemanticProbeIds,
   classifyAuthenticationTiming,
   classifyEnumeration,
-  passwordlessContainmentOutcomes,
   routeProbePassed,
   selectExpiredResetLink,
   semanticAuthorizationProbeId,

@@ -36,3 +36,5 @@ import './tests/sessionRevocationV2.test.mjs';
 import './tests/currentResetV2.test.mjs';
 import './tests/connectedGmailV2.test.mjs';
 import './tests/authenticationLeaseV2.test.mjs';
+import './tests/passwordlessProtocolV2.test.mjs';
+import './tests/materialThrottleV2.test.mjs';

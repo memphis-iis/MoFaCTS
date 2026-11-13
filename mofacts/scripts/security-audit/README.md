@@ -13,6 +13,19 @@ proof; the other 21 protocol scenarios remain explicit Phase 2 ERROR results.
 `run-selected-authorization-v2.mjs` accepts canonical private value-only bindings
 and writes canonical finite observations after browser cleanup.
 `emit-authentication-producer-v2.mjs` consumes only those finite observations.
+Phase 2 source intent now references all 22 authentication controls through
+`AUTHENTICATION_CONTROL_CASES` in the same verification catalog (68 unique
+verification entries, including baselines). This does not change the active
+producer's selected-only boundary. The current reset/two-session and lifetime
+subcases have live staging2 acceptance through the existing
+[connected Gmail procedure](../../../deploy/security-audit/connected-mail.md).
+The passwordless evaluator distinguishes observed violations from missing facts
+and exact method denials from unrelated errors. Material observation requires all
+five installed/complete channel hooks; throttle evaluation requires independent
+fresh-scope attribution. These source helpers grant no access and acquire no
+provider credentials. Live remaining protocols, complete fixture/lease ownership,
+new evidence-contract catalog activation and a complete authentication artifact
+remain pending. The immutable historical boolean helper is test-only.
 The repository and metadata entry points share the existing V2 owners. Metadata
 completion is stamped after acquisition; no environment revision or tag replaces
 a missing/mismatched protected receipt.

@@ -1,9 +1,21 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { AUTHORIZATION_VERIFICATIONS, auditVerification } from '../../../common/securityAudit/verificationCatalog.ts';
+import { AUTHORIZATION_VERIFICATIONS, auditVerification, AUDIT_VERIFICATIONS, AUTHENTICATION_CONTROL_CASES,
+  AUTHENTICATION_PROTOCOL_MUTATIONS, AUTHORIZATION_MUTATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../../../security-surface-contract.json', import.meta.url)));
+test('Phase 2 source intent closes exactly over the 22 catalog controls without claiming executed coverage', () => {
+  const catalog = JSON.parse(fs.readFileSync(new URL('../../../common/securityAudit/catalogs/control-catalog.v1.json', import.meta.url)));
+  assert.deepEqual(AUTHENTICATION_CONTROL_CASES.map(row => row.controlId).sort(), catalog.controls.filter(row => row.producerId === 'authentication').map(row => row.controlId).sort());
+  assert.equal(AUTHENTICATION_CONTROL_CASES.length, 22); assert.equal(AUDIT_VERIFICATIONS.length, 68);
+  const ids = new Set(AUDIT_VERIFICATIONS.map(row => row.verificationId));
+  assert.equal(ids.size, 68);
+  for (const control of AUTHENTICATION_CONTROL_CASES) {
+    assert.ok(Object.isFrozen(control)); assert.ok(control.verificationIds.every(id => ids.has(id)));
+  }
+  for (const entry of AUDIT_VERIFICATIONS) assert.ok(Object.hasOwn({ ...AUTHORIZATION_MUTATIONS, ...AUTHENTICATION_PROTOCOL_MUTATIONS }, entry.mutation));
+});
 test('selected authorization catalog has exact subjects and explicit successful baselines', () => {
   assert.equal(AUTHORIZATION_VERIFICATIONS.length, 29);
   assert.equal(new Set(AUTHORIZATION_VERIFICATIONS.map(row => row.verificationId)).size, 29);

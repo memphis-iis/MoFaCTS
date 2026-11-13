@@ -86,30 +86,6 @@ export function routeProbePassed({ actor, requestedPath, finalPath, expectDenied
   return expectDenied ? denied : !denied && finalPath === requestedPath;
 }
 
-export function passwordlessContainmentOutcomes(state) {
-  const definitions = [
-    ['authentication.passwordless.resume-token-issued', 'Anonymous sealed-link resume issues a login token', 'INFO', 'issuedToken', 'anonymous resume did not issue a token'],
-    ['authentication.passwordless.token-login', 'The issued passwordless token establishes its participant session', 'HIGH', 'tokenLogin', 'issued token did not establish a session'],
-    ['authentication.passwordless.participant-identity', 'The passwordless session retains the expected participant identity', 'HIGH', 'identityMatches', 'session identity did not match the participant'],
-    ['authentication.passwordless.experiment-flag', 'The passwordless session is marked as an experiment participant', 'MEDIUM', 'experimentFlag', 'session was not marked as an experiment participant'],
-    ['authentication.passwordless.sealed-target-binding', 'The passwordless session remains bound to its sealed experiment target', 'CRITICAL', 'targetMatches', 'session was not bound to the sealed experiment target'],
-    ['authentication.passwordless.modified-target-rejected', 'A passwordless participant cannot switch to a modified experiment target', 'CRITICAL', 'modifiedTargetRejected', 'modified experiment target was accepted'],
-    ['authentication.passwordless.admin-denied', 'A passwordless participant cannot call an admin method', 'CRITICAL', 'adminDenied', 'participant reached an admin method'],
-    ['authentication.passwordless.ordinary-account-denied', 'A passwordless participant cannot call an ordinary-account settings method', 'MEDIUM', 'ordinaryAccountDenied', 'participant reached getOwnOpenRouterSettings'],
-    ['authentication.passwordless.assigned-experiment-allowed', 'A passwordless participant can access the assigned experiment', 'INFO', 'assignedExperimentAllowed', 'assigned experiment was unavailable'],
-    ['authentication.passwordless.cross-user-method-denied', 'A passwordless participant cannot call a cross-user method', 'CRITICAL', 'crossUserMethodDenied', 'cross-user method was available'],
-    ['authentication.passwordless.cross-user-publication-contained', 'A passwordless participant cannot observe another user publication payload', 'CRITICAL', 'crossUserPublicationContained', 'another user payload was observable'],
-    ['authentication.passwordless.token-not-leaked', 'The issued passwordless token is absent from client-observable channels', 'CRITICAL', 'tokenNotLeaked', 'issued token appeared in a client-observable channel'],
-  ];
-  return definitions.map(([id, title, severity, stateKey, failure]) => ({
-    id,
-    title,
-    severity,
-    passed: Boolean(state[stateKey]),
-    failure,
-  }));
-}
-
 export function selectExpiredResetLink(links, nowMs, lifetimeMs) {
   if (!Array.isArray(links) || !Number.isFinite(nowMs) || !Number.isFinite(lifetimeMs) || lifetimeMs <= 0) {
     throw new Error('reset-link expiry input is invalid');

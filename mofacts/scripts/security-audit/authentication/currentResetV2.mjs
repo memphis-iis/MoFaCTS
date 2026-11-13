@@ -1,4 +1,4 @@
-import { RESET_PROTOCOL_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
+import { RESET_PROTOCOL_VERIFICATIONS, RESET_PROTOCOL_CONTROL_CASES } from '../../../common/securityAudit/verificationCatalog.ts';
 import { evaluateSourceVerificationVector } from '../../../common/securityAudit/authorizationVerification.ts';
 import { methodAuthorizationOutcome, evaluateAuthorizationOutcome, AUTHORIZATION_OUTCOME_CATEGORIES } from '../../../common/securityAudit/authorizationOutcomes.ts';
 import { resetAttemptOutcome } from '../../../common/securityAudit/resetProtocol.ts';
@@ -10,7 +10,7 @@ import { parseResetMailboxBindingV2, readResetMailboxMessageV2 } from './mailbox
 import { sessionResumeOutcomeV2 } from './sessionBrowserV2.mjs';
 
 const invalid = () => { throw new Error('Current reset acquisition is invalid'); };
-const currentCases = RESET_PROTOCOL_VERIFICATIONS.filter(row => row.verificationId.startsWith('authn.reset.current.'));
+const currentCases = RESET_PROTOCOL_VERIFICATIONS.filter(row => RESET_PROTOCOL_CONTROL_CASES['authentication.reset-token.current-single-use'].includes(row.verificationId));
 
 // The fixture/lease owner provides private transport callbacks and owns cleanup.
 // This scenario never creates credentials or acquires a mailbox authorization.
