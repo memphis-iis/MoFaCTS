@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { createEventDispatcher } from 'svelte';
   import type { PoseObservation } from '../services/poseTracking';
   import { CALIBRATION_FRAMES, createPoseCalibration, correctPose, distanceVector, segmentLengths, scoreDistances } from '../../../../../../learning-components/units/skeleton-demo/poseDistanceMatcher';
   import type { PoseScore } from '../../../../../../learning-components/units/skeleton-demo/poseDistanceMatcher';
   export let observation: PoseObservation | null = null;
+  const dispatch = createEventDispatcher<{ bodyTracking: boolean }>();
   const calibration = createPoseCalibration();
   let collecting = false;
   let count = 0;
@@ -41,7 +43,7 @@
   const display = (score: PoseScore | null): string => score ? `${score.residual.toFixed(6)} (scale ${score.scale.toFixed(3)})` : 'Unavailable';
 </script>
 
-<details class="card pose-matcher-comparison">
+<details class="card pose-matcher-comparison" on:toggle={event => dispatch('bodyTracking', event.currentTarget.open)}>
   <summary>3D pose matcher comparison</summary>
   <div class="pose-matcher-comparison-body">
   <div class="skeleton-demo-controls">

@@ -167,10 +167,13 @@ export async function startGazeCalibration(): Promise<void> {
           tracker = module.default.webgazer as WebGazer;
           tracker.params.faceMeshSolutionPath = '/webgazer/mediapipe/face_mesh';
           tracker.saveDataAcrossSessions(false).applyKalmanFilter(false)
-            .showPredictionPoints(false).showFaceOverlay(false).showFaceFeedbackBox(false);
+            .showPredictionPoints(false).showVideoPreview(false).showFaceOverlay(false).showFaceFeedbackBox(false);
         }
         // Set a lease-scoped listener: revoked callbacks cannot clear a newer bin.
         tracker.setGazeListener(sample => { if (isCurrent()) receive(sample); });
+        // The calibration component places the preview in its reserved layout
+        // after begin creates it. Do not flash the library's fixed overlay.
+        tracker.showVideoPreview(false);
         try { await tracker.begin(); }
         finally {
           // begin can leave a stream/DOM behind even when initialization fails.

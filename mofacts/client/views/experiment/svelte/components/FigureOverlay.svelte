@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { createFigureGestureController, FIGURE_GESTURE_LIMITS, type FigureGestureFrame, type FigureGestureResult, type GestureRect } from '../../../../../../learning-components/units/skeleton-demo/figureGestures';
+  import { createFigureGestureController, type FigureGestureResult, type GestureRect } from '../../../../../../learning-components/units/skeleton-demo/figureGestures';
   import type { PoseObservation } from '../services/poseTracking';
   import type { FigureId } from '../../../../../../learning-components/units/skeleton-demo/figureGeometry';
   import type { createFigureScene, FigureProjection } from '../services/figureScene';
@@ -29,11 +29,7 @@
   };
   export function resetGestures(): void { gesture.reset(); }
   export function update(frame: PoseObservation, mirrored: boolean): FigureGestureResult {
-    const gestureFrame: FigureGestureFrame = { ...frame, handedness: frame.handedness.map((label, index) => {
-      const confidence = frame.handednessConfidence[index];
-      return confidence !== undefined && confidence >= FIGURE_GESTURE_LIMITS.minHandednessConfidence ? label : '';
-    }) };
-    const result = gesture.update(gestureFrame, mirrored, { preview: bounds(host), palette: bounds(palette),
+    const result = gesture.update(frame, mirrored, { preview: bounds(host), palette: bounds(palette),
       targets: [{ id: 'cube', bounds: bounds(cubeButton) }, { id: 'pyramid', bounds: bounds(pyramidButton) }], activeFigure });
     scene?.apply(result); render(); return result;
   }

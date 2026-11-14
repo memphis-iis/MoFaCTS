@@ -32,7 +32,8 @@ export default defineConfig((Meteor) => {
     // The pinned Rspack package serves and injects every web client bundle
     // directly, including development/HMR. The stable npm config defaults
     // those bundles to commonjs2, whose final `module.exports` crashes in a
-    // browser script. Keep server and native-client output unchanged.
+    // browser script. Use a globalThis export that also works in workers.
+    // Keep server and native-client output unchanged.
     ...rspackClientOutputContract(Meteor),
     // HiGHS runs in a Node worker. Preserve its real npm files (including WASM)
     // instead of turning its loader into a virtual Rspack module identifier.

@@ -36,7 +36,9 @@ function harness() {
   const regression = { eyeFeaturesClicks: { length: 0 }, init() { this.eyeFeaturesClicks.length = 0; } };
   function stream(deviceId) {
     const track = { readyState: 'live', handlers: [], stop() { this.readyState = 'ended'; },
-      getSettings: () => ({ deviceId }), addEventListener(name, fn) { if (name === 'ended') this.handlers.push(fn); } };
+      getSettings: () => ({ deviceId }), getCapabilities: () => ({ width: { max: 1920 }, height: { max: 1080 } }),
+      async applyConstraints(constraints) { this.constraints = constraints; },
+      addEventListener(name, fn) { if (name === 'ended') this.handlers.push(fn); } };
     const value = { getTracks: () => [track], getVideoTracks: () => [track], track };
     streams.push(value); return value;
   }
@@ -66,6 +68,7 @@ function harness() {
     recordScreenPosition() { regression.eyeFeaturesClicks.length++; },
   };
   for (const name of ['saveDataAcrossSessions', 'applyKalmanFilter', 'showPredictionPoints', 'showVideoPreview', 'showFaceOverlay', 'showFaceFeedbackBox']) webgazer[name] = () => webgazer;
+  let bodyLoads = 0, handCalls = 0;
   const model = () => ({ close() { closes++; }, detectForVideo() { poses++; return { landmarks: [], worldLandmarks: [] }; } });
   const imports = {
     'meteor/tracker': { Tracker: { autorun(fn) { autoruns.push(fn); fn(); } } },
@@ -77,10 +80,10 @@ function harness() {
     'webgazer/dist/webgazer.commonjs2.js': { webgazer },
     '@mediapipe/tasks-vision': {
       FilesetResolver: { async forVisionTasks() { return {}; } },
-      PoseLandmarker: { POSE_CONNECTIONS: [], async createFromOptions() { if (poseGate) await poseGate.promise; return model(); } },
+      PoseLandmarker: { POSE_CONNECTIONS: [], async createFromOptions() { bodyLoads++; if (poseGate) await poseGate.promise; return model(); } },
       HandLandmarker: { HAND_CONNECTIONS: [], async createFromOptions() {
         if (handGate) await handGate.promise;
-        return { close() { closes++; }, detectForVideo() { return { landmarks: [], worldLandmarks: [], handedness: [] }; } };
+        return { close() { closes++; }, detectForVideo() { handCalls++; return { landmarks: [], worldLandmarks: [], handedness: [] }; } };
       } },
     },
   };
@@ -113,7 +116,7 @@ function harness() {
     workers, state: () => snapshot, listener: () => listener, regression,
     sample(x = 10) { for (let i = 0; i < 5; i++) { listener({ x, y: 20 }); now += 100; } },
     video: () => ({ srcObject: null, readyState: 2, currentTime: 0, videoWidth: 640, videoHeight: 480, pause() {}, async play() {} }),
-    counts: () => ({ requests, begins, closes, poses, frames: frames.size }),
+    counts: () => ({ requests, begins, closes, poses, bodyLoads, handCalls, frames: frames.size }),
     frame(time) { for (const [id, fn] of [...frames]) { frames.delete(id); fn(time); } },
     cameraPending() { return cameraGate = deferred(); }, gazePending() { return gazeGate = deferred(); },
     posePending() { return poseGate = deferred(); }, handPending() { return handGate = deferred(); }, resumePending() { return resumeGate = deferred(); },
@@ -135,6 +138,12 @@ test('calibrated gaze retains ordinary disabled units, hands camera to pose, and
   const oldListener = h.listener();
   const camera = h.capture(); const video = h.video();
   await camera.start(video, assert.fail);
+  assert.equal(h.settings.at(-1).video.resizeMode.exact, 'none');
+  assert.equal('width' in h.settings.at(-1).video, false);
+  assert.equal('height' in h.settings.at(-1).video, false);
+  assert.equal(h.streams.at(-1).track.constraints.resizeMode.exact, 'none');
+  assert.equal(h.streams.at(-1).track.constraints.width.ideal, 1920);
+  assert.equal(h.streams.at(-1).track.constraints.height.ideal, 1080);
   assert.equal(h.state().calibrated, false); assert.equal(h.state().sample, null);
   assert.equal(h.regression.eyeFeaturesClicks.length, 0);
   assert.equal(h.streams[0].track.readyState, 'ended');
@@ -196,6 +205,7 @@ for (const boundary of ['route', 'logout', 'lesson', 'pagehide']) {
         if (mode === 'hand-pending') gate = h.handPending();
         pending = tracking.start(h.video(), () => {}, assert.fail);
         await flush();
+        if (mode === 'pose-pending') { tracking.setBodyTracking(true); h.frame(100); await flush(); }
       }
       if (boundary === 'route') h.route('/dashboard');
       if (boundary === 'logout') h.logout();
@@ -245,13 +255,30 @@ test('hidden gaze retains calibration and stream; pose cadence skips hidden and 
   h.document.hidden = false; h.events.get('visibilitychange')();
   const camera = h.capture(); const video = h.video(); await camera.start(video, assert.fail);
   const tracking = h.tracking(); await tracking.start(video, () => {}, assert.fail);
-  h.frame(100); await flush(); h.frame(200); await flush(); assert.equal(h.counts().poses, 1);
-  video.currentTime++; h.frame(210); await flush(); assert.equal(h.counts().poses, 2);
-  video.currentTime++; h.frame(220); await flush(); assert.equal(h.counts().poses, 2);
-  h.document.hidden = true; h.frame(400); await flush(); assert.equal(h.counts().poses, 2);
+  h.frame(100); await flush(); h.frame(200); await flush(); assert.equal(h.counts().handCalls, 1);
+  video.currentTime++; h.frame(210); await flush(); assert.equal(h.counts().handCalls, 2);
+  video.currentTime++; h.frame(220); await flush(); assert.equal(h.counts().handCalls, 2);
+  h.document.hidden = true; h.frame(400); await flush(); assert.equal(h.counts().handCalls, 2);
   tracking.stop(); camera.stop();
 });
 
+
+test('hand tracking never loads a body model until explicit comparison, and closing it stops body inference', async () => {
+  const h = harness(), tracking = h.tracking(), video = h.video();
+  let latest;
+  await tracking.start(video, observation => { latest = observation; }, assert.fail);
+  h.frame(100); await flush();
+  assert.equal(h.counts().bodyLoads, 0); assert.equal(h.counts().poses, 0);
+  assert.equal(h.counts().handCalls, 1); assert.deepEqual(Array.from(latest.landmarks), []);
+  tracking.setBodyTracking(true); video.currentTime++; h.frame(200); await flush();
+  assert.equal(h.counts().bodyLoads, 1); assert.equal(h.counts().poses, 1);
+  tracking.setBodyTracking(false); video.currentTime++; h.frame(300); await flush();
+  assert.equal(h.counts().poses, 1); assert.equal(h.counts().handCalls, 3);
+  assert.equal(h.counts().closes, 1, 'Closing comparison releases its body model');
+  tracking.setBodyTracking(true); video.currentTime++; h.frame(400); await flush();
+  assert.equal(h.counts().bodyLoads, 2); assert.equal(h.counts().poses, 2);
+  tracking.stop();
+});
 
 test('queued gaze cancellations and repeated stops cannot erase a newer start or acquire an extra stream', async () => {
   const h = harness();
