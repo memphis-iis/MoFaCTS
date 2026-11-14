@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { rspack, NormalModuleReplacementPlugin } = require('@rspack/core');
 
-async function buildFixture({ captureSubmissions = false } = {}) {
+async function buildFixture({ captureSubmissions = false, realStartup = false } = {}) {
   const app = path.resolve(__dirname, '..');
   fs.mkdirSync(path.join(app, '../tmp'), { recursive: true });
   const directory = fs.mkdtempSync(path.join(app, '../tmp/sparc-reading-'));
@@ -24,6 +24,23 @@ async function buildFixture({ captureSubmissions = false } = {}) {
   stub('sparcControllerDialogueOpenRouter', 'export const createSparcDialogueOpenRouterProvider = () => ({ prepareAssessment: async () => {} });');
   stub('sparcOpenRouterSession', "export const createSparcOpenRouterSession = () => ({ sessionIdForScope: () => 'synthetic' });");
   stub('sparcRuntimeState', 'export const readSparcResumeSnapshot = () => ({ nodeValues: {}, retainedHistoryRecords: window.fixture.historyRecords || [] });');
+  if (realStartup) {
+    delete replacements.sparcRuntimeState;
+    const commit = path.join(app, 'client/views/experiment/svelte/services/sparcAutoTutorRuleCommit.ts').replaceAll('\\', '/');
+    stub('sparcAutoTutorRuleCommit', `import * as real from ${JSON.stringify(commit)};
+      export const isSparcAutoTutorDisplay = real.isSparcAutoTutorDisplay;
+      const deps = { getUserId: () => 'synthetic', getIsAdmin: () => true, writeHistory: row => window.fixture.writeHistory(row) };
+      export const commitSparcAutoTutorDocumentLoad = params => real.commitSparcAutoTutorDocumentLoad({ ...params, deps });
+      export const commitSparcAutoTutorSubmit = params => real.commitSparcAutoTutorSubmit({ ...params, deps });`);
+    stub('sparcControllerDialogueOpenRouter', `export const createSparcDialogueOpenRouterProvider = () => ({
+      prepareAssessment: display => window.fixture.prepareAssessment(display),
+      generateOrientation: () => 'We will study the synthetic condition. One learning goal remains.',
+      generateTutorUtterance: request => window.fixture.generate(request),
+      scoreLearnerResponse: () => { throw Error('Unexpected assessment'); }
+    });`);
+    stub('historyWire', 'export const insertCompressedHistory = () => { throw Error("Unexpected server call"); }; export const insertCompressedHistoryBatch = insertCompressedHistory;');
+    stub('recoverableWarnings', 'export const reportRecoverableWarning = () => {};');
+  }
   stub('sparcProductionRuleActionCommit', "export const commitSparcProductionRuleAction = () => { throw Error('Unexpected production action'); };");
   stub('sparcAutoTutorProgress', `export const buildSparcAutoTutorProgressSnapshot = () => ({ completed: false, turnCount: 0, coveredExpectations: 0,
     requiredExpectations: 1, misconceptionScore: 0, totalMisconceptions: 0 });
@@ -38,18 +55,20 @@ async function buildFixture({ captureSubmissions = false } = {}) {
     import Surface from ${JSON.stringify(surface)};
     export let initial; let current = initial;
     export function update(props) { current = { ...current, ...props }; }
-  </script><Surface {...current} />`);
+  </script><Surface {...current} ${realStartup ? 'on:runtimeevent={event => { if (event.detail.sparcNodeValues) current = { ...current, runtimeNodeValues: event.detail.sparcNodeValues }; }}' : ''} />`);
   const entry = write('entry.js', `import { mount, unmount, tick } from 'svelte';
     import Fixture from ${JSON.stringify(wrapper.replaceAll('\\', '/'))};
+    ${realStartup ? `import { commitSparcTrialDisplayAutoTutorRules } from '${path.join(app, '../learning-components/units/sparcsession/sparcTrialDisplayRuntimeBridge.ts').replaceAll('\\', '/')}';` : ''}
     let instance;
     window.fixture = { submissions: [], submissionPresentations: [], checkRemovals: async () => [], readImage: async () => { throw Error('Unconfigured image'); },
+      ${realStartup ? 'commitSparcTrialDisplayAutoTutorRules, prepareAssessment: async () => {},' : ''}
       async mount(props) { if (instance) await unmount(instance); instance = mount(Fixture, { target: document.querySelector('#fixture'), props: { initial: props } }); await tick(); },
       async update(props) { instance.update(props); await tick(); },
       async destroy() { if (instance) await unmount(instance); instance = undefined; await tick(); }
     };`);
   const compiler = rspack({
     mode: 'development', devtool: false, context: app, entry,
-    output: { path: directory, filename: 'fixture.js' },
+    output: { path: directory, filename: 'fixture.js', publicPath: '' },
     resolve: { extensions: ['.ts', '.js', '.svelte'], conditionNames: ['svelte', 'browser', 'import', 'default'], modules: [path.join(app, 'node_modules'), 'node_modules'] },
     module: { rules: [
       { test: /\.svelte$/, use: [{ loader: require.resolve('./loaders/svelte-loader-wrapper.cjs'), options: { compilerOptions: { dev: true } } }] },

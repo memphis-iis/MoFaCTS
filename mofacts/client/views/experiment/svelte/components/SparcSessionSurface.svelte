@@ -126,6 +126,7 @@
   let observedAutoTutorDialogueSignature = '';
   let mounted = false;
   let startedDialogueScope = '';
+  let dialogueLifetime = new AbortController();
   let dialogueInitialized = false;
   let checkedContentIds = new Set(), removedContentIds = new Set(), removalSignature = '', removalError = '';
   let figureReadyKeys = new Set();
@@ -191,11 +192,12 @@
   }
   onMount(() => {
     mounted = true;
-    return () => { mounted = false; };
+    return () => { mounted = false; dialogueLifetime.abort(); };
   });
 
   async function startCategorizedDialogue(currentDisplay, scope) {
     if (dialogueSubmitPending && startedDialogueScope === scope) return;
+    const signal = dialogueLifetime.signal;
     startedDialogueScope = scope;
     dialogueInitialized = false;
     dialogueSubmitPending = true;
@@ -210,31 +212,32 @@
       const provider = createSparcDialogueOpenRouterProvider({
         personas: parseSparcPersonas({ student: Meteor.user()?.profile?.sparcPersona, teacher: engine.curUnit.sparcsession.teacherPersona }),
         contentLanguage: Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.contentLanguage,
-        readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: activity => { if (mounted && dialogueScope === scope) reportDialogueActivity(activity); }, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
+        readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: activity => { if (!signal.aborted && mounted && dialogueScope === scope) reportDialogueActivity(activity); }, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
         tdfId, sessionId: openRouterSession.sessionIdForScope({ tdfId, attemptId, pageKey: currentDisplay.pageKey }) });
       await provider.prepareAssessment(currentDisplay);
-      const result = await commitSparcAutoTutorDocumentLoad({ engine, currentDisplay, tdfId, userId, attemptId, levelUnit,
+      signal.throwIfAborted();
+      const result = await commitSparcAutoTutorDocumentLoad({ signal, engine, currentDisplay, tdfId, userId, attemptId, levelUnit,
         scoreLearnerResponse: provider.scoreLearnerResponse, generateTutorUtterance: provider.generateTutorUtterance,
         generateOrientation: provider.generateOrientation,
         onNodeValues: async values => {
-          if (!mounted || dialogueScope !== scope) return;
+          if (signal.aborted || !mounted || dialogueScope !== scope) return;
           dispatchSparcNodeValues(values, timestamp); await tick();
         },
       });
-      if (!mounted || dialogueScope !== scope) return;
+      if (signal.aborted || !mounted || dialogueScope !== scope) return;
       dispatch('runtimewatchedstatechanged');
       dispatchSparcNodeValues(result.sparcNodeValues, timestamp);
       dialogueInitialized = true;
     } catch (error) {
-      if (!mounted || dialogueScope !== scope) return;
+      if (signal.aborted || !mounted || dialogueScope !== scope) return;
       dispatchSparcNodeValues(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit,
         pageKey: currentDisplay.pageKey, display: currentDisplay }).nodeValues, timestamp);
       dialogueSubmitError = platformText('sparc.serviceError');
       dialogueSubmitErrorDetail = dialogueSubmissionErrorDetail(error);
       clientConsole(1, '[SPARC][Dialogue] initialization failed', { detail: dialogueSubmitErrorDetail });
     } finally {
-      if (mounted && dialogueScope === scope) dialogueSubmitPending = false;
-      if (mounted && dialogueScope === scope) {
+      if (!signal.aborted && mounted && dialogueScope === scope) dialogueSubmitPending = false;
+      if (!signal.aborted && mounted && dialogueScope === scope) {
         await tick();
         const nextControl = surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
           || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
@@ -697,6 +700,7 @@
 
   async function commitSparcSubmitProductionRules(detail, submissionPresentation) {
     const scope = dialogueScope;
+    const signal = dialogueLifetime.signal;
     if (subsetKind !== 'question') {
       return { canSubmit: true };
     }
@@ -728,6 +732,7 @@
       let result;
       try {
         result = await commitSparcAutoTutorSubmit({
+          signal,
           submissionPresentation,
           engine,
           currentDisplay,
@@ -1072,6 +1077,9 @@
   $: categorizedDialogue = autoTutorDialogueMode && isSparcCategorizedPolicy(sparcDisplay?.instructionalController?.policyId);
   $: dialogueScope = JSON.stringify([userId, tdfId, attemptId, levelUnit, sparcDisplay?.pageKey]);
   $: if (readinessScope !== dialogueScope) {
+    dialogueLifetime.abort();
+    dialogueLifetime = new AbortController();
+    dialogueSubmitPending = false;
     readinessScope = dialogueScope;
     figureReadyKeys = new Set();
     figureFailedKeys = new Set();

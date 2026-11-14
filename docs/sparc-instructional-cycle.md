@@ -307,8 +307,14 @@ Retries and reloads use the last durable checkpoint, preserving the explanation
 and its brief instead of regenerating completed work. Lost publication
 acknowledgements use the existing accepted library decision. Old incomplete
 unpaired moves are not resumed as matched instructions. Historical completed
-nodes remain readable. Navigation guards discard late UI updates from another
-scope. Loading messages are Preparing instruction, optional Preparing visual
+nodes remain readable. The SPARC surface owns an abort signal for each mounted
+dialogue scope. Navigation or a scope change cancels that controller's continuation:
+provider results and new history writes check the signal before acceptance. A write
+already sent retains its durable checkpoint, but cannot trigger further generation
+or UI publication after cancellation. Reopening resumes accepted checkpoints;
+abandoned startup work cannot keep writing into the resumed turn. This lifecycle
+does not introduce retries or weaken the server's conflicting-write rejection.
+Loading messages are Preparing instruction, optional Preparing visual
 support, and Preparing question; display order remains explanation, support,
 question. Client and server must be released together for the new instruction
 payload and checkpoint contract. No TDF authoring fields change.
