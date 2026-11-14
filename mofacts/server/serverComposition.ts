@@ -487,6 +487,7 @@ const {
 } = mediaReferenceHelpers;
 
 const packageMethods = createPackageMethods({
+  storageRoot: getLocalStoragePaths(Meteor.settings, process.env).dynamicAssetsPath,
   Tdfs,
   TdfMutationJobs,
   usersCollection: MeteorAny.users,
@@ -852,6 +853,7 @@ export const methods: any = {
     normalizeCanonicalId,
     canAccessContentUploadTdf,
     getOrBuildCurrentPackageAsset,
+    storageRoot: getLocalStoragePaths(Meteor.settings, process.env).dynamicAssetsPath,
     storageBoundary,
     parseLocalMediaReference,
     extractSrcFromHtml,
@@ -1103,7 +1105,8 @@ export const asyncMethods: Record<string, unknown> = {
   getTdfById: getTdfByIdPublic,
 
   ...speechMethods,
-  ...createSimulationTelemetryMethods({ getMethodAuthorizationDeps, writeHistory: (userId, record) => analyticsMethods.insertHistory.call({ userId }, record) }),
+  ...createSimulationTelemetryMethods({ getMethodAuthorizationDeps, writeHistory: (userId, record) => analyticsMethods.insertHistory.call({ userId }, record),
+    loadLesson: id => Tdfs.findOneAsync({ _id: id }, { fields: { 'rawStimuliFile.setspec.sparcPages': 1 } }) }),
 
   ...createSparcLibraryCurationMethods({ getMethodAuthorizationDeps,
     remove: id => withSparcFigureLibraryLock(() => sparcLibraryCuration.remove(id)), removed: readSparcAdministrativeRemovals }),

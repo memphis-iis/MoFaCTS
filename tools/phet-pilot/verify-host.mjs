@@ -14,14 +14,20 @@ try {
   const errors=[]; page.on('pageerror', error=>errors.push(error.message));
   page.on('console', message => { if (message.text().includes('[Simulation] Monitoring stopped:')) console.log(message.text()); });
   await signInLocalPilot(page);
+  // Legacy local settings may still exist; execution must not depend on them.
+  await page.evaluate(() => { delete Meteor.settings.public.simulationBuilds; });
   // Exercise the actual authoring palette and fields without saving test edits.
   await page.goto(`http://localhost:3200/sparcEdit/${activities[0].id}`);
   await page.locator('.sparc-palette-item').filter({hasText:'Simulation'}).click({timeout:60000});
-  const fields=page.locator('.sparc-context-card').filter({hasText:'Approved simulation build'});
+  const fields=page.locator('.sparc-context-card').filter({hasText:'Packaged simulation build'});
   await fields.getByLabel('Label',{exact:true}).fill('Authoring probe');
   await fields.getByLabel('Label',{exact:true}).press('Tab');
-  const approved=await page.evaluate(()=>Meteor.settings.public.simulationBuilds.find(build=>build.id.startsWith('density-')).id);
-  await fields.getByRole('combobox').selectOption(approved);
+  const source=JSON.parse(await readFile(path.join(root,'../mofacts_config/SPARC PhET Pilot/phet-density_stims.json'),'utf8'));
+  const packaged=source.setspec.sparcPages[0].display.nodes.find(node=>node.atomType==='simulation').simulation;
+  const buildField=fields.getByLabel('Packaged simulation build',{exact:true});
+  await buildField.fill(packaged.buildId); await buildField.press('Tab');
+  const assetField=fields.getByLabel('Simulation package assets (JSON)',{exact:true});
+  await assetField.fill(JSON.stringify(packaged.asset)); await assetField.press('Tab');
   const bindingText=JSON.stringify([{name:'mass',address:{path:'screens.1.model.blockA.massProperty'},projection:'value'}]);
   const bindings=fields.getByLabel('Observation bindings (JSON)',{exact:true});
   await bindings.fill(bindingText); await bindings.press('Tab');
@@ -31,7 +37,7 @@ try {
   await bindings.fill(bindingText); await bindings.press('Tab');
   assert.equal(await fields.getByRole('alert').count(),0);
   assert.equal(await page.locator('.sparc-simulation iframe').count(),0,'Authoring preview must not start telemetry');
-  const authoring={palette:true,approvedBuildSelection:true,bindingsValidation:true,previewDoesNotLaunch:true};
+  const authoring={palette:true,packagedBuildConfiguration:true,bindingsValidation:true,previewDoesNotLaunch:true};
   // Explicitly discard only these unsaved authoring probe changes.
   page.on('dialog',dialog=>dialog.accept());
   for (const activity of activities) {
@@ -48,7 +54,7 @@ try {
       window.pilotIngests=[];window.pilotAttempt='';window.pilotRuleLatencies=[];window.pilotStops=[];window.pilotChildErrors=[];window.pilotActivityActions=[];
       window.pilotCheckpointTimes=new Map();window.pilotChildTimeOrigin=null;
       window.addEventListener('message',event=>{
-        if(event.origin!=='http://127.0.0.1:3212'||event.source!==document.querySelector('.sparc-simulation iframe')?.contentWindow
+        if(event.origin!=='null'||event.source!==document.querySelector('.sparc-simulation iframe')?.contentWindow
           ||event.data?.protocol!=='phet-research'||event.data.sessionId!==window.pilotAttempt)return;
         if(event.data.kind==='error')window.pilotChildErrors.push(event.data.data);
         if(event.data.kind!=='batch')return;
@@ -84,7 +90,7 @@ try {
       await page.evaluate(()=>window.releasePilotResearch());
     };
     await page.getByRole('button',{name:'Start simulation',exact:true}).click();
-    await page.waitForFunction(()=>document.querySelector('.sparc-simulation iframe')?.src.startsWith('http://127.0.0.1:3212'),null,{timeout:15000});
+    await page.waitForFunction(()=>document.querySelector('.sparc-simulation iframe')?.src.startsWith('http://localhost:3200/dynamic-assets/'),null,{timeout:15000});
     const frame=await (await iframe.elementHandle()).contentFrame();
     await frame.waitForFunction(()=>window.phetResearchMonitor?.status().frame>5,null,{timeout:60000});
     if(!holdResearch) await page.waitForFunction(()=>window.pilotIngests.length>0,null,{timeout:15000});

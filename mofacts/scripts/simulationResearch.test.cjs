@@ -24,14 +24,17 @@ const raw = {
   }; },
 };
 const buildId = 'synthetic-build';
-const catalogBytes=Buffer.from(JSON.stringify({version:1,buildId,artifactSha256:'0'.repeat(64),protocolVersion:3,addresses:[{path:'screens.0.model.mass',coverage:'observed'}]}));
-const catalog={url:'https://simulation.example/catalog.json',sha256:require('node:crypto').createHash('sha256').update(catalogBytes).digest('hex')};
-global.fetch=async()=>({ok:true,arrayBuffer:async()=>catalogBytes.buffer.slice(catalogBytes.byteOffset,catalogBytes.byteOffset+catalogBytes.byteLength)});
+const artifactBytes=Buffer.from('<html>synthetic</html>');
+const artifactHash=require('node:crypto').createHash('sha256').update(artifactBytes).digest('hex');
+const catalogBytes=Buffer.from(JSON.stringify({version:1,buildId,artifactSha256:artifactHash,protocolVersion:3,addresses:[{path:'screens.0.model.mass',coverage:'observed'}]}));
+const catalog={url:'/dynamic-assets/catalog/catalog.json',sha256:require('node:crypto').createHash('sha256').update(catalogBytes).digest('hex')};
+const asset={url:'/dynamic-assets/html/sim.html',sha256:artifactHash,catalog};
+global.fetch=async url=>{const bytes=url===asset.url?artifactBytes:catalogBytes;return {ok:true,arrayBuffer:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)};};
 const lifecycleRows=new Map();
 const writeHistory=async(user,row)=>{const key=row.sparc.simulationActivity.sourceEventId;if(lifecycleRows.has(key))assert.deepEqual(lifecycleRows.get(key),row);else lifecycleRows.set(key,structuredClone(row));};
 const Meteor = {
   Error: class extends Error { constructor(code, message) { super(message); this.error = code; } },
-  settings: { public: { simulationBuilds: [{ id: buildId, url: 'https://simulation.example/sim.html', sha256: '0'.repeat(64), catalog }] } },
+  settings: { public: {} },
 };
 const load = Module._load;
 Module._load = function(name, parent, main) {
@@ -49,7 +52,7 @@ const storage = require('../server/lib/simulationTelemetry.ts');
 const { createSimulationTelemetryMethods } = require('../server/methods/simulationTelemetryMethods.ts');
 const { SimulationResearchHost } = require('../client/views/experiment/svelte/services/simulationResearchHost.ts');
 Module._load = load;
-const methods = createSimulationTelemetryMethods({ writeHistory, getMethodAuthorizationDeps: () => ({
+const methods = createSimulationTelemetryMethods({ writeHistory, loadLesson:async()=>({rawStimuliFile:{setspec:{sparcPages:[{pageId:'page',display:{nodes:[{id:'simulation',atomType:'simulation',simulation:{buildId,asset,bindings:[{name:'mass',address:{path:'screens.0.model.mass'},projection:'value'}]}}]}}]}}}), getMethodAuthorizationDeps: () => ({
   requireSparcLessonAccess: async (user, tdf) => { if (tdf !== 'lesson') throw Error('no lesson access'); },
   userIsInRoleAsync: async user => user === 'admin',
 }) });
@@ -58,6 +61,16 @@ const record = (sequence, type, data) => ({ sequence, order: sequence, frame: 1,
 const batch = (...records) => ({ firstSequence: records[0].sequence, lastSequence: records.at(-1).sequence, records });
 const initial = () => batch(record(1, 'catalog', { id: 'p', path: 'screens.0.model.mass', coverage: 'observed' }),
   record(2, 'initial', { id: 'p', state: { value: 5 } }), record(3, 'checkpoint', { evidenceComplete: true }));
+
+test('server validates and hashes the same single batch serialization', async () => {
+  const { attemptId } = await storage.startSimulationAttempt('serialization-learner', scope, writeHistory);
+  const input = initial();
+  let serializations = 0;
+  Object.defineProperty(input, 'toJSON', { value() { serializations++; return { ...input }; } });
+  await storage.ingestSimulationBatch('serialization-learner', attemptId, input);
+  assert.equal(serializations, 1);
+  assert.equal(rows.get(`${attemptId}:1`).batch.lastSequence, input.lastSequence);
+});
 
 test('durable duplicate acceptance, conflict rejection, ownership, interruption and rollback', async () => {
   rows.clear();
@@ -114,11 +127,11 @@ test('sequence gaps and terminal collector errors suspend acceptance', async () 
 test('host requires explicit start, ignores foreign windows and does not duplicate instructional decisions', async () => {
   const handlers = new Map(), frameHandlers = new Map(), sent = [], decisions = [], statuses = [];
   global.window = { location: { origin: 'https://host.example' }, addEventListener: (name, fn) => handlers.set(name, fn), removeEventListener: name => handlers.delete(name) };
-  const iframe = { src: 'about:blank', contentWindow: { postMessage: message => sent.push(message) },
+  const iframe = { getAttribute:()=> 'allow-scripts', src: 'about:blank', contentWindow: { postMessage: message => sent.push(message) },
     addEventListener: (name, fn) => frameHandlers.set(name, fn), removeEventListener: name => frameHandlers.delete(name) };
   Meteor.callAsync = async (name, ...args) => methods[name].call({ userId: 'learner' }, ...args);
   const host = new SimulationResearchHost({ iframe, scope,
-    config: { buildId, bindings: [{ name: 'mass', address: { path: 'screens.0.model.mass' }, projection: 'value' }] },
+    config: {buildId,asset, bindings: [{ name: 'mass', address: { path: 'screens.0.model.mass' }, projection: 'value' }] },
     status: value => statuses.push(value), observation: async (facts, evidence) => decisions.push({ facts, evidence }),
   });
   try {
@@ -126,14 +139,14 @@ test('host requires explicit start, ignores foreign windows and does not duplica
     await host.start(); frameHandlers.get('load')();
     const init = sent.at(-1);
     const receive = async (kind, data, source = iframe.contentWindow) => {
-      handlers.get('message')({ origin: 'https://simulation.example', source, data: { ...init, kind, data } });
+      handlers.get('message')({ origin: 'null', source, data: { ...init, kind, data } });
       await host.work;
     };
     const readiness = { evidenceComplete: true, scope: 'initialized-screen-models' };
     await receive('ready', readiness, {}); assert.notEqual(statuses.at(-1), 'running');
     await receive('ready', readiness);
     assert.equal(host.timer, undefined, 'a ready idle simulation has no heartbeat watchdog');
-    const initialMessage = { origin: 'https://simulation.example', source: iframe.contentWindow, data: { ...init, kind: 'batch', data: initial() } };
+    const initialMessage = { origin: 'null', source: iframe.contentWindow, data: { ...init, kind: 'batch', data: initial() } };
     handlers.get('message')(initialMessage);
     const bytes = host.queuedBytes;
     for (let retry = 0; retry < 100; retry++) handlers.get('message')({ ...initialMessage, data: structuredClone(initialMessage.data) });
@@ -151,12 +164,12 @@ test('host requires explicit start, ignores foreign windows and does not duplica
 test('partial startup omits unavailable metadata on the actual DDP argument shape', async () => {
  const handlers=new Map(),sent=[],calls=[];
  global.window={location:{origin:'https://host.example'},addEventListener:(name,fn)=>handlers.set(name,fn),removeEventListener:name=>handlers.delete(name)};
- const iframe={src:'about:blank',contentWindow:{postMessage:m=>sent.push(m)},addEventListener(){},removeEventListener(){}};
+ const iframe={getAttribute:()=> 'allow-scripts',src:'about:blank',contentWindow:{postMessage:m=>sent.push(m)},addEventListener(){},removeEventListener(){}};
  Meteor.callAsync=async(name,...args)=>{const wire=JSON.parse(JSON.stringify(args));if(name==='ingestSimulationResearchBatch')calls.push(wire);return methods[name].call({userId:'learner'},...wire);};
- const host=new SimulationResearchHost({iframe,scope,config:{buildId,bindings:[{name:'mass',address:{path:'screens.0.model.mass'},projection:'value'}]},status(){},observation:async()=>{}});
+ const host=new SimulationResearchHost({iframe,scope,config: {buildId,asset,bindings:[{name:'mass',address:{path:'screens.0.model.mass'},projection:'value'}]},status(){},observation:async()=>{}});
  try {
   await host.initialize();await host.start();host.loaded();const init=sent.at(-1);
-  const receive=async(kind,data)=>{handlers.get('message')({origin:'https://simulation.example',source:iframe.contentWindow,data:{...init,kind,data}});await host.work;};
+  const receive=async(kind,data)=>{handlers.get('message')({origin:'null',source:iframe.contentWindow,data:{...init,kind,data}});await host.work;};
   await receive('ready',{evidenceComplete:true,scope:'initialized-screen-models'});
   await receive('batch',batch(...initial().records.slice(0,2)));await host.traceWork;
   assert.equal(calls[0].length,2,'DDP must not receive undefined metadata as null');
@@ -168,7 +181,7 @@ test('partial startup omits unavailable metadata on the actual DDP argument shap
 test('a fresh explicit attempt cannot be stopped or blocked by a prior delayed request', async () => {
   const handlers = new Map(), frameHandlers = new Map(), sent = [], decisions = [], statuses = [];
   global.window = { location: { origin: 'https://host.example' }, addEventListener: (name, fn) => handlers.set(name, fn), removeEventListener: name => handlers.delete(name) };
-  const iframe = { src: 'about:blank', contentWindow: { postMessage: message => sent.push(message) },
+  const iframe = { getAttribute:()=> 'allow-scripts', src: 'about:blank', contentWindow: { postMessage: message => sent.push(message) },
     addEventListener: (name, fn) => frameHandlers.set(name, fn), removeEventListener: name => frameHandlers.delete(name) };
   let delayedAttempt, rejectDelayed;
   const delayed = new Promise((_resolve, reject) => { rejectDelayed = reject; });
@@ -176,10 +189,10 @@ test('a fresh explicit attempt cannot be stopped or blocked by a prior delayed r
   Meteor.callAsync = async (name, ...args) => name === 'ingestSimulationResearchBatch' && args[0] === delayedAttempt
     ? delayed : methods[name].call({ userId: 'learner' }, ...args);
   const host = new SimulationResearchHost({ iframe, scope,
-    config: { buildId, bindings: [{ name: 'mass', address: { path: 'screens.0.model.mass' }, projection: 'value' }] },
+    config: {buildId,asset, bindings: [{ name: 'mass', address: { path: 'screens.0.model.mass' }, projection: 'value' }] },
     status: value => statuses.push(value), observation: async facts => decisions.push(facts),
   });
-  const send = (init, kind, data) => handlers.get('message')({ origin: 'https://simulation.example', source: iframe.contentWindow, data: { ...init, kind, data } });
+  const send = (init, kind, data) => handlers.get('message')({ origin: 'null', source: iframe.contentWindow, data: { ...init, kind, data } });
   try {
     await host.initialize(); await host.start(); frameHandlers.get('load')();
     const prior = sent.at(-1); delayedAttempt = prior.sessionId;
@@ -210,9 +223,9 @@ test('a fresh explicit attempt cannot be stopped or blocked by a prior delayed r
 function reactiveFixture() {
   const handlers=new Map(), sent=[], decisions=[], statuses=[];
   global.window={location:{origin:'https://host.example'},addEventListener:(k,v)=>handlers.set(k,v),removeEventListener:k=>handlers.delete(k)};
-  const iframe={src:'about:blank',contentWindow:{postMessage:m=>sent.push(m)},addEventListener(){},removeEventListener(){}};
-  const host=new SimulationResearchHost({iframe,scope,config:{buildId,bindings:[{name:'mass',address:{path:'screens.0.model.mass'},projection:'value'}]},status:s=>statuses.push(s),observation:async facts=>decisions.push(facts.mass)});
-  return {host,sent,decisions,statuses,send(kind,data){handlers.get('message')({origin:'https://simulation.example',source:iframe.contentWindow,data:{protocol:'phet-research',version:3,buildId,sessionId:host.sessionId,kind,data}});}};
+  const iframe={getAttribute:()=> 'allow-scripts',src:'about:blank',contentWindow:{postMessage:m=>sent.push(m)},addEventListener(){},removeEventListener(){}};
+  const host=new SimulationResearchHost({iframe,scope,config: {buildId,asset,bindings:[{name:'mass',address:{path:'screens.0.model.mass'},projection:'value'}]},status:s=>statuses.push(s),observation:async facts=>decisions.push(facts.mass)});
+  return {host,sent,decisions,statuses,send(kind,data){handlers.get('message')({origin:'null',source:iframe.contentWindow,data:{protocol:'phet-research',version:3,buildId,sessionId:host.sessionId,kind,data}});}};
 }
 test('ordered reactive updates and receipt ACKs continue while research storage is blocked; failure stops new decisions',async()=>{
   const f=reactiveFixture();let rejectWrite;const blocked=new Promise((_resolve,reject)=>rejectWrite=reject);blocked.catch(()=>{});let writes=0;

@@ -16,13 +16,14 @@ const recordTypes = new Set<TraceRecordType>(['catalog', 'initial', 'property', 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-export function validateBatch(input: unknown): ObservationBatch {
+export function validateSerializedBatch(input: unknown): { batch: ObservationBatch; serialized: string } {
   if (!isRecord(input) || !Number.isSafeInteger(input.firstSequence) || !Number.isSafeInteger(input.lastSequence)
       || !Array.isArray(input.records) || input.records.length < 1 || input.records.length > MAX_BATCH_RECORDS
       || (input.firstSequence as number) < 1 || input.lastSequence !== (input.firstSequence as number) + input.records.length - 1) {
     throw new Error('Invalid observation batch bounds');
   }
-  if (new TextEncoder().encode(JSON.stringify(input)).length > MAX_BATCH_BYTES) throw new Error('Observation batch exceeds byte limit');
+  const serialized = JSON.stringify(input);
+  if (new TextEncoder().encode(serialized).length > MAX_BATCH_BYTES) throw new Error('Observation batch exceeds byte limit');
   input.records.forEach((value: unknown, index: number) => {
     if (!isRecord(value) || value.sequence !== (input.firstSequence as number) + index
       || !recordTypes.has(value.type as TraceRecordType) || typeof value.time !== 'number' || !Number.isFinite(value.time)
@@ -38,8 +39,9 @@ export function validateBatch(input: unknown): ObservationBatch {
         || (data.kind === 'value' ? typeof data.propertyId !== 'string' : data.propertyId !== null)) throw new Error('Invalid interaction record');
     }
   });
-  return input as ObservationBatch;
+  return { batch: input as ObservationBatch, serialized };
 }
+export function validateBatch(input: unknown): ObservationBatch { return validateSerializedBatch(input).batch; }
 export function acceptsBridgeMessage(event: { origin: string; source: unknown; data: unknown }, expected: {
   origin: string; source: unknown; buildId: string; sessionId: string;
 }): event is { origin: string; source: unknown; data: BridgeMessage } {

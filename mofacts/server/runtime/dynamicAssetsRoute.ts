@@ -2,8 +2,10 @@ import { WebApp } from 'meteor/webapp';
 import type { IncomingMessage, ServerResponse } from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
+import { pipeline } from 'node:stream/promises';
 import { getMimeTypeForAssetName } from '../lib/mediaReferences';
 import type { createStorageBoundary } from '../lib/storageBoundary';
+import { SIMULATION_HTML_CSP } from '../../../packages/phet-monitor/assets';
 
 type DynamicAssetLike = {
   _id: string;
@@ -124,7 +126,8 @@ export async function serveDynamicAssetById(
 
     const storedAssetPath = typeof asset.path === 'string' ? asset.path : '';
     const resolvedName = String(asset.name || asset.fileName || path.basename(storedAssetPath) || 'asset').trim();
-    const mimeType = typeof asset.type === 'string' && asset.type.trim().length > 0
+    const isSimulationHtml = /\.html$/i.test(resolvedName);
+    const mimeType = isSimulationHtml ? 'text/html; charset=utf-8' : typeof asset.type === 'string' && asset.type.trim().length > 0
       ? asset.type
       : getMimeTypeForAssetName(resolvedName);
 
@@ -137,23 +140,23 @@ export async function serveDynamicAssetById(
         return;
       }
       try {
-        const object = await deps.storageBoundary.getObject(storageKey);
+        const object = await deps.storageBoundary.openObject(storageKey);
         const headers: Record<string, string> = {
-          'Content-Type': object.contentType || mimeType,
+          'Content-Type': isSimulationHtml ? mimeType : object.contentType || mimeType,
           'Cache-Control': 'public, max-age=31536000, immutable',
+          ...(isSimulationHtml ? { 'Content-Security-Policy': SIMULATION_HTML_CSP, 'X-Content-Type-Options': 'nosniff' } : {}),
         };
-        const contentLength = typeof object.contentLength === 'number' && Number.isFinite(object.contentLength)
-          ? object.contentLength
-          : object.body.length;
-        headers['Content-Length'] = String(contentLength);
+        if (typeof object.contentLength === 'number' && Number.isFinite(object.contentLength)) headers['Content-Length'] = String(object.contentLength);
         res.writeHead(200, headers);
-        res.end(object.body);
+        await pipeline(object.body, res);
         return;
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         deps.serverConsole('[dynamic-assets] S3 read failed for', assetId, storageKey, message);
-        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Failed to read asset from S3 storage');
+        if (!res.headersSent && !res.destroyed) {
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('Failed to read asset from S3 storage');
+        } else if (!res.destroyed) res.destroy();
         return;
       }
     }
@@ -184,34 +187,28 @@ export async function serveDynamicAssetById(
 
     const headers: Record<string, string> = {
       'Content-Type': mimeType,
+      ...(isSimulationHtml ? { 'Content-Security-Policy': SIMULATION_HTML_CSP, 'X-Content-Type-Options': 'nosniff' } : {}),
       'Cache-Control': 'public, max-age=31536000, immutable'
     };
     if (typeof asset.size === 'number' && Number.isFinite(asset.size) && asset.size >= 0) {
       headers['Content-Length'] = String(asset.size);
     }
 
-    const stream = fs.createReadStream(assetPath);
-    let responseStarted = false;
-
-    stream.on('open', () => {
-      responseStarted = true;
+    try {
       res.writeHead(200, headers);
-    });
-    stream.on('error', (error: unknown) => {
+      await pipeline(fs.createReadStream(assetPath), res);
+    } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       deps.serverConsole('[dynamic-assets] Stream read failed for', assetId, assetPath, message);
-      if (!responseStarted) {
-        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-      }
-      res.end('Failed to read asset from storage');
-    });
-
-    stream.pipe(res);
+      if (!res.destroyed) res.destroy();
+    }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     deps.serverConsole('[dynamic-assets] Unexpected route failure for', assetId, message);
-    res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Dynamic asset route failed');
+    if (!res.headersSent && !res.destroyed) {
+      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Dynamic asset route failed');
+    } else if (!res.destroyed) res.destroy();
   }
 }
 

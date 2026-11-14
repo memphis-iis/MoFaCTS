@@ -38,6 +38,7 @@ export async function processParsedPackageTdfs(args: {
   const firstStim = unzippedFiles.find((file) => file.type === 'stim');
   const stimFileName = firstStim?.name;
   const touchedStimuliSetIds = new Set<string | number>();
+  const stimulusScopesByName = new Map<string, Set<string | number>>();
   const results: SaveContentResult[] = [];
   const childUserSelectByFileName = new Map<string, string>();
   const identityByFileName = new Map(
@@ -197,6 +198,9 @@ export async function processParsedPackageTdfs(args: {
       const resultStimuliSetId = getStimuliSetIdFromPackageResult(packageResult);
       if (resultStimuliSetId !== undefined && resultStimuliSetId !== null) {
         touchedStimuliSetIds.add(resultStimuliSetId);
+        const scopes = stimulusScopesByName.get(stimulusKey) ?? new Set<string | number>();
+        scopes.add(resultStimuliSetId);
+        stimulusScopesByName.set(stimulusKey, scopes);
       }
       deps.serverConsole(
         packageResult.result ? 'packageResult success:' : 'packageResult failed:',
@@ -229,5 +233,5 @@ export async function processParsedPackageTdfs(args: {
     state.stimSetId = await deps.getStimuliSetIdByFilename(stimFileName);
   }
 
-  return { results, touchedStimuliSetIds };
+  return { results, touchedStimuliSetIds, stimulusScopesByName };
 }

@@ -89,6 +89,7 @@ type ContentMethodsDeps = {
   cloneJsonLike: <T>(value: T) => T;
   normalizeCanonicalId: (value: unknown) => string | null;
   canAccessContentUploadTdf: (userId: string, tdf: any) => boolean | Promise<boolean>;
+  storageRoot: string;
   getOrBuildCurrentPackageAsset: (
     tdfId: string,
     deps: any
@@ -359,6 +360,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
           decryptData: deps.decryptData,
           DynamicAssets: deps.DynamicAssets,
           storageBoundary: deps.storageBoundary,
+          storageRoot: deps.storageRoot,
           Tdfs: deps.Tdfs,
         });
         return { link: result.link };

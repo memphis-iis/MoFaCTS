@@ -48,18 +48,21 @@ All three compile identical collector/bridge code and the same `registration-con
 
 Silent numeric fields, ordinary arrays/maps/sets, typed buffers, direct vector/matrix writes and mutation outside registered APIs remain explicitly unsupported for continuous observation. Required lesson bindings must resolve to observed properties/collections. Event-point snapshots are labeled; paths describe first discovery and dynamic objects use session IDs. Startup verification establishes pre-first-frame scalar order for surviving addressable sources, not events before module loading or pre-discovery mutable argument values.
 
-## Local SPARC activities
+## Ordinary ZIP lesson packages
 
 ```powershell
 node tools/phet-pilot/generate-catalogs.mjs
 node tools/phet-pilot/create-activities.mjs 'C:/dev/mofacts_config/SPARC PhET Pilot'
 node tools/phet-pilot/verify-activities.cjs 'C:/dev/mofacts_config/SPARC PhET Pilot'
-node tools/phet-pilot/serve-pilot.mjs
 ```
 
-Generate catalogs after matching successful monitor probes. The simulation server verifies HTML/catalog hashes, serves only approved assets on `127.0.0.1:3212`, and writes ignored `settings-fragment.json`. Merge `public.simulationBuilds` (including `catalog: { url, sha256 }`) into isolated local settings for the canonical Docker watcher at `http://localhost:3200` through `deploy/hotfix-local.ps1`. The host validates build/protocol/catalog identity and required addresses before Start; catalogs contain no runtime values or dynamic IDs. Authentication and learner identity stay in MoFaCTS.
+Generate catalogs after matching successful monitor probes. The generator writes three ordinary, self-contained upload ZIPs to `C:/dev/mofacts_config` (`SPARC PhET density.zip`, `SPARC PhET pendulum-lab.zip`, `SPARC PhET circuit-construction-kit-dc.zip`) and the combined `SPARC PhET Pilot.zip`. Editable JSON, simulation HTML, descriptive catalogs, source ZIPs and notices live in `SPARC PhET Pilot/`. Upload through the normal Content page; no simulation server, domain setup, per-lesson settings or build registry is required. Use the canonical Docker watcher at `http://localhost:3200` for local testing.
 
-The canonical package is `C:/dev/mofacts_config/SPARC PhET Pilot.zip` (three TDF/stimulus pairs). Import user-facing demos under the intended main administrator; update existing lessons in place to preserve IDs, ownership and progress. For repeatable tests, create fresh synthetic lessons instead of clearing history:
+Each stimulus simulation node supplies `buildId`, `asset: { url, sha256, catalog: { url, sha256 } }`, and bindings. Asset URLs in the ZIP are filenames. Upload verifies both hashes, catalog/build identity and supported required addresses before persistence, then resolves them to the immutable assets written in that upload and stimulus set. JSON catalogs are attachments, not TDFs. Source and notices accompany every package.
+
+The existing dynamic-asset service serves simulation HTML with CSP `sandbox allow-scripts` and restricted network/navigation. The iframe also allows scripts only, giving the simulation a unique opaque origin rather than access to application storage/cookies. The host accepts messages only from that exact window, origin `null`, protocol/build and unpredictable attempt identity. Parent delivery uses `*` only because opaque origins cannot be named; child delivery targets the browser-supplied embedding origin exactly. The bridge derives that origin from origin-only referrer metadata, so builds are portable across application hosts. No authentication or learner identity enters the simulation. Native launch parameters such as Pendulum accessibility remain in the asset reference.
+
+Upload user-facing demos under their intended administrator and update existing lessons through the normal confirmation flow to preserve IDs, ownership and progress. For repeatable tests, create fresh synthetic lessons instead of clearing history:
 
 ```powershell
 node tools/phet-pilot/upload-local-activities.mjs 'C:/dev/mofacts_config/SPARC PhET Pilot' unique-run-label
@@ -77,7 +80,7 @@ Stimulus bindings and `history-event` effects define meaningful activity, scient
 
 ```powershell
 node --test tools/phet-pilot/local-app.test.mjs packages/phet-monitor/collector.test.mjs packages/phet-monitor/protocol.test.mjs packages/phet-monitor/lesson.test.mjs packages/phet-monitor/bridge.test.mjs
-node --test mofacts/scripts/simulationActivity.test.cjs mofacts/scripts/simulationResearch.test.cjs
+node --test mofacts/scripts/simulationPackage.test.cjs mofacts/scripts/simulationActivity.test.cjs mofacts/scripts/simulationResearch.test.cjs
 node tools/phet-pilot/verify-startup.mjs
 node tools/phet-pilot/verify-object-events.mjs
 node tools/phet-pilot/verify-interactions.mjs
@@ -102,3 +105,35 @@ Current protocol-3 local results (November 11, 2026):
 All six ten-minute sessions passed validity checks. These are one local pair per simulation, not worst-case responsiveness guarantees. Feedback preceded held research writes; Download agreed across all three scopes. Detailed qualifications, build identities, limitations and historical results have one maintained record in the wiki. Evidence remains in ignored `acceptance-summary.json`, `history-acceptance.json`, `history-meteor-first.json` and per-build files.
 
 The final full Meteor suite passed on November 12, 2026, using private detached snapshot `b1c0335598e71219d55c58dee4a5e00c85144fb3` (published PhET work plus local tool cleanup): 1,019 server and 1,249 client tests passed, zero failures/hook failures, and 15/seven pending. Source before/after matched, pre-existing containers were unchanged, and worker-owned containers/network/cache were removed. The receipt is retained in ignored `cleanup-integration-20261112-results/summary.json`; raw evidence remains on the isolated Linux worker. This closes the final-source integration rerun; it does not establish deployment qualification. Keep current/archived builds, pinned dependencies, corresponding source/licenses, catalogs, traces and qualification receipts. Only disposable local scratch diagnostics should be removed during routine cleanup.
+
+The November 12 integration receipt and November 11 performance results above qualify their historical build identities. The ZIP/opaque-origin revision changes the shared bridge/bootstrap and receives new identities; its upload/browser verification is recorded separately. The collector remains identical and event-based.
+
+## ZIP integration verification (November 13)
+
+All three normal uploads, live-feedback/held-research checks, completion/reload, ordinary Download scopes and portable package exports pass. Package downloads retain source/notices and repeat safely through the export cache. Current evidence: `package-embedding-acceptance.json`, `package-host-acceptance.json`, `history-acceptance.json`, `package-roundtrip-acceptance.json`, and per-build probes. The collector is unchanged; all three inspect zero objects over 1,000 idle frames. Targeted checks pass 62 collector/host/history/package/helper cases, 30 localization, 25 identity preflight and seven export/asset-route cases, plus required typecheck/lint/schema generation.
+
+The first full Meteor snapshot `dc2ca10ebbed803bcc3b6b76715b9862096f7108` failed (1,030 server passed/one timed out/15 pending; 1,247 client passed/two failed/seven pending). Missing Spanish asset-field text caused the two client failures and is corrected with localization tests passing. The server failure was the existing concurrent Mongo allocation case exceeding 2,000 ms; its cause is not established. The failure receipt retains source/cleanup checks in `zip-meteor-first-20261113.json`. A full retry needs fresh authorization.
+
+Use `node tools/phet-pilot/verify-package-embedding.mjs` for opaque-origin browser checks and `node tools/phet-pilot/verify-package-roundtrip.mjs <fixture-ids.json>` for normal package download/hashes/filenames. Uploader `--simulation=<pilot-name>` selects one independent fixture; `--collect-existing` only reads existing IDs. Full corresponding-source archives accompany the packages and retain upstream licenses plus the MoFaCTS license. They account for most upload size; runtime fetches only HTML and catalog.
+
+## Package resource ownership (November 14)
+
+PhET model execution, event observation, selected-state projection and production-rule evaluation remain in the browser. Research persistence is asynchronous. These storage changes add no model polling or simulation-specific collector code.
+
+The server streams ZIP entries into an owned temporary directory, hashing each entry during extraction. Only authored JSON is retained in memory. Limits are 10,000 entries, 512 MiB per binary entry, 64 MiB per JSON entry and total authored JSON, and 2 GiB total expanded bytes. Simulation HTML/catalog/source bounds remain 64/8/512 MiB. The upload workflow disposes staging on preflight confirmation, success and failure; repair uses the same lifetime contract. Source archives and notices remain intact.
+
+Declared simulation dependencies are uploaded only to their declaring stimulus-set scopes. Shared dependencies accumulate their declaring scopes. Ordinary package media retains its existing scoping behavior. The three-simulation combined package therefore needs 12 extracted media records instead of 36. Existing uploaded copies are left intact; this changes new uploads, not durable lessons or learner history.
+
+Package SHA-256 checks read streams. FilesCollection's public addFile API registers durable filesystem copies. Exports lazily open one asset stream at a time, generate the ZIP into owned temporary storage and register that file. S3 writes receive streams with ContentLength; S3 downloads stream with backpressure and close on disconnect. Buffered storage reads remain explicit for bounded consumers such as readiness checks. Independent server-side telemetry validation produces the serialization used for both byte limits and the batch digest; sequence, ownership and transaction checks remain unchanged.
+
+No lesson configuration or simulation rebuild is required for these server changes. Temporary disk space must accommodate expanded assets, durable copies and exports. This removes package-size RAM buffering; it does not claim a measured concurrency or capacity limit.
+
+### Verified efficiency result (November 14)
+
+Private detached snapshot cc8c06198a30ff10a7f033d0145833cdef24401a passed the one authorized full Meteor run: 1,036 server and 1,249 client tests, zero failures or hook failures, 15/seven pending. Test source matched before/after, existing containers were unchanged, and the worker removed its owned containers/network/cache. This closes the earlier pending full-suite check for this implementation; the earlier failed receipt is retained. The native receipt is in ignored tmp/phet-pilot/efficiency-meteor-20261114.json.
+
+Full typecheck and lint (including all 330 security surfaces) pass. Focused collector, bridge, registration, telemetry, package, storage and sandbox checks pass. All three distribution ZIPs validate with streamed extraction, complete corresponding source and unchanged hashes. No TDF/schema fields changed in this efficiency revision.
+
+An actual fresh combined normal upload produced three lessons with 12 media records, 267,930,569 total bytes and three intact source archives. Compared with the former 36 copies (803,791,707 bytes), extracted-media storage is reduced by two thirds. The initial five-minute browser-harness transfer wait expired; the same normal UI upload completed with a ten-minute bound. The repeatable helper now uses that measured transfer allowance. This is a harness bound, not a claimed upload-speed improvement.
+
+All three fresh SPARC nodes passed live feedback while research writes were held, keyboard operation, task completion, stable iframe identity, explicit restart after reload and preserved completed work. Normal streamed package downloads retain all portable filenames, queries, hashes, source and notices. Ordinary history Download agrees across scopes with 9/12/16 activity rows and no inventory or duplicate activity rows. Completed upload/export operations left zero package/export staging directories. Results are local verification, not deployment or new ten-minute frame-performance qualification.

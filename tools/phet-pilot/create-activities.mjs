@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { packageSources } from './package-sources.mjs';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
@@ -53,10 +54,25 @@ const specifications = [
 ];
 await mkdir(output, { recursive: true });
 const zip = new JSZip();
+const releaseManifest = JSON.parse(await readFile(new URL('./releases.json', import.meta.url), 'utf8'));
 for (const spec of specifications) {
   const build = JSON.parse(await readFile(path.join(root, 'tmp/phet-pilot', spec.simulation, 'monitored/monitored-build-result.json'), 'utf8'));
   if (build.status !== 'built' || build.collectorHash !== collectorHash || build.bridgeHash !== bridgeHash) throw new Error(`Build ${spec.simulation} with current shared sources first`);
   const pageKey = `phet-${spec.simulation}`;
+  const workspace = path.join(root, 'tmp/phet-pilot', spec.simulation, 'monitored');
+  const release = releaseManifest.pilots.find(pilot => pilot.simulation === spec.simulation);
+  const html = await readFile(path.join(workspace, spec.simulation, release.buildArtifact));
+  const catalog = await readFile(path.join(workspace, 'monitor-catalog.json'));
+  const catalogMetadata = JSON.parse(catalog);
+  if (hash(html) !== build.artifactHash || catalogMetadata.buildId !== build.identity || catalogMetadata.artifactSha256 !== build.artifactHash) throw new Error(`Distribution identity mismatch: ${spec.simulation}`);
+  const asset = { url: `${pageKey}.html${spec.simulation === 'pendulum-lab' ? '?accessibility' : ''}`, sha256: hash(html),
+    catalog: { url: `${pageKey}.catalog.json`, sha256: hash(catalog) } };
+  const lessonZip = new JSZip();
+  const assets = [[`${pageKey}.html`, html], [`${pageKey}.catalog.json`, catalog],
+    [`${pageKey}-source.zip`, await packageSources(spec.simulation, build)],
+    [`${pageKey}-NOTICES.txt`, `Adapted from PhET Interactive Simulations, University of Colorado Boulder.\nPublic release: ${release.version}; adapted build: ${build.identity}.\nThe HTML retains upstream notices. Corresponding pinned and modified source, dependency manifests, build instructions and upstream license files accompany this lesson in ${pageKey}-source.zip.\nShared monitoring is event-based; silent mutable fields remain unsupported.\n`]];
+  asset.attachments = assets.slice(2).map(([url, bytes]) => ({ url, sha256: hash(bytes) }));
+  for (const [name, bytes] of assets) { await writeFile(path.join(output, name), bytes); zip.file(name, bytes); lessonZip.file(name, bytes); }
   const target = nodeId => ({ pageKey, nodeId });
   const write = (key, value) => ({ type: 'write-state', write: { target: target('simulation'), key, value: literal(value) } });
   const message = (text, messageType = 'hint') => ({ type: 'message', messageType, template: text, target: target('feedback') });
@@ -87,7 +103,7 @@ for (const spec of specifications) {
   }
   const display = { type: 'sparc', schema: 'tutorscript-sparc/2.0', nodes: [
     { id: 'instructions', nodeType: 'atomic', atomType: 'text-block', value: spec.instructions },
-    { id: 'simulation', nodeType: 'atomic', atomType: 'simulation', label: spec.title, simulation: { buildId: build.identity,
+    { id: 'simulation', nodeType: 'atomic', atomType: 'simulation', label: spec.title, simulation: { buildId: build.identity, asset,
       bindings: spec.bindings.map(([name, address, projection = 'value', memberProperty]) => ({ name, ...describeVariable(name), address: { path: `screens.1.model.${address}` }, projection, ...(memberProperty ? { memberProperty } : {}) })) } },
     { id: 'feedback', nodeType: 'atomic', atomType: 'message-box', value: 'Start a fresh simulation attempt when ready.' },
     { id: 'hint', nodeType: 'atomic', atomType: 'button', value: 'Hint', label: 'Hint' },
@@ -100,8 +116,10 @@ for (const spec of specifications) {
       { unitname: 'Complete', unitinstructions: '<p>Simulation activity complete. Your recorded task progress is preserved.</p>' }] } };
   const stimuli = { setspec: { lessonname: spec.title, clusters: [{ clusterid: 0, clustername: pageKey, clusterKC: pageKey, stims: [{ stimulusid: 0, stimulusKC: pageKey, clusterKC: pageKey, textStimulus: spec.title, response: { correctResponse: '__SPARC_COMPLETED__' } }] }], sparcPages: [{ pageId: pageKey, display }] } };
   for (const [name, data] of [[`${pageKey}_TDF.json`, tdf], [stimulusName, stimuli]]) {
-    const text = JSON.stringify(data, null, 2) + '\n'; await writeFile(path.join(output, name), text); zip.file(name, text);
+    const text = JSON.stringify(data, null, 2) + '\n'; await writeFile(path.join(output, name), text); zip.file(name, text); lessonZip.file(name, text);
   }
+  await writeFile(path.join(path.dirname(output), `SPARC PhET ${spec.simulation}.zip`), await lessonZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
+  console.log(`${spec.simulation}: packaged HTML, catalog, source, notices and lesson`);
 }
-await writeFile(path.join(path.dirname(output), 'SPARC PhET Pilot.zip'), await zip.generateAsync({ type: 'nodebuffer' }));
+await writeFile(path.join(path.dirname(output), 'SPARC PhET Pilot.zip'), await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
 console.log(`Wrote three pinned activities to ${output}`);

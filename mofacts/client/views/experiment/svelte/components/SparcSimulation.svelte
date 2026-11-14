@@ -55,7 +55,7 @@
       <button type="button" class="btn btn-primary" on:click={start}>{text('simulation.start')}</button>
     {/if}
     <iframe bind:this={iframe} title={node.label} hidden={status !== 'running' && status !== 'starting'}
-      sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe>
+      sandbox="allow-scripts" referrerpolicy="origin"></iframe>
   {/if}
 </section>
 

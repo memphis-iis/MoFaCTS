@@ -10,9 +10,9 @@ function catalog(stream, id, data, type = 'catalog') {
 
 test('bindings reject ambiguous addresses and reserved event slots',()=>{
   const binding={name:'mass',address:{path:'model.mass'},projection:'value'};
-  assert.doesNotThrow(()=>validateSimulationConfig({buildId:'pinned-build',bindings:[binding]}));
+  assert.doesNotThrow(()=>validateSimulationConfig({buildId:'pinned-build',asset:{url:'sim.html',sha256:'0'.repeat(64),catalog:{url:'catalog.json',sha256:'0'.repeat(64)}},bindings:[binding]}));
   for(const bad of [{...binding,name:'evidence'}, {...binding,name:'simulationActivity'}, {...binding,address:{path:'x',tandem:'y'}}, {...binding,projection:'execute'}]) {
-    assert.throws(()=>validateSimulationConfig({buildId:'pinned-build',bindings:[bad]}));
+    assert.throws(()=>validateSimulationConfig({buildId:'pinned-build',asset:{url:'sim.html',sha256:'0'.repeat(64),catalog:{url:'catalog.json',sha256:'0'.repeat(64)}},bindings:[bad]}));
   }
 });
 test('dynamic collection projection follows object references after reordering',()=>{

@@ -1,4 +1,9 @@
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { tmpdir } from 'node:os';
+import { storePackageFile, removePackageDirectory } from './packageFileStorage';
 import { Meteor } from 'meteor/meteor';
+import { simulationAssetReferences, validateSimulationAsset } from '../../../packages/phet-monitor/assets';
 import type { createStorageBoundary } from './storageBoundary';
 import {
   assertConditionFilenameIdAlignment,
@@ -38,7 +43,7 @@ type BuildAndStoreCurrentPackageAssetDeps = {
   decryptData: (value: string) => string;
   DynamicAssets: {
     findOneAsync: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<DynamicAssetRef | null>;
-    writeAsync: (data: Buffer, options: Record<string, unknown>) => Promise<DynamicAssetRef>;
+    addFile: (path: string, options: Record<string, any>) => Promise<DynamicAssetRef>;
     removeAsync: (selector: Record<string, unknown>) => Promise<unknown>;
     link: (fileRef: Record<string, unknown>) => string | null;
     collection?: {
@@ -46,6 +51,7 @@ type BuildAndStoreCurrentPackageAssetDeps = {
     };
   };
   storageBoundary: ReturnType<typeof createStorageBoundary>;
+  storageRoot: string;
   Tdfs: {
     find: (selector: Record<string, unknown>, options?: Record<string, unknown>) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<any>;
@@ -152,9 +158,17 @@ const PACKAGE_EXPORT_MEDIA_FIELDS = new Set([
   'videoStimulus'
 ]);
 
-function rewriteKnownMediaReferencesForPackageExport(node: unknown, deps: BuildAndStoreCurrentPackageAssetDeps): void {
+export function rewriteKnownMediaReferencesForPackageExport(node: unknown, deps: BuildAndStoreCurrentPackageAssetDeps): void {
   if (!node || typeof node !== 'object') {
     return;
+  }
+  const simulation = node as { atomType?: unknown; simulation?: { asset?: unknown } };
+  if (simulation.atomType === 'simulation') {
+    const asset = validateSimulationAsset(simulation.simulation?.asset, true);
+    for (const reference of simulationAssetReferences(asset)) {
+      const query = reference.url.includes('?') ? reference.url.slice(reference.url.indexOf('?')) : '';
+      reference.url = normalizePackageExportMediaReference(reference.url, deps) + query;
+    }
   }
 
   if (Array.isArray(node)) {
@@ -197,13 +211,17 @@ function collectPackageMediaReferenceString(
   return refs;
 }
 
-function collectKnownPackageMediaReferences(
+export function collectKnownPackageMediaReferences(
   node: unknown,
   deps: BuildAndStoreCurrentPackageAssetDeps,
   refs: Set<string> = new Set<string>()
 ) {
   if (!node || typeof node !== 'object') {
     return refs;
+  }
+  const simulation = node as { atomType?: unknown; simulation?: { asset?: unknown } };
+  if (simulation.atomType === 'simulation') {
+    for (const reference of simulationAssetReferences(validateSimulationAsset(simulation.simulation?.asset, true))) collectPackageMediaReferenceString(reference.url, refs, deps);
   }
 
   if (Array.isArray(node)) {
@@ -632,10 +650,10 @@ async function maybeReuseCurrentPackageAsset(
     return null;
   }
 
-  const packageAsset = await deps.DynamicAssets.findOneAsync(
-    { _id: reusablePackageAssetId },
-    { fields: { _id: 1, name: 1, fileName: 1, meta: 1 } }
-  );
+  // FilesCollection.link needs the complete file metadata (including its route,
+  // collection and version descriptors). This is one exact-ID server-side read;
+  // only the resulting public asset URL leaves this function.
+  const packageAsset = await deps.DynamicAssets.findOneAsync({ _id: reusablePackageAssetId });
   if (!packageAsset) {
     return null;
   }
@@ -683,85 +701,93 @@ async function buildAndStorePreparedPackageAsset(
     }
   }
 
-  for (const [zipName, asset] of preparedState.assetsByZipName.entries()) {
-    let buffer: Buffer;
+  const streams: Readable[] = [];
+  const directory = await fs.promises.mkdtemp(path.join(tmpdir(), 'mofacts-export-'));
+  try {
+    for (const [zipName, asset] of preparedState.assetsByZipName.entries()) {
+      // Open each source only when JSZip consumes it. This bounds both memory and
+      // simultaneous S3 connections/file descriptors, even for combined packages.
+      const stream = Readable.from((async function* () {
+        let source: Readable;
+        if (deps.storageBoundary.backend === 's3') {
+          const storageKey = typeof asset?.meta?.storageKey === 'string' ? asset.meta.storageKey.trim() : '';
+          if (asset?.meta?.storageBackend !== 's3' || !storageKey) throw new Meteor.Error(404, `Media asset is missing S3 storage metadata: ${zipName}`);
+          source = (await deps.storageBoundary.openObject(storageKey)).body;
+        } else {
+          if (typeof asset?.path !== 'string' || !asset.path) throw new Meteor.Error(404, `Media asset is missing a readable path: ${zipName}`);
+          source = fs.createReadStream(asset.path);
+        }
+        try { yield* source; } finally { source.destroy(); }
+      })());
+      streams.push(stream);
+      zip.file(zipName, stream);
+    }
+    const zipPath = path.join(directory, 'export.zip');
+    await pipeline(zip.generateNodeStream({ type: 'nodebuffer', streamFiles: true }), fs.createWriteStream(zipPath, { flags: 'wx' }));
+    const fileRef = await storePackageFile(deps.DynamicAssets, deps.storageRoot, zipPath, {
+      fileName: preparedState.zipFileName,
+      userId: preparedState.rootOwnerId,
+      type: 'application/zip',
+      meta: {
+        public: true,
+        contentUploadCurrentExport: true,
+        rootTdfId,
+        packageExportSignature: preparedState.packageSignature
+      }
+    });
+
+    const packageExt = path.extname(preparedState.zipFileName).replace(/^\./, '') || 'zip';
+    const packageAssetId = deps.normalizeCanonicalId(fileRef?._id);
+    if (!packageAssetId) {
+      throw new Meteor.Error(500, 'Package asset id missing after export');
+    }
+
     if (deps.storageBoundary.backend === 's3') {
-      const storageKey = typeof asset?.meta?.storageKey === 'string' ? asset.meta.storageKey.trim() : '';
-      if (asset?.meta?.storageBackend !== 's3' || !storageKey) {
-        throw new Meteor.Error(404, `Media asset is missing S3 storage metadata: ${zipName}`);
+      const storageKey = `dynamic-assets/${packageAssetId}/${preparedState.zipFileName}`;
+      await deps.storageBoundary.putObject(storageKey, fs.createReadStream(zipPath), 'application/zip', (await fs.promises.stat(zipPath)).size);
+      if (!deps.DynamicAssets.collection?.updateAsync) {
+        throw new Meteor.Error(500, 'S3 storage requires DynamicAssets.collection.updateAsync for package export metadata');
       }
-      buffer = (await deps.storageBoundary.getObject(storageKey)).body;
-    } else {
-      const assetPath = typeof asset?.path === 'string' ? asset.path : '';
-      if (!assetPath) {
-        throw new Meteor.Error(404, `Media asset is missing a readable path: ${zipName}`);
-      }
-      buffer = await fs.promises.readFile(assetPath);
+      await deps.DynamicAssets.collection.updateAsync(
+        { _id: packageAssetId },
+        { $set: { 'meta.storageBackend': 's3', 'meta.storageKey': storageKey } }
+      );
+      fileRef.meta = {
+        ...(fileRef.meta || {}),
+        storageBackend: 's3',
+        storageKey,
+      };
     }
-    zip.file(zipName, buffer);
-  }
 
-  const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-  const fileRef = await deps.DynamicAssets.writeAsync(zipBuffer, {
-    fileName: preparedState.zipFileName,
-    userId: preparedState.rootOwnerId,
-    type: 'application/zip',
-    meta: {
-      public: true,
-      contentUploadCurrentExport: true,
-      rootTdfId,
-      packageExportSignature: preparedState.packageSignature
+    const packageFile = `${packageAssetId}.${packageExt}`;
+
+    if (preparedState.memberIds.length > 0) {
+      await deps.Tdfs.updateAsync(
+        { _id: { $in: preparedState.memberIds } },
+        { $set: { packageFile, packageAssetId }, $inc: { tdfRevision: 1 } },
+        { multi: true }
+      );
     }
-  });
 
-  const packageExt = path.extname(preparedState.zipFileName).replace(/^\./, '') || 'zip';
-  const packageAssetId = deps.normalizeCanonicalId(fileRef?._id);
-  if (!packageAssetId) {
-    throw new Meteor.Error(500, 'Package asset id missing after export');
-  }
-
-  if (deps.storageBoundary.backend === 's3') {
-    const storageKey = `dynamic-assets/${packageAssetId}/${preparedState.zipFileName}`;
-    await deps.storageBoundary.putObject(storageKey, zipBuffer, 'application/zip');
-    if (!deps.DynamicAssets.collection?.updateAsync) {
-      throw new Meteor.Error(500, 'S3 storage requires DynamicAssets.collection.updateAsync for package export metadata');
+    const stalePackageAssetIds = preparedState.oldPackageAssetIds.filter((oldAssetId) => oldAssetId !== packageAssetId);
+    if (stalePackageAssetIds.length > 0) {
+      await Promise.all(
+        stalePackageAssetIds.map((oldAssetId) => cleanupPackageAssetIfUnreferenced(oldAssetId, preparedState.memberIds, deps))
+      );
     }
-    await deps.DynamicAssets.collection.updateAsync(
-      { _id: packageAssetId },
-      { $set: { 'meta.storageBackend': 's3', 'meta.storageKey': storageKey } }
-    );
-    fileRef.meta = {
-      ...(fileRef.meta || {}),
-      storageBackend: 's3',
-      storageKey,
-    };
+
+    const link = typeof fileRef?.link === 'function'
+      ? fileRef.link()
+      : deps.DynamicAssets.link({ ...fileRef });
+    if (!link) {
+      throw new Meteor.Error(500, 'Package link unavailable');
+    }
+
+    return { link, packageFile, packageAssetId, reusedExisting: false };
+  } finally {
+    for (const stream of streams) stream.destroy();
+    await removePackageDirectory(directory, tmpdir(), 'mofacts-export-');
   }
-
-  const packageFile = `${packageAssetId}.${packageExt}`;
-
-  if (preparedState.memberIds.length > 0) {
-    await deps.Tdfs.updateAsync(
-      { _id: { $in: preparedState.memberIds } },
-      { $set: { packageFile, packageAssetId }, $inc: { tdfRevision: 1 } },
-      { multi: true }
-    );
-  }
-
-  const stalePackageAssetIds = preparedState.oldPackageAssetIds.filter((oldAssetId) => oldAssetId !== packageAssetId);
-  if (stalePackageAssetIds.length > 0) {
-    await Promise.all(
-      stalePackageAssetIds.map((oldAssetId) => cleanupPackageAssetIfUnreferenced(oldAssetId, preparedState.memberIds, deps))
-    );
-  }
-
-  const link = typeof fileRef?.link === 'function'
-    ? fileRef.link()
-    : deps.DynamicAssets.link({ ...fileRef });
-  if (!link) {
-    throw new Meteor.Error(500, 'Package link unavailable');
-  }
-
-  return { link, packageFile, packageAssetId, reusedExisting: false };
 }
 
 export async function getOrBuildCurrentPackageAsset(

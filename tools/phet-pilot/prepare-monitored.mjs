@@ -186,10 +186,10 @@ for (const pilot of manifest.pilots.filter(p => !process.argv[2] || p.simulation
   for (const { filename, expected } of preparedWrites) await writeFile(filename, expected);
   await writeFile(path.join(workspace, 'chipper/js/research-collector.js'), collector);
   await writeFile(path.join(workspace, 'chipper/js/research-bridge.js'), bridge);
-  const hostOrigins = ['http://localhost:3200'];
+  const embedding = 'opaque-sandbox-referrer-origin';
   const sampling = 'object-events';
-  const identity = `${pilot.simulation}-${pilot.version}-${hash(JSON.stringify({ changes, collector: hash(collector), bridge: hash(bridge), hostOrigins, sampling })).slice(0, 16)}`;
-  const bootstrap = `window.phetResearchBuild = ${JSON.stringify(identity)};\nwindow.phetResearchConfiguration = ${JSON.stringify({ buildId: identity, hostOrigins, sampling })};\nwindow.phetResearchMonitor = window.PhETResearch.createCollector( { sampling: ${JSON.stringify(sampling)} } );\n`;
+  const identity = `${pilot.simulation}-${pilot.version}-${hash(JSON.stringify({ changes, collector: hash(collector), bridge: hash(bridge), embedding, sampling })).slice(0, 16)}`;
+  const bootstrap = `window.phetResearchBuild = ${JSON.stringify(identity)};\nwindow.phetResearchConfiguration = ${JSON.stringify({ buildId: identity, embedding, sampling })};\nwindow.phetResearchMonitor = window.PhETResearch.createCollector( { sampling: ${JSON.stringify(sampling)} } );\n`;
   await writeFile(path.join(workspace, 'chipper/js/research-bootstrap.js'), bootstrap);
   await writeFile(path.join(workspace, 'monitor-build.json'), JSON.stringify({ schemaVersion: 1, registrationVersion: 1, registrationContractHash: hash(registrationContract), identity, sampling, collectorHash: hash(collector), bridgeHash: hash(bridge), bootstrapHash: hash(bootstrap), framework: oldFramework ? 'axon-amd-emitter' : 'axon-tiny-emitter', changes }, null, 2) + '\n');
   console.log(`${pilot.simulation}: prepared ${identity}`);

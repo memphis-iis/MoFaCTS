@@ -1,5 +1,5 @@
 import { Meteor } from 'meteor/meteor';
-import { approvedSimulationBuild } from '../../../../../common/simulationBuildCatalog';
+import { validateSimulationAsset, validateSimulationCatalog } from '../../../../../../packages/phet-monitor/assets';
 import { acceptsBridgeMessage, isRecord, ObservedState, validateBatch, type ObservationBatch, type BridgeMessage } from '../../../../../../packages/phet-monitor/protocol';
 import { validateSimulationConfig } from '../../../../../../packages/phet-monitor/lesson';
 
@@ -36,19 +36,27 @@ export class SimulationResearchHost {
     observation(facts: Record<string, number | string | boolean | null>, evidence: SimulationEvidence, activity: SimulationActivityHistory): Promise<void>;
   }) {
     this.config = validateSimulationConfig(options.config);
-    this.build = approvedSimulationBuild(Meteor.settings.public?.simulationBuilds, this.config.buildId);
-    if (new URL(this.build.url).origin === window.location.origin) throw new Error('Simulation requires a separate origin');
+    this.build = { id: this.config.buildId, ...validateSimulationAsset(this.config.asset, true) };
+    if (options.iframe.getAttribute('sandbox') !== 'allow-scripts') throw new Error('Simulation requires an opaque sandbox origin');
     window.addEventListener('message', this.receive);
     options.iframe.addEventListener('load', this.loaded);
   }
   async initialize(): Promise<void> {
+    // Hash both uploaded assets before launch; URLs identify immutable uploaded IDs.
+    const artifact = await fetch(this.build.url, { credentials: 'omit', redirect: 'error' });
+    if (!artifact.ok) throw new Error('Simulation HTML unavailable');
+    const artifactBytes = await artifact.arrayBuffer();
+    if (artifactBytes.byteLength > 64 * 1024 * 1024) throw new Error('Simulation HTML exceeds size limit');
+    const artifactDigest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', artifactBytes)), value => value.toString(16).padStart(2, '0')).join('');
+    if (artifactDigest !== this.build.sha256) throw new Error('Simulation HTML hash mismatch');
     const response = await fetch(this.build.catalog.url, { credentials: 'omit', redirect: 'error' });
     if (!response.ok) throw new Error('Simulation build catalog unavailable');
     const bytes = await response.arrayBuffer();
+    if (bytes.byteLength > 8 * 1024 * 1024) throw new Error('Simulation catalog exceeds size limit');
     const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), value => value.toString(16).padStart(2, '0')).join('');
     if (digest !== this.build.catalog.sha256) throw new Error('Simulation build catalog hash mismatch');
     const catalog = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
-    if (catalog.version !== 1 || catalog.buildId !== this.build.id || catalog.artifactSha256 !== this.build.sha256 || catalog.protocolVersion !== 3 || !Array.isArray(catalog.addresses)) throw new Error('Simulation build catalog identity mismatch');
+    validateSimulationCatalog(catalog, this.build.id, this.build.sha256);
     for (const binding of this.config.bindings) {
       if (!catalog.addresses.some(entry => isRecord(entry) && entry.coverage === 'observed' && (binding.address.path ? entry.path === binding.address.path : entry.tandem === binding.address.tandem))) throw new Error(`Binding absent from approved build catalog: ${binding.name}`);
     }
@@ -73,7 +81,9 @@ export class SimulationResearchHost {
   }
   private post(kind: 'initialize' | 'ack' | 'stop', data: unknown): void {
     this.options.iframe.contentWindow?.postMessage({ protocol: 'phet-research', version: 3,
-      buildId: this.build.id, sessionId: this.sessionId, kind, data }, new URL(this.build.url).origin);
+      // Opaque sandbox origins cannot be named as targetOrigin. The exact iframe
+      // window and unpredictable attempt identity bind this delivery.
+      buildId: this.build.id, sessionId: this.sessionId, kind, data }, '*');
   }
   private loaded = (): void => {
     if (!this.sessionId || this.disposed || this.failed) return;
@@ -82,7 +92,7 @@ export class SimulationResearchHost {
   };
   private receive = (event: MessageEvent): void => {
     if (this.disposed || this.failed || !this.sessionId || !acceptsBridgeMessage(event, {
-      origin: new URL(this.build.url).origin, source: this.options.iframe.contentWindow,
+      origin: 'null', source: this.options.iframe.contentWindow,
       buildId: this.build.id, sessionId: this.sessionId,
     })) return;
     const message = event.data;

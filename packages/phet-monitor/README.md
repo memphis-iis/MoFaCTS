@@ -83,3 +83,7 @@ Origin, source window, protocol version, build identity, session, sequence, orde
 Run `node --test packages/phet-monitor/*.test.mjs mofacts/scripts/simulationResearch.test.cjs`. Browser probes and exact build identities are documented in the [pilot tools](../../tools/phet-pilot/README.md). Successful reconstruction covers recorded state only, not silent mutable state or full physical replay.
 
 Research-only coalescing starts a 100 ms window for each pending storage group. Contiguous receipts are combined into bounded storage batches without changing record sequences. Further writes follow completion of the preceding write and receive their own coalescing window, limiting sustained requests to at most ten per second. No timer runs on an idle queue. This storage scheduling never gates SPARC observation delivery.
+
+## Packaged assets and browser isolation
+
+Simulations are ordinary lesson ZIP assets, referenced by `simulation.asset` (HTML URL/hash and catalog URL/hash). The normal uploader verifies content and resolves package filenames to stored asset IDs; no per-lesson server settings are used. HTML runs in a CSP and iframe sandbox with scripts but no same-origin capability. Messages require the exact iframe window, opaque origin `null`, protocol/build and attempt identity. The shared child bridge verifies its parent window and browser-provided embedding origin. Source/license archives and notices accompany the three packaged builds. This changes transport embedding, not collector registration or event capture.

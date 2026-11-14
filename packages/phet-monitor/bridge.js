@@ -2,6 +2,10 @@
 (function( global ) {
   'use strict';
   var config = global.phetResearchConfiguration;
+  // The browser supplies the embedding origin. It is independent of deployment
+  // URL and contains no learner identity (iframe referrerpolicy is origin).
+  var parentOrigin = null;
+  try { parentOrigin = new URL( global.document.referrer ).origin; } catch( error ) { /* No embedding origin: do not initialize. */ }
   var collector = global.phetResearchMonitor;
   var session = null;
   var hostOrigin = null;
@@ -60,7 +64,7 @@
     if ( !collector.status().complete && !outstanding ) { stop( 'collector-incomplete' ); }
   }
   function receive( event ) {
-    if ( event.source !== global.parent || config.hostOrigins.indexOf( event.origin ) < 0 ) { return; }
+    if ( event.source !== global.parent || !parentOrigin || event.origin !== parentOrigin || !/^https?:\/\//.test( parentOrigin ) ) { return; }
     var data = event.data;
     if ( !data || data.protocol !== 'phet-research' || data.version !== 3 || data.buildId !== config.buildId ) { return; }
     if ( data.kind === 'initialize' ) {

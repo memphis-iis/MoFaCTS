@@ -1,16 +1,15 @@
-import { Meteor } from 'meteor/meteor';
-import { approvedSimulationBuild } from '../../common/simulationBuildCatalog';
+import { requirePackagedSimulation } from '../../common/simulationPackage';
 import { requireAuthenticatedUser, requireUserWithRoles, type MethodAuthorizationDeps } from '../lib/methodAuthorization';
 import { requireSparcLessonAccess } from '../lib/sparcLessonAccess';
 import { validateSimulationScope, startSimulationAttempt, interruptSimulationScope, ingestSimulationBatch, endSimulationAttempt, exportSimulationTrace, type SimulationHistoryWriter } from '../lib/simulationTelemetry';
 
 type Context = { userId?: string | null };
-export function createSimulationTelemetryMethods(deps: { getMethodAuthorizationDeps(): MethodAuthorizationDeps; writeHistory: SimulationHistoryWriter }) {
+export function createSimulationTelemetryMethods(deps: { getMethodAuthorizationDeps(): MethodAuthorizationDeps; writeHistory: SimulationHistoryWriter; loadLesson(tdfId: string): Promise<unknown> }) {
   const authorizeScope = async (context: Context, input: unknown) => {
     const userId = requireAuthenticatedUser(context.userId);
     const scope = validateSimulationScope(input);
     await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), userId, scope.tdfId);
-    approvedSimulationBuild(Meteor.settings.public?.simulationBuilds, scope.buildId);
+    requirePackagedSimulation(await deps.loadLesson(scope.tdfId), scope);
     return { userId, scope };
   };
   return {

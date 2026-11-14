@@ -167,11 +167,14 @@ export function createStorageBoundary(settings: unknown) {
   if (backend === 'local') {
     return {
       backend,
-      async putObject(_key: string, _body: Buffer, _contentType?: string) {
+      async putObject(_key: string, _body: Buffer | Readable, _contentType?: string, _contentLength?: number) {
         throw new Error('putObject is only available when storage.backend is s3');
       },
       async getObject(_key: string) {
         throw new Error('getObject is only available when storage.backend is s3');
+      },
+      async openObject(_key: string): Promise<{ body: Readable; contentType?: string; contentLength?: number; key: string }> {
+        throw new Error('openObject is only available when storage.backend is s3');
       },
       async objectExists(_key: string) {
         throw new Error('objectExists is only available when storage.backend is s3');
@@ -193,15 +196,25 @@ export function createStorageBoundary(settings: unknown) {
     key(key: string) {
       return buildS3Key(config, key);
     },
-    async putObject(key: string, body: Buffer, contentType?: string) {
+    async putObject(key: string, body: Buffer | Readable, contentType?: string, contentLength?: number) {
       const fullKey = buildS3Key(config, key);
+      if (body instanceof Readable && (!Number.isSafeInteger(contentLength) || contentLength! < 0)) throw new Error('Streaming object writes require ContentLength');
+      try {
       await client.send(new PutObjectCommand({
         Bucket: config.bucket,
         Key: fullKey,
         Body: body,
         ContentType: contentType,
+        ContentLength: contentLength,
       }));
+      } finally { if (body instanceof Readable) body.destroy(); }
       return fullKey;
+    },
+    async openObject(key: string) {
+      const fullKey = buildS3Key(config, key);
+      const response = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: fullKey }));
+      if (!(response.Body instanceof Readable)) throw new Error('S3 Node response must be a readable stream');
+      return { body: response.Body, contentType: response.ContentType, contentLength: response.ContentLength, key: fullKey };
     },
     async getObject(key: string) {
       const fullKey = buildS3Key(config, key);

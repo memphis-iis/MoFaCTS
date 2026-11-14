@@ -2,13 +2,38 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import { createServer } from 'node:http';
+import { Readable } from 'node:stream';
 import {
   assertStorageRelativePathSafe,
   getStorageBackend,
+  createStorageBoundary,
   validateStorageBoundary,
 } from './storageBoundary';
 
 describe('storageBoundary', function() {
+  it('opens an S3 object as a Node stream through the actual SDK', async function() {
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': '6' });
+      res.end('source');
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = server.address() as { port: number };
+      const storage = createStorageBoundary({ storage: { backend: 's3', s3: {
+        endpoint: `http://127.0.0.1:${address.port}`, bucket: 'synthetic', region: 'us-east-1', accessKeyId: 'synthetic', secretAccessKey: 'synthetic',
+      } } });
+      const object = await storage.openObject('source.zip');
+      expect(object.body).to.be.instanceOf(Readable);
+      expect(object.contentLength).to.equal(6);
+      let text = '';
+      for await (const chunk of object.body) text += chunk.toString();
+      expect(text).to.equal('source');
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+  });
   it('rejects storage-relative paths that escape the configured root', function() {
     const root = path.resolve(os.tmpdir(), 'mofacts-storage-root');
 

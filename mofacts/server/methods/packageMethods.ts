@@ -1,8 +1,10 @@
+import { createReadStream } from 'node:fs';
+import { storePackageFile } from '../lib/packageFileStorage';
 import { getContentUpdateWarnings, type ContentUpdateWarning, type ContentUpdateConfirmation, type ContentUpdateReview } from '../../common/lib/contentUpdateWarnings';
 import { Meteor } from 'meteor/meteor';
 import { isPublicDemoTutor } from '../../common/publicDemoContract';
 import { check, Match } from 'meteor/check';
-import { parsePackageZip, type UploadedPackageFile } from '../lib/packageParser';
+import { parsePackageZip, disposeParsedPackage, type UploadedPackageFile } from '../lib/packageParser';
 import { processPackageUploadWorkflow } from '../lib/packageUpload';
 import { uploadPackageMedia } from '../lib/mediaUploader';
 import type { PackageUploadIntegrity, ProcessPackageUploadDeps } from '../lib/packageUploadShared';
@@ -111,6 +113,7 @@ type PackageMethodsDeps = {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
   DynamicAssets: any;
+  storageRoot: string;
   storageBoundary: ReturnType<typeof createStorageBoundary>;
   UserUploadQuota: any;
   AuditLog: any;
@@ -458,7 +461,8 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     let writtenAssetId = '';
 
     try {
-      const fileRef = await deps.DynamicAssets.writeAsync(media.contents, {
+      if (!media.source) throw new Error(`Media has no staged source: ${media.name}`);
+      const fileRef = await storePackageFile(deps.DynamicAssets, deps.storageRoot, media.source.path, {
         fileName: media.name,
         userId: owner,
         type: mimeType,
@@ -474,7 +478,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
           throw new Error(`S3 storage requires DynamicAssets.writeAsync to return an asset id for ${media.name}`);
         }
         const storageKey = `dynamic-assets/${fileRef._id}/${media.name}`;
-        await deps.storageBoundary.putObject(storageKey, media.contents as Buffer, mimeType);
+        await deps.storageBoundary.putObject(storageKey, createReadStream(media.source.path), mimeType, media.source.size);
         if (typeof deps.DynamicAssets.collection?.updateAsync !== 'function') {
           throw new Error('S3 storage requires DynamicAssets.collection.updateAsync');
         }
@@ -554,52 +558,54 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (!packageAsset?.path) throw new Meteor.Error('ai-content-repair-invalid', 'Retained generated package asset was not found.');
     const packageFile = `${packageAssetId}.${packageAsset.ext || 'zip'}`;
     const parsedFiles = await parsePackageZip(packageAsset.path, packageFile, deps.serverConsole);
-    const tdfFileName = String(tdf.tdfFileName || tdf.content?.fileName || '').trim();
-    if (!parsedFiles.some((file) => file.type === 'tdf' && file.name === tdfFileName)) {
-      throw new Meteor.Error('ai-content-repair-mismatch', 'Retained package does not contain the selected content system.');
-    }
-    const mediaByName = new Map(parsedFiles.filter((file) => file.type === 'media').map((file) => [file.name, file]));
-    const missingNames = Array.from(unresolvedNames).filter((name) => !mediaByName.has(name));
-    if (missingNames.length > 0) {
-      throw new Meteor.Error('ai-content-repair-mismatch', `Retained package is missing referenced media: ${missingNames.join(', ')}`);
-    }
-    const pathMaps = await uploadPackageMedia({
-      mediaFiles: Array.from(unresolvedNames).map((name) => mediaByName.get(name)!),
-      uploadStimSetIds: new Set([stimuliSetId]),
-      fallbackStimSetId: stimuliSetId,
-      owner: tdf.ownerId || actingUserId,
-      saveMediaFile,
-      toCanonicalDynamicAssetPath: deps.toCanonicalDynamicAssetPath,
-      normalizeUploadedMediaLookupKey: deps.normalizeUploadedMediaLookupKey,
-      serverConsole: deps.serverConsole,
-    });
-    const uploadedMediaPathMap = pathMaps.get(String(stimuliSetId).trim());
-    await deps.canonicalizeStimDisplayMediaRefs(rawStimuli, stimuliSetId, {
-      rejectUnresolved: true,
-      allowFilenameLookup: false,
-      uploadedMediaPathMap,
-      requireUploadedMediaMatch: true,
-    });
-    const responseKCMap = await getResponseKCMapForTdf(tdfId);
-    const stimulusFileName = String(tdf.stimulusFileName || tdf.content?.tdfs?.tutor?.setspec?.stimulusfile || 'unknown');
-    const canonicalStimuli = deps.getNewItemFormat({
-      fileName: stimulusFileName,
-      stimuli: rawStimuli,
-      owner: tdf.ownerId,
-      source: 'upload',
-    }, stimulusFileName, stimuliSetId, responseKCMap);
-    await deps.canonicalizeFlatStimuliMediaRefs(canonicalStimuli, stimuliSetId, {
-      rejectUnresolved: true,
-      allowFilenameLookup: false,
-      uploadedMediaPathMap,
-      requireUploadedMediaMatch: true,
-    });
-    await deps.Tdfs.updateAsync(
-      { _id: tdfId },
-      { $set: { rawStimuliFile: rawStimuli, stimuli: canonicalStimuli }, $inc: { tdfRevision: 1 } },
-    );
-    await deps.updateStimDisplayTypeMap([stimuliSetId]);
-    return { repaired: true, mediaCount: unresolvedNames.size };
+    try {
+      const tdfFileName = String(tdf.tdfFileName || tdf.content?.fileName || '').trim();
+      if (!parsedFiles.some((file) => file.type === 'tdf' && file.name === tdfFileName)) {
+        throw new Meteor.Error('ai-content-repair-mismatch', 'Retained package does not contain the selected content system.');
+      }
+      const mediaByName = new Map(parsedFiles.filter((file) => file.type === 'media').map((file) => [file.name, file]));
+      const missingNames = Array.from(unresolvedNames).filter((name) => !mediaByName.has(name));
+      if (missingNames.length > 0) {
+        throw new Meteor.Error('ai-content-repair-mismatch', `Retained package is missing referenced media: ${missingNames.join(', ')}`);
+      }
+      const pathMaps = await uploadPackageMedia({
+        mediaFiles: Array.from(unresolvedNames).map((name) => mediaByName.get(name)!),
+        uploadStimSetIds: new Set([stimuliSetId]),
+        fallbackStimSetId: stimuliSetId,
+        owner: tdf.ownerId || actingUserId,
+        saveMediaFile,
+        toCanonicalDynamicAssetPath: deps.toCanonicalDynamicAssetPath,
+        normalizeUploadedMediaLookupKey: deps.normalizeUploadedMediaLookupKey,
+        serverConsole: deps.serverConsole,
+      });
+      const uploadedMediaPathMap = pathMaps.get(String(stimuliSetId).trim());
+      await deps.canonicalizeStimDisplayMediaRefs(rawStimuli, stimuliSetId, {
+        rejectUnresolved: true,
+        allowFilenameLookup: false,
+        uploadedMediaPathMap,
+        requireUploadedMediaMatch: true,
+      });
+      const responseKCMap = await getResponseKCMapForTdf(tdfId);
+      const stimulusFileName = String(tdf.stimulusFileName || tdf.content?.tdfs?.tutor?.setspec?.stimulusfile || 'unknown');
+      const canonicalStimuli = deps.getNewItemFormat({
+        fileName: stimulusFileName,
+        stimuli: rawStimuli,
+        owner: tdf.ownerId,
+        source: 'upload',
+      }, stimulusFileName, stimuliSetId, responseKCMap);
+      await deps.canonicalizeFlatStimuliMediaRefs(canonicalStimuli, stimuliSetId, {
+        rejectUnresolved: true,
+        allowFilenameLookup: false,
+        uploadedMediaPathMap,
+        requireUploadedMediaMatch: true,
+      });
+      await deps.Tdfs.updateAsync(
+        { _id: tdfId },
+        { $set: { rawStimuliFile: rawStimuli, stimuli: canonicalStimuli }, $inc: { tdfRevision: 1 } },
+      );
+      await deps.updateStimDisplayTypeMap([stimuliSetId]);
+      return { repaired: true, mediaCount: unresolvedNames.size };
+    } finally { await disposeParsedPackage(parsedFiles); }
   }
 
   async function _validateStimAndTdf(tdfJson: unknown, stimJson: unknown, tdfFileName: string, stimFileName: string) {

@@ -1,4 +1,5 @@
 import { uploadPackageMedia } from './mediaUploader';
+import { packagedSimulationMediaScopes } from './packageSimulations';
 import type { UploadedPackageFile } from './packageParser';
 import {
   deriveUploadStimSetIds,
@@ -15,13 +16,16 @@ export async function uploadParsedPackageMedia(args: {
   deps: ProcessPackageUploadDeps;
   state: PackageUploadRuntimeState;
   touchedStimuliSetIds: Set<string | number>;
+  stimulusScopesByName: Map<string, Set<string | number>>;
 }) {
-  const { unzippedFiles, owner, zipPath, emailToggle, deps, state, touchedStimuliSetIds } = args;
+  const { unzippedFiles, owner, zipPath, emailToggle, deps, state, touchedStimuliSetIds, stimulusScopesByName } = args;
   const uploadStimSetIds = deriveUploadStimSetIds(touchedStimuliSetIds, state.stimSetId);
 
   try {
+    const mediaScopesByName = packagedSimulationMediaScopes(unzippedFiles, stimulusScopesByName);
     state.uploadedMediaPathMapsByStimSetId = await uploadPackageMedia({
       mediaFiles: unzippedFiles.filter((file): file is UploadedPackageFile => file.type === 'media'),
+      mediaScopesByName,
       uploadStimSetIds,
       fallbackStimSetId: state.stimSetId,
       owner,

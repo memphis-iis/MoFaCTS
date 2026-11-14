@@ -4,17 +4,17 @@
     {
       "name": "startSimulationResearchAttempt",
       "access": "authenticated-self",
-      "review": "2026-11-11: Authenticated lesson access and attempt ownership preserved; lifecycle activity writes reuse authorized canonical history ingestion."
+      "review": "2026-11-13: Authenticated lesson access plus exact page/node/build membership in the uploaded lesson replaces a global server build allowlist. Lifecycle writes retain authenticated canonical history ingestion."
     },
     {
       "name": "interruptSimulationResearchActivity",
       "access": "authenticated-self",
-      "review": "2026-11-11: Authenticated lesson access and attempt ownership preserved; lifecycle activity writes reuse authorized canonical history ingestion."
+      "review": "2026-11-13: Authenticated lesson access plus exact page/node/build membership in the uploaded lesson replaces a global server build allowlist. Lifecycle writes retain authenticated canonical history ingestion."
     },
     {
       "name": "ingestSimulationResearchBatch",
       "access": "authenticated-self",
-      "review": "2026-11-11: Attempt owner only; optional bounded initial selected state, ordered deduplicated research batches."
+      "review": "2026-11-14: Attempt-owner authorization and independent server byte/record/schema validation retained. The one validated serialization supplies the digest; ordered transaction and duplicate/conflict handling unchanged."
     },
     {
       "name": "endSimulationResearchAttempt",
@@ -435,7 +435,8 @@
     },
     {
       "name": "getPackageDownloadLink",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "review": "2026-11-14: Owner/admin checks and exact-ID cached links retained. Exports stream scoped assets into an owned staged ZIP using public FilesCollection registration; no full media or ZIP buffers. Temporary sources close on completion or failure."
     },
     {
       "name": "getRecoverableWarnings",
@@ -694,7 +695,8 @@
     {
       "name": "processPackageUpload",
       "access": "role-checked",
-      "notes": "Existing content-management authorization and package identity preflight remain required. Public demo uploads and replacements require the acting uploader to be an admin. Update summaries include structuralWarnings before content writes."
+      "notes": "Existing content-management authorization and package identity preflight remain required. Public demo uploads and replacements require the acting uploader to be an admin. Update summaries include structuralWarnings before content writes.",
+      "review": "2026-11-14: Existing role, owner, public-demo and identity checks retained. Bounded disk-backed extraction hashes bytes on the server before persistence. Declared simulation dependencies are stored only in their lesson scopes; ordinary media behavior is unchanged. Staging is disposed on confirmation, success and failure."
     },
     {
       "name": "provisionExperimentUser",
@@ -1224,7 +1226,8 @@
     },
     {
       "name": "/dynamic-assets",
-      "access": "role-checked"
+      "access": "role-checked",
+      "review": "2026-11-14: Existing public marker, exact-ID lookup, containment and opaque HTML CSP retained. S3 and local bodies stream with backpressure; client disconnects close sources. Errors after headers terminate the response rather than returning partial successful assets."
     },
     {
       "name": "/health",
@@ -1232,7 +1235,8 @@
     },
     {
       "name": "/cdn/storage/Assets",
-      "access": "public"
+      "access": "public",
+      "review": "2026-11-14: Existing public marker, exact-ID lookup, containment and opaque HTML CSP retained. S3 and local bodies stream with backpressure; client disconnects close sources. Errors after headers terminate the response rather than returning partial successful assets."
     }
   ],
   "exports": [

@@ -2,7 +2,7 @@ import { Mongo, MongoInternals } from 'meteor/mongo';
 import { Meteor } from 'meteor/meteor';
 import { createHash, randomUUID } from 'node:crypto';
 import { collectionMongoName } from '../../common/collectionOwnership';
-import { validateBatch, type ObservationBatch } from '../../../packages/phet-monitor/protocol';
+import { validateSerializedBatch, type ObservationBatch } from '../../../packages/phet-monitor/protocol';
 import { simulationLifecycleHistory, type SimulationHistoryScope } from '../../../learning-components/runtime/simulationLifecycleHistory';
 import { assertSimulationActivityHistory } from '../../common/simulationActivityHistory';
 
@@ -97,12 +97,13 @@ export async function ingestSimulationBatch(userId: string, attemptId: string, i
   if (initialValues !== undefined) assertSimulationActivityHistory({ version: 1, recordRole: 'internal', origin: 'observation',
     buildId: owned.scope.buildId, attemptId, sourceEventId: `${attemptId}:initial`, eventName: 'initial', values: initialValues });
   let batch: ObservationBatch;
-  try { batch = validateBatch(input); }
+  let serialized: string;
+  try { ({ batch, serialized } = validateSerializedBatch(input)); }
   catch (error) {
     await raw.updateOne({ _id: attemptId, userId }, { $set: { status: 'incomplete', reason: 'invalid-batch', endedAt: new Date(), lifecycleHistoryPending: true } });
     throw new Meteor.Error(400, error instanceof Error ? error.message : 'Invalid observation batch');
   }
-  const digest = createHash('sha256').update(JSON.stringify(batch)).digest('hex');
+  const digest = createHash('sha256').update(serialized).digest('hex');
   const session = MongoInternals.defaultRemoteCollectionDriver().mongo.client.startSession();
   let rejection = '';
   let complete = false;

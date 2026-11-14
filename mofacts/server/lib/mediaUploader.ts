@@ -12,6 +12,7 @@ import type { PackageMediaMutation, UploadedMediaRecord } from './packageUploadS
  */
 export async function uploadPackageMedia(opts: {
   mediaFiles: UploadedPackageFile[];
+  mediaScopesByName?: Map<string, Set<string | number>>;
   uploadStimSetIds: Set<string | number>;
   fallbackStimSetId: string | number | undefined;
   owner: string;
@@ -23,7 +24,7 @@ export async function uploadPackageMedia(opts: {
   serverConsole: (...args: unknown[]) => void;
 }): Promise<Map<string, Map<string, string>>> {
   const {
-    mediaFiles, uploadStimSetIds, fallbackStimSetId, owner, mutationJobId, mediaMutations = [],
+    mediaFiles, mediaScopesByName, uploadStimSetIds, fallbackStimSetId, owner, mutationJobId, mediaMutations = [],
     saveMediaFile, toCanonicalDynamicAssetPath, normalizeUploadedMediaLookupKey, serverConsole,
   } = opts;
 
@@ -33,7 +34,8 @@ export async function uploadPackageMedia(opts: {
 
   for (const media of mediaFiles) {
     if (uploadStimSetIds.size > 0) {
-      for (const scopedStimSetId of uploadStimSetIds) {
+      const scopes = mediaScopesByName?.get(normalizeUploadedMediaLookupKey(media.name)) ?? uploadStimSetIds;
+      for (const scopedStimSetId of scopes) {
         const savedMedia = await saveMediaFile(media, owner, scopedStimSetId, mutationJobId === undefined ? {} : { mutationJobId });
         if (savedMedia?.replacement) mediaMutations.push(savedMedia.replacement);
         const canonicalPath = toCanonicalDynamicAssetPath(savedMedia);
