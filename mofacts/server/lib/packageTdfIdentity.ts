@@ -131,7 +131,9 @@ function validatePackageContent(unzippedFiles: UploadedPackageFile[]) {
 
   const packageEntriesByName = new Map<string, UploadedPackageFile>();
   for (const file of unzippedFiles) {
-    if (containsKcGraphFact(file.contents)) {
+    // Only authored JSON can supply KC facts. Binary attachments must remain
+    // opaque: enumerating a source archive Buffer allocates one entry per byte.
+    if (file.type !== 'media' && containsKcGraphFact(file.contents)) {
       throw new Meteor.Error(
         'package-kc-graph-forbidden',
         `Package file "${file.name}" supplies KC graph values. KC graphs are generated from expectation embeddings; omit all kcGraph facts, expectationRelationships, and expectationRelationshipProvenance.`,

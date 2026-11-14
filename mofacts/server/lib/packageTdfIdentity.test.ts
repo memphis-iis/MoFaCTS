@@ -77,6 +77,12 @@ function deps(existing: any[] = [], manageable = true) {
 }
 
 describe('packageTdfIdentity', function() {
+  it('keeps binary simulation/source attachments opaque during identity preflight', async () => {
+    const opaque = new Proxy(Buffer.from('source archive'), { ownKeys() { throw new Error('Binary attachment was traversed'); } });
+    const attachment: UploadedPackageFile = { name: 'simulation-source.zip', path: 'simulation-source.zip', extension: 'zip', packageFile: 'package.zip', type: 'media', contents: opaque };
+    const plan = await preflightPackageTdfIdentities({ unzippedFiles: [...packageFiles(tdfFile('simulation.json')), attachment], packageAssetId: 'simulation-package', ownerId: 'owner', deps: deps() });
+    assert.equal(plan.entries.length, 1);
+  });
   for (const orientationMode of ['full', 'headings', 'off', undefined, 'FULL', '', null, false, 1]) {
     it(`validates orientationMode ${JSON.stringify(orientationMode)} in actual package preflight`, async function() {
       const file = tdfFile('orientation.json');
