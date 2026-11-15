@@ -6,6 +6,72 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Complete unattended production migration resumed (2026-11-15)
+**Hosting decision confirmed:** the audit must run with the desktop/app off.
+Phil identified staging2 as the intended server; original staging is excluded.
+Read-only staging2 inventory verified the existing pinned host identity over its
+private route, running systemd, two CPUs, about 2.6 GiB available RAM and 25 GiB
+free disk, healthy MoFaCTS/Mongo/Redis and running unrelated JEDM services.
+No audit timer was listed; host Node/npm and Nmap are absent. No host change ran.
+See deploy/security-audit/staging2-unattended-design.md for the concrete proposed
+cloud handoff, scheduler ownership, failure reporting and acceptance gates.
+Phil explicitly approved qualification of a separate staging2-only cloud audit
+connection on 2026-11-15. This grants no new Gmail permission, shell/database
+access, paid service or production authority. Actual one-time connection consent
+remains required when the verified endpoint is ready. No connection is installed.
+
+Local candidate: deploy/security-audit/connection implements scoped OAuth/PKCE,
+private scanner handoff and explicit interrupted-run recovery. Full app lint,
+connection ESLint and diff checks passed after the recovery correction. Linux
+connection plus authentication lease tests passed 12/12. The rebuilt exact image
+passed 8/8 connection tests with read-only root, no network, dropped capabilities,
+and 256 MiB/0.25 CPU limits. Image config:
+9ea26fe4186b48d38d63893adff943d4487a3e3b82319c9e1320d4a0d72f600a;
+platform manifest: 74ece88b72a0db7e7f41c215adc9e111dd89ffae210d1cbddd5ce114e7567de6.
+These tests use synthetic mail and cleanup callbacks, not real Gmail or fixture
+cleanup. No real mail or complete audit is claimed. No additional Meteor test:ci
+slot was consumed. The user-requested progress report was sent to Review security
+audit status. Source remains uncommitted and no staging service is installed.
+
+Phil requested a complete weekly unattended audit on existing infrastructure,
+without GitHub billing, with real connected-Gmail reset delivery, failure and
+missed-run reporting, and one final approved production cutover. An incomplete
+host-only installation is not authorized. Preserve all controls, encryption,
+retention, exact evidence and cleanup. Retire obsolete GitHub triggers only as
+part of the completed replacement cutover.
+
+Source inspection confirms selected authorization is the only acquired control;
+the other 21 authentication controls remain ERROR. The production workflow still
+schedules its pinned V1 scanner. The canonical production command sheet contains
+its ordinary and Change Streams Compose files and release recorder, but no audit
+receipt overlay. No production command ran here. Earlier November 15 live findings
+remain separate dated evidence in deploy/security-audit/production-operator-cutover.md.
+
+The local automation interface scheduled a bounded capability test of background
+worker execution and exact nonexistent-recipient Gmail metadata search. ID:
+mofacts-unattended-execution-qualification. Creation succeeded; actual scheduled
+execution was not observed during this turn; the test is now PAUSED. No reset request, email-body
+read, production fixture, credential, paid service or recurring production audit
+was created. Interactive Ubuntu-MoFaCTS access succeeds with existing operator
+execution permission; the restricted shell cannot see that distribution. The
+scheduled test has not established unattended access. The operator was asked whether
+production scheduling must work while this computer/app is off. Desktop-task
+documentation requires both to remain running; a desktop-dependent design cannot
+be assumed to satisfy the production availability requirement.
+
+Standing slot 9 was reconciled from original Linux results, without another run.
+Source before/after and saved local-service records are byte-identical. Both new
+progress-backed participant cases pass. Actual isolation and 6-GiB/two-CPU limits
+are recorded; exact job containers, network and named tools volume are absent.
+The receipt remains unqualified for release/image purposes. One Meteor invocation
+remains available; none is reserved here.
+
+Next: qualify scheduled Gmail/worker access, complete Phase 2 protocol acquisition
+and catalog integration, then Phase 3/4 source and staging acceptance. Production
+synthetic-identity scope and final coordinated cutover remain action-time decisions.
+Existing uncommitted mail/host work was preserved. No production host, app,
+mailbox scope or GitHub trigger changed.
+
 ## GitHub billing unavailable: standard operator security lane (2026-11-12)
 
 Phil reiterated that GitHub billing cannot be used. Security run `43212891467`
@@ -769,7 +835,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 6 | f3d21e7403cb3bc54db144aec5b729d38956ddc5 | FAIL: 1,023 server passes/one new reset-fixture failure, 1,249 client passes; 15/seven pending, zero hook failures. Mixed-case fixture email did not match the canonical lowercase reset query. Owned resources removed. Failed evidence: phase1-20261105/native-phase2-reset-f3d21e74-failed. |
 | 7 | efa3bd73a75b9df1172e01347498f06a1c5ff3b1 | PASS 2026-11-13T01:25:14Z-01:26:48Z (November 12 local): 1,024 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered reset/session cases pass. Source/isolation/resources/cleanup and unchanged original services verified. Private receipt: phase1-20261105/native-phase2-reset-efa3bd73. |
 | 8 | fe08499c7d3ed4b415d181445b0b05c257a079a2 | PASS 2026-11-13T13:41:02Z-13:42:18Z: 1,027 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered passwordless/catalog cases pass. Exact clean source, actual 6-GiB/two-CPU isolation, original-service uptime and owned-resource cleanup verified. Private: phase1-20261105/native-phase2-protocol-fe08499c. |
-| 9 | 9accf938a85d75abdee89ecd821d69ffe7c987b3 | IN PROGRESS: exclusive invocation marker verified on the supported 6-GiB/two-CPU worker. Two new laboratory return cases; final result/cleanup pending. |
+| 9 | 9accf938a85d75abdee89ecd821d69ffe7c987b3 | PASS, reconciled 2026-11-15: run 2026-11-13T19:26:12Z to 19:30:30Z; 1,029 server/1,249 client passes, zero failures/hooks, 15/seven existing pending. Both progress-backed return cases pass. Source, isolation/resources, saved service records and exact job resource absence verified. Original receipt: /var/tmp/mofacts-integration.uIoCJYbL/results/native-verification.json; SHA-256 b7119f4c6a525ed05510ac88851bf65d7a424c826a01294702f7ee487915cc53. Native evidence only, not release qualification. |
 | 10 | Pending | Available. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.

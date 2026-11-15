@@ -5,7 +5,25 @@ exposure and repository security. Audit findings do not stop services, change
 permissions/firewalls, deploy code or alter real accounts. Backup/recovery and
 application availability remain separate responsibilities.
 
+## Production reconciliation observed 2026-11-15
+
+The November 14 production release now presents the V2 receiver, but its
+restricted host command still emits V1 and its GitHub scanner remains pinned
+to V1. The earlier production-V1 pairing statements below describe the prior
+baseline, not the current live pairing. The scheduled audit is not operational.
+See the [verified finding and offline cutover packet](../../deploy/security-audit/production-operator-cutover.md).
+The observed MongoDB role FAIL comes from the obsolete single-role expectation;
+bounded metadata checks confirmed the current approved app/Sidecar role policy.
+No production permission, configuration, mail transport or schedule changed.
+
 ## Current execution and deployment
+
+The target scheduler/scanner host is **staging2**, independent of the operator's
+desktop. Original staging is excluded. Read-only host inventory is complete;
+no recurring audit timer or cloud mail-handoff service is installed. The
+[staging2 unattended design](../../deploy/security-audit/staging2-unattended-design.md)
+records measured prerequisites, the connected-Gmail boundary and required
+independent missed-run detection. This is planned architecture, not acceptance.
 
 GitHub billing is unavailable. The four repository Security jobs use the
 [standard operator Linux executor](../../deploy/security-audit/operator-security-checks.md).
@@ -21,13 +39,13 @@ The [operator exposure workflow](../../deploy/security-audit/operator-exposure-v
 composes the same V2 producers, assembler, encryption, uploader and final
 assertion without GitHub scheduling or new server access.
 
-Production retains the separately pinned V1 scanner/receiver pairing. Its
+Production's scanner still selects V1 although its receiver is now V2. Its
 workflow selects `09f0c32fc2af6d220c699dd805133df3c0507c2e`; publishing V2 source
 neither upgrades production nor authorizes scanning it. The configured daily
 06:00 UTC exposure/weekly Monday full schedule does not prove execution while
 GitHub is locked. The existing V1 setup is preserved in its
 [immutable operating guide](https://github.com/memphis-iis/MoFaCTS/blob/09f0c32fc2af6d220c699dd805133df3c0507c2e/docs/deployment/security-audit.md).
-Do not install current V2 source into that V1 pairing. Production execution,
+Reconcile the entire host/scanner/receiver unit at the complete cutover. Production execution,
 credential changes and cutover require their own explicit authorization.
 
 ## Reports and evidence semantics

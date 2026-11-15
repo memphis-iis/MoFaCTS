@@ -1,0 +1,23 @@
+[Unit]
+Description=MoFaCTS staging2 audit mail connection
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mofacts-audit-connection
+RuntimeDirectory=mofacts-audit-connection
+RuntimeDirectoryMode=0700
+ExecStartPre=/usr/bin/chown 2000:2000 /run/mofacts-audit-connection
+ExecStart=/usr/bin/flock --no-fork --nonblock /var/lib/mofacts-audit-connection/owner.lock /usr/bin/docker compose --env-file connection.env -f compose.yml up --no-build --pull never --abort-on-container-exit --exit-code-from connection
+ExecStop=/usr/bin/docker compose --env-file connection.env -f compose.yml stop -t 10 connection
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

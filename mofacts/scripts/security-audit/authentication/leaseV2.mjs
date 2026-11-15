@@ -27,6 +27,12 @@ async function existing(file) {
   if (bytes.length > 1024) invalid();
   return parse(parseAuditFileV2(bytes));
 }
+
+// Read-only projection for the audit mail bridge. The scanner remains the only
+// lease/recovery owner; reading this value cannot release or renew its lease.
+export async function readAuthenticationLeaseV2(directory) {
+  return existing(await location(directory));
+}
 async function requireOwner(file, owner, identity) {
   const current = await existing(file), stat = await fs.lstat(file, { bigint: true });
   if (canonicalAuditJson(current) !== canonicalAuditJson(owner) || stat.ino !== identity.ino || stat.dev !== identity.dev) invalid();

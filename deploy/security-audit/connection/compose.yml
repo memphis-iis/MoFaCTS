@@ -1,0 +1,38 @@
+name: mofacts-audit-connection
+services:
+  connection:
+    image: ${AUDIT_CONNECTION_IMAGE:?Select the exact qualified connection image}
+    user: "2000:2000"
+    command: ["serve", "/state", "/run/connection/scanner.sock", "/lease", "8943"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.25
+    pids_limit: 64
+    init: true
+    ports: ["127.0.0.1:8943:8943"]
+    volumes:
+      - type: bind
+        source: /var/lib/mofacts-audit-connection/state
+        target: /state
+        bind: {create_host_path: false}
+      - type: bind
+        source: /run/mofacts-audit-connection
+        target: /run/connection
+        bind: {create_host_path: false}
+      - type: bind
+        source: /var/lib/mofacts-audit-scanner/staging2
+        target: /lease
+        read_only: true
+        bind: {create_host_path: false}
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=8m"]
+    healthcheck:
+      test: ["CMD", "node", "--input-type=module", "-e", "const r=await fetch('http://127.0.0.1:8943/.well-known/oauth-protected-resource/audit-connection/mcp');if(r.status!==200)process.exit(1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [connection]
+networks:
+  connection:
+    internal: true

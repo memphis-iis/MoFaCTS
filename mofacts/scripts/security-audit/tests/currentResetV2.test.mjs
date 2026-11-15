@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { captureCurrentResetV2 as capture, evaluateCurrentResetSessionsV2 as evaluate } from '../authentication/currentResetV2.mjs';
+import { acquireConnectedGmailResetMessageV2 as acquire } from '../authentication/connectedGmailV2.mjs';
 
 function fixture() {
   const namespace = 'mofacts_audit_fixture_0123456789ab';
@@ -30,6 +31,28 @@ test('connected-mail scenario shares current reset cases and retains only bounde
   assert.deepEqual(calls, ['baseline', 'request', 'mail', 'reset', 'new-login', 'old-login', 'sessions', 'reset']);
   const serialized = JSON.stringify(result);
   for (const secret of [value.actor.username, value.actor.password, value.newPassword, 'a'.repeat(64)]) assert.ok(!serialized.includes(secret));
+});
+
+test('connector acquisition composes with the current-reset protocol without changing its mail contract', async () => {
+  const { value } = fixture();
+  let resetCalls = 0;
+  const reset = value.transport.reset;
+  value.transport.reset = async (recipient, token, password) => {
+    assert.equal(recipient, value.actor.username); assert.equal(token, 'a'.repeat(64));
+    assert.equal(password, value.newPassword); resetCalls++;
+    return reset();
+  };
+  value.acquireMail = async binding => {
+    const content = `${binding.target}/auth/reset-password?email=${encodeURIComponent(binding.recipient)}&token=${'a'.repeat(64)}`;
+    const message = { id: '1abc', payload: { mime_type: 'text/plain', filename: null, parts: null,
+      headers: [{ name: 'To', value: binding.recipient }, { name: 'Delivered-To', value: binding.recipient },
+        { name: 'X-Received', value: `by 2002:a17:903:1 with SMTP id synthetic.${binding.requestedAtMs}; Synthetic` }],
+      body: { content, size: Buffer.byteLength(content), attachment_id: null } } };
+    return acquire({ binding, listMessages: async () => [message], readMessage: async () => message });
+  };
+  const result = await capture(value);
+  assert.equal(result.current.status, 'PASS'); assert.equal(result.session.status, 'PASS');
+  assert.equal(resetCalls, 2); assert.equal(JSON.stringify(result).includes('a'.repeat(64)), false);
 });
 test('foreign accounts and origins fail before password or mail callbacks', async () => {
   for (const patch of [{ target: 'https://optimallearning.org' }, { actor: { ...fixture().value.actor, username: 'existing@gmail.com' } }]) {

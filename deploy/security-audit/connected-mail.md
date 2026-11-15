@@ -68,3 +68,14 @@ It does not provide a reusable credential or prove unattended acquisition by the
 standalone scanner. Keep unattended mailbox qualification visibly pending;
 do not introduce another mail transport or credential to bypass that boundary.
 Other authorization scenarios and source implementation can continue meanwhile.
+
+
+## Bounded acquisition helper (2026-11-15)
+
+The existing connector adapter includes a bounded acquisition coordinator and
+private stdin transport, using the same mailbox validation owner and current-reset
+input contract. All 28 mailbox/connector/transport/current-reset tests and full
+application lint pass. Actual interactive terminal carriage is verified; the
+isolated scheduled probe reached Gmail but failed before local execution. No
+production target, unattended worker access or new credential is enabled. See
+the [execution evidence and remaining proof](unattended-authentication-review.md).

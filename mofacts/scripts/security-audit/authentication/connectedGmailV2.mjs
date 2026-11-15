@@ -1,4 +1,4 @@
-import { RESET_MAILBOX_LIMITS_V2, resetMailboxMessageMatchesV2, readResetMailboxMessageV2 } from './mailboxV2.mjs';
+import { RESET_MAILBOX_LIMITS_V2, resetMailboxMessageMatchesV2, readResetMailboxMessageV2, parseResetMailboxBindingV2, acquireResetMailboxMessageV2 } from './mailboxV2.mjs';
 
 const invalid = () => { throw new Error('Connected Gmail reset evidence is invalid'); };
 function headerValues(message, name) {
@@ -40,4 +40,55 @@ export function connectedGmailResetMessageV2(binding, metadata, message) {
       || Buffer.byteLength(part.body.content) > RESET_MAILBOX_LIMITS_V2.bodyBytes) invalid();
   const result = readResetMailboxMessageV2(binding, checked, part.body.content);
   return { metadata: checked, plainText: part.body.content, receipt: result.receipt };
+}
+
+// One bounded connector-owned acquisition, callable by an unattended owner only
+// when that owner already has authorized tool access and a private scanner handoff.
+// This adds no HTTP client, OAuth/IMAP access, scheduler, production binding or
+// credential storage. The existing mailbox owner retains matching and token rules.
+export async function acquireConnectedGmailResetMessageV2({ binding, listMessages, readMessage, now = Date.now }) {
+  try {
+    const scope = parseResetMailboxBindingV2(binding);
+    if (typeof listMessages !== 'function' || typeof readMessage !== 'function' || typeof now !== 'function') invalid();
+    const withinWindow = () => {
+      const time = now();
+      if (!Number.isSafeInteger(time) || time < scope.requestedAtMs || time > scope.deadlineMs) invalid();
+    };
+    const selected = new Map();
+    let evidence;
+    withinWindow();
+    const result = await acquireResetMailboxMessageV2({
+      binding: scope,
+      listMetadata: async () => {
+        // The callback must use exact recipient + reset subject and request no
+        // more than the existing ten-message bound; never fetch a whole inbox.
+        const messages = await listMessages({ ...scope });
+        withinWindow();
+        if (!Array.isArray(messages) || messages.length > RESET_MAILBOX_LIMITS_V2.messageCount) invalid();
+        return messages.map(message => {
+          const metadata = connectedGmailMetadataV2(scope, message);
+          if (selected.has(metadata.messageId)) invalid();
+          selected.set(metadata.messageId, metadata);
+          return metadata;
+        });
+      },
+      readPlainText: async messageId => {
+        withinWindow();
+        const metadata = selected.get(messageId);
+        if (!metadata) invalid();
+        const message = await readMessage(messageId);
+        withinWindow();
+        evidence = connectedGmailResetMessageV2(scope, metadata, message);
+        return evidence.plainText;
+      },
+    });
+    withinWindow();
+    // Match captureCurrentResetV2's existing private-mail contract. It validates
+    // the evidence again against its own request before any password mutation.
+    return evidence ?? result;
+  } catch {
+    // Connector exceptions can contain email bodies or capabilities. Do not
+    // retain them as causes, logs, receipts or user-visible diagnostics.
+    throw new Error('Connected Gmail reset acquisition is unavailable');
+  }
 }
