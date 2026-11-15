@@ -1,0 +1,19 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "staging2-audit": {
+      "type": "streamable-http",
+      "url": "https://staging2.optimallearning.org/audit-connection/mcp",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "client": { "mode": "dcr" },
+            "baseScopes": ["audit:mail", "audit:status"],
+            "defaultScopes": ["audit:mail", "audit:status"]
+          }
+        }
+      }
+    }
+  }
+}

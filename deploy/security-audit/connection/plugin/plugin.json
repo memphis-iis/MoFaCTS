@@ -1,0 +1,24 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "mofacts-staging2-audit",
+  "version": "0.1.1",
+  "description": "Authenticated staging2 audit status and exact synthetic reset-message handoff. Does not grant Gmail, shell, database or production access.",
+  "author": {
+    "name": "MoFaCTS"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "MoFaCTS Staging2 Audit",
+        "shortDescription": "Staging2 audit mail handoff",
+        "longDescription": "Connect an authorized cloud reader to the staging2 audit's owned reset-message request. Gmail authorization remains in the existing Gmail connection. Complete scanner and scheduling qualification remain separate.",
+        "developerName": "MoFaCTS",
+        "category": "Productivity",
+        "capabilities": [
+          "Interactive"
+        ],
+        "defaultPrompt": "Check the staging2 audit connection status."
+      }
+    }
+  }
+}

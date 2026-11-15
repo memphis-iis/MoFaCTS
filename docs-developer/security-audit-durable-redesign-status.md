@@ -11,26 +11,42 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 - [x] Publish the reviewed connection/mail/lease batch as 2313af2e. Full app
   lint (330 surfaces), explicit connection lint, 12 connection/lease cases and
   24 affected mail/transport/reset cases pass. No Meteor invocation consumed.
-- [x] Build from clean committed public source. Preserve the first preparation
-  failure: private extraction permissions made non-root reads fail. Re-extract
-  the public source with its readable Git modes; all eight image cases pass.
-- [x] Transfer checksum-pinned image/source over the existing verified private
-  staging2 route. Resolve the immutable engine index separately from the config
-  digest; the initial config-only selection stopped before service installation.
-- [x] Verify the application/JEDM containers and HTTPS configuration remained
-  unchanged through that stopped preparation; retain its root-owned recovery.
-- [ ] Complete actual connection service readiness and restart qualification.
-  The first service start failed; it was stopped before any Apache route was
-  enabled. Add fixed content-free initialization stages (8ba945ce) and a real
-  serve-process readiness/shutdown test (89c1d7f8; nine Linux cases pass).
-  Diagnose and repair before enabling the HTTPS route or requesting consent.
-- [ ] Verify public OAuth/MCP metadata, unauthorized denial, revocation/restart,
-  original-service uptime and a real cloud connection. No Gmail observation,
-  installed schedule or complete authentication audit is claimed.
+- [x] Preserve failed preparation/source-read permissions and config-only image
+  selection records. Both failed closed before HTTPS changes. The Docker engine
+  index and image-config digest are recorded separately, not replaced by a tag.
+- [x] Diagnose actual service startup: systemd reapplied root ownership after
+  pre-start. Use its private UID-2000 scanner child (f2b55766); preserve failures.
+- [x] Remove the unavailable internal-network port mapping without adding egress.
+  Source 0592752bd5b8ffe677a7d2b8eecf63355d8ea35a uses no container network and
+  separate HTTP/scanner Unix sockets. Nine Linux cases and nine exact-image
+  cases pass, including actual serve readiness and clean shutdown.
+- [x] Install and qualify that exact candidate on staging2. Engine index:
+  18f64ab2fb9176eaaa6a6ab07aa346f3ab048d87a835a8e5460c9bed24b21acd.
+  HTTPS resource/authorization discovery, S256 metadata, unauthenticated MCP
+  denial, real systemd restart, resource limits and network_mode=none pass.
+  All five original containers retain IDs/images/start times and remain running;
+  MoFaCTS remains healthy. Apache configuration validated before reload.
+- [x] Verify minimum persistent access: runtime parent root:root 0711; scanner
+  child 2000:2000 0700; HTTP child 2000:www-data 2750 and socket 0660. Apache can
+  reach only the authenticated HTTP interface, not scanner channel or state.
+  No shell/database/Gmail permission, paid service or production change added.
+- [x] Register a private USER-scoped connection package, version 0.1.1. Inspect
+  its stored MCP configuration and bounded mail-handoff skill. It is not yet
+  connected; no live tool or Gmail acquisition is claimed.
+- [ ] User completes the reserved one-time connection consent, then verify live
+  tool discovery, narrowly scoped operations and revocation/refresh behavior.
+- [ ] Qualify real exact-recipient Gmail carriage, full authentication scanner,
+  independent hosted scheduling, missed-run alerts and complete audit acceptance.
 
-Progress-backed passwordless access and existing accepted checkmarks are
-preserved. Production/original staging remain excluded. Unrelated production
-cutover drafts are preserved and excluded from this publication batch.
+Private evidence: phase1-20261105/staging2-connection-0592752b. Host receipt
+SHA-256 f2d92cafa4cd9f56da65bab413f6d65f11df8f3ad6342ace926e188b5ec4c9cd;
+retained host recovery includes original HTTPS config, failed attempts and exact
+qualified config hashes. No accepted historical check is rerun merely to clean
+up this checklist. P2-01/06/07/10 remain closed; overall Phase 2 is still open.
+Progress-backed passwordless access is unchanged. Production/original staging
+remain excluded. Unrelated production cutover drafts are preserved/excluded.
+The following initial offline milestone is historical; this section supersedes
+its then-current statements about installation and registration being absent.
 
 ## Complete unattended production migration resumed (2026-11-15)
 **Hosting decision confirmed:** the audit must run with the desktop/app off.
