@@ -42,7 +42,11 @@ the MoFaCTS application.
 The installation owns only `/opt/mofacts-audit-connection`,
 `/var/lib/mofacts-audit-connection`, `/run/mofacts-audit-connection`, its one
 systemd unit, and the explicitly reviewed Apache include. State is mode 0700,
-UID/GID 2000; state files are 0600. The scanner lease directory is a separate
+UID/GID 2000; state files are 0600. The systemd runtime parent remains root-owned;
+its `channel` child alone is UID/GID 2000 and is the private socket bind mount.
+Systemd reapplies ownership of its managed parent at each execution boundary,
+so changing the parent's owner in a pre-start command is insufficient.
+The scanner lease directory is a separate
 private mode-0700 directory mounted read-only here. Do not change ownership of
 an existing directory without checking its current owner and purpose.
 
@@ -94,3 +98,10 @@ a desktop, real exact-recipient Gmail carriage, full scanner integration,
 failure/missed-run notification and all complete-audit acceptance remain
 required. Synthetic connection tests do not satisfy those requirements. See
 `../staging2-unattended-design.md` for the coordinated cutover gates.
+
+The Docker engine's immutable image identity can be an OCI index rather than
+its image-config checksum. Verify the transferred archive checksum, selected
+engine identity, platform, source revision and config separately. Supply the
+verified engine identity to Compose; do not silently substitute a tag when an
+image-config checksum is not addressable. A successful component-test image is
+also insufficient: qualify the actual `serve` process and supervisor readiness.

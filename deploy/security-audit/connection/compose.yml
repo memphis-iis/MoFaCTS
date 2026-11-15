@@ -18,7 +18,7 @@ services:
         target: /state
         bind: {create_host_path: false}
       - type: bind
-        source: /run/mofacts-audit-connection
+        source: /run/mofacts-audit-connection/channel
         target: /run/connection
         bind: {create_host_path: false}
       - type: bind

@@ -6,6 +6,32 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Staging2 connection qualification continued (2026-11-15)
+
+- [x] Publish the reviewed connection/mail/lease batch as 2313af2e. Full app
+  lint (330 surfaces), explicit connection lint, 12 connection/lease cases and
+  24 affected mail/transport/reset cases pass. No Meteor invocation consumed.
+- [x] Build from clean committed public source. Preserve the first preparation
+  failure: private extraction permissions made non-root reads fail. Re-extract
+  the public source with its readable Git modes; all eight image cases pass.
+- [x] Transfer checksum-pinned image/source over the existing verified private
+  staging2 route. Resolve the immutable engine index separately from the config
+  digest; the initial config-only selection stopped before service installation.
+- [x] Verify the application/JEDM containers and HTTPS configuration remained
+  unchanged through that stopped preparation; retain its root-owned recovery.
+- [ ] Complete actual connection service readiness and restart qualification.
+  The first service start failed; it was stopped before any Apache route was
+  enabled. Add fixed content-free initialization stages (8ba945ce) and a real
+  serve-process readiness/shutdown test (89c1d7f8; nine Linux cases pass).
+  Diagnose and repair before enabling the HTTPS route or requesting consent.
+- [ ] Verify public OAuth/MCP metadata, unauthorized denial, revocation/restart,
+  original-service uptime and a real cloud connection. No Gmail observation,
+  installed schedule or complete authentication audit is claimed.
+
+Progress-backed passwordless access and existing accepted checkmarks are
+preserved. Production/original staging remain excluded. Unrelated production
+cutover drafts are preserved and excluded from this publication batch.
+
 ## Complete unattended production migration resumed (2026-11-15)
 **Hosting decision confirmed:** the audit must run with the desktop/app off.
 Phil identified staging2 as the intended server; original staging is excluded.
