@@ -6,9 +6,12 @@ import { createConnectionApp } from './server.mjs';
 import { createScannerChannel, listenScannerChannel } from './scannerChannel.mjs';
 
 const [action, stateDirectory, ...args] = process.argv.slice(2);
+let stage = 'runtime';
 try {
   if (process.version !== 'v24.22.1' || !stateDirectory) throw new Error();
+  stage = 'state';
   const store = await openConnectionStore(stateDirectory);
+  stage = 'authorization';
   const authorization = createAuditAuthorization({ store });
   if (action === 'enroll' && args.length === 1) {
     // Operator-only command, offline while service is stopped. The output file
@@ -25,8 +28,10 @@ try {
     const port = Number(portText);
     if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error();
     const handoff = createMailHandoff({ store });
+    stage = 'scanner-channel';
     const privateServer = createScannerChannel({ handoff, leaseDirectory });
     await listenScannerChannel(privateServer, socketPath);
+    stage = 'http-listener';
     const publicServer = createConnectionApp({ authorization, handoff }).listen(port, '0.0.0.0');
     publicServer.on('error', () => { process.stderr.write('Audit connection listener unavailable.\n'); process.exit(1); });
     process.on('SIGTERM', () => {
@@ -35,5 +40,5 @@ try {
     });
   } else throw new Error();
 } catch {
-  process.stderr.write('Audit connection configuration or state rejected.\n'); process.exitCode = 1;
+  process.stderr.write(`Audit connection initialization rejected at ${stage}.\n`); process.exitCode = 1;
 }
