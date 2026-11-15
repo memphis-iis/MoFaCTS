@@ -43,7 +43,7 @@ The installation owns only `/opt/mofacts-audit-connection`,
 `/var/lib/mofacts-audit-connection`, `/run/mofacts-audit-connection`, its one
 systemd unit, and the explicitly reviewed Apache include. State is mode 0700,
 UID/GID 2000; state files are 0600. The systemd runtime parent remains root-owned;
-its `channel` child alone is UID/GID 2000 and is the private socket bind mount.
+its `channel` child is UID/GID 2000 and is the private scanner socket mount.
 Systemd reapplies ownership of its managed parent at each execution boundary,
 so changing the parent's owner in a pre-start command is insufficient.
 The scanner lease directory is a separate
@@ -59,7 +59,11 @@ An existing socket is not automatically deleted by the service.
 Supply `AUDIT_CONNECTION_IMAGE` in root-owned `connection.env` using the exact
 verified image identity. Compose may not build or pull at startup. Validate
 Apache before reload; insert its include before the existing catch-all proxy.
-The service publishes only loopback port 8943 through existing HTTPS port 443.
+The container has no networking. Apache reaches a separate HTTP Unix socket
+through existing HTTPS port 443. Its directory is UID 2000/GID 33, mode 2750;
+the socket inherits Apache group 33 and is mode 0660. The runtime parent is
+root-owned mode 0711; the scanner channel remains private mode 0700. Apache
+has no access to the scanner channel or state.
 Confirm metadata, unauthenticated denial, container health, systemd ownership,
 and unchanged application/JEDM containers before declaring installation passed.
 The user must subsequently complete the actual connection consent; mocked

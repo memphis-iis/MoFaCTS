@@ -9,6 +9,7 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
+import http from 'node:http';
 import { createInterface } from 'node:readline';
 import { openConnectionStore } from './store.mjs';
 import { createAuditAuthorization, CONNECTION_BASE, CONNECTION_RESOURCE, CONNECTION_SCOPES } from './authorization.mjs';
@@ -25,23 +26,29 @@ test('the actual serve entry point reaches HTTP readiness and terminates cleanly
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-entry-'));
   await fs.chmod(directory, 0o700);
   const lease = path.join(directory, 'lease'); await fs.mkdir(lease, { mode: 0o700 });
-  const probe = net.createServer(); probe.listen(0, '127.0.0.1'); await once(probe, 'listening');
-  const port = probe.address().port; await new Promise(resolve => probe.close(resolve));
+  const httpSocket = path.join(directory, 'http.sock');
   const child = spawn(process.execPath, [fileURLToPath(new URL('./main.mjs', import.meta.url)), 'serve',
-    directory, path.join(directory, 'scanner.sock'), lease, String(port)], { stdio: ['ignore', 'pipe', 'pipe'] });
+    directory, path.join(directory, 'scanner.sock'), lease, httpSocket], { stdio: ['ignore', 'pipe', 'pipe'] });
   let closed = false, exit;
   const done = new Promise(resolve => child.once('close', (code, signal) => { closed = true; exit = { code, signal }; resolve(); }));
   t.after(async () => { if (!closed) { child.kill('SIGKILL'); await done; } await fs.rm(directory, { recursive: true, force: true }); });
   let ready = false;
   for (let attempt = 0; attempt < 100 && !closed; attempt++) {
     try {
-      const response = await fetch(`http://127.0.0.1:${port}/.well-known/oauth-protected-resource/audit-connection/mcp`, { signal: AbortSignal.timeout(500) });
-      ready = response.status === 200 && (await response.json()).resource === CONNECTION_RESOURCE;
+      ready = await new Promise((resolve, reject) => {
+        const request = http.get({ socketPath: httpSocket, path: '/.well-known/oauth-protected-resource/audit-connection/mcp',
+          headers: { Host: 'staging2.optimallearning.org' } }, response => {
+          let body = ''; response.on('data', chunk => { body += chunk; });
+          response.on('end', () => { try { resolve(response.statusCode === 200 && JSON.parse(body).resource === CONNECTION_RESOURCE); } catch { reject(new Error('Invalid metadata')); } });
+        });
+        request.setTimeout(500, () => request.destroy()); request.on('error', reject);
+      });
       if (ready) break;
     } catch { /* The listener may not yet exist; readiness remains unproven. */ }
     await delay(100);
   }
   assert.equal(ready, true, 'Actual entry point did not become ready');
+  assert.equal((await fs.stat(httpSocket)).mode & 0o777, 0o660);
   child.kill('SIGTERM'); await done;
   assert.deepEqual(exit, { code: 0, signal: null });
 });

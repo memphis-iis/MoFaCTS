@@ -24,18 +24,22 @@ try {
     await authorization.revokeAll();
     process.stdout.write('All audit connection grants revoked.\n');
   } else if (action === 'serve' && args.length === 3) {
-    const [socketPath, leaseDirectory, portText] = args;
-    const port = Number(portText);
-    if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error();
+    const [socketPath, leaseDirectory, httpSocketPath] = args;
+    if (!httpSocketPath.startsWith('/') || !httpSocketPath.endsWith('.sock') || httpSocketPath === socketPath) throw new Error();
     const handoff = createMailHandoff({ store });
     stage = 'scanner-channel';
     const privateServer = createScannerChannel({ handoff, leaseDirectory });
     await listenScannerChannel(privateServer, socketPath);
     stage = 'http-listener';
-    const publicServer = createConnectionApp({ authorization, handoff }).listen(port, '0.0.0.0');
-    publicServer.on('error', () => { process.stderr.write('Audit connection listener unavailable.\n'); process.exit(1); });
+    const publicServer = createConnectionApp({ authorization, handoff });
+    const httpListener = await new Promise((resolve, reject) => {
+      const listener = publicServer.listen(httpSocketPath, () => resolve(listener));
+      listener.once('error', reject);
+    });
+    await fs.chmod(httpSocketPath, 0o660);
+    httpListener.on('error', () => { process.stderr.write('Audit connection listener unavailable.\n'); process.exit(1); });
     process.on('SIGTERM', () => {
-      publicServer.close(); privateServer.close();
+      httpListener.close(); privateServer.close();
       setTimeout(() => process.exit(0), 1000).unref();
     });
   } else throw new Error();
