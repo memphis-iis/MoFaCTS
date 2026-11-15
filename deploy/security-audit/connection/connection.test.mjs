@@ -6,6 +6,9 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import net from 'node:net';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { setTimeout as delay } from 'node:timers/promises';
 import { createInterface } from 'node:readline';
 import { openConnectionStore } from './store.mjs';
 import { createAuditAuthorization, CONNECTION_BASE, CONNECTION_RESOURCE, CONNECTION_SCOPES } from './authorization.mjs';
@@ -18,6 +21,30 @@ import { recoverAuthenticationLeaseV2 } from '../../../mofacts/scripts/security-
 const callback = 'https://chatgpt.com/connector/oauth/test-audit';
 const verifier = 'A'.repeat(43);
 const challenge = createHash('sha256').update(verifier).digest('base64url');
+test('the actual serve entry point reaches HTTP readiness and terminates cleanly', { timeout: 30000 }, async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-entry-'));
+  await fs.chmod(directory, 0o700);
+  const lease = path.join(directory, 'lease'); await fs.mkdir(lease, { mode: 0o700 });
+  const probe = net.createServer(); probe.listen(0, '127.0.0.1'); await once(probe, 'listening');
+  const port = probe.address().port; await new Promise(resolve => probe.close(resolve));
+  const child = spawn(process.execPath, [fileURLToPath(new URL('./main.mjs', import.meta.url)), 'serve',
+    directory, path.join(directory, 'scanner.sock'), lease, String(port)], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let closed = false, exit;
+  const done = new Promise(resolve => child.once('close', (code, signal) => { closed = true; exit = { code, signal }; resolve(); }));
+  t.after(async () => { if (!closed) { child.kill('SIGKILL'); await done; } await fs.rm(directory, { recursive: true, force: true }); });
+  let ready = false;
+  for (let attempt = 0; attempt < 100 && !closed; attempt++) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/.well-known/oauth-protected-resource/audit-connection/mcp`, { signal: AbortSignal.timeout(500) });
+      ready = response.status === 200 && (await response.json()).resource === CONNECTION_RESOURCE;
+      if (ready) break;
+    } catch { /* The listener may not yet exist; readiness remains unproven. */ }
+    await delay(100);
+  }
+  assert.equal(ready, true, 'Actual entry point did not become ready');
+  child.kill('SIGTERM'); await done;
+  assert.deepEqual(exit, { code: 0, signal: null });
+});
 async function fixture(t) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-connection-'));
   await fs.chmod(directory, 0o700);
