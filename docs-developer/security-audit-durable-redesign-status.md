@@ -6,6 +6,26 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Real connection authorization accepted (2026-11-16)
+
+- [x] User completes fresh approval. Read-only server metadata confirms enrollment
+  consumed, one active grant, one active access record, exactly audit:mail and
+  audit:status, and zero unexpired authorization codes. Actual platform token
+  exchange passed. No credential values were retained.
+- [x] Registered app page offers Try in chat and no Continue connecting action.
+  The accepted package binding is 0.1.2. No app/database/Gmail/production permission
+  was added by this verification.
+- [x] Preserve the intervening expired-code failure: enrollment had zero seconds
+  remaining and zero validation attempts. Reopening the form without checking
+  expiry was an operator error; replace enrollment and pending request together.
+- [ ] Live MCP invocation remains unverified: the three tool names are absent
+  from this conversation's current tool inventory after authorization. Do not
+  extract platform credentials or substitute a host-side request for live ChatGPT
+  execution. No new code or reconnection is indicated by this observation.
+- [ ] Continue exact-recipient Gmail carriage and scanner qualification when the
+  authenticated tools are available. No Gmail search/read, complete audit,
+  unattended execution, production action or fresh Meteor invocation is claimed.
+
 ## Accepted code; callback blocked by form policy (2026-11-16)
 
 - [x] Diagnose the next reported fresh-code error using minimized state: enrollment
@@ -30,7 +50,8 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   Live public HTTPS has one exact registered-callback policy and strict-origin.
   All other containers and Apache configuration are unchanged; prior image retained.
   Protected evidence: `staging2-callback-29f7a98a`. Enrollment preparation follows.
-- [ ] Real platform callback exchange, active grant and live tools remain pending.
+- [x] Real platform callback exchange and active grant verified in the latest
+  authorization section. Live tool execution remains a separate open gate.
   No fresh Meteor invocation, Gmail observation or production change occurred.
 
 ## Registered package replacement approved and saved (2026-11-16)
@@ -87,12 +108,8 @@ Unrelated production cutover drafts remain preserved and excluded. The learner
 application and its intentional progress-backed passwordless return are unchanged.
 
 
-The original private instruction package still needs its registered-app binding.
-The prepared 0.1.2 replacement keeps instructions and adds the verified existing
-native app, removing the two obsolete raw MCP configurations from that private
-package. Automatic approval review rejected that exact configuration replacement
-pending explicit confirmation. The async question is pending; no plugin change
-was applied, and this does not block the separately approved host repair.
+Historical binding approval was subsequently resolved: the approved 0.1.2
+replacement is saved and verified, as recorded above. It is no longer pending.
 
 ## Cloud registration correction (2026-11-15)
 
