@@ -6,6 +6,31 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Cloud registration correction (2026-11-15)
+
+The installed private package exposed its skill but not the live MCP tools.
+Earlier advice to click Connect/Try Now or request status was unverified and
+withdrawn. The operator's verbal consent did not complete a platform handshake.
+Official setup requires registering the existing MCP server in ChatGPT before
+binding the registered app into the instruction package.
+
+- [x] Use actual ChatGPT Plugins -> Add -> Add custom MCP server. Public HTTPS
+  discovery succeeds from the cloud; DCR and exactly audit:mail/audit:status are
+  discovered. Create the staging2-only server connection with OAuth retained.
+- [x] Observe the real Connect dialog and reach the server's actual consent form.
+  The form contains One-time connection code and Approve audit connection.
+- [x] Renew the expired enrollment under the stopped service's exclusive lock,
+  save it only to the approved private Desktop file, and reinitiate authorization
+  after restart. The first pending browser request is intentionally discarded;
+  no stale pending request is treated as current.
+- [ ] Operator completes code entry on the prepared Chrome page. Active grant,
+  live tool discovery, original package's registered-app binding, and successful
+  tool execution remain pending. No Gmail observation or full audit is claimed.
+
+The existing application/passwordless policy, production boundaries and sole
+Meteor allowance are unchanged. Keep credential values and callback parameters
+out of retained evidence.
+
 ## Staging2 connection qualification continued (2026-11-15)
 
 - [x] Publish the reviewed connection/mail/lease batch as 2313af2e. Full app
