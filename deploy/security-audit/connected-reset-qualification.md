@@ -1,6 +1,7 @@
 # Connected staging2 reset qualification
 
-Status: source prepared and tested; actual mail/account execution has not started.
+Status: operator-assisted normal verification/current-reset qualification passed
+on 2026-11-16. Complete protocol/scanner and scheduled-mail qualification remain open.
 The existing remote tool image passed UID-2000 Node 24.22.1 / Playwright 1.60.0
 checks and an actual anonymous browser preflight on 2026-11-16. That preflight
 reported public signup enabled and email verification required.
@@ -20,7 +21,8 @@ private scanner channel, the existing current-reset evaluator, and the maintaine
 baseline sessions, current/reset/replay logins and both prior-session probes.
 It closes its contexts and reports fixed diagnostics on cleanup failure.
 
-Run the worker only in the explicitly qualified tool image, UID/GID 2000, with
+Run the worker with Docker `-i` so its private control stream remains open, only
+in the explicitly qualified tool image, UID/GID 2000, with
 read-only public source, private writable lease mount, private scanner socket,
 bounded memory/CPU/PIDs, writable temporary browser storage and no published
 port. Supply no Docker socket, application/database settings, admin credential,
@@ -80,5 +82,37 @@ original delivery deadline. Open the reset window only after native verification
 and an independent check of the owned account. Never seed email verification,
 disable it globally or change real accounts to obtain passing evidence.
 
-Implementation and live qualification remain pending. No verification request,
-message read or passing authentication observation is claimed by this note.
+## Accepted live evidence (2026-11-16)
+
+Committed worker/observer source `86ba0c6001973c7d3f945f681f02d21628979ec0`
+ran against staging2 with the existing qualified tool image `14819297...` and
+optional connection image `d6eb31b8...` built from `e855b669`. The same private
+plugin is version 0.1.3; its original app binding, grant and audience are preserved.
+The registered tools became directly available in the operator conversation.
+
+One exact-recipient verification message and one reset message each passed native
+Gmail metadata selection, original ingestion-time bounds and private full-message
+submission. Native verification, exact verified-account observation, reset,
+replay denial, new-password login, old-password denial and both independent
+old-session method/resume denials passed. Fresh session lifetime was within the
+approved bounds. No mail body or capability was written to a handoff file.
+
+Independent root-only observation confirmed the owned account and all reset
+records for its exact ID/address absent after canonical admin deletion. Operator
+sessions closed; the worker and lease are absent; direct connection status is
+idle with `auditExecutionComplete: false`. Existing containers, HTTPS configuration
+and app health remain unchanged. Private receipts are under
+`phase1-20261105/connected-verification-20261116-21977f4a08a5`.
+
+Retain the failed operator preparations separately: entrypoint startup messages
+preceded the JSON result; a restricted Windows environment omitted `PATHEXT` and
+`ProgramData`; and a Docker launch omitted `-i`. The failures created no account.
+The stdin-failed worker retained its recovery marker/lease; the existing explicit
+recovery owner cleared them only after worker termination and independent empty
+fixture verification. The corrected complete path passed. Windows operator
+subprocess allowlists must retain these two ordinary OS variables without
+inheriting unrelated credentials.
+
+This proves operator-assisted connected mail and the current reset/session
+branch. Unused genuinely aged-token expiry, the catalog-complete authentication
+artifact, scheduled mail and alert acceptance remain separate unfinished gates.

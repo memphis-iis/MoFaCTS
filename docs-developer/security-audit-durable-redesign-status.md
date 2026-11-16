@@ -92,8 +92,8 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   768-MiB memory/swap cap, 0.5 CPU and 192 PIDs. Public getAuthClientConfig returns
   allowPublicSignup true and requireEmailVerification true. No login, account
   creation, mail request or private-data read in that preflight.
-- [ ] Qualify remote browser tooling and real connected-Gmail carriage through
-  the owned scanner lease/channel. Full scanner/protocol integration remains open.
+- [x] Qualify remote browser tooling and real connected-Gmail carriage through
+  the owned scanner lease/channel (accepted live qualification below). Full scanner/protocol integration remains open.
 
 ### Maintained reset worker and normal verification prerequisite (2026-11-16)
 
@@ -142,10 +142,32 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   fixture runtime. It checks the exact owned account/time/email tuple and counts
   only reset records for that ID/address; no password/token document is read.
   Five focused tests pass. Live cleanup still requires an independent observation.
-- [ ] Finish and qualify the verification-purpose bridge and native verification,
-  followed by reset under the same held lease. Separate original mail deadlines,
-  exact recipient checks and independent owned cleanup remain required. Source
-  preparation does not establish real message delivery or authentication coverage.
+- [x] Qualify actual connected Gmail verification and reset carriage directly in
+  this conversation after the registered tools became available. Exactly one
+  metadata-selected full message per purpose passes the original recipient,
+  ingestion-time, MIME, origin and capability checks. No raw body/capability file,
+  IMAP credential, private-key read or application authentication change.
+- [x] Source 86ba0c60, existing remote tool image 14819297... / UID 2000, and
+  installed optional connection image d6eb31b8... complete native verification,
+  all three current-reset cases, new-password login, old-password denial, both
+  independent old-session method/resume denials and fresh lifetime bounds (PASS,
+  29.99998633101852 days). Preserve progress-backed passwordless access.
+- [x] Independently verify the exact disposable account and its reset records
+  absent, operator logout/context cleanup, worker absence, lease absence and
+  direct tool status idle/false. Existing app and connection remain healthy;
+  other containers and qualified HTTPS configuration remain unchanged.
+  Private evidence: connected-verification-20261116-21977f4a08a5.
+- [x] Preserve failed operator preparations: initial entrypoint output parsing,
+  missing Windows executable-resolution variables PATHEXT/ProgramData, and a
+  missing Docker -i on the private worker launch. No account was created in
+  those attempts. The stopped stdin-failed worker retained its lease/marker;
+  explicit recovery passed only after independent empty-state verification.
+  The corrected path then passed; do not relabel the earlier attempts passing.
+- [ ] Integrate the remaining protocol families and produce a complete, no-ERROR
+  authentication artifact. Unused genuinely aged-token expiry, remaining live
+  scenario ownership/recovery, scheduled mail acquisition and failure alerts are
+  separate gates. This operator-assisted current-reset qualification does not
+  close Phase 2, full scanner acceptance or the coordinated production gate.
 ## Real connection authorization accepted (2026-11-16)
 
 - [x] User completes fresh approval. Read-only server metadata confirms enrollment
@@ -209,7 +231,7 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   explicit approval; the guarded replacement succeeded.
 - [x] Verify strict-origin through actual public HTTPS as well as the private
   socket. No callback parameters, cookie or code values retained in evidence.
-- [ ] Complete actual browser authorization and acquire live tool execution.
+- [x] Complete actual browser authorization and acquire live tool execution (accepted in the November 16 qualification above).
   At the latest read-only check there were no active grants; no Gmail read or
   complete audit is claimed. This update creates no new Meteor invocation.
 
@@ -241,9 +263,9 @@ the exact-origin guard correctly rejected it before reaching the code check.
   existing HTTPS/config hashes pass. A synthetic live pending request confirms
   strict-origin on the actual consent response. No values retained.
   Private evidence: phase1-20261105/staging2-consent-5426b01c.
-- [ ] Renew code and platform request only after that repair passes. Actual user
-  authorization, registered-app package binding and live tool execution remain
-  pending; no Gmail/full-audit acceptance is claimed.
+- [x] Renew code and platform request after that repair passed. Subsequent user
+  authorization, registered-app package binding and live tool execution are
+  accepted above; complete full-audit acceptance remains separate.
 
 Unrelated production cutover drafts remain preserved and excluded. The learner
 application and its intentional progress-backed passwordless return are unchanged.
@@ -269,9 +291,9 @@ binding the registered app into the instruction package.
   save it only to the approved private Desktop file, and reinitiate authorization
   after restart. The first pending browser request is intentionally discarded;
   no stale pending request is treated as current.
-- [ ] Operator completes code entry on the prepared Chrome page. Active grant,
-  live tool discovery, original package's registered-app binding, and successful
-  tool execution remain pending. No Gmail observation or full audit is claimed.
+- [x] Operator completed code entry; subsequent accepted evidence above proves active grant,
+  live tool discovery, original package's registered-app binding and successful
+  tool execution. Full audit remains open; later Gmail proof is recorded above.
 
 The existing application/passwordless policy, production boundaries and sole
 Meteor allowance are unchanged. Keep credential values and callback parameters
