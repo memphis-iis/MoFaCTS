@@ -17,7 +17,7 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   after verifying no active scanner lease or handoff. Health and unchanged grant
   metadata pass; all five other containers and qualified configuration hashes
   remain unchanged. Stored metadata shows two refresh records, one spent: actual
-  refresh has occurred. Post-restart cloud execution remains a separate gate.
+  refresh had occurred. The later post-restart cloud gate is checked off below.
 - [x] Implement scannerClient.mjs with the existing connected-Gmail parser and
   authentication lease owner. No second lock, mailbox credential or transport
   permission is introduced. Wait for cloud-reader readiness before invoking a
@@ -32,14 +32,37 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   169 pass, zero failures, three skips. Preserve the restricted Windows failure
   when its Bash test could not access WSL, and the later execution-tool stall
   which never started the process. The supported Linux run exited zero.
-- [ ] One read-only hosted status probe is scheduled in the actual cloud UI.
-  Initial 10:15 CST occurrence had no observed execution output after a prolonged
-  tool interruption; do not count its Completed label as proof. The same task
-  was corrected to November 16 at 10:45 CST, once only, with no duplicate schedule.
-  It may call only status; no desktop, Gmail, scanner, account or permission action.
-- [ ] Real exact-recipient Gmail carriage, scanner integration, scheduled access,
-  refresh after restart, failure alerts and complete authentication coverage remain.
+- [x] Actual cloud-scheduled status execution passed. The late-displayed result
+  reports idle/false; existing Apache log metadata corroborates successful MCP
+  calls at 16:16:52 UTC (10:16:52 CST), after the restart receipt at 16:03:40 UTC.
+  The nominal 10:15 occurrence was delayed 112 seconds; no on-time SLA is claimed.
+  Refresh state increased from two records/one spent to three/two, confirming
+  renewed access after restart. No token, IP, headers, mail or body retained.
+- [x] Preserve the earlier uncertainty: the result was not initially visible.
+  Run now later displayed the same execution time and is not counted as a second
+  independently verified call. Pause and verify the redundant 10:45 retry; no
+  recurring qualification task or production scheduler is enabled.
+- [x] Build the committed optional candidate 993ade91 with exact engine image
+  0d0e00f0... on Linux/amd64. All 26 actual-image connection/adapter cases pass.
+  The installed connection stays on its qualified 29f7a98a image; this is prepared
+  scanner source, not an application deployment or full scanner acceptance.
+  Private evidence: phase1-20261105/staging2-live-tools-20261116.
+- [ ] Real exact-recipient Gmail carriage, scanner integration, scheduled mail access,
+  failure alerts and complete authentication coverage remain.
   Preserve progress-backed passwordless access and the coordinated production gate.
+
+### Next policy decision: unattended archive verification
+
+The reviewed proposal is deploy/security-audit/unattended-archive-verification-decision.md.
+Existing key setup/round-trip evidence is accepted and is not reopened. The
+new desktop-independent workflow cannot perform every-run archive decryption
+with the private key confined to the Desktop folder. Recommend keeping the key
+offline, automating per-run saved-byte/ingested-report integrity checks and
+performing actual decrypt/digest checks at qualification, after key/encryption
+changes and during recovery tests. This changes the per-run plaintext-removal
+condition and requires an explicit policy choice; it is not implemented. The
+alternative requires separately approved always-available decryption custody.
+No key was moved and no production or mailbox action was performed.
 
 ## Real connection authorization accepted (2026-11-16)
 

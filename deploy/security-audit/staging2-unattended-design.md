@@ -1,7 +1,8 @@
 # Desktop-independent audit on staging2
 
 Status: connection installed, authorized and manually invoked, 2026-11-16.
-Scheduled cloud execution remains unqualified. Phil selected desktop independence and confirmed staging2 is the
+A scheduled cloud status call and refresh after restart passed. Full scheduled
+scanner/mail execution remains unqualified. Phil confirmed staging2 is the
 intended infrastructure. Original staging is excluded. The existing production
 cutover remains separate and must include the complete solution.
 
@@ -115,6 +116,8 @@ do not suppress continuing missed-run status because an earlier run passed.
 5. Verify encryption, storage, exact readback, plaintext cleanup and retention.
    Keep the decryption key off the scanner host; determine the authorized owner
    for unattended readback rather than silently relocating the private key.
+   The pending [archive verification decision](unattended-archive-verification-decision.md)
+   presents the concrete frequency/custody choice; no acceptance rule is changed.
 6. Observe real timer execution, catch-up and injected failure/missed-run alerts,
    including staging2 unavailability as seen by the independent observer.
 7. Finish runtime-registry and exact-image/source qualification from the existing

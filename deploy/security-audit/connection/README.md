@@ -98,8 +98,8 @@ identities and outcomes in the sole audit status ledger.
 ## Remaining acceptance
 
 Actual cloud consent and a manual live status invocation passed on 2026-11-16.
-The sole status ledger records exact evidence and the remaining gates. Refresh
-across restart, scheduled cloud execution without
+A scheduled cloud status call and refresh after restart also passed. The sole
+status ledger retains the evidence. Complete scheduled scanner execution without
 a desktop, real exact-recipient Gmail carriage, full scanner integration,
 failure/missed-run notification and all complete-audit acceptance remain
 required. Synthetic connection tests do not satisfy those requirements. See
