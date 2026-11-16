@@ -72,10 +72,20 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   including corrupt archive, wrong pin, missing/foreign readback and refused
   cleanup. Full lint/330 surfaces passes; the complete V2 source gate has
   403 passes, zero failures and seven platform skips (410 total).
-- [ ] Publish verified intentional source, then qualify one fresh synthetic ERROR
+- [x] Publish verified source 25e26a42 and qualify one fresh synthetic ERROR
   report on staging2 through encryption, single upload, actual protected download,
   exact comparisons and owned plaintext cleanup. This is workflow proof only,
   not full/exposure security coverage, Gmail carriage or production acceptance.
+  Actual protected JSON download matches the exact source; accepted key pin and
+  saved encrypted bytes verify. Both temporary plaintext files are absent, the
+  encrypted report/receipts remain, and operator logout/context cleanup verifies.
+  No private key was opened. Private evidence: offline-key-20261116-4d948fc20bb4.
+- [x] Inspect existing browser-tool images before reuse. Cached Node is 24.15.0,
+  while the current repository pins 24.22.1. Preserve that mismatch and do not use
+  an older runtime as current evidence. Existing approved tool recipe is building
+  from committed source; no Meteor integration invocation has been issued.
+- [ ] Qualify remote browser tooling and real connected-Gmail carriage through
+  the owned scanner lease/channel. Full scanner/protocol integration remains open.
 
 ## Real connection authorization accepted (2026-11-16)
 
