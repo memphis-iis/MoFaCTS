@@ -29,11 +29,17 @@ test('the actual serve entry point reaches HTTP readiness and terminates cleanly
   const httpSocket = path.join(directory, 'http.sock');
   const child = spawn(process.execPath, [fileURLToPath(new URL('./main.mjs', import.meta.url)), 'serve',
     directory, path.join(directory, 'scanner.sock'), lease, httpSocket], { stdio: ['ignore', 'pipe', 'pipe'] });
-  let closed = false, exit;
+  let closed = false, exit, startupStage = 'not-reported';
+  child.stderr.on('data', bytes => {
+    const stage = /initialization rejected at (runtime|state|authorization|scanner-channel|http-listener)\./.exec(String(bytes));
+    if (stage) startupStage = stage[1];
+  });
   const done = new Promise(resolve => child.once('close', (code, signal) => { closed = true; exit = { code, signal }; resolve(); }));
   t.after(async () => { if (!closed) { child.kill('SIGKILL'); await done; } await fs.rm(directory, { recursive: true, force: true }); });
   let ready = false;
-  for (let attempt = 0; attempt < 100 && !closed; attempt++) {
+  // Windows-mounted Linux source can take over ten seconds to load the shared
+  // modules. Keep readiness bounded inside this case's 30-second limit.
+  for (let attempt = 0; attempt < 250 && !closed; attempt++) {
     try {
       ready = await new Promise((resolve, reject) => {
         const request = http.get({ socketPath: httpSocket, path: '/.well-known/oauth-protected-resource/audit-connection/mcp',
@@ -47,7 +53,7 @@ test('the actual serve entry point reaches HTTP readiness and terminates cleanly
     } catch { /* The listener may not yet exist; readiness remains unproven. */ }
     await delay(100);
   }
-  assert.equal(ready, true, 'Actual entry point did not become ready');
+  assert.equal(ready, true, `Actual entry point did not become ready (${closed ? 'exited' : 'running'}; ${startupStage})`);
   assert.equal((await fs.stat(httpSocket)).mode & 0o777, 0o660);
   child.kill('SIGTERM'); await done;
   assert.deepEqual(exit, { code: 0, signal: null });
@@ -202,6 +208,29 @@ test('actual HTTP OAuth middleware verifies PKCE and protects MCP tools with per
   assert.equal(status.status, 200); const result = await status.json(); assert.equal(result.result.structuredContent.auditExecutionComplete, false);
   assert.equal((await (await mcp('audit_mail_request', {})).json()).result.isError, true);
   assert.equal((await exchange(verifier)).status, 400);
+});
+
+test('HTTP consent retains exact-origin and bound-cookie guards with an origin-only referrer policy', async t => {
+  const f = await fixture(t), enrollment = await f.auth.enroll();
+  let consentUrl, cookie;
+  await f.auth.provider.authorize(f.client, { redirectUri: callback, codeChallenge: challenge, resource: new URL(CONNECTION_RESOURCE),
+    scopes: ['audit:status'], state: 'synthetic-origin-check' }, {
+    cookie(name, value) { cookie = `${name}=${value}`; }, redirect(value) { consentUrl = new URL(value); },
+  });
+  const listener = createConnectionApp({ authorization: f.auth, handoff: createMailHandoff({ store: f.store }) }).listen(0, '127.0.0.1');
+  await once(listener, 'listening'); t.after(() => new Promise(resolve => listener.close(resolve)));
+  const root = `http://127.0.0.1:${listener.address().port}`;
+  const form = await fetch(root + consentUrl.pathname + consentUrl.search);
+  assert.equal(form.headers.get('referrer-policy'), 'strict-origin');
+  for (const origin of [undefined, 'null', 'https://other.invalid']) {
+    const response = await fetch(root + '/audit-connection/consent', { method: 'POST', headers: { cookie, ...(origin ? { origin } : {}) },
+      body: new URLSearchParams({ request: consentUrl.searchParams.get('request'), enrollment }) });
+    assert.equal(response.status, 400);
+  }
+  const noCookie = await fetch(root + '/audit-connection/consent', { method: 'POST', headers: { origin: 'https://staging2.optimallearning.org' },
+    body: new URLSearchParams({ request: consentUrl.searchParams.get('request'), enrollment }) });
+  assert.equal(noCookie.status, 400); assert.equal(f.store.read().enrollment.attempts, 0);
+  assert.equal(Object.keys(f.store.read().codes).length, 0);
 });
 
 test('private scanner socket requires the actual lease and independently observed cleanup', { skip: process.platform !== 'linux' }, async t => {

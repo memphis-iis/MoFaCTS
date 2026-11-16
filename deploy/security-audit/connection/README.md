@@ -109,3 +109,22 @@ engine identity, platform, source revision and config separately. Supply the
 verified engine identity to Compose; do not silently substitute a tag when an
 image-config checksum is not addressable. A successful component-test image is
 also insufficient: qualify the actual `serve` process and supervisor readiness.
+
+## Consent form browser qualification
+
+The consent page uses `Referrer-Policy: strict-origin`: native form POSTs retain
+the exact Origin required by the existing CSRF check, while Referer includes no
+request path or query. Other responses retain `no-referrer`. Missing/null/foreign
+origins and missing bound cookies still fail before code validation. Do not
+accept a null Origin as a repair. The initial manual-header HTTP tests missed
+this native-browser interaction.
+
+Run the connection and authentication-lease cases on pinned Linux Node. Run
+`node --test deploy/security-audit/connection/browser.test.mjs` with pinned Node
+and the application's existing Playwright/Chromium installation. That separate
+operator test uses synthetic source-issued requests/cookies and intercepts its
+canonical URLs to a loopback fixture, intercepting the final callback rather
+than leaving the fixture. It verifies actual form submission, origin-only
+referral, single-use enrollment and token exchange. It uses no staging account,
+Gmail, private credential or new dependency. Keep real user/platform acceptance
+separate from this browser regression.

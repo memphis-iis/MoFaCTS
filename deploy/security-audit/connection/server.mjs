@@ -44,7 +44,10 @@ export function createConnectionApp({ authorization, handoff }) {
   app.get(`${base}/consent`, (req, res) => {
     if (typeof req.query.request !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(req.query.request)
       || !authorization.hasPending(req.query.request)) return res.sendStatus(400);
-    res.type('html').send(`<!doctype html><html lang="en"><meta charset="utf-8"><title>Connect staging2 audit</title>
+    // no-referrer makes native HTML form POSTs send Origin: null. Preserve the
+    // exact-origin CSRF check while disclosing only the origin, never this
+    // page's request query, in the form's Referer header.
+    res.set('Referrer-Policy', 'strict-origin').type('html').send(`<!doctype html><html lang="en"><meta charset="utf-8"><title>Connect staging2 audit</title>
 <main><h1>Connect the staging2 audit</h1><p>This connection can deliver a requested synthetic reset message and read sanitized audit status. It grants no shell, database, production or Gmail access.</p>
 <form method="post" action="${base}/consent"><input type="hidden" name="request" value="${req.query.request}">
 <label for="enrollment">One-time connection code</label><input id="enrollment" name="enrollment" type="password" required maxlength="43" autocomplete="off">

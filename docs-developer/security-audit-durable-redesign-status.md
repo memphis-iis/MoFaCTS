@@ -6,6 +6,35 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Consent rejection repair (2026-11-16)
+
+The user's code retries exposed a server/browser contract defect, not an
+observed invalid code. A rejected live attempt still had 432 seconds remaining
+and zero code-validation attempts. No active grant or authorization code existed.
+The consent response's no-referrer policy makes native form POST Origin null;
+the exact-origin guard correctly rejected it before reaching the code check.
+
+- [x] Reproduce in Chromium using the actual form/handler with source-issued
+  synthetic request and cookie: cookie present, exact Origin absent, HTTP 400.
+- [x] Repair only the consent response to strict-origin. Preserve its exact-origin
+  and bound-cookie guards, CSP and other responses' no-referrer policy. Native
+  form now sends exact Origin and an origin-only Referer; synthetic consent and
+  token exchange pass. No request query/capability is retained in a referrer.
+- [x] Full app lint/330 surfaces and explicit connection lint pass. All 14 Linux
+  connection/lease cases pass, including null/missing/foreign Origin and missing
+  cookie denial. The separate native browser regression passes. The unchanged
+  entry point took 12.1 seconds through Windows-mounted Linux source; preserve
+  earlier ten-second readiness failures, and use a bounded 25-second readiness
+  window inside its existing 30-second case deadline. No Meteor run consumed.
+- [ ] Build/qualify the committed connection image and install on staging2 only;
+  verify live consent header, health, unchanged services and the retained rollback.
+- [ ] Renew code and platform request only after that repair passes. Actual user
+  authorization, registered-app package binding and live tool execution remain
+  pending; no Gmail/full-audit acceptance is claimed.
+
+Unrelated production cutover drafts remain preserved and excluded. The learner
+application and its intentional progress-backed passwordless return are unchanged.
+
 ## Cloud registration correction (2026-11-15)
 
 The installed private package exposed its skill but not the live MCP tools.
