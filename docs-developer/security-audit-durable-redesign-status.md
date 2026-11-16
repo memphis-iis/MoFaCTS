@@ -80,12 +80,47 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   saved encrypted bytes verify. Both temporary plaintext files are absent, the
   encrypted report/receipts remain, and operator logout/context cleanup verifies.
   No private key was opened. Private evidence: offline-key-20261116-4d948fc20bb4.
-- [x] Inspect existing browser-tool images before reuse. Cached Node is 24.15.0,
-  while the current repository pins 24.22.1. Preserve that mismatch and do not use
-  an older runtime as current evidence. Existing approved tool recipe is building
-  from committed source; no Meteor integration invocation has been issued.
+- [x] Correct the tooling preflight: root with capabilities dropped could not
+  traverse the worker's private runtime home and resolved the base image's older
+  Node. That was an operator-profile error, not a stale cached worker. Correct
+  UID-2000 probes on the current local and existing staging2 image verify Node
+  24.22.1 / Playwright 1.60.0. The intervening rebuild was unnecessary; retain its
+  build log and failed root-profile assertion. No permissions were relaxed, no
+  additional dependency was needed and no Meteor integration invocation occurred.
+- [x] Actual anonymous Chromium on staging2 passes with the existing exact image
+  14819297... and documented UID 2000, read-only root, dropped capabilities,
+  768-MiB memory/swap cap, 0.5 CPU and 192 PIDs. Public getAuthClientConfig returns
+  allowPublicSignup true and requireEmailVerification true. No login, account
+  creation, mail request or private-data read in that preflight.
 - [ ] Qualify remote browser tooling and real connected-Gmail carriage through
   the owned scanner lease/channel. Full scanner/protocol integration remains open.
+
+### Maintained reset worker and next fixture-policy decision (2026-11-16)
+
+- [x] Prepare currentResetBrowserV2.mjs: two independent ordinary-account sessions,
+  existing native reset/replay/password probes, both old-session method/resume
+  observations and owned context cleanup. Cloned sessions cannot satisfy baseline;
+  a cleanup failure cannot become verified by repeating close.
+- [x] Prepare connected-reset-worker.mjs with private bounded control frames.
+  Credentials arrive only after the held lease/cloud readiness. Only the ordinary
+  fixture reaches the worker; admin/database/provider/signing keys remain absent.
+  Owned cleanup verification precedes lease/marker release. Malformed/EOF/failed
+  callbacks expose fixed diagnostics and cannot emit a completed lifecycle.
+- [x] Thirteen new worker/browser cases pass. Complete V2 scanner gate: 423 cases,
+  416 pass, zero failures, seven platform skips. Full app lint/330 surfaces and
+  explicit worker lint pass. No app TypeScript/server-surface change or fresh
+  Meteor invocation; the sole allowance still has one invocation available.
+- [x] Prepare concrete review: deploy/security-audit/connected-reset-qualification.md.
+  Actual email-verification-required setting means a new unverified ordinary
+  fixture cannot provide the reset test's positive login baseline. Preserve that
+  setting and progress-backed passwordless behavior. The existing bridge accepts
+  reset mail only; it does not already authorize/validate a verification capability.
+- [ ] Fixture policy: recommend completing normal email verification through an
+  explicit narrow verification-mail purpose, then reset mail under the same lease.
+  The alternative administratively seeds only the owned fixture as verified and
+  claims no verification-delivery coverage. This changes selected fixture/mail
+  evidence; no verification request, account creation, seed or broker expansion
+  has been executed. Await that policy choice before the live fixture window.
 
 ## Real connection authorization accepted (2026-11-16)
 

@@ -36,6 +36,8 @@ import './tests/resetProtocolV2.test.mjs';
 import './tests/sessionLifetimeV2.test.mjs';
 import './tests/sessionRevocationV2.test.mjs';
 import './tests/currentResetV2.test.mjs';
+import './tests/currentResetBrowserV2.test.mjs';
+import '../../../deploy/security-audit/tests/connected-reset-worker.test.mjs';
 import './tests/connectedGmailV2.test.mjs';
 import './tests/authenticationLeaseV2.test.mjs';
 import './tests/passwordlessProtocolV2.test.mjs';
