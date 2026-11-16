@@ -23,9 +23,13 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   violation; a denying fixture proxy prevents actual external traffic. Synthetic
   enrollment consumption and token exchange pass. All 14 Linux connection/lease
   cases, full lint/330 surfaces and explicit connection lint pass.
-- [ ] Qualify and deploy the exact committed connection candidate on staging2,
+- [x] Qualify and deploy the exact committed connection candidate on staging2,
   verify its public HTTPS policy and unchanged services, then prepare one new
   enrollment and platform request. The consumed old code cannot be reused.
+  Source `29f7a98a`, engine image `02d1d42d...`; ten container tests pass.
+  Live public HTTPS has one exact registered-callback policy and strict-origin.
+  All other containers and Apache configuration are unchanged; prior image retained.
+  Protected evidence: `staging2-callback-29f7a98a`. Enrollment preparation follows.
 - [ ] Real platform callback exchange, active grant and live tools remain pending.
   No fresh Meteor invocation, Gmail observation or production change occurred.
 
