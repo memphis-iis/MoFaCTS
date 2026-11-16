@@ -145,3 +145,13 @@ does not register a ChatGPT cloud connection. Do not present skill availability,
 a saved package, registration, user authorization or live tool execution as
 interchangeable evidence. The current private registered-app package is 0.1.2;
 actual browser authorization and tool execution are separate pending gates.
+
+A valid consent page also pins its `form-action` policy to the exact callback
+already stored by the authorization owner for that pending request. Browsers
+apply this policy to the form's 303 return, not just its same-origin POST.
+Unknown or expired requests and all other responses retain the self-only policy.
+Do not accept a callback URL from the consent query/body, allow a wildcard, or
+relax the learner application's CSP. The browser regression now observes the
+actual callback request, with a denying fixture proxy preventing real external
+traffic; it no longer substitutes a successful page for the 303 response.
+Real ChatGPT exchange and live tool acquisition still require actual acceptance.

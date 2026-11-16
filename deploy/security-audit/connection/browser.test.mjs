@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { once } from 'node:events';
 import { createHash } from 'node:crypto';
+import http from 'node:http';
 import { chromium } from '../../../mofacts/node_modules/playwright/index.mjs';
 import { openConnectionStore } from './store.mjs';
 import { createAuditAuthorization, CONNECTION_RESOURCE } from './authorization.mjs';
@@ -14,10 +15,10 @@ import { createConnectionApp } from './server.mjs';
 // Source qualification on the existing operator browser installation. Every
 // canonical URL is intercepted and forwarded only to the synthetic loopback
 // server; this test never connects to staging2, Gmail or a real OAuth callback.
-test('native Chromium form submission preserves exact Origin and the bound consent cookie', { timeout: 30000 }, async t => {
+test('native Chromium form preserves its guards and permits only the registered OAuth return', { timeout: 30000 }, async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-consent-browser-'));
   await fs.chmod(directory, 0o700);
-  let browser, listener;
+  let browser, listener, denyProxy;
   try {
     const store = await openConnectionStore(directory), authorization = createAuditAuthorization({ store });
     const callback = 'https://chatgpt.com/connector/oauth/test-audit';
@@ -32,7 +33,16 @@ test('native Chromium form submission preserves exact Origin and the bound conse
     listener = createConnectionApp({ authorization, handoff: createMailHandoff({ store }) }).listen(0, '127.0.0.1');
     await once(listener, 'listening');
     const loopback = `http://127.0.0.1:${listener.address().port}`;
-    browser = await chromium.launch({ headless: true });
+    // Unintercepted redirects must not escape to a real external endpoint.
+    denyProxy = http.createServer((_request, response) => response.writeHead(502).end());
+    let callbackObserved;
+    const reachedCallback = new Promise(resolve => { callbackObserved = resolve; });
+    denyProxy.on('connect', (request, socket) => {
+      if (request.url === 'chatgpt.com:443') callbackObserved('fixture-proxy');
+      socket.end('HTTP/1.1 502 Denied\r\n\r\n');
+    });
+    denyProxy.listen(0, '127.0.0.1'); await once(denyProxy, 'listening');
+    browser = await chromium.launch({ headless: true, proxy: { server: `http://127.0.0.1:${denyProxy.address().port}` } });
     const context = await browser.newContext({ serviceWorkers: 'block' });
     await context.addCookies([{ ...consentCookie, domain: 'staging2.optimallearning.org',
       path: '/audit-connection/consent', secure: true, httpOnly: true, sameSite: 'Strict' }]);
@@ -54,19 +64,34 @@ test('native Chromium form submission preserves exact Origin and the bound conse
         if (response.status === 303) {
           completedRedirect = new URL(response.headers.get('location'));
           assert.equal(completedRedirect.origin + completedRedirect.pathname, callback);
-          await route.fulfill({ status: 200, contentType: 'text/plain', body: 'Synthetic consent accepted' });
+          await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: Buffer.from(await response.arrayBuffer()) });
         } else {
           assert.equal(response.status >= 300 && response.status < 400, false, 'Unexpected redirect may not leave the isolated test');
           await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: Buffer.from(await response.arrayBuffer()) });
         }
+      } else if (url.origin + url.pathname === callback) {
+        await route.fulfill({ status: 200, contentType: 'text/plain', body: 'Synthetic consent accepted' });
+        callbackObserved('intercepted-callback');
       } else await route.abort();
     });
     const page = await context.newPage();
+    let formActionBlocked = false;
+    let callbackRequested = false;
+    page.on('request', request => { const url = new URL(request.url()); if (url.origin + url.pathname === callback) callbackRequested = true; });
+    page.on('console', message => { if (message.text().includes('form-action')) formActionBlocked = true; });
     await page.goto(consentUrl, { timeout: 10000 });
     await page.getByLabel('One-time connection code').fill(enrollment, { timeout: 3000 });
     await page.getByRole('button', { name: 'Approve audit connection', exact: true }).click({ timeout: 10000 });
     assert.deepEqual(formObservation, { exactOrigin: true, boundCookiePresent: true, referrerOriginOnly: true });
-    assert.equal(await page.locator('body').innerText(), 'Synthetic consent accepted');
+    let callbackTimer;
+    try {
+      const destination = await Promise.race([reachedCallback, new Promise((_, reject) => {
+        callbackTimer = setTimeout(() => reject(new Error(formActionBlocked ? 'Registered callback blocked by form-action CSP'
+          : `Synthetic callback navigation unavailable (requested=${callbackRequested})`)), 3000);
+      })]);
+      assert.equal(formActionBlocked, false); assert.equal(callbackRequested, true);
+      t.diagnostic(`Registered callback reached ${destination}; real external traffic remains denied`);
+    } finally { clearTimeout(callbackTimer); }
     assert.equal(store.read().enrollment, null);
     const code = completedRedirect.searchParams.get('code');
     const tokens = await authorization.provider.exchangeAuthorizationCode(client, code, verifier, callback, new URL(CONNECTION_RESOURCE));
@@ -75,6 +100,7 @@ test('native Chromium form submission preserves exact Origin and the bound conse
   } finally {
     if (browser) await browser.close();
     if (listener) await new Promise(resolve => listener.close(resolve));
+    if (denyProxy) await new Promise(resolve => denyProxy.close(resolve));
     await fs.rm(directory, { recursive: true, force: true });
   }
 });

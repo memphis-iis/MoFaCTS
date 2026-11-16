@@ -6,6 +6,29 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Accepted code; callback blocked by form policy (2026-11-16)
+
+- [x] Diagnose the next reported fresh-code error using minimized state: enrollment
+  absent, one authorization code issued, zero active grants. The submitted code
+  had been accepted. A repeat submission of its consumed request produced the
+  misleading error; no invalid-code conclusion is claimed.
+- [x] Extend the browser regression through the actual 303. Reproduce its
+  form-action CSP violation. The earlier test replaced 303 with a successful
+  fixture page and therefore missed return navigation; preserve that limitation.
+- [x] Pin only the consent page to the current request's already registered exact
+  callback, obtained from the authorization owner. Unknown/expired requests and
+  other pages stay self-only; no query/body callback, wildcard or new recipient
+  is accepted. Origin/cookie/PKCE checks and the learner app CSP are unchanged.
+- [x] Native Chromium now emits the registered callback request without a policy
+  violation; a denying fixture proxy prevents actual external traffic. Synthetic
+  enrollment consumption and token exchange pass. All 14 Linux connection/lease
+  cases, full lint/330 surfaces and explicit connection lint pass.
+- [ ] Qualify and deploy the exact committed connection candidate on staging2,
+  verify its public HTTPS policy and unchanged services, then prepare one new
+  enrollment and platform request. The consumed old code cannot be reused.
+- [ ] Real platform callback exchange, active grant and live tools remain pending.
+  No fresh Meteor invocation, Gmail observation or production change occurred.
+
 ## Registered package replacement approved and saved (2026-11-16)
 
 - [x] Phil explicitly approved replacing the original private plugin's old

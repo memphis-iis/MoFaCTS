@@ -13,6 +13,7 @@ const z = await dependency('zod/v4');
 const base = '/audit-connection';
 const resourceMetadata = '/.well-known/oauth-protected-resource/audit-connection/mcp';
 const result = value => ({ content: [{ type: 'text', text: JSON.stringify(value) }], structuredContent: value });
+const contentSecurityPolicy = callback => `default-src 'none'; form-action 'self'${callback ? ` ${callback}` : ''}; frame-ancestors 'none'; base-uri 'none'`;
 
 export function createConnectionApp({ authorization, handoff }) {
   const app = express();
@@ -22,7 +23,7 @@ export function createConnectionApp({ authorization, handoff }) {
   app.use((req, res, next) => {
     if (!['staging2.optimallearning.org', '127.0.0.1', 'localhost'].includes(req.hostname)) return res.sendStatus(421);
     res.set({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
-      'Content-Security-Policy': "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" });
+      'Content-Security-Policy': contentSecurityPolicy() });
     next();
   });
   app.use(express.json({ limit: '128kb', strict: true }));
@@ -42,12 +43,16 @@ export function createConnectionApp({ authorization, handoff }) {
   app.use(`${base}/register`, clientRegistrationHandler({ clientsStore: authorization.provider.clientsStore }));
   app.use(`${base}/revoke`, revocationHandler({ provider: authorization.provider }));
   app.get(`${base}/consent`, (req, res) => {
-    if (typeof req.query.request !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(req.query.request)
-      || !authorization.hasPending(req.query.request)) return res.sendStatus(400);
+    if (typeof req.query.request !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(req.query.request)) return res.sendStatus(400);
+    const callback = authorization.consentRedirectUri(req.query.request);
+    if (!callback) return res.sendStatus(400);
     // no-referrer makes native HTML form POSTs send Origin: null. Preserve the
     // exact-origin CSRF check while disclosing only the origin, never this
     // page's request query, in the form's Referer header.
-    res.set('Referrer-Policy', 'strict-origin').type('html').send(`<!doctype html><html lang="en"><meta charset="utf-8"><title>Connect staging2 audit</title>
+    // Browsers apply form-action to the 303 return as well. Pin only this
+    // pending request's already registered callback; no caller-supplied URL.
+    res.set({ 'Referrer-Policy': 'strict-origin', 'Content-Security-Policy': contentSecurityPolicy(callback) })
+      .type('html').send(`<!doctype html><html lang="en"><meta charset="utf-8"><title>Connect staging2 audit</title>
 <main><h1>Connect the staging2 audit</h1><p>This connection can deliver a requested synthetic reset message and read sanitized audit status. It grants no shell, database, production or Gmail access.</p>
 <form method="post" action="${base}/consent"><input type="hidden" name="request" value="${req.query.request}">
 <label for="enrollment">One-time connection code</label><input id="enrollment" name="enrollment" type="password" required maxlength="43" autocomplete="off">
@@ -62,7 +67,7 @@ export function createConnectionApp({ authorization, handoff }) {
         csrf: cookies[0].slice('__Secure-mofacts-audit-consent='.length), enrollmentCode: req.body.enrollment });
       res.clearCookie('__Secure-mofacts-audit-consent', { path: '/audit-connection/consent', httpOnly: true, secure: true, sameSite: 'strict' });
       res.redirect(303, redirect);
-    } catch { res.status(400).type('text').send('Connection approval unavailable. Request a fresh operator code.'); }
+    } catch { res.status(400).type('text').send('Connection approval could not be completed. Reopen the connection from ChatGPT and use the latest operator code.'); }
   });
   app.use(`${base}/mcp`, requireBearerAuth({ verifier: authorization.provider,
     resourceMetadataUrl: `${CONNECTION_ORIGIN}${resourceMetadata}`, expectedResource: CONNECTION_RESOURCE }));

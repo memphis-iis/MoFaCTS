@@ -222,6 +222,12 @@ test('HTTP consent retains exact-origin and bound-cookie guards with an origin-o
   const root = `http://127.0.0.1:${listener.address().port}`;
   const form = await fetch(root + consentUrl.pathname + consentUrl.search);
   assert.equal(form.headers.get('referrer-policy'), 'strict-origin');
+  assert.equal(form.headers.get('content-security-policy'),
+    `default-src 'none'; form-action 'self' ${callback}; frame-ancestors 'none'; base-uri 'none'`);
+  const unknown = await fetch(root + '/audit-connection/consent?request=' + 'A'.repeat(43));
+  assert.equal(unknown.status, 400);
+  assert.equal(unknown.headers.get('content-security-policy'),
+    "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
   for (const origin of [undefined, 'null', 'https://other.invalid']) {
     const response = await fetch(root + '/audit-connection/consent', { method: 'POST', headers: { cookie, ...(origin ? { origin } : {}) },
       body: new URLSearchParams({ request: consentUrl.searchParams.get('request'), enrollment }) });

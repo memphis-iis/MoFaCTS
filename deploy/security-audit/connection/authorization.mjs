@@ -159,5 +159,8 @@ export function createAuditAuthorization({ store, now = Date.now }) {
   return { provider, enroll, consent, revokeAll: () => store.transaction(state => {
     for (const grant of Object.values(state.grants)) grant.revoked = true;
     state.enrollment = null; state.codes = {}; pending.clear();
-  }), hasPending: id => pending.has(id) && pending.get(id).deadline > milliseconds() };
+  }), consentRedirectUri: id => {
+    const row = pending.get(id);
+    return row && row.deadline > milliseconds() ? row.redirectUri : undefined;
+  } };
 }
