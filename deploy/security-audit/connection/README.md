@@ -128,3 +128,20 @@ than leaving the fixture. It verifies actual form submission, origin-only
 referral, single-use enrollment and token exchange. It uses no staging account,
 Gmail, private credential or new dependency. Keep real user/platform acceptance
 separate from this browser regression.
+
+## Registered cloud package
+
+For ChatGPT cloud execution, register the existing server first through Plugins
+-> Add custom MCP server and verify discovered OAuth settings. Read the native
+registered plugin's actual `.app.json` to obtain its app ID; a browser plugin ID
+is not an app ID and must not be substituted or guessed. The operator-specific
+package points `extensions.com.openai.apps` to that verified registered app,
+keeps its instructions and presentation, and omits both raw MCP configuration
+files after an approved replacement. Keep this environment binding in the private
+operator artifact, not in the public application defaults.
+
+The portable `plugin/mcp.json` is a direct-client declaration; uploading it alone
+does not register a ChatGPT cloud connection. Do not present skill availability,
+a saved package, registration, user authorization or live tool execution as
+interchangeable evidence. The current private registered-app package is 0.1.2;
+actual browser authorization and tool execution are separate pending gates.

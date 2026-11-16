@@ -6,6 +6,24 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Registered package replacement approved and saved (2026-11-16)
+
+- [x] Phil explicitly approved replacing the original private plugin's old
+  connection configuration with its registered staging2 connection.
+- [x] Resolve the actual app identity from the registered native plugin's own
+  .app.json. The first archive's plugin-ID-as-app-ID failed schema validation;
+  preserve that failure. Use the verified app ID without inventing an identity.
+- [x] Publish private USER package 0.1.2 and read it back: original instructions,
+  presentation and PRIVATE audience retained; verified registered-app binding
+  present; mcp.json and .mcp.json absent. No mailbox/shell/database/production
+  authority added. The earlier automatic-review rejection is resolved by the
+  explicit approval; the guarded replacement succeeded.
+- [x] Verify strict-origin through actual public HTTPS as well as the private
+  socket. No callback parameters, cookie or code values retained in evidence.
+- [ ] Complete actual browser authorization and acquire live tool execution.
+  At the latest read-only check there were no active grants; no Gmail read or
+  complete audit is claimed. This update creates no new Meteor invocation.
+
 ## Consent rejection repair (2026-11-16)
 
 The user's code retries exposed a server/browser contract defect, not an
