@@ -176,6 +176,27 @@ evidence keeps the existing final assertion nonzero after storage.
 Operator results remain operator evidence; they do not satisfy a hosted-only
 adapter or create release qualification. Continue the remaining native/staging2
 acceptance work under its existing mandate and keep unexecuted items open.
+#### Offline report key and recurring integrity checks (approved 2026-11-16)
+
+Phil approved the offline-key approach in
+[the archive verification review](../deploy/security-audit/unattended-archive-verification-decision.md).
+Keep the accepted private report key in its approved Desktop custody. No online
+private-key copy or new decryption service is authorized. Existing key setup and
+round-trip acceptance are complete and must not be repeated as setup work.
+
+Every recurring run must validate its report/digest, require the accepted public
+key fingerprint and algorithms, read back saved encrypted bytes and compare their
+checksum, independently read back the ingested report with exact report/catalog/
+digest equality, verify cleanup and enforce retention. Only after these automated
+gates may its owner remove that run's temporary plaintext. Missing required
+evidence remains an execution error; a ciphertext checksum is not decryption proof.
+
+Actual saved-archive decrypt/digest comparison is required during complete release
+qualification, after key or encryption implementation changes, and in recovery
+tests. It is not required on every recurring run. The current full qualification
+still needs its real report round trip. Do not claim each archive was decrypted
+or that complete audit/production acceptance follows from source tests.
+
 #### Execution and verification cycle
 
 1. Select the next incomplete functional milestone from the current worklist.

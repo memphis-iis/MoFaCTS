@@ -11,10 +11,14 @@ const invalid = () => { throw new Error('Invalid V2 audit file input'); };
 
 // These files belong to a private per-run directory. Bound reads even when a
 // producer crashes, changes its file, emits a device, or exceeds its contract.
-export async function readAuditFileV2(file) {
+export async function readAuditFileV2(file, maximumBytes = AUDIT_V2_MAX_BODY_BYTES) {
+  // Encrypted envelopes can exceed their 2-MiB plaintext after base64 encoding.
+  // Report/producer callers keep the original bound; archive readers opt into
+  // an explicit finite bound, never more than twice that maximum.
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1 || maximumBytes > 2 * AUDIT_V2_MAX_BODY_BYTES) invalid();
   const before = await fs.lstat(file, { bigint: true });
   if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n
-    || before.size > BigInt(AUDIT_V2_MAX_BODY_BYTES)) invalid();
+    || before.size > BigInt(maximumBytes)) invalid();
   const handle = await fs.open(file, fs.constants.O_RDONLY
     | (process.platform === 'linux' ? fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK : 0));
   try {
@@ -22,7 +26,7 @@ export async function readAuditFileV2(file) {
     for (const key of ['ino', 'dev', 'mode', 'nlink', 'size', 'mtimeNs', 'ctimeNs']) {
       if (before[key] !== opened[key]) invalid();
     }
-    const buffer = Buffer.alloc(AUDIT_V2_MAX_BODY_BYTES + 1);
+    const buffer = Buffer.alloc(maximumBytes + 1);
     let count = 0;
     while (count < buffer.length) {
       const { bytesRead } = await handle.read(buffer, count, buffer.length - count, null);
@@ -34,7 +38,7 @@ export async function readAuditFileV2(file) {
     for (const key of ['ino', 'dev', 'mode', 'nlink', 'size', 'mtimeNs', 'ctimeNs']) {
       if (before[key] !== after[key] || before[key] !== final[key]) invalid();
     }
-    if (count > AUDIT_V2_MAX_BODY_BYTES || BigInt(count) !== before.size) invalid();
+    if (count > maximumBytes || BigInt(count) !== before.size) invalid();
     return buffer.subarray(0, count);
   } finally { await handle.close(); }
 }

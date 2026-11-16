@@ -1,6 +1,7 @@
 # Unattended encrypted-archive verification
 
-Status: proposal for decision, 2026-11-16. No custody or acceptance rule changed.
+Status: offline-key approach explicitly approved by Phil, 2026-11-16.
+The rules below are the selected policy; implementation/acceptance remain tracked separately.
 
 ## Verified starting point
 
@@ -16,14 +17,14 @@ only its public part is authorized for the signer. Preserve all retained keys.
 
 `staging2-unattended-design.md`, qualification item 5, requires keeping the
 decryption key off the scanner host and resolving the owner for unattended
-readback. `operator-exposure-v2.md` currently requires saved-key decryption and
+readback. Before this approval, `operator-exposure-v2.md` required saved-key decryption and
 exact payload-digest comparison before claiming recoverable retention and
 removing that run's private plaintext. The current operator can do that while
 the workstation is available. A fully unattended server cannot use an offline
 Desktop key while the workstation is off. A ciphertext checksum does not prove
 that it can be decrypted.
 
-## Recommended decision: offline recovery key, distinct routine checks
+## Approved decision: offline recovery key, distinct routine checks
 
 Keep the existing private key offline. Automate these checks for every run:
 
@@ -51,9 +52,9 @@ without waiting for an offline-key operation on every run.
 
 This option needs no new mailbox grant, online private key, paid service or
 production access. It keeps all security controls and the separate application
-readback requirement. It is proposed, not applied.
+readback requirement. This policy is approved; execution evidence is separate.
 
-## Alternative: decrypt every recurring archive
+## Unselected alternative: decrypt every recurring archive
 
 Preserve the current per-run saved-key decryption condition. That requires a
 reviewed, always-available decryption owner with access to a private key. Its
@@ -68,4 +69,28 @@ or assume the newly connected mail/status service can decrypt reports.
 The decision does not close Phase 2, schedule a production audit, waive real
 Gmail/reset/unused-token-aging tests, suppress ERROR findings, change learner
 passwordless access or authorize production cutover. Continue those gates from
-the sole status checklist after the policy choice is resolved.
+the sole status checklist. The policy choice is resolved; its implementation and
+live acceptance remain separately tracked.
+
+## Implementation owners
+
+`core/reportFilesV2.mjs` owns the pinned archive write, saved-byte verification,
+exact validated receiver comparison and gated temporary-plaintext cleanup.
+The receipt reuses the accepted `publicKeySha256`, `reportBytesSha256` and
+`encryptedBytesSha256` names. Its hash pins are not calculated from an untrusted
+readback and then accepted as expected values. Keep the accepted fingerprint
+separate from the supplied public PEM.
+
+`core/reportReadbackBrowserV2.mjs` reads only the selected staging2 report through
+the existing admin-protected JSON download. It creates no account or access,
+validates the operator before/after, rejects redirects/foreign URLs, bounds the
+stream and verifies the download hash before strict V2 parsing. Its returned
+bytes remain private runner input, never console output or public evidence.
+This interactive operator reader does not establish unattended administrator
+custody or expand the mail/status connection's authority.
+
+The run owner must persist its private manifest and content-free verification
+receipts before asking `completeOfflineKeyRetentionV2` to remove temporary source
+and receiver-copy paths. It owns cancellation and recovery after partial cleanup.
+Do not delete unrelated plaintext or keys, infer a missing readback, or call a
+synthetic ERROR report a complete audit.

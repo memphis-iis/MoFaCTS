@@ -65,11 +65,18 @@ Encryption must succeed before the one signed HTTPS POST. Receipt creation
 requires HTTP 201; it does not infer storage from a transport timeout. Never
 blindly retry an uncertain upload. Verify its report ID/digest through the
 existing admin list/get/download operations first. Retained encrypted bytes
-remain in operator storage; verify their saved-key decryption and exact payload
-digest before claiming recoverable retention. Keep private plaintext until that
-readback is finished, then remove only that run's owned plaintext. Retain the
-encrypted report and content-free outcome/readback fingerprints under the
+remain in operator storage. Under the approved offline-key policy, every recurring
+run requires the accepted public-key fingerprint, saved encrypted-byte checksum
+readback, and independent ingested-report ID/catalog/digest equality. Remove only
+that run's owned plaintext after all those gates pass. Missing evidence blocks
+cleanup/completion; upload acceptance alone is insufficient.
+
+Use the offline saved key for an actual archive decrypt/digest comparison during
+complete release qualification, after key/encryption changes and in recovery tests.
+A routine checksum receipt must not claim decryption. Keep the key in the approved
+Desktop folder. Retain encrypted reports and content-free outcomes under the
 existing audit evidence policy (the hosted artifact policy was 90 days).
+See [the approved policy](unattended-archive-verification-decision.md).
 
 The final assertion runs after encryption and storage acceptance. A report with
 any execution ERROR exits 1 and records `executionComplete: false`, even when its

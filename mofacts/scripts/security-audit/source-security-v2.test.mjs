@@ -12,6 +12,8 @@ import './tests/repositoryProducerFilesV2.test.mjs';
 import './tests/authorizationOutcomes.test.mjs';
 import './tests/legacyProbeInventory.test.mjs';
 import './tests/reportFilesV2.test.mjs';
+import './tests/archiveIntegrityV2.test.mjs';
+import './tests/reportReadbackBrowserV2.test.mjs';
 import './tests/reportAdminPresentationV2.test.mjs';
 import './tests/verificationCatalog.test.mjs';
 import './tests/authorizationBrowserV2.test.mjs';

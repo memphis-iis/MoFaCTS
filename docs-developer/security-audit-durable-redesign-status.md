@@ -51,18 +51,31 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   failure alerts and complete authentication coverage remain.
   Preserve progress-backed passwordless access and the coordinated production gate.
 
-### Next policy decision: unattended archive verification
+### Offline-key policy approved and implementation continued (2026-11-16)
 
-The reviewed proposal is deploy/security-audit/unattended-archive-verification-decision.md.
-Existing key setup/round-trip evidence is accepted and is not reopened. The
-new desktop-independent workflow cannot perform every-run archive decryption
-with the private key confined to the Desktop folder. Recommend keeping the key
-offline, automating per-run saved-byte/ingested-report integrity checks and
-performing actual decrypt/digest checks at qualification, after key/encryption
-changes and during recovery tests. This changes the per-run plaintext-removal
-condition and requires an explicit policy choice; it is not implemented. The
-alternative requires separately approved always-available decryption custody.
-No key was moved and no production or mailbox action was performed.
+- [x] Phil approves the offline-key approach. Update Section 0 of the written plan,
+  the archive policy and operator/design guidance. The private key stays in its
+  approved Desktop custody; actual decrypt/digest checks remain required at
+  qualification, after key/encryption changes and in recovery tests.
+- [x] Reuse accepted November 12 key evidence. The saved public PEM matches its
+  accepted SPKI-DER SHA-256 fingerprint; no private-key read, key generation or
+  repeat setup test. Reuse established publicKeySha256/reportBytesSha256/
+  encryptedBytesSha256 names rather than adding parallel checksum concepts.
+- [x] Implement pinned archive writes, bounded saved-byte readback, exact receiver
+  comparison and gated cleanup. Archive envelopes opt into a finite larger read
+  bound; ordinary reports retain their existing 2-MiB limit. No offline-key
+  operation is claimed by these recurring receipts.
+- [x] Add the existing-admin protected single-report browser reader. No report
+  listing, new account, endpoint or permission. Check identity, origin, download
+  hash, stream bound and strict V2 report parsing. Failures expose fixed errors.
+- [x] All 30 focused integrity/reader/retention/operator cases pass on Linux,
+  including corrupt archive, wrong pin, missing/foreign readback and refused
+  cleanup. Full lint/330 surfaces passes; the complete V2 source gate has
+  403 passes, zero failures and seven platform skips (410 total).
+- [ ] Publish verified intentional source, then qualify one fresh synthetic ERROR
+  report on staging2 through encryption, single upload, actual protected download,
+  exact comparisons and owned plaintext cleanup. This is workflow proof only,
+  not full/exposure security coverage, Gmail carriage or production acceptance.
 
 ## Real connection authorization accepted (2026-11-16)
 
