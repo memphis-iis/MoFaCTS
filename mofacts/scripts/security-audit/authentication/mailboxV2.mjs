@@ -46,6 +46,7 @@ export function readResetMailboxMessageV2(binding, metadata, plainText) {
   for (const candidate of candidates) {
     let link;
     try { link = new URL(candidate); } catch { invalid(); }
+    if (link.pathname === '/auth/verify-email') invalid();
     if (link.pathname !== '/auth/reset-password') continue;
     if (link.origin !== scope.target || link.username || link.password || link.hash
         || link.searchParams.get('email') !== scope.recipient
@@ -60,7 +61,30 @@ export function readResetMailboxMessageV2(binding, metadata, plainText) {
       receivedWithinRequestWindow: true, targetOriginMatched: true, resetLinkCount: 1 } };
 }
 
-export async function acquireResetMailboxMessageV2({ binding, listMetadata, readPlainText }) {
+export function readVerificationMailboxMessageV2(binding, metadata, plainText) {
+  const scope = parseResetMailboxBindingV2(binding);
+  if (!resetMailboxMessageMatchesV2(scope, metadata) || typeof plainText !== 'string'
+    || Buffer.byteLength(plainText) > RESET_MAILBOX_LIMITS_V2.bodyBytes) invalid();
+  const links = [];
+  for (const match of plainText.matchAll(/https?:\/\/[^\s<>"']+/g)) {
+    let link;
+    try { link = new URL(match[0]); } catch { invalid(); }
+    if (link.pathname === '/auth/reset-password') invalid();
+    if (link.pathname !== '/auth/verify-email') continue;
+    if (link.origin !== scope.target || link.username || link.password || link.hash
+      || [...link.searchParams.keys()].join(',') !== 'token' || link.searchParams.getAll('token').length !== 1
+      || !/^[A-Za-z0-9_-]{1,256}$/.test(link.searchParams.get('token') ?? '')) invalid();
+    links.push(link);
+  }
+  if (links.length !== 1) invalid();
+  // Native Accounts owns acceptance of this opaque token. The transport checks
+  // identity, origin, shape and bounds; it never substitutes a stored token.
+  return { token: links[0].searchParams.get('token'), recipient: scope.recipient,
+    receipt: { state: 'staging2-verification-mail-delivery-observed', exactRecipientMatched: true,
+      receivedWithinRequestWindow: true, targetOriginMatched: true, verificationLinkCount: 1 } };
+}
+
+async function acquireMailboxMessageV2({ binding, listMetadata, readPlainText }, readCapability) {
   const scope = parseResetMailboxBindingV2(binding);
   if (typeof listMetadata !== 'function' || typeof readPlainText !== 'function') invalid();
   const messages = await listMetadata(scope);
@@ -70,5 +94,8 @@ export async function acquireResetMailboxMessageV2({ binding, listMetadata, read
   if (matches.length === 0) return { state: 'not-observed' };
   if (matches.length !== 1) invalid();
   const message = matches[0];
-  return readResetMailboxMessageV2(scope, message, await readPlainText(message.messageId, scope));
+  return readCapability(scope, message, await readPlainText(message.messageId, scope));
 }
+
+export const acquireResetMailboxMessageV2 = options => acquireMailboxMessageV2(options, readResetMailboxMessageV2);
+export const acquireVerificationMailboxMessageV2 = options => acquireMailboxMessageV2(options, readVerificationMailboxMessageV2);

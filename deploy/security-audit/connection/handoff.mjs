@@ -1,5 +1,5 @@
 import { parseResetMailboxBindingV2 } from '../../../mofacts/scripts/security-audit/authentication/mailboxV2.mjs';
-import { connectedGmailMetadataV2, connectedGmailResetMessageV2 } from '../../../mofacts/scripts/security-audit/authentication/connectedGmailV2.mjs';
+import { connectedGmailMetadataV2, connectedGmailResetMessageV2, connectedGmailVerificationMessageV2 } from '../../../mofacts/scripts/security-audit/authentication/connectedGmailV2.mjs';
 
 const fail = () => { throw new Error('Audit mail handoff unavailable'); };
 const namespacePattern = /^mofacts_audit_fixture_[a-f0-9]{12}$/;
@@ -26,16 +26,30 @@ export function createMailHandoff({ store, now = Date.now }) {
     await store.transaction(state => { if (state.handoff) state.handoff.state = 'recovery-required'; });
   }
   async function acceptScannerRequest(frame) {
+    if (active && frame.operation === 'begin-reset') {
+      if (active.phase !== 'mail-handed-off' || active.purpose !== 'verification'
+        || Object.keys(frame).sort().join(',') !== 'operation,requestId'
+        || frame.requestId !== active.request.requestId + 1) fail();
+      active.verificationRecipient = active.binding.recipient;
+      active.phase = 'reader-needed'; active.deadline = now() + 120000;
+      active.minimumRequestId = frame.requestId + 1; active.request = null; active.selected = null; active.purpose = 'reset';
+      active.send({ operation: 'reset-window-ready' });
+      return;
+    }
     if (!active || active.phase !== 'reader-ready' && active.phase !== 'waiting-body' || now() >= active.deadline) fail();
     if (!Number.isSafeInteger(frame.requestId) || frame.requestId < 1) fail();
-    if (frame.operation === 'gmail-metadata') {
+    if (['gmail-metadata', 'gmail-verification-metadata'].includes(frame.operation)) {
       if (active.phase !== 'reader-ready' || Object.keys(frame).sort().join(',') !== 'binding,maximumResults,operation,requestId'
         || frame.maximumResults !== 10) fail();
       const binding = parseResetMailboxBindingV2(frame.binding);
       if (binding.namespace !== active.namespace || binding.requestedAtMs > now() || binding.deadlineMs <= now()) fail();
+      if (frame.requestId !== (active.minimumRequestId ?? 1)
+        || active.verificationRecipient && (frame.operation !== 'gmail-metadata' || binding.recipient !== active.verificationRecipient)) fail();
+      active.purpose = frame.operation === 'gmail-verification-metadata' ? 'verification' : 'reset';
       active.binding = binding; active.deadline = binding.deadlineMs; active.phase = 'metadata-requested';
-    } else if (frame.operation === 'gmail-full') {
+    } else if (['gmail-full', 'gmail-verification-full'].includes(frame.operation)) {
       if (active.phase !== 'waiting-body' || Object.keys(frame).sort().join(',') !== 'messageId,operation,requestId'
+        || frame.operation !== (active.purpose === 'verification' ? 'gmail-verification-full' : 'gmail-full')
         || frame.messageId !== active.selected?.messageId || frame.requestId !== active.request.requestId + 1) fail();
       active.phase = 'body-requested';
     } else fail();
@@ -63,7 +77,7 @@ export function createMailHandoff({ store, now = Date.now }) {
       active.selected = connectedGmailMetadataV2(active.binding, response[0]);
       active.phase = 'waiting-body';
     } else if (active.phase === 'body-requested') {
-      connectedGmailResetMessageV2(active.binding, active.selected, response);
+      (active.purpose === 'verification' ? connectedGmailVerificationMessageV2 : connectedGmailResetMessageV2)(active.binding, active.selected, response);
       active.phase = 'mail-handed-off';
     } else fail();
     active.send({ requestId, response });

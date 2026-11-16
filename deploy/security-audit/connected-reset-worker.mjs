@@ -4,6 +4,7 @@ import { withScannerMailHandoffV2 } from './connection/scannerClient.mjs';
 import { fixtureNamespaceV2 } from '../../mofacts/scripts/security-audit/authentication/stagingFixturesV2.mjs';
 import { captureCurrentResetV2 } from '../../mofacts/scripts/security-audit/authentication/currentResetV2.mjs';
 import { createCurrentResetBrowserTransportV2 } from '../../mofacts/scripts/security-audit/authentication/currentResetBrowserV2.mjs';
+import { parseResetMailboxBindingV2, readVerificationMailboxMessageV2 } from '../../mofacts/scripts/security-audit/authentication/mailboxV2.mjs';
 
 const unavailable = () => new Error('Connected reset qualification requires owned recovery');
 
@@ -40,17 +41,27 @@ export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketP
   const launch = dependencies.launch ?? (async () => (await import('/opt/browser/node_modules/playwright/index.mjs')).chromium.launch({ headless: true }));
   try {
     const result = await own({ socketPath, leaseDirectory, namespace, deadlineMs,
-      run: async ({ acquireMail }) => {
+      run: async ({ acquireMail, acquireVerificationMail, beginResetWindow }) => {
         const frame = await ask('fixture-needed');
-        if (Object.keys(frame).sort().join(',') !== 'actor,newPassword,operation') throw unavailable();
+        if (Object.keys(frame).sort().join(',') !== 'actor,newPassword,operation,verification') throw unavailable();
+        const binding = parseResetMailboxBindingV2(frame.verification);
+        if (binding.namespace !== namespace || binding.recipient !== frame.actor?.username || binding.deadlineMs > deadlineMs) throw unavailable();
         let browser, owner;
         try {
           browser = await launch();
           owner = transportFactory({ browser, target: 'https://staging2.optimallearning.org', actor: frame.actor });
+          const mail = await acquireVerificationMail(binding);
+          const capability = readVerificationMailboxMessageV2(binding, mail.metadata, mail.plainText);
+          const verification = await owner.verifyEmail(capability.token);
+          capability.token = '';
+          if (verification?.state !== 'owned-fixture-email-verified' || verification.nativeVerificationSucceeded !== true
+            || verification.ownedIdentityMatched !== true) throw unavailable();
+          output.write(JSON.stringify({ operation: 'fixture-verified', verification, receipt: capability.receipt }) + '\n');
+          await beginResetWindow();
           return await capture({ namespace, target: 'https://staging2.optimallearning.org', actor: frame.actor,
             newPassword: frame.newPassword, transport: owner.transport, acquireMail });
         } finally {
-          frame.actor = null; frame.newPassword = null;
+          frame.actor = null; frame.newPassword = null; frame.verification = null;
           try { await owner?.close(); } finally { await browser?.close(); }
         }
       },

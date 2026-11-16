@@ -150,6 +150,35 @@ async function pendingMail(f) {
   return { handoff, sent, binding };
 }
 
+test('only verified-purpose handoff can open one same-recipient reset window without extending old delivery', async t => {
+  const f = await fixture(t), sent = [], handoff = createMailHandoff({ store: f.store, now: f.now });
+  await handoff.open(namespace, frame => sent.push(frame)); handoff.request();
+  const binding = { namespace, recipient: `audit+${namespace}-reset@gmail.com`, target: 'https://staging2.optimallearning.org',
+    requestedAtMs: f.now(), deadlineMs: f.now() + 1000 };
+  await assert.rejects(handoff.acceptScannerRequest({ operation: 'begin-reset', requestId: 1 }));
+  await handoff.acceptScannerRequest({ operation: 'gmail-verification-metadata', binding, maximumResults: 10, requestId: 1 });
+  const full = mail(binding); full.payload.body.content = `${binding.target}/auth/verify-email?token=native_opaque-token`;
+  full.payload.body.size = Buffer.byteLength(full.payload.body.content);
+  const metadata = structuredClone(full); delete metadata.payload.body;
+  handoff.submit({ requestId: 1, response: [metadata] });
+  await assert.rejects(handoff.acceptScannerRequest({ operation: 'gmail-full', requestId: 2, messageId: full.id }));
+  await handoff.acceptScannerRequest({ operation: 'gmail-verification-full', requestId: 2, messageId: full.id });
+  handoff.submit({ requestId: 2, response: full });
+  f.advance(1001);
+  assert.throws(() => handoff.submit({ requestId: 2, response: full }));
+  await handoff.acceptScannerRequest({ operation: 'begin-reset', requestId: 3 });
+  assert.deepEqual(sent.at(-1), { operation: 'reset-window-ready' });
+  handoff.request();
+  const reset = { ...binding, requestedAtMs: f.now(), deadlineMs: f.now() + 1000 };
+  await assert.rejects(handoff.acceptScannerRequest({ operation: 'gmail-metadata', binding: { ...reset,
+    recipient: `audit+${namespace}-expiry@gmail.com` }, maximumResults: 10, requestId: 4 }));
+  await assert.rejects(handoff.acceptScannerRequest({ operation: 'gmail-verification-metadata', binding: reset, maximumResults: 10, requestId: 4 }));
+  await assert.rejects(handoff.acceptScannerRequest({ operation: 'gmail-metadata', binding: reset, maximumResults: 10, requestId: 1 }));
+  await handoff.acceptScannerRequest({ operation: 'gmail-metadata', binding: reset, maximumResults: 10, requestId: 4 });
+  await assert.rejects(handoff.acceptScannerRequest({ operation: 'begin-reset', requestId: 5 }));
+  assert.equal(handoff.status().state, 'metadata-requested');
+});
+
 test('mail remains private and only exact staged metadata then full-message carriage succeeds', async t => {
   const f = await fixture(t), { handoff, sent, binding } = await pendingMail(f);
   const full = mail(binding), metadata = structuredClone(full); delete metadata.payload.body;
@@ -256,8 +285,12 @@ test('private scanner socket requires the actual lease and independently observe
   socket.write(JSON.stringify({ operation: 'open', namespace }) + '\n');
   assert.deepEqual(await next(), { operation: 'attached' });
   handoff.request(); assert.deepEqual(await next(), { operation: 'reader-ready' });
+  const interrupted = once(server, 'scanner-idle');
   socket.write(JSON.stringify({ operation: 'cleanup-complete' }) + '\n');
   await once(socket, 'close');
+  // Socket closure precedes asynchronous persistence of the recovery marker.
+  // A simulated restart must wait for the owner to finish that transaction.
+  await interrupted;
   // The present lease prevented a false cleanup acknowledgement.
   assert.notEqual(handoff.status().state, 'idle');
   assert.equal(await fs.stat(leaseFile).then(() => true), true);

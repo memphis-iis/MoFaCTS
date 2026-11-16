@@ -48,6 +48,38 @@ function message(binding) {
     body: { content, size: Buffer.byteLength(content), attachment_id: null } } };
 }
 
+test('verification and reset use one lease with separate readiness and monotonic private requests', async t => {
+  const f = await fixture(t), client = await f.open();
+  const reader = client.waitForReader(); f.handoff.request(); await reader;
+  const requestedAtMs = Date.now();
+  const binding = { namespace, recipient: `operator+${namespace}-reset@example.test`,
+    target: 'https://staging2.optimallearning.org', requestedAtMs, deadlineMs: requestedAtMs + 5000 };
+  const verification = message(binding);
+  verification.payload.body.content = `${binding.target}/auth/verify-email?token=opaque_native-token`;
+  verification.payload.body.size = Buffer.byteLength(verification.payload.body.content);
+  const deliver = async (acquisition, mail, expectedOperation, expectedId) => {
+    await until(() => f.handoff.status().state === 'metadata-requested');
+    const first = f.handoff.request();
+    assert.equal(first.operation, expectedOperation); assert.equal(first.requestId, expectedId);
+    const metadata = structuredClone(mail); delete metadata.payload.body;
+    f.handoff.submit({ requestId: first.requestId, response: [metadata] });
+    await until(() => f.handoff.status().state === 'body-requested');
+    const second = f.handoff.request(); assert.equal(second.requestId, expectedId + 1);
+    f.handoff.submit({ requestId: second.requestId, response: mail });
+    return acquisition;
+  };
+  await deliver(client.acquireVerificationMail(binding), verification, 'gmail-verification-metadata', 1);
+  const transition = client.beginResetWindow();
+  await until(() => f.handoff.status().state === 'reader-needed');
+  assert.equal(f.handoff.request().state, 'reader-ready'); await transition;
+  const resetAt = Date.now();
+  const reset = { ...binding, requestedAtMs: resetAt, deadlineMs: resetAt + 5000 };
+  await deliver(client.acquireMail(reset), message(reset), 'gmail-metadata', 4);
+  assert.ok(await fs.stat(f.lease));
+  await fs.unlink(f.lease); await client.closeAfterVerifiedCleanup();
+  assert.equal(f.handoff.status().state, 'idle');
+});
+
 test('real private channel waits for reader, carries validated metadata/body and closes only after lease release', async t => {
   const f = await fixture(t), client = await f.open();
   assert.equal(f.handoff.status().state, 'reader-needed');

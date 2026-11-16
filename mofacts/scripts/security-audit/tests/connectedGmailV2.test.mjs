@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { connectedGmailMetadataV2 as metadata, connectedGmailResetMessageV2 as read, acquireConnectedGmailResetMessageV2 as acquire } from '../authentication/connectedGmailV2.mjs';
+import { connectedGmailVerificationMessageV2 as readVerification, acquireConnectedGmailVerificationMessageV2 as acquireVerification } from '../authentication/connectedGmailV2.mjs';
 const namespace = 'mofacts_audit_fixture_0123456789ab';
 const binding = { namespace, recipient: `imrryr+${namespace}-reset@gmail.com`, target: 'https://staging2.optimallearning.org', requestedAtMs: 1794575020232, deadlineMs: 1794575140232 };
 function message() {
@@ -10,6 +11,27 @@ function message() {
       { name: 'X-Received', value: 'by 2002:a17:903:1c6:b0:2ed:2e3a:1faf with SMTP id d9443-2ee0.47.1794575021854; Fri, 13 Nov 2026 05:03:41 -0800 (PST)' }],
     body: { content, size: Buffer.byteLength(content), attachment_id: null } } };
 }
+
+test('normal verification uses its native opaque capability and the same bounded private mail carriage', async () => {
+  const value = message();
+  value.payload.body.content = `${binding.target}/auth/verify-email?token=opaque_NATIVE-token_43`;
+  value.payload.body.size = Buffer.byteLength(value.payload.body.content);
+  const meta = metadata(binding, value);
+  assert.equal(readVerification(binding, meta, value).receipt.verificationLinkCount, 1);
+  assert.throws(() => read(binding, meta, value));
+  assert.throws(() => readVerification(binding, metadata(binding, message()), message()));
+  const result = await acquireVerification({ binding, now: () => binding.requestedAtMs + 2000,
+    listMessages: async () => [value], readMessage: async () => value });
+  assert.equal(result.receipt.state, 'staging2-verification-mail-delivery-observed');
+  assert.equal(JSON.stringify(result.receipt).includes('opaque_NATIVE'), false);
+  for (const url of [`${binding.target}/auth/verify-email?token=a&extra=b`,
+    `${binding.target}/auth/verify-email?token=a&token=b`,
+    'https://optimallearning.org/auth/verify-email?token=a',
+    `${binding.target}/auth/verify-email?token=a#fragment`]) {
+    value.payload.body.content = url; value.payload.body.size = Buffer.byteLength(url);
+    assert.throws(() => readVerification(binding, meta, value));
+  }
+});
 test('connected Gmail uses exact recipients and one explicit provider receipt clock before body acquisition', () => {
   const value = message(), meta = metadata(binding, value);
   assert.equal(meta.receivedAtMs, 1794575021854);

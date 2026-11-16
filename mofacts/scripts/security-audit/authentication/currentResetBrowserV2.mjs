@@ -12,7 +12,7 @@ export function createCurrentResetBrowserTransportV2({ browser, target, actor })
   if (origin !== 'https://staging2.optimallearning.org'
     || !/\+mofacts_audit_fixture_[a-f0-9]{12}-reset@gmail\.com$/.test(user.username)) throw unavailable();
   const contexts = [], sessions = [];
-  let anonymous, baselineStarted = false, closed = false, cleanupFailed = false;
+  let anonymous, baselineStarted = false, verificationStarted = false, closed = false, cleanupFailed = false;
   const ownedBrowser = { async newContext() {
     if (closed) throw unavailable();
     const context = await browser.newContext(); contexts.push(context); return context;
@@ -70,6 +70,34 @@ export function createCurrentResetBrowserTransportV2({ browser, target, actor })
     }), { candidate, origin }); }
     catch { return { state: 'transport-error' }; }
   }
+  async function verifyEmail(token) {
+      if (closed || baselineStarted || verificationStarted || typeof token !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/.test(token)) throw unavailable();
+      verificationStarted = true;
+      const page = await anonymousPage();
+      let verified = false;
+      try {
+        verified = await page.evaluate(({ token, origin, userId, username }) => new Promise(resolve => {
+          if (location.origin !== origin || !globalThis.Meteor.status().connected || globalThis.Meteor.userId() !== null) {
+            resolve(false); return;
+          }
+          const timer = setTimeout(() => resolve(false), 12000);
+          globalThis.Accounts.verifyEmail(token, error => {
+            clearTimeout(timer);
+            const account = globalThis.Meteor.user();
+            resolve(!error && globalThis.Meteor.userId() === userId && account?.username === username
+              && account.emails?.some(row => row.address === username && row.verified === true) === true);
+          });
+        }), { token, origin, userId: user.userId, username: user.username });
+      } catch { throw unavailable(); }
+      finally { token = ''; }
+      if (!verified) throw unavailable();
+      const loggedOut = await page.evaluate(() => new Promise(resolve => {
+        const timer = setTimeout(() => resolve(false), 12000);
+        globalThis.Meteor.logout(error => { clearTimeout(timer); resolve(!error && globalThis.Meteor.userId() === null); });
+      })).catch(() => false);
+      if (!loggedOut) throw unavailable();
+      return { state: 'owned-fixture-email-verified', nativeVerificationSucceeded: true, ownedIdentityMatched: true };
+  }
   const transport = {
     async baseline(value) {
       const candidate = parseAuthorizationActorBindingV2(value);
@@ -122,7 +150,7 @@ export function createCurrentResetBrowserTransportV2({ browser, target, actor })
       return result;
     },
   };
-  return { transport, async close() {
+  return { transport, verifyEmail, async close() {
     if (closed) {
       if (cleanupFailed) throw new Error('Owned reset browser cleanup is unverified');
       return;

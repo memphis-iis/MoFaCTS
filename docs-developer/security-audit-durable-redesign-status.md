@@ -95,7 +95,7 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 - [ ] Qualify remote browser tooling and real connected-Gmail carriage through
   the owned scanner lease/channel. Full scanner/protocol integration remains open.
 
-### Maintained reset worker and next fixture-policy decision (2026-11-16)
+### Maintained reset worker and normal verification prerequisite (2026-11-16)
 
 - [x] Prepare currentResetBrowserV2.mjs: two independent ordinary-account sessions,
   existing native reset/replay/password probes, both old-session method/resume
@@ -115,13 +115,23 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   fixture cannot provide the reset test's positive login baseline. Preserve that
   setting and progress-backed passwordless behavior. The existing bridge accepts
   reset mail only; it does not already authorize/validate a verification capability.
-- [ ] Fixture policy: recommend completing normal email verification through an
-  explicit narrow verification-mail purpose, then reset mail under the same lease.
-  The alternative administratively seeds only the owned fixture as verified and
-  claims no verification-delivery coverage. This changes selected fixture/mail
-  evidence; no verification request, account creation, seed or broker expansion
-  has been executed. Await that policy choice before the live fixture window.
-
+- [x] Fixture policy resolved: normal verification of the exact disposable
+  staging2 fixture is a routine prerequisite covered by standing authorization.
+  Phil explicitly directs proceeding on 2026-11-16 without another test-email
+  question. Preserve global verification and progress-backed passwordless access.
+- [x] Prepare narrow verification-purpose parsing and private carriage, one-way
+  same-recipient verification/reset windows, native Accounts verification with
+  identity/address checks and logout, and content-free worker setup receipts.
+  Full lint/330 surfaces and the V2 source gate pass: 428 cases, 421 pass,
+  zero failures, seven skips. The separate connection/worker set passes 35/35.
+  Correct its test restart race by awaiting the owner's durable scanner-idle
+  event; the initial failed store read is retained in the diagnostic transcript.
+  No app TypeScript/server-surface change or Meteor invocation. Live mail and
+  installation remain pending and are not represented by these source checks.
+- [ ] Finish and qualify the verification-purpose bridge and native verification,
+  followed by reset under the same held lease. Separate original mail deadlines,
+  exact recipient checks and independent owned cleanup remain required. Source
+  preparation does not establish real message delivery or authentication coverage.
 ## Real connection authorization accepted (2026-11-16)
 
 - [x] User completes fresh approval. Read-only server metadata confirms enrollment

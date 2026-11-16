@@ -3,7 +3,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { fixtureNamespaceV2 } from '../../../mofacts/scripts/security-audit/authentication/stagingFixturesV2.mjs';
 import { parseResetMailboxBindingV2 } from '../../../mofacts/scripts/security-audit/authentication/mailboxV2.mjs';
-import { acquireConnectedGmailResetMessageV2 } from '../../../mofacts/scripts/security-audit/authentication/connectedGmailV2.mjs';
+import { acquireConnectedGmailResetMessageV2, acquireConnectedGmailVerificationMessageV2 } from '../../../mofacts/scripts/security-audit/authentication/connectedGmailV2.mjs';
 import { withAuthenticationLeaseV2 } from '../../../mofacts/scripts/security-audit/authentication/leaseV2.mjs';
 
 const unavailable = () => new Error('Scanner mail connection requires owned recovery');
@@ -29,14 +29,15 @@ export async function openScannerMailClientV2({ socketPath, namespace, deadlineM
     const stat = await fs.lstat(location);
     if (!stat.isSocket() || stat.isSymbolicLink() || await fs.realpath(location) !== location) throw unavailable();
   } catch { throw unavailable(); }
-  const attached = deferred(), ready = deferred(), closed = deferred();
+  const attached = deferred(), closed = deferred();
+  let ready = deferred(), readerDeadline = started + 120000, transition, purpose, recipient;
   const socket = net.createConnection({ path: location });
   let phase = 'attaching', pending, sequence = 0, buffer = Buffer.alloc(0), used = false;
   const timers = new Set();
   const fail = () => {
     if (phase === 'closed' || phase === 'failed') return;
     phase = 'failed'; buffer.fill(0); buffer = Buffer.alloc(0);
-    attached.reject(unavailable()); ready.reject(unavailable()); closed.reject(unavailable());
+    attached.reject(unavailable()); ready.reject(unavailable()); closed.reject(unavailable()); transition?.reject(unavailable());
     if (pending) { pending.reject(unavailable()); pending = undefined; }
     for (const timer of timers) clearTimeout(timer);
     timers.clear(); socket.destroy();
@@ -70,6 +71,8 @@ export async function openScannerMailClientV2({ socketPath, namespace, deadlineM
           phase = 'reader-needed'; attached.resolve();
         } else if (keys === 'operation' && frame.operation === 'reader-ready' && phase === 'reader-needed') {
           phase = 'ready'; ready.resolve();
+        } else if (keys === 'operation' && frame.operation === 'reset-window-ready' && phase === 'reset-transition') {
+          phase = 'reader-needed'; transition.resolve();
         } else if (keys === 'requestId,response' && phase === 'acquiring' && pending?.id === frame.requestId) {
           const current = pending; pending = undefined; current.resolve(frame.response);
         } else if (keys === 'operation' && frame.operation === 'closed' && phase === 'closing') {
@@ -80,28 +83,46 @@ export async function openScannerMailClientV2({ socketPath, namespace, deadlineM
   });
   try { await wait(attached.promise, started + 120000); }
   catch { fail(); throw unavailable(); }
-  return {
-    async waitForReader() {
-      try { await wait(ready.promise, started + 120000); }
-      catch { fail(); throw unavailable(); }
-    },
-    async acquireMail(value) {
+  const acquire = async (value, requestedPurpose) => {
       try {
         const binding = parseResetMailboxBindingV2(value);
-        if (used || phase !== 'ready' || binding.namespace !== namespace || binding.deadlineMs > deadlineMs) throw unavailable();
-        used = true; phase = 'acquiring';
+        if (used || phase !== 'ready' || binding.namespace !== namespace || binding.deadlineMs > deadlineMs
+          || recipient && (requestedPurpose !== 'reset' || binding.recipient !== recipient)) throw unavailable();
+        used = true; purpose = requestedPurpose; recipient = binding.recipient; phase = 'acquiring';
         const request = async (operation, fields) => {
           if (pending || phase !== 'acquiring') throw unavailable();
           const response = deferred(); pending = { ...response, id: ++sequence };
           send({ requestId: sequence, operation, ...fields });
           return wait(response.promise, binding.deadlineMs);
         };
-        const result = await acquireConnectedGmailResetMessageV2({ binding, now,
-          listMessages: () => request('gmail-metadata', { binding, maximumResults: 10 }),
-          readMessage: messageId => request('gmail-full', { messageId }),
+        const verification = requestedPurpose === 'verification';
+        const result = await (verification ? acquireConnectedGmailVerificationMessageV2 : acquireConnectedGmailResetMessageV2)({ binding, now,
+          listMessages: () => request(verification ? 'gmail-verification-metadata' : 'gmail-metadata', { binding, maximumResults: 10 }),
+          readMessage: messageId => request(verification ? 'gmail-verification-full' : 'gmail-full', { messageId }),
         });
+        if (!result?.plainText) throw unavailable();
         phase = 'mail-handed-off';
         return result;
+      } catch { fail(); throw unavailable(); }
+  };
+  return {
+    async waitForReader() {
+      try { await wait(ready.promise, readerDeadline); }
+      catch { fail(); throw unavailable(); }
+    },
+    acquireMail: value => acquire(value, 'reset'),
+    acquireVerificationMail: value => acquire(value, 'verification'),
+    // The fixture owner calls this only after native verification succeeds.
+    // The old message deadline is never extended by this transition.
+    async beginResetWindow() {
+      try {
+        if (phase !== 'mail-handed-off' || purpose !== 'verification') throw unavailable();
+        phase = 'reset-transition'; ready = deferred(); transition = deferred();
+        readerDeadline = now() + 120000;
+        send({ operation: 'begin-reset', requestId: ++sequence });
+        await wait(transition.promise, now() + 5000);
+        purpose = 'reset'; used = false;
+        await wait(ready.promise, readerDeadline);
       } catch { fail(); throw unavailable(); }
     },
     async closeAfterVerifiedCleanup() {
@@ -128,7 +149,8 @@ export async function withScannerMailHandoffV2({ socketPath, leaseDirectory, nam
         try {
           client = await openScannerMailClientV2({ socketPath, namespace, deadlineMs });
           await client.waitForReader();
-          return { completed: true, value: await run({ ...lease, acquireMail: client.acquireMail }) };
+          return { completed: true, value: await run({ ...lease, acquireMail: client.acquireMail,
+            acquireVerificationMail: client.acquireVerificationMail, beginResetWindow: client.beginResetWindow }) };
         } catch { return { completed: false }; }
       },
       verifyClean,

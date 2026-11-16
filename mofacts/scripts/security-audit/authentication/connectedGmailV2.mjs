@@ -1,4 +1,5 @@
-import { RESET_MAILBOX_LIMITS_V2, resetMailboxMessageMatchesV2, readResetMailboxMessageV2, parseResetMailboxBindingV2, acquireResetMailboxMessageV2 } from './mailboxV2.mjs';
+import { RESET_MAILBOX_LIMITS_V2, resetMailboxMessageMatchesV2, readResetMailboxMessageV2, readVerificationMailboxMessageV2,
+  parseResetMailboxBindingV2, acquireResetMailboxMessageV2, acquireVerificationMailboxMessageV2 } from './mailboxV2.mjs';
 
 const invalid = () => { throw new Error('Connected Gmail reset evidence is invalid'); };
 function headerValues(message, name) {
@@ -29,7 +30,7 @@ export function connectedGmailMetadataV2(binding, message) {
 
 // Revalidate the full response's identity/receipt metadata before exposing its
 // decoded body to the existing capability validator. No raw/HTML/attachment path.
-export function connectedGmailResetMessageV2(binding, metadata, message) {
+function connectedGmailMessageV2(binding, metadata, message, readCapability) {
   const checked = connectedGmailMetadataV2(binding, message);
   if (JSON.stringify(checked) !== JSON.stringify(metadata)) invalid();
   const part = message.payload;
@@ -38,15 +39,18 @@ export function connectedGmailResetMessageV2(binding, metadata, message) {
       || !Number.isSafeInteger(part.body.size) || part.body.size < 0
       || part.body.size > RESET_MAILBOX_LIMITS_V2.bodyBytes
       || Buffer.byteLength(part.body.content) > RESET_MAILBOX_LIMITS_V2.bodyBytes) invalid();
-  const result = readResetMailboxMessageV2(binding, checked, part.body.content);
+  const result = readCapability(binding, checked, part.body.content);
   return { metadata: checked, plainText: part.body.content, receipt: result.receipt };
 }
+
+export const connectedGmailResetMessageV2 = (binding, metadata, message) => connectedGmailMessageV2(binding, metadata, message, readResetMailboxMessageV2);
+export const connectedGmailVerificationMessageV2 = (binding, metadata, message) => connectedGmailMessageV2(binding, metadata, message, readVerificationMailboxMessageV2);
 
 // One bounded connector-owned acquisition, callable by an unattended owner only
 // when that owner already has authorized tool access and a private scanner handoff.
 // This adds no HTTP client, OAuth/IMAP access, scheduler, production binding or
 // credential storage. The existing mailbox owner retains matching and token rules.
-export async function acquireConnectedGmailResetMessageV2({ binding, listMessages, readMessage, now = Date.now }) {
+async function acquireConnectedGmailMessageV2({ binding, listMessages, readMessage, now = Date.now }, acquireMailbox, readMessageCapability, failureMessage) {
   try {
     const scope = parseResetMailboxBindingV2(binding);
     if (typeof listMessages !== 'function' || typeof readMessage !== 'function' || typeof now !== 'function') invalid();
@@ -57,7 +61,7 @@ export async function acquireConnectedGmailResetMessageV2({ binding, listMessage
     const selected = new Map();
     let evidence;
     withinWindow();
-    const result = await acquireResetMailboxMessageV2({
+    const result = await acquireMailbox({
       binding: scope,
       listMetadata: async () => {
         // The callback must use exact recipient + reset subject and request no
@@ -78,7 +82,7 @@ export async function acquireConnectedGmailResetMessageV2({ binding, listMessage
         if (!metadata) invalid();
         const message = await readMessage(messageId);
         withinWindow();
-        evidence = connectedGmailResetMessageV2(scope, metadata, message);
+        evidence = readMessageCapability(scope, metadata, message);
         return evidence.plainText;
       },
     });
@@ -89,6 +93,11 @@ export async function acquireConnectedGmailResetMessageV2({ binding, listMessage
   } catch {
     // Connector exceptions can contain email bodies or capabilities. Do not
     // retain them as causes, logs, receipts or user-visible diagnostics.
-    throw new Error('Connected Gmail reset acquisition is unavailable');
+    throw new Error(failureMessage);
   }
 }
+
+export const acquireConnectedGmailResetMessageV2 = options => acquireConnectedGmailMessageV2(options,
+  acquireResetMailboxMessageV2, connectedGmailResetMessageV2, 'Connected Gmail reset acquisition is unavailable');
+export const acquireConnectedGmailVerificationMessageV2 = options => acquireConnectedGmailMessageV2(options,
+  acquireVerificationMailboxMessageV2, connectedGmailVerificationMessageV2, 'Connected Gmail verification acquisition is unavailable');

@@ -13,6 +13,7 @@ function fixture(mode = 'success') {
   const browser = { async newContext() {
     const state = { userId: null, token: null, closed: false };
     const meteor = { status: () => ({ connected: true }), userId: () => state.userId,
+      user: () => ({ username: actor.username, emails: [{ address: actor.username, verified: mode !== 'unverified-email' }] }),
       loginWithPassword(username, candidate, done) {
         calls.push('login');
         if (username !== actor.username || candidate !== password) { done({ error: '403' }); return; }
@@ -50,6 +51,11 @@ function fixture(mode = 'success') {
     const globals = { location: { origin: target }, setTimeout, clearTimeout,
       sessionStorage: { getItem: name => ({ 'Meteor.loginToken': state.token,
         'Meteor.loginTokenExpires': new Date(Date.now() + 86400000).toISOString() })[name] },
+      Accounts: { verifyEmail(token, done) {
+        assert.equal(token, 'opaque_NATIVE-token'); calls.push('verifyEmail');
+        state.userId = mode === 'wrong-verification-owner' ? 'foreign-user' : actor.userId;
+        done(mode === 'verification-rejected' ? { error: '403' } : undefined);
+      } },
       Meteor: meteor, Session: { get: name => ({ authReady: true, authRolesHydrated: true,
         authRolesSyncedUserId: state.userId, authRoles: { admin: false, teacher: false } })[name] } };
     const evaluate = (fn, argument) => {
@@ -68,6 +74,27 @@ function fixture(mode = 'success') {
       acquireMail: async binding => ({ metadata: { messageId: 'synthetic', recipients: [actor.username], receivedAtMs: binding.requestedAtMs },
         plainText: `${target}/auth/reset-password?email=${encodeURIComponent(actor.username)}&token=${'a'.repeat(64)}` }) });
   } };
+}
+
+test('normal verification uses native Accounts, checks the owned verified address and logs out before reset baseline', async () => {
+  const f = fixture();
+  try {
+    const result = await f.verifyEmail('opaque_NATIVE-token');
+    assert.equal(result.nativeVerificationSucceeded, true);
+    assert.equal(f.contexts[0].state.userId, null);
+    assert.deepEqual(f.calls, ['verifyEmail', 'logout']);
+    await assert.rejects(f.verifyEmail('opaque_NATIVE-token'));
+    assert.equal((await f.capture()).current.status, 'PASS');
+  } finally { await f.close(); }
+});
+
+for (const mode of ['wrong-verification-owner', 'unverified-email', 'verification-rejected']) {
+  test(`native verification ${mode} cannot satisfy the reset prerequisite`, async () => {
+    const f = fixture(mode);
+    try { await assert.rejects(f.verifyEmail('opaque_NATIVE-token')); }
+    finally { await f.close(); }
+    assert.equal(f.calls.includes('requestPasswordReset'), false);
+  });
 }
 
 test('maintained browser transport composes current reset with two independent sessions and sanitized results', async () => {

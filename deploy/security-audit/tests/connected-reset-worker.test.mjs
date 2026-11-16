@@ -15,7 +15,9 @@ async function run(mode) {
       if (mode === 'eof') { input.end(); return; }
       const response = { operation: 'fixture-needed', actor: { userId: 'owned',
         username: `operator+${namespace}-reset@gmail.com`, password: 'PRIVATE_SYNTHETIC_PASSWORD' },
-      newPassword: 'PRIVATE_SYNTHETIC_NEW_PASSWORD' };
+      newPassword: 'PRIVATE_SYNTHETIC_NEW_PASSWORD', verification: { namespace,
+        recipient: `operator+${namespace}-reset@gmail.com`, target: 'https://staging2.optimallearning.org',
+        requestedAtMs: Date.now(), deadlineMs: Date.now() + 1000 } };
       if (mode === 'extra-field') response.extra = 'PRIVATE_EXTRA';
       queueMicrotask(() => input.write(JSON.stringify(response) + '\n'));
     } else if (frame.operation === 'cleanup-required') queueMicrotask(() => input.write(JSON.stringify({
@@ -30,7 +32,10 @@ async function run(mode) {
         if (mode === 'lease-denied') throw new Error('PRIVATE_LEASE_DETAIL');
         ready = true;
         let value, failure;
-        try { value = await options.run({ acquireMail: async () => { throw new Error('Unexpected mail'); } }); }
+        try { value = await options.run({ acquireMail: async () => { throw new Error('Unexpected mail'); },
+          acquireVerificationMail: async binding => ({ metadata: { messageId: 'owned', recipients: [binding.recipient], receivedAtMs: binding.requestedAtMs },
+            plainText: `${binding.target}/auth/verify-email?token=PRIVATE_NATIVE_TOKEN` }),
+          beginResetWindow: async () => {} }); }
         catch (caught) { failure = caught; }
         cleanupAccepted = await options.verifyClean();
         if (!cleanupAccepted) throw new Error('Cleanup not verified');
@@ -38,7 +43,10 @@ async function run(mode) {
         return value;
       },
       launch: async () => { launched++; return { async close() { browserClosed++; } }; },
-      transportFactory: () => ({ transport: {}, async close() { transportClosed++; } }),
+      transportFactory: () => ({ transport: {}, async verifyEmail(token) {
+        assert.equal(token, 'PRIVATE_NATIVE_TOKEN');
+        return { state: 'owned-fixture-email-verified', nativeVerificationSucceeded: true, ownedIdentityMatched: true };
+      }, async close() { transportClosed++; } }),
       capture: async options => {
         assert.equal(options.actor.password, 'PRIVATE_SYNTHETIC_PASSWORD');
         assert.equal(options.newPassword, 'PRIVATE_SYNTHETIC_NEW_PASSWORD');
