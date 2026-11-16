@@ -6,6 +6,33 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Operator-requested stopping checkpoint (2026-11-16)
+
+Phil explicitly requested a logical stopping point and no further execution.
+No new audit run, installation, permission request or continuation is pending.
+
+- [x] Normal verification and current reset/session live qualification passed,
+  with independent fixture/reset-state/session/lease cleanup and unchanged
+  existing services. Accepted evidence and earlier preparation failures below
+  remain distinct. No live account or audit lease remains from that run.
+- [x] Coupled unused-expiry source is committed/pushed as 4af84705. Full lint,
+  438-case source gate (431 pass, zero failures, seven skips), affected tests
+  and explicit optional lint pass. No Meteor invocation consumed; one remains.
+- [x] Build exact optional candidate e7513598... from 4af84705; all 29 actual-image
+  connection tests pass. Retain the qualified installed d6eb31b8... candidate.
+- [x] Stop the pending public candidate transfer at the operator's request.
+  Its owned upload directory is /var/tmp/mofacts-connection-upload.8tXbWoWB;
+  do not assume a complete archive or transfer acceptance. Existing local
+  checksum/source/image receipts are retained for an explicit future resume.
+- [ ] Optional expiry candidate installation and plugin 0.1.4 publication have
+  not run. The installed plugin remains 0.1.3, with the existing grant preserved.
+- [ ] No real aged-token test has started. The native elapsed-hour gate, remaining
+  protocol families, complete no-ERROR authentication artifact and later phases
+  remain open. Phase 2 and the coordinated production gate are not complete.
+
+Four unrelated untracked production drafts are preserved and excluded. No
+production access or changes, private-key reads, new mail grants or spending.
+Resume only on Phil's direction, using this checkpoint and the sole run ledger.
 ## Live tools and scanner-side connection qualification (2026-11-16)
 
 - [x] Inspect the connected native app: exactly one read tool and two mail-handoff
