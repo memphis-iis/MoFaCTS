@@ -1,7 +1,7 @@
 # Desktop-independent audit on staging2
 
-Status: local connection implementation and offline qualification, 2026-11-15.
-Not installed or qualified for scheduled cloud execution. Phil selected desktop independence and confirmed staging2 is the
+Status: connection installed, authorized and manually invoked, 2026-11-16.
+Scheduled cloud execution remains unqualified. Phil selected desktop independence and confirmed staging2 is the
 intended infrastructure. Original staging is excluded. The existing production
 cutover remains separate and must include the complete solution.
 
@@ -130,6 +130,7 @@ do not suppress continuing missed-run status because an earlier run passed.
 - [Official plugin authentication](https://developers.openai.com/plugins/build/auth)
 - [Hosted and desktop scheduling](https://learn.chatgpt.com/docs/automations?surface=app)
 
-No endpoint, cloud plugin, OAuth grant, systemd unit or scanner installation has
-been created by this review. Its architecture is a candidate until the complete
-handoff and failure reporting pass actual execution.
+The initial infrastructure observations above are historical. The connection
+endpoint, private cloud package, OAuth grant and systemd service were subsequently
+installed and qualified for manual status use; see the sole status ledger.
+Complete scanner execution, scheduled carriage and failure reporting remain open.

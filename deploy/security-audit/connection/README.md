@@ -97,7 +97,9 @@ identities and outcomes in the sole audit status ledger.
 
 ## Remaining acceptance
 
-Actual cloud consent, refresh across restart, scheduled cloud execution without
+Actual cloud consent and a manual live status invocation passed on 2026-11-16.
+The sole status ledger records exact evidence and the remaining gates. Refresh
+across restart, scheduled cloud execution without
 a desktop, real exact-recipient Gmail carriage, full scanner integration,
 failure/missed-run notification and all complete-audit acceptance remain
 required. Synthetic connection tests do not satisfy those requirements. See
@@ -143,8 +145,10 @@ operator artifact, not in the public application defaults.
 The portable `plugin/mcp.json` is a direct-client declaration; uploading it alone
 does not register a ChatGPT cloud connection. Do not present skill availability,
 a saved package, registration, user authorization or live tool execution as
-interchangeable evidence. The current private registered-app package is 0.1.2;
-actual browser authorization and tool execution are separate pending gates.
+interchangeable evidence. The current private registered-app package is 0.1.2.
+Actual browser authorization and a live status call through the native app launch
+passed on 2026-11-16. That does not establish scheduled access or tool availability
+inside an already running local conversation.
 
 A valid consent page also pins its `form-action` policy to the exact callback
 already stored by the authorization owner for that pending request. Browsers
@@ -154,4 +158,32 @@ Do not accept a callback URL from the consent query/body, allow a wildcard, or
 relax the learner application's CSP. The browser regression now observes the
 actual callback request, with a denying fixture proxy preventing real external
 traffic; it no longer substitutes a successful page for the 303 response.
-Real ChatGPT exchange and live tool acquisition still require actual acceptance.
+The status ledger records real ChatGPT exchange and live tool acceptance separately.
+
+## Scanner-side private adapter
+
+`openScannerMailClientV2` in `scannerClient.mjs` connects to the existing protected
+Unix socket. Its caller must already own the environment lease and namespace.
+Await `waitForReader()` **before** issuing a reset request; then supply
+`acquireMail` to the existing `captureCurrentResetV2` owner. The adapter uses the
+same connected-Gmail parser and original two-minute delivery deadline. It passes
+the selected message only in memory; it provides no mailbox authorization.
+
+Each client serves one mail scenario. It neither picks a fixture nor creates,
+extends or releases its lease. After independent fixture/session cleanup, the
+lease owner releases the lease; only then call `closeAfterVerifiedCleanup()`.
+The service independently checks that release before clearing its marker.
+`abort()` disconnects and leaves the marker/lease for explicit owned recovery.
+Do not treat client timeout as verified cleanup or reopen another run over it.
+
+Run `node --test deploy/security-audit/connection/scannerClient.test.mjs` on the
+pinned Linux runtime. Real Unix-socket tests exercise the service-side broker,
+readiness, metadata/body validation, exact ownership, deadlines and cleanup refusal.
+They use synthetic mail and leases, and are not live Gmail or scanner acceptance.
+
+`withScannerMailHandoffV2` composes that adapter with `withAuthenticationLeaseV2`.
+It acquires the existing lease, waits for reader readiness before invoking the
+scenario, runs the caller's independent cleanup verifier even after a scenario
+error, and acknowledges closure only after verified lease release. Cleanup
+failure preserves both the lease and recovery marker. It does not replace the
+caller's job cancellation/deadline owner or implement a complete scanner.

@@ -1,6 +1,9 @@
 # Unattended authentication: credential-free connector design review
 
-2026-11-15 status: offline helpers and actual interactive private handoff tested.
+2026-11-16 status: the staging2 connection is installed and authorized; its live
+cloud status tool succeeds. Scanner-side Unix transport and lease composition
+are source-qualified. Scheduled execution and real Gmail carriage remain open.
+Historical 2026-11-15 evidence: offline helpers and interactive handoff tested.
 A single isolated scheduled capability probe ran in the cloud; its local
 execution failed before starting. No production mailbox read, new credential,
 production scope extension or recurring production scheduler was created.
@@ -12,8 +15,8 @@ and app off, and that staging2 is the intended server. The desktop-worker design
 below is historical investigation, not the selected production architecture.
 See the [staging2 design and measured prerequisites](staging2-unattended-design.md).
 Staging2 owns scheduling and scanner execution; a supported authenticated cloud
-handoff is still required to use the existing Gmail connection. No such handoff
-or cloud authorization has been installed or qualified.
+handoff is still required to use the existing Gmail connection. At that review, no such handoff or cloud authorization was installed. The later
+connection/status milestone is now accepted in the sole status ledger.
 
 Use the existing connected Gmail tools **inside an authorized scheduled agent
 execution**, retaining Gmail authorization in that connector. The same execution

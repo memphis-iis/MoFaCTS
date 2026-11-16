@@ -6,6 +6,41 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Live tools and scanner-side connection qualification (2026-11-16)
+
+- [x] Inspect the connected native app: exactly one read tool and two mail-handoff
+  tools are listed. Use its supported Try in chat launch with the app attached.
+  Actual cloud execution shows the Auditing Connection Status tool trace and
+  returns state idle, auditExecutionComplete false. The local conversation still
+  lacks those tool definitions; do not infer live execution from an installed skill.
+- [x] Qualify restart of only the installed optional connection image 02d1d42d...,
+  after verifying no active scanner lease or handoff. Health and unchanged grant
+  metadata pass; all five other containers and qualified configuration hashes
+  remain unchanged. Stored metadata shows two refresh records, one spent: actual
+  refresh has occurred. Post-restart cloud execution remains a separate gate.
+- [x] Implement scannerClient.mjs with the existing connected-Gmail parser and
+  authentication lease owner. No second lock, mailbox credential or transport
+  permission is introduced. Wait for cloud-reader readiness before invoking a
+  scenario; retain the original delivery deadline and exact namespace. Independent
+  cleanup runs after a scenario error; unverified cleanup retains lease and marker.
+- [x] Sixteen real Unix-socket cases pass on pinned Linux Node 24.22.1, including
+  metadata/body carriage, ownership, readiness, timeout, malformed/oversized peer,
+  foreign target, socket-link denial and lease composition. The full affected
+  connection/mail/reset/lease set passes 54/54. Full application lint/330 surfaces
+  and explicit adapter lint pass. No TypeScript app change or Meteor invocation.
+- [x] Broader source-security passes directly on approved Linux: 172 cases,
+  169 pass, zero failures, three skips. Preserve the restricted Windows failure
+  when its Bash test could not access WSL, and the later execution-tool stall
+  which never started the process. The supported Linux run exited zero.
+- [ ] One read-only hosted status probe is scheduled in the actual cloud UI.
+  Initial 10:15 CST occurrence had no observed execution output after a prolonged
+  tool interruption; do not count its Completed label as proof. The same task
+  was corrected to November 16 at 10:45 CST, once only, with no duplicate schedule.
+  It may call only status; no desktop, Gmail, scanner, account or permission action.
+- [ ] Real exact-recipient Gmail carriage, scanner integration, scheduled access,
+  refresh after restart, failure alerts and complete authentication coverage remain.
+  Preserve progress-backed passwordless access and the coordinated production gate.
+
 ## Real connection authorization accepted (2026-11-16)
 
 - [x] User completes fresh approval. Read-only server metadata confirms enrollment
@@ -18,7 +53,8 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 - [x] Preserve the intervening expired-code failure: enrollment had zero seconds
   remaining and zero validation attempts. Reopening the form without checking
   expiry was an operator error; replace enrollment and pending request together.
-- [ ] Live MCP invocation remains unverified: the three tool names are absent
+- [x] Live MCP invocation is verified through the native cloud app launch above.
+  Historical local limitation: the three tool names were absent
   from this conversation's current tool inventory after authorization. Do not
   extract platform credentials or substitute a host-side request for live ChatGPT
   execution. No new code or reconnection is indicated by this observation.
