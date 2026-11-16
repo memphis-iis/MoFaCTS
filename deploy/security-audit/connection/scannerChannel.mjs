@@ -52,6 +52,10 @@ export function createScannerChannel({ handoff, leaseDirectory, now = Date.now }
         send({ operation: 'closed' }); socket.end();
       } else {
         await leaseMatches();
+        if (frame.operation === 'hold') {
+          if (Object.keys(frame).join(',') !== 'operation' || handoff.status().state !== 'mail-handed-off') throw new Error();
+          send({ operation: 'lease-held' }); return;
+        }
         await handoff.acceptScannerRequest(frame);
       }
     }

@@ -116,3 +116,25 @@ inheriting unrelated credentials.
 This proves operator-assisted connected mail and the current reset/session
 branch. Unused genuinely aged-token expiry, the catalog-complete authentication
 artifact, scheduled mail and alert acceptance remain separate unfinished gates.
+
+## Complete reset protocol preparation
+
+The worker's explicit `protocol` scope adds the separate `-expiry` actor required
+by the source catalog. It preserves the accepted `current` scope. Both actors
+use normal verification and distinct private mail windows under one held lease.
+The bridge permits only the derived second recipient and at most two actor pairs.
+
+The root fixture runtime's `reset-token-age` operation projects only creation and
+expiry timestamps plus the used flag from exactly one record belonging to the
+verified owned ID/address. It never reads its hash or capability. The collector
+keeps the selected mail capability in memory, waits for the real one-hour
+lifetime, rechecks lease/channel ownership at bounded intervals and rejects a
+used, missing, ambiguous or inconsistent record. It never backdates a record or
+changes a clock. A private lease confirmation keeps the socket active without
+extending either the job deadline or a mail delivery window.
+
+Use a deadline with room for that hour plus setup/cleanup, within the existing
+two-hour lease bound. Independent cleanup must cover both accounts and their
+reset records. The shared Windows child-environment profile admits `PATHEXT` and
+`ProgramData`; use that existing owner rather than inheriting the operator's
+complete environment. Preparation/tests do not claim the live aged-token gate.

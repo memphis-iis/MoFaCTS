@@ -177,6 +177,17 @@ test('only verified-purpose handoff can open one same-recipient reset window wit
   await handoff.acceptScannerRequest({ operation: 'gmail-metadata', binding: reset, maximumResults: 10, requestId: 4 });
   await assert.rejects(handoff.acceptScannerRequest({ operation: 'begin-reset', requestId: 5 }));
   assert.equal(handoff.status().state, 'metadata-requested');
+  const resetMail = mail(reset), resetMetadata = structuredClone(resetMail); delete resetMetadata.payload.body;
+  handoff.submit({ requestId: 4, response: [resetMetadata] });
+  await handoff.acceptScannerRequest({ operation: 'gmail-full', requestId: 5, messageId: resetMail.id });
+  handoff.submit({ requestId: 5, response: resetMail });
+  await handoff.acceptScannerRequest({ operation: 'begin-expiry', requestId: 6 });
+  handoff.request();
+  const expiry = { ...reset, recipient: reset.recipient.replace('-reset@', '-expiry@') };
+  await assert.rejects(handoff.acceptScannerRequest({ operation: 'gmail-verification-metadata', binding: reset, maximumResults: 10, requestId: 7 }));
+  await assert.rejects(handoff.acceptScannerRequest({ operation: 'gmail-metadata', binding: expiry, maximumResults: 10, requestId: 7 }));
+  await handoff.acceptScannerRequest({ operation: 'gmail-verification-metadata', binding: expiry, maximumResults: 10, requestId: 7 });
+  assert.equal(handoff.status().state, 'metadata-requested');
 });
 
 test('mail remains private and only exact staged metadata then full-message carriage succeeds', async t => {

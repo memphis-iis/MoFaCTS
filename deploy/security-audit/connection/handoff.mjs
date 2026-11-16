@@ -26,6 +26,18 @@ export function createMailHandoff({ store, now = Date.now }) {
     await store.transaction(state => { if (state.handoff) state.handoff.state = 'recovery-required'; });
   }
   async function acceptScannerRequest(frame) {
+    if (active && frame.operation === 'begin-expiry') {
+      if (active.phase !== 'mail-handed-off' || active.purpose !== 'reset' || active.expiryStarted
+        || active.verificationRecipient !== active.binding.recipient
+        || !active.binding.recipient.includes(`+${active.namespace}-reset@`)
+        || Object.keys(frame).sort().join(',') !== 'operation,requestId'
+        || frame.requestId !== active.request.requestId + 1) fail();
+      active.expectedRecipient = active.binding.recipient.replace(`+${active.namespace}-reset@`, `+${active.namespace}-expiry@`);
+      active.verificationRecipient = null; active.expiryStarted = true;
+      active.phase = 'reader-needed'; active.deadline = now() + 120000;
+      active.minimumRequestId = frame.requestId + 1; active.request = null; active.selected = null;
+      active.send({ operation: 'expiry-window-ready' }); return;
+    }
     if (active && frame.operation === 'begin-reset') {
       if (active.phase !== 'mail-handed-off' || active.purpose !== 'verification'
         || Object.keys(frame).sort().join(',') !== 'operation,requestId'
@@ -44,8 +56,10 @@ export function createMailHandoff({ store, now = Date.now }) {
       const binding = parseResetMailboxBindingV2(frame.binding);
       if (binding.namespace !== active.namespace || binding.requestedAtMs > now() || binding.deadlineMs <= now()) fail();
       if (frame.requestId !== (active.minimumRequestId ?? 1)
+        || active.expectedRecipient && (frame.operation !== 'gmail-verification-metadata' || binding.recipient !== active.expectedRecipient)
         || active.verificationRecipient && (frame.operation !== 'gmail-metadata' || binding.recipient !== active.verificationRecipient)) fail();
       active.purpose = frame.operation === 'gmail-verification-metadata' ? 'verification' : 'reset';
+      active.expectedRecipient = null;
       active.binding = binding; active.deadline = binding.deadlineMs; active.phase = 'metadata-requested';
     } else if (['gmail-full', 'gmail-verification-full'].includes(frame.operation)) {
       if (active.phase !== 'waiting-body' || Object.keys(frame).sort().join(',') !== 'messageId,operation,requestId'

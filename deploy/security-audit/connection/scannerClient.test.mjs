@@ -10,6 +10,7 @@ import { createMailHandoff } from './handoff.mjs';
 import { createScannerChannel, listenScannerChannel } from './scannerChannel.mjs';
 import { openScannerMailClientV2, withScannerMailHandoffV2 } from './scannerClient.mjs';
 import { writeAuditFileV2 } from '../../../mofacts/scripts/security-audit/core/producerFilesV2.mjs';
+import { canonicalAuditJson } from '../../../mofacts/common/securityAudit/canonicalReport.ts';
 
 const namespace = 'mofacts_audit_fixture_0123456789ab';
 async function fixture(t) {
@@ -75,6 +76,20 @@ test('verification and reset use one lease with separate readiness and monotonic
   const resetAt = Date.now();
   const reset = { ...binding, requestedAtMs: resetAt, deadlineMs: resetAt + 5000 };
   await deliver(client.acquireMail(reset), message(reset), 'gmail-metadata', 4);
+  await client.confirmMailLease();
+  const nextActor = client.beginExpiryWindow();
+  await until(() => f.handoff.status().state === 'reader-needed'); f.handoff.request(); await nextActor;
+  const expiryAt = Date.now(), expiry = { ...binding, recipient: binding.recipient.replace('-reset@', '-expiry@'),
+    requestedAtMs: expiryAt, deadlineMs: expiryAt + 5000 };
+  const expiryVerification = message(expiry);
+  expiryVerification.payload.body.content = `${expiry.target}/auth/verify-email?token=second_native-token`;
+  expiryVerification.payload.body.size = Buffer.byteLength(expiryVerification.payload.body.content);
+  await deliver(client.acquireVerificationMail(expiry), expiryVerification, 'gmail-verification-metadata', 7);
+  const expiryResetWindow = client.beginResetWindow();
+  await until(() => f.handoff.status().state === 'reader-needed'); f.handoff.request(); await expiryResetWindow;
+  const expiryResetAt = Date.now(), expiryReset = { ...expiry, requestedAtMs: expiryResetAt, deadlineMs: expiryResetAt + 5000 };
+  await deliver(client.acquireMail(expiryReset), message(expiryReset), 'gmail-metadata', 10);
+  await client.confirmMailLease();
   assert.ok(await fs.stat(f.lease));
   await fs.unlink(f.lease); await client.closeAfterVerifiedCleanup();
   assert.equal(f.handoff.status().state, 'idle');
@@ -116,6 +131,22 @@ test('cleanup with a retained lease fails, preserving the lease and recovery mar
   await until(() => f.handoff.status().state === 'recovery-required');
   assert.equal(JSON.parse(await fs.readFile(f.lease, 'utf8')).namespace, namespace);
   assert.equal(f.store.read().handoff.namespace, namespace);
+});
+
+test('private lease confirmation cannot keep an expired owner alive or clear its recovery marker', async t => {
+  const f = await fixture(t), client = await f.open();
+  const reader = client.waitForReader(); f.handoff.request(); await reader;
+  const requestedAtMs=Date.now(), binding={namespace,recipient:`operator+${namespace}-reset@example.test`,
+    target:'https://staging2.optimallearning.org',requestedAtMs,deadlineMs:requestedAtMs+5000};
+  const acquisition=client.acquireMail(binding), full=message(binding), metadata=structuredClone(full);delete metadata.payload.body;
+  await until(()=>f.handoff.status().state==='metadata-requested');f.handoff.submit({requestId:1,response:[metadata]});
+  await until(()=>f.handoff.status().state==='body-requested');f.handoff.submit({requestId:2,response:full});await acquisition;
+  const time=Date.now();
+  await fs.writeFile(f.lease,canonicalAuditJson({schema:'MoFaCTSAuditAuthenticationLeaseV1',target:binding.target,
+    namespace,startedAtMs:time-2000,deadlineMs:time-1000})+'\n');
+  await assert.rejects(client.confirmMailLease(),/requires owned recovery/);
+  await until(()=>f.handoff.status().state==='recovery-required');
+  assert.ok(await fs.stat(f.lease));assert.equal(f.store.read().handoff.namespace,namespace);
 });
 
 test('a different namespace cannot attach to another scanner lease', async t => {

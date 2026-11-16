@@ -27,6 +27,14 @@ provider credentials. Live remaining protocols, complete fixture/lease ownership
 new evidence-contract catalog activation and a complete authentication artifact
 remain pending. The immutable historical boolean helper is test-only.
 
+`authentication/expiredResetV2.mjs` prepares unused-token expiry acquisition with
+the real source-owned lifetime, timing-only record metadata, bounded lease checks
+and private socket liveness. The optional connected reset worker's `protocol`
+scope couples separate current/expiry actors under one lease. Its source tests
+do not establish live aging or a complete authentication artifact. Follow the
+[owned reset qualification](../../../deploy/security-audit/connected-reset-qualification.md)
+for the accepted current branch, preparation boundaries and cleanup contract.
+
 `authentication/protocolBindingsV2.mjs` owns the value-only
 `MoFaCTSAuditProtocolBindingsV1` preparation/validation and child projections.
 It generates seven fresh scoped credentials, accepts the existing operator as

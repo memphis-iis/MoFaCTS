@@ -52,7 +52,8 @@ test('each child receives only its required actor/value subset and never the con
 });
 test('explicit OS environments exclude unrelated secrets and Node test/code injection', () => {
   const linux = { PATH: '/usr/bin', NODE_OPTIONS: '' };
-  const windows = { PATH: 'C:\\Windows\\System32', SystemRoot: 'C:\\Windows', USERPROFILE: 'C:\\Users\\synthetic', NODE_OPTIONS: '' };
+  const windows = { PATH: 'C:\\Windows\\System32', PATHEXT: '.COM;.EXE;.BAT;.CMD', ProgramData: 'C:\\ProgramData',
+    SystemRoot: 'C:\\Windows', USERPROFILE: 'C:\\Users\\synthetic', NODE_OPTIONS: '' };
   assert.deepEqual(environment(linux), linux); assert.deepEqual(environment(windows, 'windows-browser'), windows);
   for (const extra of [{ AUDIT_AUTH_FIXTURES_JSON: 'PRIVATE' }, { AWS_SECRET_ACCESS_KEY: 'PRIVATE' }, { NODE_OPTIONS: '--require=PRIVATE' }, { NODE_TEST_CONTEXT: 'child-v8' }]) {
     assert.throws(() => environment({ ...linux, ...extra })); assert.throws(() => environment({ ...windows, ...extra }, 'windows-browser'));

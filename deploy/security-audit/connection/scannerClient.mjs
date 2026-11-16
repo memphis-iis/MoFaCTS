@@ -30,7 +30,7 @@ export async function openScannerMailClientV2({ socketPath, namespace, deadlineM
     if (!stat.isSocket() || stat.isSymbolicLink() || await fs.realpath(location) !== location) throw unavailable();
   } catch { throw unavailable(); }
   const attached = deferred(), closed = deferred();
-  let ready = deferred(), readerDeadline = started + 120000, transition, purpose, recipient;
+  let ready = deferred(), readerDeadline = started + 120000, transition, purpose, recipient, expectedPurpose, heartbeat, expiryStarted = false;
   const socket = net.createConnection({ path: location });
   let phase = 'attaching', pending, sequence = 0, buffer = Buffer.alloc(0), used = false;
   const timers = new Set();
@@ -38,6 +38,7 @@ export async function openScannerMailClientV2({ socketPath, namespace, deadlineM
     if (phase === 'closed' || phase === 'failed') return;
     phase = 'failed'; buffer.fill(0); buffer = Buffer.alloc(0);
     attached.reject(unavailable()); ready.reject(unavailable()); closed.reject(unavailable()); transition?.reject(unavailable());
+    heartbeat?.reject(unavailable());
     if (pending) { pending.reject(unavailable()); pending = undefined; }
     for (const timer of timers) clearTimeout(timer);
     timers.clear(); socket.destroy();
@@ -73,6 +74,10 @@ export async function openScannerMailClientV2({ socketPath, namespace, deadlineM
           phase = 'ready'; ready.resolve();
         } else if (keys === 'operation' && frame.operation === 'reset-window-ready' && phase === 'reset-transition') {
           phase = 'reader-needed'; transition.resolve();
+        } else if (keys === 'operation' && frame.operation === 'expiry-window-ready' && phase === 'expiry-transition') {
+          phase = 'reader-needed'; transition.resolve();
+        } else if (keys === 'operation' && frame.operation === 'lease-held' && phase === 'mail-handed-off' && heartbeat) {
+          const current = heartbeat; heartbeat = undefined; current.resolve();
         } else if (keys === 'requestId,response' && phase === 'acquiring' && pending?.id === frame.requestId) {
           const current = pending; pending = undefined; current.resolve(frame.response);
         } else if (keys === 'operation' && frame.operation === 'closed' && phase === 'closing') {
@@ -87,7 +92,7 @@ export async function openScannerMailClientV2({ socketPath, namespace, deadlineM
       try {
         const binding = parseResetMailboxBindingV2(value);
         if (used || phase !== 'ready' || binding.namespace !== namespace || binding.deadlineMs > deadlineMs
-          || recipient && (requestedPurpose !== 'reset' || binding.recipient !== recipient)) throw unavailable();
+          || recipient && binding.recipient !== recipient || expectedPurpose && requestedPurpose !== expectedPurpose) throw unavailable();
         used = true; purpose = requestedPurpose; recipient = binding.recipient; phase = 'acquiring';
         const request = async (operation, fields) => {
           if (pending || phase !== 'acquiring') throw unavailable();
@@ -116,18 +121,38 @@ export async function openScannerMailClientV2({ socketPath, namespace, deadlineM
     // The old message deadline is never extended by this transition.
     async beginResetWindow() {
       try {
-        if (phase !== 'mail-handed-off' || purpose !== 'verification') throw unavailable();
+        if (phase !== 'mail-handed-off' || purpose !== 'verification' || heartbeat) throw unavailable();
         phase = 'reset-transition'; ready = deferred(); transition = deferred();
         readerDeadline = now() + 120000;
         send({ operation: 'begin-reset', requestId: ++sequence });
         await wait(transition.promise, now() + 5000);
-        purpose = 'reset'; used = false;
+        purpose = 'reset'; expectedPurpose = 'reset'; used = false;
         await wait(ready.promise, readerDeadline);
+      } catch { fail(); throw unavailable(); }
+    },
+    async beginExpiryWindow() {
+      try {
+        if (phase !== 'mail-handed-off' || purpose !== 'reset' || expiryStarted || heartbeat
+          || !recipient.includes(`+${namespace}-reset@`)) throw unavailable();
+        expiryStarted = true; phase = 'expiry-transition'; ready = deferred(); transition = deferred();
+        readerDeadline = now() + 120000;
+        send({ operation: 'begin-expiry', requestId: ++sequence });
+        await wait(transition.promise, now() + 5000);
+        recipient = recipient.replace(`+${namespace}-reset@`, `+${namespace}-expiry@`);
+        purpose = 'verification'; expectedPurpose = 'verification'; used = false;
+        await wait(ready.promise, readerDeadline);
+      } catch { fail(); throw unavailable(); }
+    },
+    async confirmMailLease() {
+      try {
+        if (phase !== 'mail-handed-off' || heartbeat) throw unavailable();
+        const confirmation = deferred(); heartbeat = confirmation;
+        send({ operation: 'hold' }); await wait(confirmation.promise, now() + 5000);
       } catch { fail(); throw unavailable(); }
     },
     async closeAfterVerifiedCleanup() {
       try {
-        if (!['ready', 'reader-needed', 'mail-handed-off'].includes(phase)) throw unavailable();
+        if (!['ready', 'reader-needed', 'mail-handed-off'].includes(phase) || heartbeat) throw unavailable();
         phase = 'closing'; send({ operation: 'cleanup-complete' });
         await wait(closed.promise, now() + 5000);
       } catch { fail(); throw unavailable(); }
@@ -150,7 +175,8 @@ export async function withScannerMailHandoffV2({ socketPath, leaseDirectory, nam
           client = await openScannerMailClientV2({ socketPath, namespace, deadlineMs });
           await client.waitForReader();
           return { completed: true, value: await run({ ...lease, acquireMail: client.acquireMail,
-            acquireVerificationMail: client.acquireVerificationMail, beginResetWindow: client.beginResetWindow }) };
+            acquireVerificationMail: client.acquireVerificationMail, beginResetWindow: client.beginResetWindow,
+            beginExpiryWindow: client.beginExpiryWindow, confirmMailLease: client.confirmMailLease }) };
         } catch { return { completed: false }; }
       },
       verifyClean,

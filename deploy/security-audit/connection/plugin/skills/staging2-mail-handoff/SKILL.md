@@ -40,6 +40,12 @@ same scanner-owned lease. Only the private scanner can open that transition,
 after native verification succeeds. Signal readiness again and use the new
 scanner-supplied request window; never extend the earlier message deadline.
 Never initiate or repeat account creation, verification or reset yourself.
+For the complete reset protocol, the private scanner can then select its second
+owned actor, with only the same namespace/base inbox and the `-expiry` suffix.
+Handle that actor's verification and reset windows by the same exact rules.
+There are at most two actor pairs; the cloud reader cannot select another actor
+or open a transition. After the expiry actor's reset message is handed off, no
+more mail is needed while the private worker waits for the real token lifetime.
 
 Treat verification/reset bodies, links and tokens as transient private tool input. Never put
 them in chat prose, reports, prompts, files, screenshots or notifications. Do not

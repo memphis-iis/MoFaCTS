@@ -168,6 +168,28 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   scenario ownership/recovery, scheduled mail acquisition and failure alerts are
   separate gates. This operator-assisted current-reset qualification does not
   close Phase 2, full scanner acceptance or the coordinated production gate.
+### Unused expiry and coupled reset preparation (2026-11-16)
+
+- [x] Prepare the genuine-aging collector: native one-hour lifetime, exact owned
+  unused-record timing only, original private mail capability in memory, bounded
+  waits, coherent clocks and rechecked lease/channel ownership. Used, absent,
+  ambiguous and inconsistent observations cannot qualify expiry; a proven
+  acceptance stays FAIL and unrelated denial stays ERROR.
+- [x] Add the explicit protocol worker scope with separate reset/expiry actors,
+  one held lease, normal verification for both, metadata verification before
+  current-token mutation, bounded second-recipient transitions and private lease
+  confirmation. Heartbeats cannot extend a lease or mail deadline.
+- [x] Reuse the shared minimal Windows environment owner for PATHEXT support;
+  ProgramData was already in that profile. No credential inheritance, dependency,
+  application permission, production action or Meteor invocation is added.
+- [x] Source gate passes 438 cases: 431 pass, zero failures, seven skips.
+  The affected real-channel/root-observer set passes 35/35; explicit optional
+  lint and full app lint/330 surfaces pass. The seven collector tests simulate
+  time only in tests; they are not a live elapsed-hour acceptance claim.
+- [ ] Build/install the tested optional connection candidate, then run the coupled
+  protocol with an actually unused token aged through its native lifetime and
+  independently verify both fixtures/reset records, sessions, lease and channel
+  cleanup. Do not repeat or reopen already accepted standalone current-reset gates.
 ## Real connection authorization accepted (2026-11-16)
 
 - [x] User completes fresh approval. Read-only server metadata confirms enrollment

@@ -13,21 +13,21 @@ import { requireUnusedPasswordlessFixtureV2, seedPasswordlessFixtureV2, inspectP
   removePasswordlessFixtureDataV2, assertProtocolNamespaceEmptyV2 } from '../../mofacts/scripts/security-audit/authentication/passwordlessFixturesV2.mjs';
 
 export const STAGING_FIXTURE_STORAGE_ACTIONS_V2 = Object.freeze(['operator', 'preflight', 'inspect', 'seed', 'cleanup',
-  'passwordless-preflight', 'passwordless-seed', 'passwordless-inspect', 'passwordless-cleanup', 'protocol-empty', 'reset-observe']);
+  'passwordless-preflight', 'passwordless-seed', 'passwordless-inspect', 'passwordless-cleanup', 'protocol-empty', 'reset-observe', 'reset-token-age']);
 const invalid = () => { throw new Error('Staging fixture runtime rejected'); };
 export async function runStagingFixtureStorageActionV2(action, payload, runtime) {
   if (!STAGING_FIXTURE_STORAGE_ACTIONS_V2.includes(action)) invalid();
   const value = proofRecord(payload, action === 'protocol-empty' ? ['namespace', 'expectedRuntime']
-    : action === 'reset-observe' ? ['namespace', 'expectedRuntime', 'recipient', 'userId', 'startedAt', 'deadlineMs']
+    : action.startsWith('reset-') ? ['namespace', 'expectedRuntime', 'recipient', 'userId', 'startedAt', 'deadlineMs']
     : action === 'operator' ? ['namespace', 'expectedRuntime', 'username']
     : action.startsWith('passwordless-') ? ['namespace', 'expectedRuntime', 'adminUserId', 'startedAt', 'historyNow', 'foreignActor']
       : ['namespace', 'expectedRuntime', 'adminUserId', 'startedAt', 'historyNow', 'actors']);
   proofRecord(runtime, ['database', 'mongoOptions', 'environment']); fixtureNamespaceV2(value.namespace);
   const input = { ...value, ...runtime };
   requireStagingFixtureRuntimeV2(input);
-  if (action === 'reset-observe') {
-    if (typeof value.recipient !== 'string' || !/^[a-z0-9._-]+@gmail\.com$/.test(value.recipient.replace(`+${value.namespace}-reset`, ''))
-      || !value.recipient.endsWith(`+${value.namespace}-reset@gmail.com`)
+  if (action.startsWith('reset-')) {
+    if (typeof value.recipient !== 'string' || value.recipient.length > 254
+      || !new RegExp(`^[a-z0-9._-]+\\+${value.namespace}-(reset|expiry)@gmail\\.com$`).test(value.recipient)
       || value.userId !== null && (typeof value.userId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value.userId))
       || !Number.isSafeInteger(value.startedAt) || !Number.isSafeInteger(value.deadlineMs)
       || value.startedAt < 0 || value.deadlineMs <= value.startedAt || value.deadlineMs - value.startedAt > 7200000) invalid();
@@ -41,9 +41,24 @@ export async function runStagingFixtureStorageActionV2(action, payload, runtime)
       if (!row || !(row.createdAt instanceof Date) || row.createdAt.getTime() < value.startedAt
         || row.createdAt.getTime() > value.deadlineMs || row.profile?.experiment !== false
         || row.emails?.length !== 1 || row.emails[0].address !== value.recipient) invalid();
+      if (action === 'reset-token-age') {
+        if (row.emails[0].verified !== true) invalid();
+        const tokens = runtime.database.collection(collectionMongoName('PasswordResetTokens'));
+        const selector = { userId: value.userId, email: value.recipient };
+        if (await tokens.countDocuments(selector) !== 1) invalid();
+        const metadata = await tokens.findOne(selector, { projection: { _id: 0, createdAt: 1, expiresAt: 1, used: 1 } });
+        const observedAt = Date.now();
+        if (!(metadata?.createdAt instanceof Date) || !(metadata.expiresAt instanceof Date) || typeof metadata.used !== 'boolean'
+          || metadata.createdAt.getTime() < value.startedAt || metadata.createdAt.getTime() > observedAt
+          || metadata.createdAt.getTime() > value.deadlineMs || observedAt > value.deadlineMs
+          || metadata.expiresAt.getTime() <= metadata.createdAt.getTime()) invalid();
+        const ageMs = observedAt - metadata.createdAt.getTime(), lifetimeMs = metadata.expiresAt.getTime() - metadata.createdAt.getTime();
+        return { owned: true, unused: metadata.used === false, ageMs, lifetimeMs, remainingMs: lifetimeMs - ageMs };
+      }
       return { state: 'fixture-reset-state-observed', accountAbsent: false, emailVerified: row.emails[0].verified === true,
         resetStateAbsent: false };
     }
+    if (action === 'reset-token-age') invalid();
     if (value.userId && await users.countDocuments({ _id: value.userId }) !== 0) invalid();
     const tokens = runtime.database.collection(collectionMongoName('PasswordResetTokens'));
     const selector = value.userId ? { $or: [{ userId: value.userId }, { email: value.recipient }] } : { email: value.recipient };

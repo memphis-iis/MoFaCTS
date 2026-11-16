@@ -10,7 +10,7 @@ const unavailable = () => new Error('Owned reset browser transport is unavailabl
 export function createCurrentResetBrowserTransportV2({ browser, target, actor }) {
   const origin = auditTargetOrigin(target), user = parseAuthorizationActorBindingV2(actor);
   if (origin !== 'https://staging2.optimallearning.org'
-    || !/\+mofacts_audit_fixture_[a-f0-9]{12}-reset@gmail\.com$/.test(user.username)) throw unavailable();
+    || !/\+mofacts_audit_fixture_[a-f0-9]{12}-(reset|expiry)@gmail\.com$/.test(user.username)) throw unavailable();
   const contexts = [], sessions = [];
   let anonymous, baselineStarted = false, verificationStarted = false, closed = false, cleanupFailed = false;
   const ownedBrowser = { async newContext() {

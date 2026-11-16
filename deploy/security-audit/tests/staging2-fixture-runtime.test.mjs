@@ -47,6 +47,34 @@ test('reset account observation checks the returned identity, creation window an
   await assert.rejects(runStagingFixtureStorageActionV2('reset-observe', payload, f.runtime));
   await assert.rejects(runStagingFixtureStorageActionV2('reset-observe', { ...payload, userId: null }, f.runtime));
 });
+
+test('expiry observation reads only exact owned record timing and used state; absence or ambiguity cannot prove expiry', async () => {
+  const f = fixture(), recipient = `operator+${namespace}-expiry@gmail.com`, { username, ...base } = f.payload; void username;
+  const now = Date.now(), queries = [];
+  let tokenCount = 1, unused = true;
+  f.runtime.database.collection = name => ({
+    async countDocuments(selector) { queries.push({ name, selector }); return name === 'users' ? 1 : tokenCount; },
+    async findOne(selector, options) {
+      if (name === 'users') return { _id: 'OwnedFixture', createdAt: new Date(now - 3700000),
+        profile: { experiment: false }, emails: [{ address: recipient, verified: true }] };
+      assert.deepEqual(selector, { userId: 'OwnedFixture', email: recipient });
+      assert.deepEqual(options.projection, { _id: 0, createdAt: 1, expiresAt: 1, used: 1 });
+      return { createdAt: new Date(now - 3601000), expiresAt: new Date(now - 1000), used: !unused };
+    },
+  });
+  const payload = { ...base, recipient, userId: 'OwnedFixture', startedAt: now - 3800000, deadlineMs: now + 100000 };
+  const observation = await runStagingFixtureStorageActionV2('reset-token-age', payload, f.runtime);
+  assert.equal(observation.owned, true); assert.equal(observation.unused, true);
+  assert.equal(observation.lifetimeMs, 3600000); assert.ok(observation.remainingMs < 0);
+  assert.equal(observation.remainingMs, observation.lifetimeMs - observation.ageMs);
+  assert.equal(JSON.stringify(observation).includes(recipient), false);
+  unused = false;
+  assert.equal((await runStagingFixtureStorageActionV2('reset-token-age', payload, f.runtime)).unused, false);
+  for (const count of [0, 2]) {
+    tokenCount = count;
+    await assert.rejects(runStagingFixtureStorageActionV2('reset-token-age', payload, f.runtime));
+  }
+});
 test('operator identity lookup reads only the exact canonical credential identifier and returns no account document', async () => {
   const value = fixture(), result = await runStagingFixtureStorageActionV2('operator', value.payload, value.runtime);
   assert.equal(result.state, 'fixture-operator-identity-observed'); assert.equal(result.userId, 'KnownOperator');

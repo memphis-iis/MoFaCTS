@@ -1,7 +1,7 @@
 const profiles = Object.freeze({
   'linux-tool': new Set(['PATH', 'HOME', 'TMPDIR', 'XDG_CACHE_HOME', 'HTTP_PROXY', 'HTTPS_PROXY',
     'NO_PROXY', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'NODE_OPTIONS', 'CI']),
-  'windows-browser': new Set(['PATH', 'SystemRoot', 'WINDIR', 'ProgramData', 'USERPROFILE', 'LOCALAPPDATA', 'TEMP', 'TMP', 'NODE_OPTIONS']),
+  'windows-browser': new Set(['PATH', 'PATHEXT', 'SystemRoot', 'WINDIR', 'ProgramData', 'USERPROFILE', 'LOCALAPPDATA', 'TEMP', 'TMP', 'NODE_OPTIONS']),
   'staging2-storage': new Set(['PATH', 'MONGO_URL', 'ROOT_URL', 'EXPECTED_MONGO_DB_NAME', 'NODE_OPTIONS']),
 });
 
