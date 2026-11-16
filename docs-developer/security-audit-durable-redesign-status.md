@@ -26,14 +26,28 @@ the exact-origin guard correctly rejected it before reaching the code check.
   entry point took 12.1 seconds through Windows-mounted Linux source; preserve
   earlier ten-second readiness failures, and use a bounded 25-second readiness
   window inside its existing 30-second case deadline. No Meteor run consumed.
-- [ ] Build/qualify the committed connection image and install on staging2 only;
-  verify live consent header, health, unchanged services and the retained rollback.
+- [x] Build/qualify source 5426b01cf4e6eadbc8e7bb3bbe6734e839328b5f: ten
+  exact-image cases pass. Deploy only the connection candidate, engine identity
+  6db2ce134f42b913628d80a52cf4058116b3d3640941b11b91a3c8646498fe9f;
+  previous image retained for rollback. Health, disabled networking/resource limits,
+  HTTPS discovery/unauthenticated denial, unchanged other containers and exact
+  existing HTTPS/config hashes pass. A synthetic live pending request confirms
+  strict-origin on the actual consent response. No values retained.
+  Private evidence: phase1-20261105/staging2-consent-5426b01c.
 - [ ] Renew code and platform request only after that repair passes. Actual user
   authorization, registered-app package binding and live tool execution remain
   pending; no Gmail/full-audit acceptance is claimed.
 
 Unrelated production cutover drafts remain preserved and excluded. The learner
 application and its intentional progress-backed passwordless return are unchanged.
+
+
+The original private instruction package still needs its registered-app binding.
+The prepared 0.1.2 replacement keeps instructions and adds the verified existing
+native app, removing the two obsolete raw MCP configurations from that private
+package. Automatic approval review rejected that exact configuration replacement
+pending explicit confirmation. The async question is pending; no plugin change
+was applied, and this does not block the separately approved host repair.
 
 ## Cloud registration correction (2026-11-15)
 
