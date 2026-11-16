@@ -15,6 +15,38 @@ function fixture() {
   environment: { ROOT_URL: 'https://staging2.optimallearning.org', EXPECTED_MONGO_DB_NAME: 'fixture-db' } };
   return { runtime, calls, payload: { namespace, expectedRuntime, username: 'ExistingOperator@localhost.invalid' } };
 }
+
+test('reset cleanup observes only its exact account and token selectors and never reads a token document', async () => {
+  const f = fixture(), queries = [];
+  const recipient = `operator+${namespace}-reset@gmail.com`;
+  f.runtime.database.collection = name => ({ async countDocuments(selector) { queries.push({ name, selector }); return 0; } });
+  const { username, ...base } = f.payload; void username;
+  const payload = { ...base, recipient, userId: 'OwnedFixture', startedAt: 1000, deadlineMs: 2000 };
+  const result = await runStagingFixtureStorageActionV2('reset-observe', payload, f.runtime);
+  assert.equal(result.accountAbsent, true); assert.equal(result.resetStateAbsent, true);
+  assert.deepEqual(queries.at(-1), { name: 'passwordResetTokens', selector: { $or: [{ userId: 'OwnedFixture' }, { email: recipient }] } });
+  assert.equal(JSON.stringify(result).includes(recipient), false);
+  queries.length = 0;
+  await assert.rejects(runStagingFixtureStorageActionV2('reset-observe', { ...payload, recipient: 'existing@gmail.com' }, f.runtime));
+  assert.equal(queries.length, 0);
+});
+
+test('reset account observation checks the returned identity, creation window and verified address without reading services', async () => {
+  const f = fixture(), recipient = `operator+${namespace}-reset@gmail.com`, { username, ...base } = f.payload; void username;
+  let row = { _id: 'OwnedFixture', createdAt: new Date(1500), profile: { experiment: false }, emails: [{ address: recipient, verified: true }] };
+  f.runtime.database.collection = name => {
+    assert.equal(name, 'users');
+    return { async countDocuments() { return 1; }, async findOne(selector, options) {
+      assert.deepEqual(selector, { _id: 'OwnedFixture', username: recipient });
+      assert.equal(Object.keys(options.projection).includes('services'), false); return row;
+    } };
+  };
+  const payload = { ...base, recipient, userId: 'OwnedFixture', startedAt: 1000, deadlineMs: 2000 };
+  assert.equal((await runStagingFixtureStorageActionV2('reset-observe', payload, f.runtime)).emailVerified, true);
+  row = { ...row, createdAt: new Date(999) };
+  await assert.rejects(runStagingFixtureStorageActionV2('reset-observe', payload, f.runtime));
+  await assert.rejects(runStagingFixtureStorageActionV2('reset-observe', { ...payload, userId: null }, f.runtime));
+});
 test('operator identity lookup reads only the exact canonical credential identifier and returns no account document', async () => {
   const value = fixture(), result = await runStagingFixtureStorageActionV2('operator', value.payload, value.runtime);
   assert.equal(result.state, 'fixture-operator-identity-observed'); assert.equal(result.userId, 'KnownOperator');

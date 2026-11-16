@@ -128,6 +128,20 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   event; the initial failed store read is retained in the diagnostic transcript.
   No app TypeScript/server-surface change or Meteor invocation. Live mail and
   installation remain pending and are not represented by these source checks.
+- [x] Publish e855b669 and build exact optional connection image d6eb31b8...
+  (Linux/amd64); all 28 actual-image connection tests pass. Install only that
+  service on staging2, preserve the saved grant byte-for-byte, retain previous
+  image/configuration, and verify health, required authentication, unchanged
+  HTTPS configuration and unchanged other containers. Recovery receipt:
+  /opt/mofacts-audit-connection/recovery/verification-e855b669/outcome.json.
+- [x] Update the same private USER plugin to 0.1.3 using the plugin-update skill,
+  preserving its registered app ID, connection, presentation and audience.
+  Read back the saved verification-purpose skill and existing app binding.
+  This is installed tooling, not real Gmail carriage evidence.
+- [x] Prepare a narrow read-only reset-observe operation in the existing root
+  fixture runtime. It checks the exact owned account/time/email tuple and counts
+  only reset records for that ID/address; no password/token document is read.
+  Five focused tests pass. Live cleanup still requires an independent observation.
 - [ ] Finish and qualify the verification-purpose bridge and native verification,
   followed by reset under the same held lease. Separate original mail deadlines,
   exact recipient checks and independent owned cleanup remain required. Source

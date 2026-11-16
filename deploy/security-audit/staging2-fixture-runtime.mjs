@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { proofRecord, proofString } from '../../mofacts/common/securityAudit/proofFields.ts';
+import { collectionMongoName } from '../../mofacts/common/collectionOwnership.ts';
 import { parseAuditFileV2 } from '../../mofacts/scripts/security-audit/core/producerFilesV2.mjs';
 import { fixtureNamespaceV2 } from '../../mofacts/scripts/security-audit/authentication/stagingFixturesV2.mjs';
 import { requireStagingFixtureRuntimeV2, requireUnusedFixtureNamesV2, findOwnedFixtureActorsV2,
@@ -12,17 +13,43 @@ import { requireUnusedPasswordlessFixtureV2, seedPasswordlessFixtureV2, inspectP
   removePasswordlessFixtureDataV2, assertProtocolNamespaceEmptyV2 } from '../../mofacts/scripts/security-audit/authentication/passwordlessFixturesV2.mjs';
 
 export const STAGING_FIXTURE_STORAGE_ACTIONS_V2 = Object.freeze(['operator', 'preflight', 'inspect', 'seed', 'cleanup',
-  'passwordless-preflight', 'passwordless-seed', 'passwordless-inspect', 'passwordless-cleanup', 'protocol-empty']);
+  'passwordless-preflight', 'passwordless-seed', 'passwordless-inspect', 'passwordless-cleanup', 'protocol-empty', 'reset-observe']);
 const invalid = () => { throw new Error('Staging fixture runtime rejected'); };
 export async function runStagingFixtureStorageActionV2(action, payload, runtime) {
   if (!STAGING_FIXTURE_STORAGE_ACTIONS_V2.includes(action)) invalid();
   const value = proofRecord(payload, action === 'protocol-empty' ? ['namespace', 'expectedRuntime']
+    : action === 'reset-observe' ? ['namespace', 'expectedRuntime', 'recipient', 'userId', 'startedAt', 'deadlineMs']
     : action === 'operator' ? ['namespace', 'expectedRuntime', 'username']
     : action.startsWith('passwordless-') ? ['namespace', 'expectedRuntime', 'adminUserId', 'startedAt', 'historyNow', 'foreignActor']
       : ['namespace', 'expectedRuntime', 'adminUserId', 'startedAt', 'historyNow', 'actors']);
   proofRecord(runtime, ['database', 'mongoOptions', 'environment']); fixtureNamespaceV2(value.namespace);
   const input = { ...value, ...runtime };
   requireStagingFixtureRuntimeV2(input);
+  if (action === 'reset-observe') {
+    if (typeof value.recipient !== 'string' || !/^[a-z0-9._-]+@gmail\.com$/.test(value.recipient.replace(`+${value.namespace}-reset`, ''))
+      || !value.recipient.endsWith(`+${value.namespace}-reset@gmail.com`)
+      || value.userId !== null && (typeof value.userId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value.userId))
+      || !Number.isSafeInteger(value.startedAt) || !Number.isSafeInteger(value.deadlineMs)
+      || value.startedAt < 0 || value.deadlineMs <= value.startedAt || value.deadlineMs - value.startedAt > 7200000) invalid();
+    const users = runtime.database.collection('users');
+    const names = { $or: [{ username: value.recipient }, { 'emails.address': value.recipient }] };
+    const count = await users.countDocuments(names);
+    if (count > 1 || value.userId === null && count !== 0) invalid();
+    if (count) {
+      const row = await users.findOne({ _id: value.userId, username: value.recipient },
+        { projection: { _id: 1, createdAt: 1, 'profile.experiment': 1, emails: 1 } });
+      if (!row || !(row.createdAt instanceof Date) || row.createdAt.getTime() < value.startedAt
+        || row.createdAt.getTime() > value.deadlineMs || row.profile?.experiment !== false
+        || row.emails?.length !== 1 || row.emails[0].address !== value.recipient) invalid();
+      return { state: 'fixture-reset-state-observed', accountAbsent: false, emailVerified: row.emails[0].verified === true,
+        resetStateAbsent: false };
+    }
+    if (value.userId && await users.countDocuments({ _id: value.userId }) !== 0) invalid();
+    const tokens = runtime.database.collection(collectionMongoName('PasswordResetTokens'));
+    const selector = value.userId ? { $or: [{ userId: value.userId }, { email: value.recipient }] } : { email: value.recipient };
+    return { state: 'fixture-reset-state-observed', accountAbsent: true, emailVerified: false,
+      resetStateAbsent: await tokens.countDocuments(selector) === 0 };
+  }
   if (action === 'protocol-empty') return assertProtocolNamespaceEmptyV2(input);
   if (action === 'passwordless-preflight') { await requireUnusedPasswordlessFixtureV2(input); return { state: 'fixture-passwordless-names-unused' }; }
   if (action === 'passwordless-seed') return seedPasswordlessFixtureV2(input);
