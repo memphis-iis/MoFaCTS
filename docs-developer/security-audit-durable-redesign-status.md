@@ -68,6 +68,15 @@ authorized resuming Phase 2 on staging2.
   Staging2 remained healthy. Evidence: progress-return-20261118-af01468d8c7f.
   This supports the next catalog's progress-backed eligibility claim. Keep
   the historical flag title and published catalog immutable.
+- [x] Qualify the connection-based login throttle on staging2. Source a289bd70
+  reuses the same evaluator for staged and complete results. A fresh anonymous
+  browser connection used distinct synthetic identifiers and received the
+  exact connection-level denial on attempt 10. The positive login baseline,
+  connected transport, namespace absence and window release passed. The
+  protected receipt is connection-throttle-20261118-525df0804a38. Full lint and
+  all five focused source tests passed. No Meteor invocation was used.
+- [ ] Qualify the identifier and IP throttles with independent fresh-window
+  evidence. Let prior attempts expire naturally across test windows.
 - [ ] Compose the remaining live authentication protocols and the complete
   22-control report under the next catalog. Comparison and attributable
   connection/identifier/IP throttle acquisition remain open. The active

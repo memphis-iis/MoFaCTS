@@ -1,6 +1,7 @@
 // Optional root operator subprocess, run through the existing container
 // entrypoint. Never imported/registered by the application or exposed as RPC.
 import { createRequire } from 'node:module';
+import { isIP } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { proofRecord, proofString } from '../../mofacts/common/securityAudit/proofFields.ts';
@@ -13,11 +14,13 @@ import { requireUnusedPasswordlessFixtureV2, seedPasswordlessFixtureV2, inspectP
   removePasswordlessFixtureDataV2, assertProtocolNamespaceEmptyV2 } from '../../mofacts/scripts/security-audit/authentication/passwordlessFixturesV2.mjs';
 
 export const STAGING_FIXTURE_STORAGE_ACTIONS_V2 = Object.freeze(['operator', 'preflight', 'inspect', 'seed', 'cleanup',
-  'passwordless-preflight', 'passwordless-seed', 'passwordless-inspect', 'passwordless-cleanup', 'protocol-empty', 'reset-observe', 'reset-token-age']);
+  'passwordless-preflight', 'passwordless-seed', 'passwordless-inspect', 'passwordless-cleanup', 'protocol-empty', 'reset-observe', 'reset-token-age',
+  'throttle-observe']);
 const invalid = () => { throw new Error('Staging fixture runtime rejected'); };
 export async function runStagingFixtureStorageActionV2(action, payload, runtime) {
   if (!STAGING_FIXTURE_STORAGE_ACTIONS_V2.includes(action)) invalid();
   const value = proofRecord(payload, action === 'protocol-empty' ? ['namespace', 'expectedRuntime']
+    : action === 'throttle-observe' ? ['namespace', 'expectedRuntime', 'sourceAddress']
     : action.startsWith('reset-') ? ['namespace', 'expectedRuntime', 'recipient', 'userId', 'startedAt', 'deadlineMs']
     : action === 'operator' ? ['namespace', 'expectedRuntime', 'username']
     : action.startsWith('passwordless-') ? ['namespace', 'expectedRuntime', 'adminUserId', 'startedAt', 'historyNow', 'foreignActor']
@@ -25,6 +28,26 @@ export async function runStagingFixtureStorageActionV2(action, payload, runtime)
   proofRecord(runtime, ['database', 'mongoOptions', 'environment']); fixtureNamespaceV2(value.namespace);
   const input = { ...value, ...runtime };
   requireStagingFixtureRuntimeV2(input);
+  if (action === 'throttle-observe') {
+    if (typeof value.sourceAddress !== 'string' || !isIP(value.sourceAddress)) invalid();
+    const identifier = `${value.namespace}-lockout@localhost.invalid`;
+    const throttle = runtime.database.collection(collectionMongoName('AuthThrottleState'));
+    const now = Date.now();
+    const windowMs = 15 * 60 * 1000;
+    const [ip, user, lock] = await Promise.all([
+      throttle.findOne({ key: `login:ip:${value.sourceAddress}` }, { projection: { _id: 0, timestamps: 1 } }),
+      throttle.findOne({ key: `login:id:${identifier}` }, { projection: { _id: 0, timestamps: 1 } }),
+      throttle.findOne({ key: `login-lock:${identifier}` }, { projection: { _id: 0, lockedUntil: 1 } }),
+    ]);
+    const timestamps = row => {
+      if (row === null) return 0;
+      if (!Array.isArray(row.timestamps) || row.timestamps.some(time => !Number.isSafeInteger(time) || time > now)) invalid();
+      return row.timestamps.filter(time => now - time < windowMs).length;
+    };
+    if (lock !== null && !Number.isSafeInteger(lock.lockedUntil)) invalid();
+    return { state: 'fixture-throttle-state-observed', ipAttemptCount: timestamps(ip),
+      identifierAttemptCount: timestamps(user), identifierLocked: lock !== null && lock.lockedUntil > now };
+  }
   if (action.startsWith('reset-')) {
     if (typeof value.recipient !== 'string' || value.recipient.length > 254
       || !new RegExp(`^[a-z0-9._-]+\\+${value.namespace}-(reset|expiry)@gmail\\.com$`).test(value.recipient)

@@ -82,6 +82,29 @@ test('operator identity lookup reads only the exact canonical credential identif
   assert.deepEqual(value.calls, [{ query: { username: 'existingoperator@localhost.invalid' }, options: { projection: { _id: 1 } } }]);
   assert(!JSON.stringify(result).includes('localhost.invalid'));
 });
+test('throttle observation distinguishes live attempts and lock state without returning keys or timestamps', async () => {
+  const f = fixture(), now = Date.now(), queries = [];
+  const { username, ...base } = f.payload; void username;
+  const sourceAddress = '192.0.2.17';
+  f.runtime.database.collection = name => {
+    assert.equal(name, 'auth_throttle_state');
+    return { async findOne(selector, options) {
+      queries.push({ selector, options });
+      if (selector.key.startsWith('login:ip:')) return { timestamps: [now - 901000, now - 1000] };
+      if (selector.key.startsWith('login:id:')) return null;
+      return { lockedUntil: now + 5000 };
+    } };
+  };
+  const observed = await runStagingFixtureStorageActionV2('throttle-observe', { ...base, sourceAddress }, f.runtime);
+  assert.deepEqual(observed, { state: 'fixture-throttle-state-observed', ipAttemptCount: 1, identifierAttemptCount: 0, identifierLocked: true });
+  assert.deepEqual(queries.map(row => row.selector.key), [
+    `login:ip:${sourceAddress}`, `login:id:${namespace}-lockout@localhost.invalid`, `login-lock:${namespace}-lockout@localhost.invalid`,
+  ]);
+  assert.deepEqual(queries[0].options.projection, { _id: 0, timestamps: 1 });
+  assert.deepEqual(queries[2].options.projection, { _id: 0, lockedUntil: 1 });
+  await assert.rejects(runStagingFixtureStorageActionV2('throttle-observe', { ...base, sourceAddress: '192.0.2.17:23' }, f.runtime));
+  assert.equal(queries.length, 3);
+});
 test('unknown actions, extra credential fields, wrong namespaces and runtime overrides are rejected before any query', async () => {
   const value = fixture();
   await assert.rejects(runStagingFixtureStorageActionV2('delete-any-user', value.payload, value.runtime));

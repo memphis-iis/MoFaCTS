@@ -12,6 +12,7 @@ for command in jq flock docker timeout stat; do command -v "$command" >/dev/null
 namespace=$(jq -er '.namespace|select(test("^mofacts_audit_fixture_[a-f0-9]{12}$"))' "$job/profile.json")
 [[ ${namespace##*_} == ${job##*.} ]]
 jq -e 'keys==["expectedRuntime","namespace"] and .expectedRuntime.rootOrigin=="https://staging2.optimallearning.org"' "$job/profile.json" >/dev/null
+expected_profile=$(jq -Sc . "$job/profile.json")
 lockdir=/run/mofacts-security-audit
 if [[ ! -e $lockdir && ! -L $lockdir ]]; then mkdir -m 0700 "$lockdir"; fi
 [[ -d $lockdir && ! -L $lockdir && $(stat -c '%u:%g:%a' "$lockdir") == 0:0:700 ]]
@@ -81,7 +82,6 @@ while true; do
   printf '%s' "$payload" | base64 -d | jq -e --arg namespace "$namespace" '.namespace==$namespace' >/dev/null
   check_container
   if [[ $action == complete ]]; then
-    expected_profile=$(jq -Sc . "$job/profile.json")
     [[ $(printf '%s' "$payload" | base64 -d | jq -Sc .) == "$expected_profile" ]]
     result=$(invoke protocol-empty "$payload")
     [[ $(printf '%s' "$result" | jq -er .state) == fixture-protocol-namespace-empty ]]
@@ -93,11 +93,21 @@ while true; do
     break
   fi
   case "$action" in
-    operator|preflight|inspect|passwordless-preflight|passwordless-seed|passwordless-inspect|passwordless-cleanup|protocol-empty) ;;
+    operator|preflight|inspect|passwordless-preflight|passwordless-seed|passwordless-inspect|passwordless-cleanup|protocol-empty|throttle-observe) ;;
     *) exit 2 ;;
   esac
   if [[ $mode == recover ]]; then
     case "$action" in operator|inspect|passwordless-inspect|passwordless-cleanup|protocol-empty) ;; *) exit 2 ;; esac
+  fi
+  if [[ $action == throttle-observe ]]; then
+    [[ $(printf '%s' "$payload" | base64 -d | jq -Sc .) == "$expected_profile" ]]
+    # Only the browser's unique health request identifies the audit source.
+    # The address and log line never leave the host's operator window.
+    source_address=$(tail -n 10000 /var/log/apache2/access.log | awk -v probe="/health?auditThrottleNonce=$namespace" '
+      $6 == "\"GET" && $7 == probe && $9 == 200 { seen[$1]=1 }
+      END { for (address in seen) { count++; match_address=address }
+        if (count != 1) exit 1; print match_address }')
+    payload=$(jq -Sc --arg sourceAddress "$source_address" '. + {sourceAddress:$sourceAddress}' "$job/profile.json" | base64 -w 0)
   fi
   invoke "$action" "$payload"
 done
