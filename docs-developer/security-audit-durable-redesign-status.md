@@ -53,9 +53,15 @@ authorized resuming Phase 2 on staging2.
 - [x] Correct the window to suppress successful output while preserving checksum
   validation and failure status. The command passed against the exact staged
   archive and rejected an intentionally wrong checksum on staging2.
-- [ ] Recover the original empty window and qualify passwordless return in a fresh
-  window. Preserve the approved progress-backed behavior and keep complete
-  authentication report assembly open.
+- [x] Recover the original empty window. Its archive also omitted the shared
+  ingestion constant imported by the fixture runner. Verify that exact missing
+  dependency from the recorded revision and independently check the namespace
+  is empty before releasing the original window. Preserve the original archive
+  and failed results. The window now stops on a failed storage subprocess before
+  parsing its output.
+- [ ] Qualify passwordless return in a fresh window with the full source closure.
+  Preserve approved progress-backed behavior and keep complete report assembly
+  open.
 
 ## Checklist reconciliation (2026-11-18)
 

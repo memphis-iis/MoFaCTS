@@ -61,7 +61,7 @@ docker exec --user 0 --workdir "$tool" -i mofacts sha256sum -c < "$job/source-fi
 invoke() {
   local action=$1 payload=$2 raw output
   raw=$(printf '%s' "$payload" | base64 -d | timeout --signal TERM --kill-after 5s 40 \
-    docker exec --user 0 -i mofacts /docker/entrypoint.sh node "$tool/deploy/security-audit/launch-staging2-fixture.mjs" "$action" 2>/dev/null)
+    docker exec --user 0 -i mofacts /docker/entrypoint.sh node "$tool/deploy/security-audit/launch-staging2-fixture.mjs" "$action" 2>/dev/null) || return 1
   [[ ${#raw} -lt 65536 ]]
   output=$(printf '%s\n' "$raw" | tail -n 1)
   printf '%s' "$output" | jq -e '.state|type=="string" and startswith("fixture-")' >/dev/null
