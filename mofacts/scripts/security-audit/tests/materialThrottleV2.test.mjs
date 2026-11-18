@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { AUTHENTICATION_MATERIAL_CHANNELS as channels, AUTHENTICATION_THROTTLE_CASES as cases } from '../../../common/securityAudit/verificationCatalog.ts';
 import { observeAuthenticationMaterialV2 as material } from '../authentication/materialV2.mjs';
-import { evaluateAuthenticationThrottlesV2 as throttle } from '../authentication/throttleV2.mjs';
+import { evaluateAuthenticationThrottleScopeV2, evaluateAuthenticationThrottlesV2 as throttle } from '../authentication/throttleV2.mjs';
 import { parseAuditEvidence } from '../../../common/securityAudit/evidenceContracts.ts';
 const secret = 'PRIVATE-synthetic-capability';
 const materialInput = () => ({ baselineVerified: true, canaries: [secret], channels: Object.fromEntries(channels.map(name => [name, { installed: true, complete: true, values: ['synthetic-public-text'] }])) });
@@ -34,4 +34,14 @@ test('foreign limiter, dirty scope, too-short run and transport/domain errors ca
     const value = throttleInput(); mutate(value.scopes[definition.scope]); assert.equal(throttle(value).status, 'ERROR');
   }
   const value = throttleInput(); value.scopes.identifier.attempts[1] = denied('too-many-requests'); assert.equal(throttle(value).status, 'ERROR');
+});
+test('a staged per-scope result uses the same qualification as the complete vector', () => {
+  const { scopes, ...proof } = throttleInput();
+  const qualify = scope => evaluateAuthenticationThrottleScopeV2(scope, { ...proof, observation: scopes[scope] });
+  assert.deepEqual(cases.map(row => qualify(row.scope)), throttle({ ...proof, scopes }).results);
+  scopes.connection.attempts[1] = denied('rate-limit');
+  assert.equal(qualify('connection').status, 'ERROR');
+  assert.equal(evaluateAuthenticationThrottleScopeV2('ip', {
+    ...proof, environmentLeaseHeld: false, observation: scopes.ip,
+  }).status, 'ERROR');
 });
