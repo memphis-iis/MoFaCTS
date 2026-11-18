@@ -35,21 +35,26 @@ authorized resuming Phase 2 on staging2.
   carriage for both disposable accounts. Both fresh age observations showed
   owned, unused tokens with a 3600000 ms lifetime. Private run:
   connected-expiry-20261118-d69a2503d8e8.
-- [ ] Observe native elapsed-hour expiration and independently verify account,
-  reset-state, session, worker and lease cleanup. P2-08 remains open while
-  the corrected test runs. One Meteor invocation remains.
+- [x] Pass the native elapsed-hour expiry test. The read-only observer confirmed
+  an owned unused token after 3601169 ms, 1169 ms past its stored expiry.
+  The native reset rejected it by policy and the original password still worked.
+  Current reset, replay denial, session revocation and lifetime bounds also passed.
+  Both accounts and their reset records were independently absent. Operator
+  session cleanup passed. Host checks confirmed worker and lease absent, mail
+  connection idle, services healthy, and other containers and HTTPS unchanged.
+  P2-08 is complete. One Meteor invocation remains.
 
 ## Checklist reconciliation (2026-11-18)
 
 Phase 0 is closed. Phase 1 has 16 of 17 deliverables accepted. Its remaining
 production recording gate (P1-04) belongs to the coordinated final cutover.
-Phase 2 has five of 13 deliverables checked in the worklist below. Phases 3
+At this review, Phase 2 had five of 13 deliverables checked in the worklist below. Phases 3
 and 4 still await their exit evidence. The November 16 execution stop remains
 in effect. This review compared committed source, dated test results and the
 saved qualification receipt without running a new test.
 
-The next staging2 evidence needed for P2-08 is a genuine elapsed-hour test with
-independent cleanup. The receipt for the current reset already confirms cleanup
+At this review, P2-08 still needed staging2 evidence of real elapsed-hour expiry
+and independent cleanup. The resumed qualification above records its acceptance. The receipt for the current reset already confirms cleanup
 and explicitly leaves the overall audit incomplete. After the remaining protocol
 families are wired, the authentication report must cover all 22 controls without
 fixture errors. Weekly unattended execution and failure reporting need their own
@@ -704,7 +709,7 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-05 | Exact policy denial categories | Shared closed outcome union/decision table complete. Protocol-specific classifications and complete expected vectors remain. |
 | P2-06 | Scoped publication canaries/store isolation | [x] Complete for Phase 2: accepted selected own/other/anonymous progress cases and six real-Mongo cases. Reuse proof; new registry scenarios belong to Phase 3. |
 | P2-07 | Download mint/fetch/content/replay | [x] Complete for Phase 2: accepted selected own-history/admin report issuance/content/replay. Reuse these exact capabilities; newly declared registry surfaces belong to Phase 3. |
-| P2-08 | Reset/session preconditions and unused aged token | Source/native aged/current/replay/password/storage qualification accepted on efa3bd73; fresh inbox delivery accepted. Live unused aged-token and complete session-transport/lease acceptance remain. |
+| P2-08 | Reset/session preconditions and unused aged token | [x] Complete. Native slot 7 and connected staging2 evidence cover current reset, replay denial, real elapsed-hour rejection of an unused token, session revocation, and independent fixture/lease cleanup. Live evidence: connected-expiry-20261118-d69a2503d8e8. Full authentication report assembly remains P2-11. |
 | P2-09 | Run lock/namespace/idempotent cleanup/recovery | Existing selected synthetic ownership/cleanup accepted; add mutation contracts and recovery for every protocol family. |
 | P2-10 | Positive lower and upper session-lifetime bounds | [x] Source/native validation and fresh identity-bound live staging2 measurement pass: strictly positive and at most 30 days. Append-only v2 proof is accepted; complete authentication report/catalog wiring remains P2-11. |
 | P2-11 | Exact Phase 2 control coverage | 22 authentication controls: one selected authorization control acquired, 21 currently explicit ERROR. No whole-runtime coverage claim before Phase 3. |

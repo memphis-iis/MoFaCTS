@@ -1391,7 +1391,7 @@ Deliverables:
 - Exact policy-denial categories.
 - [x] Scoped publication canaries and store isolation (accepted P1-D8 selected progress cases and real-Mongo proof; new registry cases belong to Phase 3).
 - [x] Token-mint/fetch/content/replay download scenarios (accepted selected own-history/admin-report issuance, content and replay proof; no unchanged rerun).
-- Correct reset/session preconditions and an unused aged-token expiration scenario.
+- [x] Correct reset/session preconditions and an unused aged-token expiration scenario (P2-08, accepted on staging2 with real elapsed-hour expiry and independent cleanup).
 - Environment lock, unique run namespace, idempotent cleanup, and interrupted-run recovery for every stateful scenario.
 - [x] Positive lower and upper session-lifetime bounds (source/native and fresh identity-bound live staging2 proof accepted 2026-11-13; report wiring remains separate).
 - Exact coverage of the Phase 2 authorization controls, linked to stable surface IDs without claiming whole-runtime completeness.
