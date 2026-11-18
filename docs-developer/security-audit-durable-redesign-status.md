@@ -20,15 +20,24 @@ authorized resuming Phase 2 on staging2.
   The exact observer confirmed no account or reset records for either synthetic
   preflight address. An initial noncanonical diagnostic request was rejected.
   The same read-only observation passed using the canonical payload format.
-- [ ] Publish the private plugin 0.1.4 instructions for the two-account workflow.
-  Automatic approval review rejected upload and publication to Plugin Creator
-  because staging2 qualification authorization did not cover that destination
-  or persistent plugin update. The readback before the attempt showed 0.1.3
-  and the existing connection state remains idle.
-- [ ] Run the live coupled current/unused-expired protocol, observe its native
-  elapsed hour and verify independent account, reset-state, session, worker
-  and lease cleanup. No account was created, no mail was requested, and no
-  worker or lease is active. P2-08 remains open. One Meteor invocation remains.
+- [x] Publish private plugin 0.1.4 after Phil explicitly approved the archive
+  upload and persistent update. Readback confirmed the two-account instructions
+  and existing private audience (release pluginrel_6afdb106be40819187657876624e9396).
+  The earlier automatic review rejection preceded this explicit approval.
+- [x] Recover the first live attempt after the launcher called the earlier
+  cleanup-only observer for the age operation. Verification and reset mail
+  carriage passed. Independent account/reset-state and session cleanup passed.
+  The connection's read-only lease mount rejected release. The scanner recovered
+  the exact lease after proving the worker was absent, and the channel returned
+  to idle. The launcher now calls the age-capable observer. Private failed run:
+  connected-expiry-20261118-08b6bca6d92c.
+- [x] Start the corrected live run and pass normal verification and mail
+  carriage for both disposable accounts. Both fresh age observations showed
+  owned, unused tokens with a 3600000 ms lifetime. Private run:
+  connected-expiry-20261118-d69a2503d8e8.
+- [ ] Observe native elapsed-hour expiration and independently verify account,
+  reset-state, session, worker and lease cleanup. P2-08 remains open while
+  the corrected test runs. One Meteor invocation remains.
 
 ## Checklist reconciliation (2026-11-18)
 
