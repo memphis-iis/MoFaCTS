@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import fixture from './catalogs/control-catalog.v1.json' with { type: 'json' };
-import { ACTIVE_AUDIT_CATALOG, AUDIT_SECTION_IDS, profileControls, readAuditCatalog } from './catalogRegistry.ts';
+import { ACTIVE_AUDIT_CATALOG, AUDIT_CATALOG_V1, AUDIT_SECTION_IDS, profileControls, readAuditCatalog } from './catalogRegistry.ts';
 import { auditDigest } from './canonicalReport.ts';
 import { parseAuditProducerArtifact } from './producerArtifact.ts';
 import { parseAuditEvidence } from './evidenceContracts.ts';
@@ -38,6 +38,18 @@ describe('V2 catalog shared Node/Meteor parity', function() {
     const artifact = { artifactSchema: 'MoFaCTSSecurityAuditProducerArtifactV1', producerId: 'composite-exposure', sectionId: 'external', controls };
     expect(parseAuditProducerArtifact(artifact, catalog, 'full', 'composite-exposure').controls).to.have.length(1);
     expect(() => parseAuditProducerArtifact({ ...artifact, controls: [] }, catalog, 'full', 'composite-exposure')).to.throw();
+  });
+
+  it('accepts catalog v2 for new reports and keeps catalog v1 readable', async function() {
+    expect(ACTIVE_AUDIT_CATALOG.catalogVersion).to.equal(2);
+    expect(ACTIVE_AUDIT_CATALOG.catalogDigestSha256).to.equal('00825a1d183e3b1b3d1014273e49c3f1de17c3bd0a8207299e5778d4c44e5ac4');
+    const active = await readAuditCatalog(ACTIVE_AUDIT_CATALOG, 'ingestion');
+    expect(active.profiles.full.authentication).to.have.length(22);
+    expect(active.profiles.full.authentication).to.include('authentication.passwordless.experiment-eligibility');
+    const historical = await readAuditCatalog(AUDIT_CATALOG_V1, 'retained');
+    expect(historical.profiles.full.authentication).to.include('authentication.passwordless.experiment-flag');
+    const obsoleteIngestionAccepted = await readAuditCatalog(AUDIT_CATALOG_V1, 'ingestion').then(() => true, () => false);
+    expect(obsoleteIngestionAccepted).to.equal(false);
   });
 
   it('records the same complete ERROR report without inventing image identity', async function() {

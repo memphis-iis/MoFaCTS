@@ -12,8 +12,8 @@ test('V2 catalog: pinned runtime JSON/TypeScript imports match the independently
   const parsed = await readAuditCatalog(ACTIVE_AUDIT_CATALOG, 'ingestion');
   assert.equal(await auditDigest(raw), golden);
   assert.equal(createHash('sha256').update(canonicalAuditJson(raw)).digest('hex'), golden);
-  assert.equal(await auditDigest(parsed), golden);
-  assert.equal(ACTIVE_AUDIT_CATALOG.catalogDigestSha256, golden);
+  assert.equal(await auditDigest(parsed), '00825a1d183e3b1b3d1014273e49c3f1de17c3bd0a8207299e5778d4c44e5ac4');
+  assert.equal(ACTIVE_AUDIT_CATALOG.catalogVersion, 2);
   assert.equal(profileControls(parsed, 'full').length, 70);
   assert.equal(profileControls(parsed, 'exposure').length, 23);
   assert.deepEqual(parsed.profiles.exposure.authentication, []);
@@ -58,7 +58,7 @@ test('V2 catalog: reject unresolved/duplicate/wrong-section metadata and profile
 });
 
 test('V2 catalog: retained coordinates are exact and semantic edits cannot retain the approved digest', async () => {
-  for (const change of [{ catalogId: 'another-catalog' }, { catalogVersion: 2 },
+  for (const change of [{ catalogId: 'another-catalog' }, { catalogVersion: 3 },
     { catalogDigestSha256: '1'.repeat(64) }, { unexpected: true }]) {
     await assert.rejects(readAuditCatalog({ ...ACTIVE_AUDIT_CATALOG, ...change }, 'retained'));
   }
@@ -119,6 +119,7 @@ test('V2 evidence: every released proof shape accepts complete observations and 
     'timing-observations-v1': { loginDifferentialMs: 5, loginApprovedBoundMs: 50, resetDifferentialMs: 8, resetApprovedBoundMs: 50, sampleCountPerIdentifier: 10 },
     'reset-expiration-v1': { ageMinutes: 65, configuredLifetimeMinutes: 60, accepted: false },
     'session-lifetime-v1': { lifetimeDays: 30, authenticated: true },
+    'session-lifetime-v2': { lifetimeDays: 30, authenticated: true, freshSessionVerified: true },
     'verification-observations-v1': { expectedCaseCount: 2, completedCaseCount: 2, matchedCaseCount: 2, domainRejectionCount: 0, transportErrorCount: 0, inconclusiveCaseCount: 0 },
     'host-configuration-v1': { requiredSettingCount: 3, presentSettingCount: 3, rootOwned: true, rootOnly: true },
     'host-listeners-v1': { inspectedListenerCount: 5, unexpectedListenerCount: 0, unexpectedUdpListenerCount: 0 },
@@ -131,6 +132,14 @@ test('V2 evidence: every released proof shape accepts complete observations and 
     'mongodb-scoped-roles-v1': { authenticatedConnectivity: true, replicaSetMatched: true, applicationGrantsMatched: true, readConcernRoleMatched: true, sidecarAccountStateMatched: true },
     'redis-policy-v1': { unauthenticatedCommandAccepted: false, auditConnectivity: true, applicationConnectivity: true, hostPublicationCount: 0 },
   };
+  const comparison = { loginPairCount: 5, resetPairCount: 2, baselineVerified: true, bindingsVerified: true,
+    environmentLeaseHeld: true, rateLimitedAttemptCount: 0, domainRejectionCount: 0,
+    transportErrorCount: 0, inconclusiveCaseCount: 0 };
+  samples['enumeration-observations-v2'] = { ...comparison, loginResponseMatch: true, resetResponseMatch: true };
+  samples['timing-observations-v2'] = { ...comparison, loginExistingMedianMs: 900, loginMissingMedianMs: 900,
+    loginDifferentialMs: 0, loginApprovedBoundMs: 450, loginDominantDirectionCount: 0, loginRequiredDirectionCount: 4,
+    resetExistingMedianMs: 300, resetMissingMedianMs: 300, resetDifferentialMs: 0,
+    resetApprovedBoundMs: 250, resetDominantDirectionCount: 0, resetRequiredDirectionCount: 2 };
   assert.deepEqual(Object.keys(samples).sort(), [...AUDIT_EVIDENCE_CONTRACT_IDS].sort());
   for (const [id, metrics] of Object.entries(samples)) {
     const evidence = { summary: 'Complete bounded observations.', metrics };
