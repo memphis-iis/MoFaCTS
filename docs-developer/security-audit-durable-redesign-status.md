@@ -59,9 +59,23 @@ authorized resuming Phase 2 on staging2.
   is empty before releasing the original window. Preserve the original archive
   and failed results. The window now stops on a failed storage subprocess before
   parsing its output.
-- [ ] Qualify passwordless return in a fresh window with the full source closure.
-  Preserve approved progress-backed behavior and keep complete report assembly
-  open.
+- [x] Qualify passwordless return in a fresh window from 06f10726. All twelve
+  controls passed, with all five positive baselines and verified save/reload.
+  The participant had owned progress and no explicit experiment flag. The
+  assigned target was sealed on native return and a different target was
+  rejected. The two synthetic accounts and fixture records were removed,
+  namespace absence was independently checked, and the window was released.
+  Staging2 remained healthy. Evidence: progress-return-20261118-af01468d8c7f.
+  This supports the next catalog's progress-backed eligibility claim. Keep
+  the historical flag title and published catalog immutable.
+- [ ] Compose the remaining live authentication protocols and the complete
+  22-control report under the next catalog. Comparison and attributable
+  connection/identifier/IP throttle acquisition remain open. The active
+  staging2 service trusts one forwarded client-address hop. Its IP limiter
+  can deny logins for the same observed address within the 15-minute window.
+  Require a verified dedicated source path before deliberately filling a
+  bucket on shared staging2, or qualify that check on an isolated replica.
+  Never reset a shared bucket or count an unattributed denial as a pass.
 
 ## Checklist reconciliation (2026-11-18)
 
@@ -731,7 +745,7 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-08 | Reset/session preconditions and unused aged token | [x] Complete. Native slot 7 and connected staging2 evidence cover current reset, replay denial, real elapsed-hour rejection of an unused token, session revocation, and independent fixture/lease cleanup. Live evidence: connected-expiry-20261118-d69a2503d8e8. Full authentication report assembly remains P2-11. |
 | P2-09 | Run lock/namespace/idempotent cleanup/recovery | Existing selected synthetic ownership/cleanup accepted; add mutation contracts and recovery for every protocol family. |
 | P2-10 | Positive lower and upper session-lifetime bounds | [x] Source/native validation and fresh identity-bound live staging2 measurement pass: strictly positive and at most 30 days. Append-only v2 proof is accepted; complete authentication report/catalog wiring remains P2-11. |
-| P2-11 | Exact Phase 2 control coverage | 22 authentication controls: one selected authorization control acquired, 21 currently explicit ERROR. No whole-runtime coverage claim before Phase 3. |
+| P2-11 | Exact Phase 2 control coverage | 22 authentication controls. The active report still has only the selected authorization result wired. Reuse the accepted live reset/session and passwordless evidence when composing the complete artifact. Comparison, throttle attribution and report assembly remain open. Whole-runtime coverage belongs to Phase 3. |
 | P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
 | P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
 
@@ -1258,7 +1272,7 @@ needed or consumed; two remain. No production action or account-data change.
   also passes separately. Root host-window bash syntax passes.
 - [x] Publish the intentional source (9accf938) and execute both native cases.
   Both passed in slot 9, as reconciled against the original receipt in the ledger.
-- [ ] Qualify the remote fixture window and live passwordless adapter on staging2.
+- [x] Qualify the remote fixture window and live passwordless adapter on staging2. All twelve controls passed on 2026-11-18 with independent cleanup. See the current qualification checkpoint.
 
 Unrelated gaze-tracking/Rspack/harness/docs edits appeared during this work and
 are preserved/excluded. Tests of this working tree can include them; the supported
