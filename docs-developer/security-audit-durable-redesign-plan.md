@@ -1385,20 +1385,23 @@ visible without blocking unrelated Phase 2 implementation.
 Deliverables:
 
 - [x] Source-controlled authorization entries in the verification catalog with explicit outcomes and baselines (22 authentication controls/68 source entries; Node and Meteor slot 8 accepted 2026-11-13; acquisition remains separate).
-- [x] Versioned exact protected fixture-binding contract containing values only (P2-02, source contract). Exercising every binding through the staging2 runner remains a Phase 2 exit gate.
-- Decomposed transport, scenario, and evaluator modules.
-- Positive baselines paired with denials.
-- Exact policy-denial categories.
+- [x] Versioned exact protected fixture-binding contract containing values only (P2-02). The exact selected binding set and owned protocol fixtures were exercised by the integrated staging2 run.
+- [x] Decomposed transport, scenario, and evaluator modules for the selected authorization and authentication protocols (P2-03).
+- [x] Positive baselines paired with denials (P2-04, fresh integrated staging2 result).
+- [x] Exact policy-denial categories for the selected cases, protected reset and session verification, passwordless return, comparison and throttling (P2-05).
 - [x] Scoped publication canaries and store isolation (accepted P1-D8 selected progress cases and real-Mongo proof; new registry cases belong to Phase 3).
 - [x] Token-mint/fetch/content/replay download scenarios (accepted selected own-history/admin-report issuance, content and replay proof; no unchanged rerun).
 - [x] Correct reset/session preconditions and an unused aged-token expiration scenario (P2-08, accepted on staging2 with real elapsed-hour expiry and independent cleanup).
-- Environment lock, unique run namespace, idempotent cleanup, and interrupted-run recovery for every stateful scenario.
+- [x] Environment lock, unique run namespace, idempotent cleanup, and interrupted-run recovery (P2-09, shared protocol contracts and live staging2 cleanup/recovery).
 - [x] Positive lower and upper session-lifetime bounds (source/native and fresh identity-bound live staging2 proof accepted 2026-11-13; report wiring remains separate).
-- [x] Exact coverage of the 22 Phase 2 authorization controls in the staging2 qualification artifact (P2-11). Integrated scanner execution and coordinated ingestion activation remain open exit gates.
-- Behavioral tests for every outcome class.
-- Minimal child-process environment exposure.
+- [x] Exact coverage of 22 Phase 2 authorization controls in one integrated staging2 run (P2-11, 22 PASS, zero FAIL or ERROR). The matching catalog v2 producer/receiver cutover and retained v1 readback passed on staging2; see the status record.
+- [x] Behavioral tests for authorization outcome classes and exact four-phase coordinator output (P2-12). Pinned Linux focused and source-security suites, application lint and prior owning-runtime Meteor evidence passed.
+- [x] Minimal child-process environment exposure (P2-13, browser and fixture storage profiles with the existing connected mail handoff).
 
 Exit gates:
+
+The staging2 authentication and catalog cutover gates passed on 2026-11-18.
+Production acceptance remains assigned to the coordinated final cutover.
 
 - No domain error, timeout, missing route, 404, unreadable store, or missing canary can pass a denial probe.
 - Every required actor/surface/resource case has one validated scenario binding.

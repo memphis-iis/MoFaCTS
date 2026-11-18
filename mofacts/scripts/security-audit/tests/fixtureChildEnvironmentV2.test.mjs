@@ -7,10 +7,15 @@ test('trusted entrypoint projects only required storage coordinates into the fix
   const value = environment(parent());
   assert.deepEqual(Object.keys(value).sort(), ['EXPECTED_MONGO_DB_NAME', 'MONGO_URL', 'NODE_OPTIONS', 'PATH', 'ROOT_URL']);
   assert.equal(value.NODE_OPTIONS, ''); assert.ok(!JSON.stringify(value).includes('PRIVATE'));
-  let args;
-  launch('passwordless-inspect', parent(), (...value) => { args = value; return {}; });
-  assert.equal(args[0], process.execPath); assert.ok(args[1][0].endsWith('/staging2-fixture-runtime.mjs') || args[1][0].endsWith('\\staging2-fixture-runtime.mjs'));
-  assert.equal(args[1][1], 'passwordless-inspect'); assert.equal(args[2].shell, false); assert.deepEqual(args[2].env, value);
+  for (const action of ['passwordless-inspect', 'reset-observe', 'reset-token-age']) {
+    let args;
+    launch(action, parent(), (...value) => { args = value; return {}; });
+    assert.equal(args[0], process.execPath);
+    assert.ok(args[1][0].endsWith('/staging2-fixture-runtime.mjs') || args[1][0].endsWith('\\staging2-fixture-runtime.mjs'));
+    assert.equal(args[1][1], action);
+    assert.equal(args[2].shell, false);
+    assert.deepEqual(args[2].env, value);
+  }
 });
 test('unknown actions and substituted/missing storage scope reject before child creation', () => {
   let called = false; const spawn = () => { called = true; };

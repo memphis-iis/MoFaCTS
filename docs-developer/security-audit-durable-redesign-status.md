@@ -1,12 +1,13 @@
 # Security Audit Durable Redesign Status
 
 Last baseline with passing CI, Security and image checks: `251022369812dd07417cc4d248e91a1c1f1d8b6a`.
-Selected deployed staging2 application: `1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140` (reobserved 2026-11-12);
-retained auditor-policy baseline: `c7444b4e`. Their evidence and image identities remain separate.
+Staging2 application: `93b7d444ba2216cf68c9b930a2e51052f7d022bb` (accepted 2026-11-18),
+with `1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140` retained for rollback. The
+retained auditor-policy baseline `c7444b4e` has separate evidence and identity.
 
 
 
-## Integrated authentication and catalog cutover preparation (2026-11-18)
+## Integrated authentication and catalog v2 staging2 acceptance (2026-11-18)
 
 - [x] Freeze the exact catalog v2 from the accepted 22-control qualification.
   Its digest remains 00825a1d183e3b1b3d1014273e49c3f1de17c3bd0a8207299e5778d4c44e5ac4.
@@ -19,14 +20,66 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
   Full typecheck/lint, Bash-independent diff checks and 23 focused tests passed.
   The integrated behavior test uses injected phases. No live integrated result
   or receiver activation follows from it.
-- [ ] Bind and run the protected live phase owners under the integrated
-  coordinator. Acquire fresh selected authorization, passwordless and
-  attributable throttle evidence in the run. An earlier assembled receipt
-  cannot substitute for acquisition. Run throttle qualification after positive
-  login baselines. Allow real cooldowns without editing throttle counters.
-- [ ] Activate catalog v2 with its producer and receiver on staging2 after
-  supported verification. Verify signed receiver readback and retain rollback.
-  The remaining Meteor invocation is available for the final candidate.
+- [x] Run all four protected live phases in a single invocation from
+  `12424179fb91c6630d9024b4ab35e48f5f1592ab` on staging2 app `1c72734b`.
+  The coordinator verified the deployment identity and owned cleanup between
+  phases. An unused reset link was rejected at 3602424 ms. The five login and
+  two reset comparison pairs, session revocation, 29 selected authorization
+  cases, and 12 progress-backed passwordless controls passed. The connection,
+  identifier and IP limits were attributed independently (11th, ninth and
+  21st attempts). The cooldowns elapsed without counter edits.
+  Final authentication artifact: 22 PASS, zero FAIL, zero ERROR. Protected
+  evidence: `integrated-authentication-20261118-f8797b4f0249`. Artifact SHA-256:
+  `773df7465461455d46fdb922a823a5626520324f7115e07c1d4a373d262b5a91`.
+- [x] Reobserve both reset accounts and their reset records as absent through
+  the existing narrow fixture launcher. The first request used noncanonical
+  JSON and was rejected. It passed through the shared canonical encoder.
+  This follow-up verifies the narrower subprocess and independent cleanup
+  without repeating mail delivery or the one-hour expiry test.
+- [x] Recover the run interrupted for the workstation restart. Both owned
+  accounts and reset records were independently absent, operator session
+  cleanup passed, and the stopped worker was absent. Release the exact lease
+  and return the mail connection to idle. The interrupted attempt
+  (connected-integrated-20261118-e60e3a5839e1) is incomplete.
+- [x] Verify the approved audit-only staging2 release from the running
+  `1c72734b` baseline. Branch `codex/staging2-audit-catalog`, commit
+  `93b7d444ba2216cf68c9b930a2e51052f7d022bb`, changes nine catalog, validator
+  and test files. Typecheck, lint, all 172 Linux source checks and Meteor
+  slot 10 passed. Catalog v1 bytes are unchanged. The candidate enables new
+  v2 ingestion and retains v1 readback.
+- [x] Build through Compose, verify the embedded source identity, and publish
+  the exact staging2 candidate. The registry root digest is
+  `sha256:917beee2e46fadf8ef7d0cc71e1503872669f5fa90158811a2b4db07c83d4156`.
+  The linux/amd64 manifest digest is
+  `sha256:c33c875fafe333980da1e48dbd14841d1c2f9d5ccb84250d820f0dbe0d741718`.
+  The staged controller checksum, existing deployment, HTTPS configuration
+  and rollback authority passed the read-only preflight. Protected evidence:
+  `staging2-catalog-cutover-93b7d444`.
+- [x] Activate the paired catalog v2 producer and receiver on staging2.
+  The approved release preserves the running application baseline apart from
+  the catalog/validator change. Normal learner sign-in, reload, role and
+  logout passed. The running-image observation and protected host receipt
+  matched the workstation release record. Receipt record SHA-256:
+  `526ffe3a5e0786bafd0fbbaa60d747407a0e8e80c86bd7880b4b6a4b00cb394f`.
+- [x] Verify signed acceptance and retained report readback. The exact
+  release producer assembled the catalog v2 probe byte-for-byte. The
+  receiver returned 201 for the new v2 report and 400 for the signed new v1
+  submission. Admin list, get and download verified the stored v2 report
+  and a historical v1 report. The receiver probes are marked synthetic,
+  with no measured security results. The separate integrated authentication
+  artifact contains the 22 measured controls.
+- [x] Verify public HTTPS readiness, exact running image and receipt, absence
+  of authentication leases, unchanged HTTPS configuration and other
+  staging2 containers, and retention of the previous app image/configuration
+  and receipt. Both rollout and independent verification passed. The initial
+  prefetch check compared the Docker native ID with the config digest.
+  Registry identity and independent config identity were then verified at
+  their respective boundaries. All ten authorized Meteor invocations are consumed.
+
+Phase 2 staging2 deliverables and acceptance are complete. A complete live
+four-section report, unattended scheduling and the coordinated production
+cutover remain separate gates. The Phase 1 production recording gate (P1-04)
+remains with that production window.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 
@@ -126,18 +179,19 @@ authorized resuming Phase 2 on staging2.
   Protected evidence: authentication-qualification-20261118.
   Artifact SHA-256: 87bcf22f63dc24155144b6055154dad6a291d17f8598a54b27304492328e8952.
   Full lint and 27 focused tests passed. No Meteor invocation was used.
-- [ ] Qualify integrated execution and the coordinated catalog/receiver change
-  before claiming that the standing scanner produces the new artifact. This
-  qualification joined separately executed receipts. The active report and
-  the Phase 2 exit gate remain open.
+- [x] Independently qualify the exact catalog-complete authentication section
+  through one integrated staging2 run. The earlier assembled receipts remain
+  historical evidence. The coordinated receiver cutover above is tracked
+  separately from this authentication-section qualification.
 
 ## Checklist reconciliation (2026-11-18)
 
 Phase 0 is closed. Phase 1 has 16 of 17 deliverables accepted. Its remaining
 production recording gate (P1-04) belongs to the coordinated final cutover.
 At this review, Phase 2 had five of 13 deliverables checked in the worklist below. Phases 3
-and 4 still await their exit evidence. The November 16 execution stop remains
-in effect. This review compared committed source, dated test results and the
+and 4 still await their exit evidence. The November 16 execution stop was in effect at this review. The November 18
+resumption and current gates are recorded above. This review compared committed
+source, dated test results and the
 saved qualification receipt without running a new test.
 
 At this review, P2-08 still needed staging2 evidence of real elapsed-hour expiry
@@ -791,17 +845,17 @@ spending and destructive operations retain their explicit permission boundaries.
 | --- | --- | --- |
 | P2-01 | Source-owned verification intent for all authorization controls | [x] Exact source references for all 22 controls and 68 unique verification entries pass Node and Meteor slot 8. The accepted 29-case subset is unchanged. This closes intent, not live acquisition or whole-runtime coverage. |
 | P2-02 | Exact value-only protected fixture binding contract | [x] Versioned value-only source contract verified in protocolBindingsV2.mjs and the November 13 binding/process tests. It checks the actor set, unique identities, scoped values and exact staging2 target. End-to-end use by every scenario remains under P2-11. |
-| P2-03 | Transport, scenario and evaluator decomposition | Existing selected method/publication/route/download adapters complete. Protocol families remain; keep acquisition separate from pure evaluation. |
-| P2-04 | Positive baselines paired with denials | Selected cases complete. Add verified protocol baselines; failed login, timeout or missing resource cannot prove safety. |
-| P2-05 | Exact policy denial categories | Shared closed outcome union/decision table complete. Protocol-specific classifications and complete expected vectors remain. |
+| P2-03 | Transport, scenario and evaluator decomposition | [x] Selected method/publication/route/download adapters and separate reset, comparison, session, passwordless and throttle acquisition/evaluation are implemented. The focused 117-test suite passed on pinned Node. Live integrated acceptance is recorded separately. |
+| P2-04 | Positive baselines paired with denials | [x] Positive actor, route, capability, reset/session, passwordless, comparison and throttle baselines passed in the integrated staging2 run. A timeout or unrelated denial cannot satisfy the evidence contract. |
+| P2-05 | Exact policy denial categories | [x] Shared outcome matrix and protocol-specific exact categories pass behavioral tests. Unsupported denials, missing baselines and transport failures stay errors. |
 | P2-06 | Scoped publication canaries/store isolation | [x] Complete for Phase 2: accepted selected own/other/anonymous progress cases and six real-Mongo cases. Reuse proof; new registry scenarios belong to Phase 3. |
 | P2-07 | Download mint/fetch/content/replay | [x] Complete for Phase 2: accepted selected own-history/admin report issuance/content/replay. Reuse these exact capabilities; newly declared registry surfaces belong to Phase 3. |
 | P2-08 | Reset/session preconditions and unused aged token | [x] Complete. Native slot 7 and connected staging2 evidence cover current reset, replay denial, real elapsed-hour rejection of an unused token, session revocation, and independent fixture/lease cleanup. Live evidence: connected-expiry-20261118-d69a2503d8e8. Full authentication report assembly remains P2-11. |
-| P2-09 | Run lock/namespace/idempotent cleanup/recovery | Existing selected synthetic ownership/cleanup accepted; add mutation contracts and recovery for every protocol family. |
+| P2-09 | Run lock/namespace/idempotent cleanup/recovery | [x] Protocol mutation contracts, exact run namespaces, phase leases and cleanup passed live. Shared recovery prevents new mutations after an interrupted owned window. The interrupted mail run was recovered with both accounts, reset state and sessions verified absent. |
 | P2-10 | Positive lower and upper session-lifetime bounds | [x] Source/native validation and fresh identity-bound live staging2 measurement pass: strictly positive and at most 30 days. Append-only v2 proof is accepted; complete authentication report/catalog wiring remains P2-11. |
-| P2-11 | Exact Phase 2 control coverage | [x] All 22 controls have live staging2 qualification evidence and a validated candidate artifact with zero errors. Integrated scanner execution and coordinated ingestion activation remain open as separate exit gates. Whole-runtime coverage belongs to Phase 3. |
-| P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
-| P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
+| P2-11 | Exact Phase 2 control coverage | [x] All 22 control results were reproduced in one integrated staging2 invocation with zero errors or failures. The coordinated receiver activation is tracked above. Whole-runtime coverage belongs to Phase 3. |
+| P2-12 | Behavioral tests for all outcome classes | [x] The Section 7.4 outcome classes are covered by the protocol, transport and evaluator suites. New cases exercise comparison browser acquisition and verify the coordinator emits exactly 22 version 2 controls after four clean phases. Pinned Linux focused tests passed 117/117, source-security passed 172/172, and full lint passed. The owning native checks are recorded in the run ledger. |
+| P2-13 | Minimal child environments | [x] Browser and storage subprocess profiles are bounded, and Gmail authority stays in the connected tool. The integrated mail observer had launched the storage helper directly. The standard launcher now runs that observer with storage-only inputs. Both owned fixtures and reset state were independently absent through that launcher. |
 
 Current next milestone: continue protocol acquisition/ownership and live unused
 aged-token expiry under the clarified progress-backed passwordless requirement.
@@ -1344,7 +1398,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 9 consumed, 0 reserved, 1 available.**
+**Current allowance: 10 total, 10 consumed, 0 reserved, 0 available.**
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -1363,7 +1417,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 7 | efa3bd73a75b9df1172e01347498f06a1c5ff3b1 | PASS 2026-11-13T01:25:14Z-01:26:48Z (November 12 local): 1,024 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered reset/session cases pass. Source/isolation/resources/cleanup and unchanged original services verified. Private receipt: phase1-20261105/native-phase2-reset-efa3bd73. |
 | 8 | fe08499c7d3ed4b415d181445b0b05c257a079a2 | PASS 2026-11-13T13:41:02Z-13:42:18Z: 1,027 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered passwordless/catalog cases pass. Exact clean source, actual 6-GiB/two-CPU isolation, original-service uptime and owned-resource cleanup verified. Private: phase1-20261105/native-phase2-protocol-fe08499c. |
 | 9 | 9accf938a85d75abdee89ecd821d69ffe7c987b3 | PASS, reconciled 2026-11-15: run 2026-11-13T19:26:12Z to 19:30:30Z; 1,029 server/1,249 client passes, zero failures/hooks, 15/seven existing pending. Both progress-backed return cases pass. Source, isolation/resources, saved service records and exact job resource absence verified. Original receipt: /var/tmp/mofacts-integration.uIoCJYbL/results/native-verification.json; SHA-256 b7119f4c6a525ed05510ac88851bf65d7a424c826a01294702f7ee487915cc53. Native evidence only, not release qualification. |
-| 10 | Pending | Available. |
+| 10 | 93b7d444ba2216cf68c9b930a2e51052f7d022bb | PASS 2026-11-18T19:02:02Z to 19:03:18Z. Server 1,019 passes, client 1,249 passes, zero failures or hook failures, 15/seven existing pending. The v2 active/v1 retained case passed. The exact Linux source gate passed 172/172. Original receipt: /var/tmp/mofacts-integration.f2EE5Wh4/results/native-verification.json. The test environment passed isolation proof. The existing local JEDM scheduler had the same container and image with a later start timestamp, and Docker recorded repeated exit-255 restarts continuing after this run ended without an OOM event in the observed interval. Other existing local service records matched. Native test evidence only. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.

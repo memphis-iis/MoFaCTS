@@ -53,6 +53,12 @@ delivery receipt proves none of the later mutations. Use real wall-clock aging
 for the live expiry case; changing stored dates qualifies only a synthetic test.
 Retain preconditions, typed outcomes and independent cleanup confirmation.
 
+Package `launch-staging2-fixture.mjs` with the pinned fixture source for
+`reset-observe` and `reset-token-age`. Invoke that launcher through the trusted
+container entrypoint with the exact owned request on private stdin. The launcher
+passes only the storage environment to the fixture child. Require the separate
+account-absence and reset-state-absence observations for each owned fixture.
+
 `captureCurrentResetV2` drives the source-owned current-reset cases and requires
 two successful independent pre-reset sessions with distinct capabilities.
 Both old sessions must lose their guarded method access and fail fresh token

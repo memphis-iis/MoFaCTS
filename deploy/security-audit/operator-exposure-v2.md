@@ -7,7 +7,15 @@ as the optional hosted workflow. No application deployment, account creation,
 new SSH permission, GitHub runner registration or Meteor invocation is needed.
 
 Use the pinned Node/npm runtime and an exact committed checkout. Keep evidence in
-a new operator-owned private directory. Use the existing approved staging2
+a new operator-owned private directory. For staging2's catalog v2 release,
+use commit `93b7d444ba2216cf68c9b930a2e51052f7d022bb` on
+`codex/staging2-audit-catalog` for both acquisition and signing. The paired
+producer and receiver were verified on 2026-11-18. Keep the hosted staging2
+workflow paused while its `main` checkout selects catalog v1. After a later
+cutover, use the producer revision recorded for the active receiver in the
+[audit status](../../docs-developer/security-audit-durable-redesign-status.md).
+
+Use the existing approved staging2
 restricted SSH identity to acquire the no-argument forced command described in
 [staging2 access](staging2-access.md). Save its bounded response as a new
 `host-acquisition.json`; do not use the general operator account, run another
