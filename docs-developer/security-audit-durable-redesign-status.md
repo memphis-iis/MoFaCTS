@@ -99,8 +99,18 @@ remains with that production window.
   policy record. Both native runs passed. The third authorization remains
   unused and is limited to a retry for this HTTP baseline/migration batch.
 
-The registry currently covers this one HTTP owner. Remaining HTTP owners,
-composition sealing, full registry coverage and staging qualification stay open.
+- [x] Prepare the paired V2 audit ingestion and report download migration.
+  Both normal-stack mounts bind the original protocol callbacks directly.
+  The registry records signed ingestion, the single-use report capability
+  and the current issuing-administrator check. Full typecheck, lint, Linux
+  source-security and focused regressions passed.
+- [ ] Verify the migrated audit pair in Meteor. Its mounted listener tests
+  cover registry entries, handler-specific 404/405 responses, admin-minted
+  download and replay rejection. Existing signed-ingestion and retained-record
+  tests remain in the suite. The remaining /health retry is scoped to that batch.
+
+Remaining HTTP owners, composition sealing, full registry coverage and
+staging qualification stay open.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 

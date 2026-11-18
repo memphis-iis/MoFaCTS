@@ -1205,11 +1205,13 @@
     },
     {
       "name": "/admin/security-audits/download",
-      "access": "single-use-download"
+      "access": "single-use-download",
+      "review": "Existing mounted GET consumes a single-use report capability and rechecks the issuing administrator before reading the report. The HTTP registry binds the existing protocol handler."
     },
     {
       "name": "/internal/security-audits/v2",
       "access": "signed-ingestion",
+      "review": "The HTTP registry binds the existing normal-stack protocol handler. The handler owns dispatch, body bounds and request verification.",
       "notes": "V2-only bounded HMAC ingestion with exact catalog/evidence validation, independent receiver build/image identity and replay-safe private V2 storage. V1 records remain untouched and have no application reader."
     },
     {

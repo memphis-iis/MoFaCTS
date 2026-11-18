@@ -27,7 +27,8 @@ test('production remains paired with the immutable V1 scanner while the applicat
   assert.match(source(retained, 'mofacts/server/http/securityAudits.ts'), /use\('\/internal\/security-audits\/v1'/);
   assert.match(source(retained, 'mofacts/scripts/security-audit/assemble-report.mjs'), /process\.env\.GITHUB_SHA/);
   const binding = fs.readFileSync(new URL('../../../server/http/securityAudits.ts', import.meta.url), 'utf8');
-  assert.match(binding, /use\('\/internal\/security-audits\/v2'/);
+  assert.match(binding, /registerAuditHttpMount\(WebApp\.connectHandlers, '\/internal\/security-audits\/v2',[\s\S]*?runtime\.http\.ingest\);/);
+  assert.match(binding, /registerAuditHttpMount\(WebApp\.connectHandlers, '\/admin\/security-audits\/download',[\s\S]*?runtime\.http\.download\);/);
   assert.doesNotMatch(binding, /\/internal\/security-audits\/v1|securityAuditStorage/);
 });
 test('scanner update/rollback requires matching immutable selection and runtime assertion', () => {

@@ -4,12 +4,34 @@ import { WebApp } from 'meteor/webapp';
 import { Roles } from 'meteor/alanning:roles';
 import { randomBytes } from 'node:crypto';
 import { collectionMongoName } from '../../common/collectionOwnership.ts';
+import { HTTP_AUDIT_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registeredHttpMounts } from '../securitySurfaces/registerHttpRoutes.ts';
 import { auditDigest } from '../../common/securityAudit/canonicalReport.ts';
 import { errorReport, ingestionContext } from '../../scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
 import { SecurityAuditReportsV2 } from './securityAuditCollectionsV2.ts';
 import { createAuditReportStoreV2 } from './securityAuditReportStoreV2.ts';
 
+function applicationOrigin(): string {
+  const address = WebApp.httpServer.address();
+  if (!address || typeof address === 'string') throw new Error('Application TCP listener is unavailable');
+  return `http://127.0.0.1:${address.port}`;
+}
+
 describe('activated V2 audit application boundaries', function() {
+  it('registers the signed receiver and single-use download on the normal HTTP stack', function() {
+    const mounts = registeredHttpMounts();
+    const ingest = mounts.filter(entry => entry.mount === '/internal/security-audits/v2');
+    const download = mounts.filter(entry => entry.mount === '/admin/security-audits/download');
+    expect(ingest).to.have.length(1);
+    expect(download).to.have.length(1);
+    expect(ingest[0]).to.include({ stack: 'connectHandlers', dispatch: 'mounted-prefix' });
+    expect(download[0]).to.include({ stack: 'connectHandlers', dispatch: 'mounted-prefix' });
+    expect(ingest[0]?.policy).to.deep.equal({ kind: 'signed-ingestion', protocol: 'security-audit-v2-hmac' });
+    expect(download[0]?.policy).to.deep.equal({ kind: 'single-use-capability', issuerAuthorization: 'current-admin' });
+    expect(download[0]?.dataEgress).to.deep.equal({ kind: 'security-audit-report' });
+    expect(ingest[0]?.verification).to.equal(HTTP_AUDIT_VERIFICATIONS.ingest);
+    expect(download[0]?.verification).to.equal(HTTP_AUDIT_VERIFICATIONS.download);
+  });
   for (const name of ['admin.securityAudits.list', 'admin.securityAudits.get', 'admin.securityAudits.downloadToken']) {
     for (const userId of [null, 'synthetic-missing-audit-learner', 'synthetic-missing-audit-teacher']) {
       it(`keeps the registered ${name} admin guarded for ${userId ?? 'anonymous'}`, async function() {
@@ -23,9 +45,7 @@ describe('activated V2 audit application boundaries', function() {
     }
   }
   it('serves the V2 HTTP boundary and excludes V1 on the actual application listener', async function() {
-    const address = WebApp.httpServer.address();
-    if (!address || typeof address === 'string') throw new Error('Application TCP listener is unavailable');
-    const origin = `http://127.0.0.1:${address.port}`;
+    const origin = applicationOrigin();
     const options = { signal: AbortSignal.timeout(5000) };
     expect((await fetch(`${origin}/internal/security-audits/v2`, options)).status).to.equal(405);
     expect((await fetch(`${origin}/internal/security-audits/v2`, { ...options,
@@ -36,6 +56,10 @@ describe('activated V2 audit application boundaries', function() {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     expect(retired.status).to.equal(405);
     expect(retired.headers.get('allow')).to.equal('OPTIONS, GET, HEAD');
+    expect((await fetch(`${origin}/internal/security-audits/v2/extra`, options)).status).to.equal(404);
+    const wrongMethod = await fetch(`${origin}/admin/security-audits/download/invalid/name.json`, { ...options, method: 'POST' });
+    expect(wrongMethod.status).to.equal(405);
+    expect(wrongMethod.headers.get('allow')).to.equal(null);
     expect((await fetch(`${origin}/admin/security-audits/download/invalid/name.json`, options)).status).to.equal(404);
   });
 
@@ -64,6 +88,15 @@ describe('activated V2 audit application boundaries', function() {
       expect(result.reports.every((row: { schema: string }) => row.schema === 'SecurityAuditReportV2')).to.equal(true);
       const summary = await handlers['admin.securityAudits.get'].call({ userId: admin, unblock() {} }, v2Id);
       expect(summary.schema).to.equal('SecurityAuditReportV2');
+      const issued = await handlers['admin.securityAudits.downloadToken'].call({ userId: admin, unblock() {} }, v2Id, 'json');
+      const url = applicationOrigin() + issued.url;
+      const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      expect(response.status).to.equal(200);
+      expect(response.headers.get('cache-control')).to.equal('no-store');
+      expect(await response.json()).to.deep.equal(report);
+      const replay = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      expect(replay.status).to.equal(404);
+      await replay.text();
       for (const name of ['admin.securityAudits.get', 'admin.securityAudits.downloadToken']) {
         let error: any;
         try { await handlers[name].call({ userId: admin, unblock() {} }, v1Id, 'json'); }

@@ -79,7 +79,7 @@ export async function discoverSecuritySurfaces() {
     publications.push(...regexMatches(text, /Meteor\.publish\(\s*(?:'([^']+)'|null)/g,
       (match) => match[1] || '<default>'));
     httpRoutes.push(...regexMatches(text, /(?:connectHandlers|rawConnectHandlers)\.use\(\s*'([^']+)'/g, (match) => match[1]));
-    httpRoutes.push(...regexMatches(text, /registerPublicHttpMount\(\s*WebApp\.connectHandlers,\s*'([^']+)'/g, (match) => match[1]));
+    httpRoutes.push(...regexMatches(text, /register(?:Public|Audit)HttpMount\(\s*WebApp\.connectHandlers,\s*'([^']+)'/g, (match) => match[1]));
   }
   const routePolicyText = await fs.readFile(
     path.join(appRoot, 'client', 'lib', 'adminUi', 'managementRoutePresentationPolicies.ts'), 'utf8',

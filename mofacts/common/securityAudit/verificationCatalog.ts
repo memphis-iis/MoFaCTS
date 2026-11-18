@@ -259,7 +259,7 @@ for (const entry of entries) {
     }
   }
 }
-type HttpIntegrationVerification = Readonly<{
+export type HttpIntegrationVerification = Readonly<{
   kind: 'integrationTest';
   lane: 'meteor';
   verificationId: string;
@@ -291,6 +291,18 @@ export const HTTP_HEALTH_VERIFICATIONS = Object.freeze({
       'leaves an adjacent prefix to the application rather than serving health JSON'] as const) }),
 } satisfies PublicHttpVerification);
 
+const auditHttpTest = { kind: 'integrationTest', lane: 'meteor', expectedOutcome: 'pass', mutation: 'none' } as const;
+const auditHttpListenerCase = 'serves the V2 HTTP boundary and excludes V1 on the actual application listener';
+export const HTTP_AUDIT_VERIFICATIONS = Object.freeze({
+  ingest: Object.freeze({ ...auditHttpTest, verificationId: 'http.audit.v2-ingest',
+    surfaceId: 'http:post:/internal/security-audits/v2',
+    suite: 'activated V2 audit application boundaries', cases: Object.freeze([auditHttpListenerCase] as const) }),
+  download: Object.freeze({ ...auditHttpTest, verificationId: 'http.audit.download',
+    surfaceId: 'http:get:/admin/security-audits/download/:token/:filename',
+    suite: 'activated V2 audit application boundaries', cases: Object.freeze([auditHttpListenerCase,
+      'serves V2 through registered admin methods without reading or changing retained V1 records'] as const) }),
+});
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -298,7 +310,8 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   AUTHENTICATION_COMPARISON_BASELINE, ...AUTHENTICATION_PROTOCOL_VERIFICATIONS, ...RESET_PROTOCOL_VERIFICATIONS,
   ...PASSWORDLESS_PROTOCOL_VERIFICATIONS, ...AUTHENTICATION_THROTTLE_CASES, ...AUTHENTICATION_MATERIAL_CASES,
   ...AUTHENTICATION_SESSION_VERIFICATIONS,
-  ...HTTP_HEALTH_VERIFICATIONS.endpoints, HTTP_HEALTH_VERIFICATIONS.fallthrough]);
+  ...HTTP_HEALTH_VERIFICATIONS.endpoints, HTTP_HEALTH_VERIFICATIONS.fallthrough,
+  HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }
