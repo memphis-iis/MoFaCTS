@@ -6,6 +6,30 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Staging2 reset-expiry qualification resumed (2026-11-18)
+
+Phil confirmed P1-04 remains at the coordinated production cutover and
+authorized resuming Phase 2 on staging2.
+
+- [x] Transfer and verify the tested 4af84705 connection image and source
+  archives. Install image e7513598... on staging2. The installation receipt
+  confirms health, authentication required, the existing grant preserved,
+  unchanged HTTPS configuration and other containers, and the previous image
+  retained for rollback. Receipt: /opt/mofacts-audit-connection/recovery/expiry-4af84705/outcome.json.
+- [x] Stage the checksum-verified worker and read-only observer from 4af84705.
+  The exact observer confirmed no account or reset records for either synthetic
+  preflight address. An initial noncanonical diagnostic request was rejected.
+  The same read-only observation passed using the canonical payload format.
+- [ ] Publish the private plugin 0.1.4 instructions for the two-account workflow.
+  Automatic approval review rejected upload and publication to Plugin Creator
+  because staging2 qualification authorization did not cover that destination
+  or persistent plugin update. The readback before the attempt showed 0.1.3
+  and the existing connection state remains idle.
+- [ ] Run the live coupled current/unused-expired protocol, observe its native
+  elapsed hour and verify independent account, reset-state, session, worker
+  and lease cleanup. No account was created, no mail was requested, and no
+  worker or lease is active. P2-08 remains open. One Meteor invocation remains.
+
 ## Checklist reconciliation (2026-11-18)
 
 Phase 0 is closed. Phase 1 has 16 of 17 deliverables accepted. Its remaining
