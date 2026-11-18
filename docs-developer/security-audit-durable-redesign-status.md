@@ -73,9 +73,12 @@ authorized resuming Phase 2 on staging2.
   connection/identifier/IP throttle acquisition remain open. The active
   staging2 service trusts one forwarded client-address hop. Its IP limiter
   can deny logins for the same observed address within the 15-minute window.
-  Require a verified dedicated source path before deliberately filling a
-  bucket on shared staging2, or qualify that check on an isolated replica.
-  Never reset a shared bucket or count an unattributed denial as a pass.
+  Phil confirmed staging2 is dedicated to audit work. Use the existing staging2
+  deployment for all three throttle checks. Preflight confirmed application
+  health and that both authentication test windows were available. Attribute
+  the expected denial to the scope under test using fresh windows and bounded
+  synthetic attempts. Keep existing throttle counters intact and let the
+  application expire test traffic through its normal rate-limit window.
 
 ## Checklist reconciliation (2026-11-18)
 
