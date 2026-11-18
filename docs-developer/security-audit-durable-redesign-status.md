@@ -81,6 +81,27 @@ four-section report, unattended scheduling and the coordinated production
 cutover remain separate gates. The Phase 1 production recording gate (P1-04)
 remains with that production window.
 
+## Phase 3 HTTP characterization started (2026-11-18)
+
+- [x] Confirm the written migration order starts with HTTP. The existing
+  registrations use the normal, raw and handlers stacks. The current source
+  manifest reports 330 surfaces. Runtime coverage remains to be measured.
+- [x] Establish the native baseline for the mounted public health route.
+  The corrected suite exercises the actual Meteor listener for GET, HEAD,
+  mounted suffixes, adjacent paths and unsupported methods. Slot 11 passed.
+- [x] Migrate the mounted public health route through the typed HTTP
+  registration adapter. It uses the catalog-owned GET and HEAD method
+  definitions and links the existing mounted-path and fallthrough evidence.
+  The manifest now records the route as public. The application handler has
+  no rate limiter. Deployment ingress policy remains a separate observation.
+  Full typecheck, lint, Linux source-security and focused catalog tests passed.
+  Slot 12 verified the four pre-migration behaviors again and checked the live
+  policy record. Both native runs passed. The third authorization remains
+  unused and is limited to a retry for this HTTP baseline/migration batch.
+
+The registry currently covers this one HTTP owner. Remaining HTTP owners,
+composition sealing, full registry coverage and staging qualification stay open.
+
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 
 Phil confirmed P1-04 remains at the coordinated production cutover and
@@ -1398,7 +1419,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 10 consumed, 0 reserved, 0 available.**
+**Current allowance: 13 total, 12 consumed, 0 reserved, 1 available.**
+The original allowance of ten is exhausted. On 2026-11-18 Phil authorized up
+to three additional runs on the same 6 GiB/two-CPU worker for the Phase 3 HTTP
+baseline and first migration, including a retry if needed.
+
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -1418,6 +1443,8 @@ within this allowance. Do not import historical invocations into this counter.
 | 8 | fe08499c7d3ed4b415d181445b0b05c257a079a2 | PASS 2026-11-13T13:41:02Z-13:42:18Z: 1,027 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered passwordless/catalog cases pass. Exact clean source, actual 6-GiB/two-CPU isolation, original-service uptime and owned-resource cleanup verified. Private: phase1-20261105/native-phase2-protocol-fe08499c. |
 | 9 | 9accf938a85d75abdee89ecd821d69ffe7c987b3 | PASS, reconciled 2026-11-15: run 2026-11-13T19:26:12Z to 19:30:30Z; 1,029 server/1,249 client passes, zero failures/hooks, 15/seven existing pending. Both progress-backed return cases pass. Source, isolation/resources, saved service records and exact job resource absence verified. Original receipt: /var/tmp/mofacts-integration.uIoCJYbL/results/native-verification.json; SHA-256 b7119f4c6a525ed05510ac88851bf65d7a424c826a01294702f7ee487915cc53. Native evidence only, not release qualification. |
 | 10 | 93b7d444ba2216cf68c9b930a2e51052f7d022bb | PASS 2026-11-18T19:02:02Z to 19:03:18Z. Server 1,019 passes, client 1,249 passes, zero failures or hook failures, 15/seven existing pending. The v2 active/v1 retained case passed. The exact Linux source gate passed 172/172. Original receipt: /var/tmp/mofacts-integration.f2EE5Wh4/results/native-verification.json. The test environment passed isolation proof. The existing local JEDM scheduler had the same container and image with a later start timestamp, and Docker recorded repeated exit-255 restarts continuing after this run ended without an OOM event in the observed interval. Other existing local service records matched. Native test evidence only. |
+| 11 | 81f3ed29bc2ff20b455c902494ece3a42a277d2d | PASS 2026-11-18T22:10:29Z to 22:11:43Z. 1,041 server, 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. All four mounted health cases passed. No owned containers, cache or network remained. The existing JEDM scheduler continued its exit-255 restarts after this run. Other service records matched. Private receipt: /var/tmp/mofacts-integration.7zzDbZD9/results/native-verification.json. |
+| 12 | 40f4384f60ea6cc95902e7ac49b4a9eb0e598049 | PASS 2026-11-18T22:17:51Z to 22:19:02Z. 1,042 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. All four baseline route cases and the new registered-policy case passed. Source capture, worker isolation, resource limits and owned resource cleanup verified. The pre-existing JEDM scheduler continued its exit-255 restart cycle before and during verification; no OOM event was observed in the checked interval. Other local service records matched. Private receipt: /var/tmp/mofacts-integration.Sd1z4cuc/results/native-verification.json. SHA-256 98f6948e1a48f8c4fcfdef29a2eaf8c6b972ab836fd6be8c7d6dfa1d0a529be0. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
