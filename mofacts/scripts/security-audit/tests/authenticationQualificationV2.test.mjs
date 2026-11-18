@@ -22,4 +22,8 @@ test('qualification catalog covers all authentication contracts while preserving
   }
   assert.equal(byId.has('authentication.passwordless.experiment-flag'), false);
   assert.equal(released.profiles.full.authentication.includes('authentication.passwordless.experiment-flag'), true);
+  const coordinates = { catalogId: candidate.catalogId, catalogVersion: candidate.catalogVersion,
+    catalogDigestSha256: '00825a1d183e3b1b3d1014273e49c3f1de17c3bd0a8207299e5778d4c44e5ac4' };
+  assert.deepEqual(await readAuditCatalog(coordinates, 'retained'), candidate);
+  await assert.rejects(readAuditCatalog(coordinates, 'ingestion'));
 });

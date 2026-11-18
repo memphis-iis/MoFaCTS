@@ -6,6 +6,28 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Integrated authentication and catalog cutover preparation (2026-11-18)
+
+- [x] Freeze the exact catalog v2 from the accepted 22-control qualification.
+  Its digest remains 00825a1d183e3b1b3d1014273e49c3f1de17c3bd0a8207299e5778d4c44e5ac4.
+  Catalog v1 bytes are preserved. The registry can read v2 for qualification
+  while new ingestion remains on v1 until the coordinated cutover.
+- [x] Wire real reset expiry, login/reset comparisons and logout under one
+  mail-worker lease. Comparisons follow natural expiry so the two earlier
+  reset requests leave the hourly IP budget. The scanner coordinator rejects
+  wrong namespaces, unverified phase cleanup and a changed receiver identity.
+  Full typecheck/lint, Bash-independent diff checks and 23 focused tests passed.
+  The integrated behavior test uses injected phases. No live integrated result
+  or receiver activation follows from it.
+- [ ] Bind and run the protected live phase owners under the integrated
+  coordinator. Acquire fresh selected authorization, passwordless and
+  attributable throttle evidence in the run. An earlier assembled receipt
+  cannot substitute for acquisition. Run throttle qualification after positive
+  login baselines. Allow real cooldowns without editing throttle counters.
+- [ ] Activate catalog v2 with its producer and receiver on staging2 after
+  supported verification. Verify signed receiver readback and retain rollback.
+  The remaining Meteor invocation is available for the final candidate.
+
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 
 Phil confirmed P1-04 remains at the coordinated production cutover and

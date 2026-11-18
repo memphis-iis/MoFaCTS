@@ -7,6 +7,7 @@ import { createCurrentResetBrowserTransportV2 } from '../../mofacts/scripts/secu
 import { parseResetMailboxBindingV2, readVerificationMailboxMessageV2 } from '../../mofacts/scripts/security-audit/authentication/mailboxV2.mjs';
 import { captureUnusedExpiredResetV2 } from '../../mofacts/scripts/security-audit/authentication/expiredResetV2.mjs';
 import { captureAuthenticationComparisonsV2 } from '../../mofacts/scripts/security-audit/authentication/comparisonBrowserV2.mjs';
+import { captureLogoutRevocationV2 } from '../../mofacts/scripts/security-audit/authentication/sessionBrowserV2.mjs';
 import { evaluateResetProtocol, unusedExpiredResetPrecondition } from '../../mofacts/common/securityAudit/resetProtocol.ts';
 import { evaluateSourceVerificationVector } from '../../mofacts/common/securityAudit/authorizationVerification.ts';
 import { RESET_PROTOCOL_VERIFICATIONS, AUTHENTICATION_RESET_POLICY } from '../../mofacts/common/securityAudit/verificationCatalog.ts';
@@ -19,8 +20,10 @@ const unavailable = () => new Error('Connected reset qualification requires owne
 export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketPath, leaseDirectory,
   scope = 'current', input = process.stdin, output = process.stdout }, dependencies = {}) {
   fixtureNamespaceV2(namespace);
+  const coupleExpiry = scope === 'protocol' || scope === 'integrated';
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= Date.now() || deadlineMs - Date.now() > 7200000) throw unavailable();
-  if (!['current', 'protocol', 'comparison'].includes(scope) || scope === 'protocol' && deadlineMs - Date.now() < 3900000) throw unavailable();
+  if (!['current', 'protocol', 'comparison', 'integrated'].includes(scope)
+    || coupleExpiry && deadlineMs - Date.now() < (scope === 'integrated' ? 4200000 : 3900000)) throw unavailable();
   let pending, buffer = Buffer.alloc(0), failed = false;
   const reject = () => { failed = true; if (pending) { const current = pending; pending = undefined; current.reject(unavailable()); } };
   const receive = bytes => {
@@ -45,6 +48,7 @@ export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketP
   const capture = dependencies.capture ?? captureCurrentResetV2;
   const captureExpiry = dependencies.captureExpiry ?? captureUnusedExpiredResetV2;
   const captureComparisons = dependencies.captureComparisons ?? captureAuthenticationComparisonsV2;
+  const captureLogout = dependencies.captureLogout ?? captureLogoutRevocationV2;
   const transportFactory = dependencies.transportFactory ?? createCurrentResetBrowserTransportV2;
   const launch = dependencies.launch ?? (async () => (await import('/opt/browser/node_modules/playwright/index.mjs')).chromium.launch({ headless: true }));
   try {
@@ -53,6 +57,12 @@ export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketP
         let browser, owner, currentActorId, currentMetadataVerified = false;
         try {
           browser = await launch();
+          const compare = actor => captureComparisons({ browser, namespace, target: 'https://staging2.optimallearning.org', actor,
+            confirmLease: confirmMailLease, requireOwnership: async () => {
+              const observation = await ask('comparison-ownership-needed');
+              return Object.keys(observation).sort().join(',') === 'operation,verified' && observation.verified === true;
+            },
+          });
           const scenario = async (operation, alias, collect) => {
             const frame = await ask(operation);
             try {
@@ -72,14 +82,7 @@ export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketP
               if (verification?.state !== 'owned-fixture-email-verified' || verification.nativeVerificationSucceeded !== true
                 || verification.ownedIdentityMatched !== true) throw unavailable();
               output.write(JSON.stringify({ operation: 'fixture-verified', actor: alias, verification, receipt: capability.receipt }) + '\n');
-              if (scope === 'comparison') {
-                return await captureComparisons({ browser, namespace, target: binding.target, actor: frame.actor,
-                  confirmLease: confirmMailLease, requireOwnership: async () => {
-                    const observation = await ask('comparison-ownership-needed');
-                    return Object.keys(observation).sort().join(',') === 'operation,verified' && observation.verified === true;
-                  },
-                });
-              }
+              if (scope === 'comparison') return await compare(frame.actor);
               await beginResetWindow();
               return await collect({ namespace, target: 'https://staging2.optimallearning.org', actor: frame.actor,
                 newPassword: frame.newPassword, transport: owner.transport, acquireMail });
@@ -99,23 +102,33 @@ export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketP
               currentMetadataVerified = true; return mail;
             },
           }));
-          if (scope !== 'protocol') return current;
+          if (!coupleExpiry) return current;
           const cases = RESET_PROTOCOL_VERIFICATIONS.filter(row => row.verificationId.startsWith('authn.reset.current.'));
           const vector = evaluateSourceVerificationVector(current.current.results.map(({ verificationId, outcome }) => ({ verificationId, outcome })), cases);
           if (!currentMetadataVerified || vector.status === 'ERROR' || vector.results.some(row => ['authn.reset.current.password-before', 'authn.reset.current.accepted'].includes(row.verificationId)
             && row.outcome !== 'ALLOWED')) throw unavailable();
           await beginExpiryWindow();
-          const expiry = await scenario('expiry-fixture-needed', 'expiry', options => captureExpiry({ ...options, leaseDirectory, confirmMailLease,
-            observeTokenAge: async () => {
-              const frame = await ask('expiry-age-needed');
-              if (Object.keys(frame).sort().join(',') !== 'metadata,operation') throw unavailable();
-              return frame.metadata;
-            },
-          }));
+          const { expiry, comparisons, logout } = await scenario('expiry-fixture-needed', 'expiry', async options => {
+            const expiry = await captureExpiry({ ...options, leaseDirectory, confirmMailLease,
+              observeTokenAge: async () => {
+                const frame = await ask('expiry-age-needed');
+                if (Object.keys(frame).sort().join(',') !== 'metadata,operation') throw unavailable();
+                return frame.metadata;
+              },
+            });
+            // After the expiry token has actually aged for an hour, the two
+            // preceding issuance requests are outside the reset IP window.
+            if (scope !== 'integrated') return { expiry };
+            const comparisons = await compare(options.actor);
+            await confirmMailLease();
+            const logout = await captureLogout({ browser, target: options.target, binding: options.actor });
+            await confirmMailLease();
+            return { expiry, comparisons, logout };
+          });
           const protocol = evaluateResetProtocol({ bindingsVerified: true, environmentLeaseHeld: true,
             currentTokenOwned: true, currentTokenUnused: true, expiredToken: expiry.expiredToken,
             results: [...vector.results.map(({ verificationId, outcome }) => ({ verificationId, outcome })), ...expiry.results] });
-          return { ...current, protocol, expiryDelivery: expiry.delivery };
+          return { ...current, protocol, expiryDelivery: expiry.delivery, ...(comparisons ? { comparisons, logout } : {}) };
         } finally {
           try { await owner?.close(); } finally { await browser?.close(); }
         }
@@ -143,6 +156,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const result = await runConnectedResetWorkerV2({ namespace, deadlineMs: Number(rawDeadline), socketPath, leaseDirectory, scope });
     if (scope === 'comparison' ? result?.proofs?.length !== 2 || result.proofs.some(row => row.status === 'ERROR')
       : ['current', 'session', 'lifetime'].some(key => !result?.[key] || result[key].status === 'ERROR')) process.exitCode = 1;
-    if (scope === 'protocol' && ['current', 'replay', 'expired'].some(key => !result?.protocol?.[key] || result.protocol[key].status === 'ERROR')) process.exitCode = 1;
+    if (['protocol', 'integrated'].includes(scope)
+      && ['current', 'replay', 'expired'].some(key => !result?.protocol?.[key] || result.protocol[key].status === 'ERROR')) process.exitCode = 1;
+    if (scope === 'integrated' && (result?.comparisons?.proofs?.length !== 2
+      || result.comparisons.proofs.some(row => row.status === 'ERROR')
+      || !result.logout?.result || result.logout.result.status === 'ERROR')) process.exitCode = 1;
   } catch { process.stderr.write('Connected reset qualification incomplete; owned recovery may be required.\n'); process.exitCode = 1; }
 }

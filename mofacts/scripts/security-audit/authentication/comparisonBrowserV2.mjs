@@ -10,7 +10,8 @@ export async function captureAuthenticationComparisonsV2({ browser, namespace, t
   const binding = parseAuthorizationActorBindingV2(actor);
   const missing = `${namespace}-missing@localhost.invalid`;
   const unavailable = () => new Error('Live authentication comparison incomplete');
-  if (target !== 'https://staging2.optimallearning.org' || !binding.username.endsWith(`+${namespace}-reset@gmail.com`)) throw unavailable();
+  if (target !== 'https://staging2.optimallearning.org'
+    || !['reset', 'expiry'].some(alias => binding.username.endsWith(`+${namespace}-${alias}@gmail.com`))) throw unavailable();
   if (await requireOwnership() !== true) throw unavailable();
   await confirmLease();
   const baseline = await openAuthorizationActorPageV2({ browser, target, actor: 'learnerA', binding });

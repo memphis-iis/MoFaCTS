@@ -1,4 +1,4 @@
-import { parseAuditCatalog } from '../../../common/securityAudit/catalogRegistry.ts';
+import { AUTHENTICATION_QUALIFICATION_CATALOG } from '../../../common/securityAudit/catalogRegistry.ts';
 import { canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
 import { evaluatePasswordlessProtocol } from '../../../common/securityAudit/passwordlessProtocol.ts';
 import { parseAuditProducerArtifact } from '../../../common/securityAudit/producerArtifact.ts';
@@ -12,26 +12,11 @@ import { evaluateLogoutRevocationV2 } from './sessionBrowserV2.mjs';
 const literalFlag = 'authentication.passwordless.experiment-flag';
 const eligibility = 'authentication.passwordless.experiment-eligibility';
 const qualifiedId = id => id === literalFlag ? eligibility : id;
-const titles = {
-  [eligibility]: 'The passwordless participant has an experiment marker or verified owned progress',
-  'authentication.material-leakage': 'Bounded browser channels contain no unintended authentication material disclosure',
-  'authentication.passwordless.token-not-leaked': 'Bounded browser channels contain no unintended passwordless token disclosure',
-};
 
 // This qualification candidate leaves the deployed ingestion registry intact.
 export function authenticationQualificationCatalogV2(released) {
   if (released.catalogId !== 'mofacts-security-audit-controls' || released.catalogVersion !== 1) throw new Error('Unexpected base catalog');
-  const contracts = new Map(AUTHENTICATION_CONTROL_CASES.map(row => [row.controlId, row.evidenceContract]));
-  return parseAuditCatalog({
-    ...released, catalogVersion: 2,
-    controls: released.controls.map(row => {
-      const controlId = qualifiedId(row.controlId);
-      return { ...row, controlId, title: titles[controlId] ?? row.title, evidenceContract: contracts.get(row.controlId) ?? row.evidenceContract };
-    }),
-    profiles: Object.fromEntries(Object.entries(released.profiles).map(([name, sections]) => [
-      name, { ...sections, authentication: sections.authentication.map(qualifiedId) },
-    ])),
-  });
+  return AUTHENTICATION_QUALIFICATION_CATALOG;
 }
 
 function verifiedReceipt(receipt) {

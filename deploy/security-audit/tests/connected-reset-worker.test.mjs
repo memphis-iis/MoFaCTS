@@ -5,10 +5,12 @@ import { runConnectedResetWorkerV2 } from '../connected-reset-worker.mjs';
 
 const namespace = 'mofacts_audit_fixture_0123456789ab';
 async function run(mode) {
-  const protocol = mode.startsWith('protocol-');
+  const integrated = mode === 'integrated';
+  const protocol = integrated || mode.startsWith('protocol-');
   const comparison = mode === 'comparison';
   const input = new PassThrough(), output = new PassThrough();
   let text = '', ready = false, launched = 0, transportClosed = 0, browserClosed = 0, cleanupAccepted = false;
+  const sequence = [];
   output.on('data', bytes => {
     text += bytes;
     const frame = JSON.parse(String(bytes));
@@ -34,7 +36,7 @@ async function run(mode) {
   let result, error;
   try {
     result = await runConnectedResetWorkerV2({ namespace, deadlineMs: Date.now() + (protocol ? 6000000 : 2000),
-      scope: protocol ? 'protocol' : comparison ? 'comparison' : 'current',
+      scope: integrated ? 'integrated' : protocol ? 'protocol' : comparison ? 'comparison' : 'current',
       socketPath: '/private/scanner.sock', leaseDirectory: '/private/lease', input, output }, {
       withHandoff: async options => {
         if (mode === 'lease-denied') throw new Error('PRIVATE_LEASE_DETAIL');
@@ -57,9 +59,15 @@ async function run(mode) {
       }, async close() { transportClosed++; } }),
       captureComparisons: async options => {
         assert.equal(await options.requireOwnership(), true);
-        assert.equal(options.actor.userId, 'owned');
+        assert.equal(options.actor.userId, integrated ? 'owned-expiry' : 'owned');
         await options.confirmLease();
+        sequence.push('comparison');
         return { proofs: [{ status: 'PASS' }, { status: 'PASS' }] };
+      },
+      captureLogout: async options => {
+        assert.equal(options.binding.userId, 'owned-expiry');
+        sequence.push('logout');
+        return { result: { status: 'PASS' } };
       },
       capture: async options => {
         assert.equal(options.actor.password, 'PRIVATE_SYNTHETIC_PASSWORD');
@@ -76,6 +84,7 @@ async function run(mode) {
         assert.match(options.actor.username,/-expiry@gmail\.com$/);
         assert.equal(typeof options.confirmMailLease,'function');await options.observeTokenAge();
         if(mode==='protocol-expiry-error')throw Error('PRIVATE_EXPIRY_DETAIL');
+        sequence.push('expiry');
         return {delivery:{state:'synthetic'},expiredToken:{owned:true,unused:true,ageMs:3600001,lifetimeMs:3600000,remainingMs:-1},results:[
           {verificationId:'authn.reset.expired.password-before',outcome:'ALLOWED'},
           {verificationId:'authn.reset.expired.rejected',outcome:'DENIED_BY_POLICY'},
@@ -86,8 +95,18 @@ async function run(mode) {
   } catch (caught) { error = caught; }
   finally { input.destroy(); output.destroy(); }
   assert.equal(text.includes('PRIVATE'), false);
-  return { result, error, text, launched, transportClosed, browserClosed, cleanupAccepted };
+  return { result, error, text, launched, transportClosed, browserClosed, cleanupAccepted, sequence };
 }
+
+test('integrated reset, comparison and logout execute in the observed lease order', async () => {
+  const value = await run('integrated');
+  assert.equal(value.error, undefined);
+  assert.deepEqual(value.sequence, ['expiry', 'comparison', 'logout']);
+  assert.equal(value.result.protocol.expired.status, 'PASS');
+  assert.equal(value.result.comparisons.proofs.length, 2);
+  assert.equal(value.result.logout.result.status, 'PASS');
+  assert.equal(value.cleanupAccepted, true);
+});
 
 test('comparison scope verifies the fixture and cleanup without opening a reset mail handoff', async () => {
   const value = await run('comparison');
