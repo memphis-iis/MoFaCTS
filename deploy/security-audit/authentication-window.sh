@@ -93,11 +93,11 @@ while true; do
     break
   fi
   case "$action" in
-    operator|preflight|inspect|passwordless-preflight|passwordless-seed|passwordless-inspect|passwordless-cleanup|protocol-empty|throttle-observe) ;;
+    operator|preflight|inspect|seed|cleanup|passwordless-preflight|passwordless-seed|passwordless-inspect|passwordless-cleanup|protocol-empty|throttle-observe) ;;
     *) exit 2 ;;
   esac
   if [[ $mode == recover ]]; then
-    case "$action" in operator|inspect|passwordless-inspect|passwordless-cleanup|protocol-empty) ;; *) exit 2 ;; esac
+    case "$action" in operator|inspect|cleanup|passwordless-inspect|passwordless-cleanup|protocol-empty) ;; *) exit 2 ;; esac
   fi
   if [[ $action == throttle-observe ]]; then
     [[ $(printf '%s' "$payload" | base64 -d | jq -Sc .) == "$expected_profile" ]]

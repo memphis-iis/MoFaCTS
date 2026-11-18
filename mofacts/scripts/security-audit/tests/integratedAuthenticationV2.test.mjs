@@ -13,9 +13,9 @@ test('an integrated phase cannot contribute old or unclean evidence', async () =
     let laterPhaseStarted = false;
     await assert.rejects(runIntegratedAuthenticationV2({
       observeRuntime: async () => runtime,
-      captureMailProtocols: async ({ namespace }) => ({
+      captureMailProtocols: async ({ namespace, phaseNamespace }) => ({
         namespace: cleanupVerified ? 'mofacts_audit_fixture_000000000000' : namespace,
-        result: {}, cleanupVerified,
+        phaseNamespace, result: {}, cleanupVerified,
       }),
       captureSelected: async () => { laterPhaseStarted = true; },
     }), /did not retain its run scope/);
@@ -27,7 +27,7 @@ test('receiver identity changes stop acquisition before further stateful phases'
   let observations = 0, laterPhaseStarted = false;
   await assert.rejects(runIntegratedAuthenticationV2({
     observeRuntime: async () => ++observations === 1 ? runtime : { ...runtime, applicationRevision: '3'.repeat(40) },
-    captureMailProtocols: async ({ namespace }) => ({ namespace, result: {}, cleanupVerified: true }),
+    captureMailProtocols: async ({ namespace, phaseNamespace }) => ({ namespace, phaseNamespace, result: {}, cleanupVerified: true }),
     captureSelected: async () => { laterPhaseStarted = true; },
   }), /did not retain its run scope/);
   assert.equal(laterPhaseStarted, false);
