@@ -6,6 +6,22 @@ retained auditor-policy baseline: `c7444b4e`. Their evidence and image identitie
 
 
 
+## Checklist reconciliation (2026-11-18)
+
+Phase 0 is closed. Phase 1 has 16 of 17 deliverables accepted. Its remaining
+production recording gate (P1-04) belongs to the coordinated final cutover.
+Phase 2 has five of 13 deliverables checked in the worklist below. Phases 3
+and 4 still await their exit evidence. The November 16 execution stop remains
+in effect. This review compared committed source, dated test results and the
+saved qualification receipt without running a new test.
+
+The next staging2 evidence needed for P2-08 is a genuine elapsed-hour test with
+independent cleanup. The receipt for the current reset already confirms cleanup
+and explicitly leaves the overall audit incomplete. After the remaining protocol
+families are wired, the authentication report must cover all 22 controls without
+fixture errors. Weekly unattended execution and failure reporting need their own
+evidence. Preserve the accepted progress-backed passwordless return behavior.
+
 ## Operator-requested stopping checkpoint (2026-11-16)
 
 Phil explicitly requested a logical stopping point and no further execution.
@@ -213,7 +229,9 @@ Resume only on Phil's direction, using this checkpoint and the sole run ledger.
   The affected real-channel/root-observer set passes 35/35; explicit optional
   lint and full app lint/330 surfaces pass. The seven collector tests simulate
   time only in tests; they are not a live elapsed-hour acceptance claim.
-- [ ] Build/install the tested optional connection candidate, then run the coupled
+- [x] Build the optional expiry candidate from 4af84705. All 29 image tests passed.
+- [ ] Complete and verify transfer, install the candidate and publish plugin 0.1.4.
+- [ ] Run the coupled
   protocol with an actually unused token aged through its native lifetime and
   independently verify both fixtures/reset records, sessions, lease and channel
   cleanup. Do not repeat or reopen already accepted standalone current-reset gates.
@@ -647,7 +665,7 @@ spending and destructive operations retain their explicit permission boundaries.
 | ID | Phase 2 deliverable | Current state / next evidence |
 | --- | --- | --- |
 | P2-01 | Source-owned verification intent for all authorization controls | [x] Exact source references for all 22 controls and 68 unique verification entries pass Node and Meteor slot 8. The accepted 29-case subset is unchanged. This closes intent, not live acquisition or whole-runtime coverage. |
-| P2-02 | Exact value-only protected fixture binding contract | Selected binding parser complete; protocol actor/mail/session/lockout values and validation remain. No protected source read is implied. |
+| P2-02 | Exact value-only protected fixture binding contract | [x] Versioned value-only source contract verified in protocolBindingsV2.mjs and the November 13 binding/process tests. It checks the actor set, unique identities, scoped values and exact staging2 target. End-to-end use by every scenario remains under P2-11. |
 | P2-03 | Transport, scenario and evaluator decomposition | Existing selected method/publication/route/download adapters complete. Protocol families remain; keep acquisition separate from pure evaluation. |
 | P2-04 | Positive baselines paired with denials | Selected cases complete. Add verified protocol baselines; failed login, timeout or missing resource cannot prove safety. |
 | P2-05 | Exact policy denial categories | Shared closed outcome union/decision table complete. Protocol-specific classifications and complete expected vectors remain. |
@@ -664,9 +682,9 @@ Current next milestone: continue protocol acquisition/ownership and live unused
 aged-token expiry under the clarified progress-backed passwordless requirement.
 P2-D2 is resolved: the stricter marker gate is withdrawn. Prolific-specific
 validation is a separate improvement candidate, not an audit prerequisite.
-P2-01/06/07/10 remain complete. Current reset/replay, both prior-session denials
-and fresh session lifetime are accepted; do not rerun them unchanged. Two Meteor
-invocations remain in the sole ledger. Full protocol/artifact coverage remains open.
+P2-01/02/06/07/10 are complete. Current reset/replay, both prior-session denials
+and fresh session lifetime are accepted; do not rerun them unchanged. Consult
+the sole standing execution ledger for the remaining Meteor allowance. Full protocol/artifact coverage remains open.
 
 ### Phase 2 comparison foundation (2026-11-12)
 
@@ -1181,9 +1199,9 @@ needed or consumed; two remain. No production action or account-data change.
   Linux source gate passes 377 cases, zero failures and seven existing skips;
   17 focused Windows cases pass. The final Gmail-namespace absence assertion
   also passes separately. Root host-window bash syntax passes.
-- [ ] Publish intentional source only and execute the two new native cases with
-  reserved slot 9. Integrate/qualify the remote
-  fixture window and live adapter afterward; no live acceptance is claimed yet.
+- [x] Publish the intentional source (9accf938) and execute both native cases.
+  Both passed in slot 9, as reconciled against the original receipt in the ledger.
+- [ ] Qualify the remote fixture window and live passwordless adapter on staging2.
 
 Unrelated gaze-tracking/Rspack/harness/docs edits appeared during this work and
 are preserved/excluded. Tests of this working tree can include them; the supported

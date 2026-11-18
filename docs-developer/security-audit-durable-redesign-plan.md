@@ -1385,7 +1385,7 @@ visible without blocking unrelated Phase 2 implementation.
 Deliverables:
 
 - [x] Source-controlled authorization entries in the verification catalog with explicit outcomes and baselines (22 authentication controls/68 source entries; Node and Meteor slot 8 accepted 2026-11-13; acquisition remains separate).
-- Versioned exact protected fixture-binding contract containing values only.
+- [x] Versioned exact protected fixture-binding contract containing values only (P2-02, source contract). Exercising every binding through the staging2 runner remains a Phase 2 exit gate.
 - Decomposed transport, scenario, and evaluator modules.
 - Positive baselines paired with denials.
 - Exact policy-denial categories.
