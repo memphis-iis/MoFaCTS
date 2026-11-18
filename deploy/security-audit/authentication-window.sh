@@ -57,7 +57,7 @@ fi
 docker exec --user 0 mofacts test ! -L "$tool"
 docker exec --user 0 mofacts test -d "$tool"
 (cd "$job/source" && find . -type f -print0 | sort -z | xargs -0 sha256sum) > "$job/source-files.sha256"
-docker exec --user 0 --workdir "$tool" -i mofacts sha256sum -c --quiet < "$job/source-files.sha256"
+docker exec --user 0 --workdir "$tool" -i mofacts sha256sum -c < "$job/source-files.sha256" >/dev/null
 invoke() {
   local action=$1 payload=$2 raw output
   raw=$(printf '%s' "$payload" | base64 -d | timeout --signal TERM --kill-after 5s 40 \

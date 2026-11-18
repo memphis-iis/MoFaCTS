@@ -44,6 +44,19 @@ authorized resuming Phase 2 on staging2.
   connection idle, services healthy, and other containers and HTTPS unchanged.
   P2-08 is complete. One Meteor invocation remains.
 
+### Passwordless return qualification continuation (2026-11-18)
+
+- [x] Verify staging2 application identity, health and the existing fixture window.
+- [x] Diagnose the first preparation failure. The application's container checksum
+  utility does not accept the GNU-specific quiet flag. The window stopped before
+  any fixture call. Retain the original attempt and its recovery marker.
+- [x] Correct the window to suppress successful output while preserving checksum
+  validation and failure status. The command passed against the exact staged
+  archive and rejected an intentionally wrong checksum on staging2.
+- [ ] Recover the original empty window and qualify passwordless return in a fresh
+  window. Preserve the approved progress-backed behavior and keep complete
+  authentication report assembly open.
+
 ## Checklist reconciliation (2026-11-18)
 
 Phase 0 is closed. Phase 1 has 16 of 17 deliverables accepted. Its remaining
