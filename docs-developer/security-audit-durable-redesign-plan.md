@@ -1394,7 +1394,7 @@ Deliverables:
 - [x] Correct reset/session preconditions and an unused aged-token expiration scenario (P2-08, accepted on staging2 with real elapsed-hour expiry and independent cleanup).
 - Environment lock, unique run namespace, idempotent cleanup, and interrupted-run recovery for every stateful scenario.
 - [x] Positive lower and upper session-lifetime bounds (source/native and fresh identity-bound live staging2 proof accepted 2026-11-13; report wiring remains separate).
-- Exact coverage of the Phase 2 authorization controls, linked to stable surface IDs without claiming whole-runtime completeness.
+- [x] Exact coverage of the 22 Phase 2 authorization controls in the staging2 qualification artifact (P2-11). Integrated scanner execution and coordinated ingestion activation remain open exit gates.
 - Behavioral tests for every outcome class.
 - Minimal child-process environment exposure.
 

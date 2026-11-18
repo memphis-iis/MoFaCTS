@@ -85,9 +85,29 @@ authorized resuming Phase 2 on staging2.
   were absent afterward, and the app remained healthy. Protected evidence:
   identifier-ip-throttle-20261118-8c6ac142868f. All 12 focused tests, observer
   lint and Bash syntax passed. No Meteor invocation was used.
-- [ ] Integrate the accepted throttle and other live evidence into the complete
-  22-control report under the next catalog. Live login/reset response and timing
-  comparisons and report assembly remain open.
+- [x] Qualify live login and reset response and timing comparisons on staging2
+  using b363959c. Five login pairs and two reset pairs matched public responses.
+  Paired median gaps were 121.6 ms for login and 67.3 ms for reset, within the
+  approved bounds of 640 ms and 800.7 ms. The owned account and reset records
+  were independently absent. Session cleanup passed, the connection returned
+  to idle, both leases and the worker were absent, and the expected app image
+  remained healthy. Protected receipt: connected-comparison-20261118-af036b05e24c.
+  The earlier launch stopped at operator login during the IP cooldown, before
+  fixture creation. Its observer path also had a syntax error. The corrected
+  observer confirmed both exact identities absent before retry.
+- [x] Assemble and validate the 22-control authentication qualification from
+  eight protected receipts with 39827938. Results: 22 PASS, zero FAIL, zero
+  ERROR. Freeze the candidate v2 catalog in the evidence directory and retain
+  the released v1 catalog and its ingestion behavior. The candidate uses a
+  distinct experiment-eligibility control for the approved progress-based
+  policy and retains the historical literal flag control in v1.
+  Protected evidence: authentication-qualification-20261118.
+  Artifact SHA-256: 87bcf22f63dc24155144b6055154dad6a291d17f8598a54b27304492328e8952.
+  Full lint and 27 focused tests passed. No Meteor invocation was used.
+- [ ] Qualify integrated execution and the coordinated catalog/receiver change
+  before claiming that the standing scanner produces the new artifact. This
+  qualification joined separately executed receipts. The active report and
+  the Phase 2 exit gate remain open.
 
 ## Checklist reconciliation (2026-11-18)
 
@@ -757,7 +777,7 @@ spending and destructive operations retain their explicit permission boundaries.
 | P2-08 | Reset/session preconditions and unused aged token | [x] Complete. Native slot 7 and connected staging2 evidence cover current reset, replay denial, real elapsed-hour rejection of an unused token, session revocation, and independent fixture/lease cleanup. Live evidence: connected-expiry-20261118-d69a2503d8e8. Full authentication report assembly remains P2-11. |
 | P2-09 | Run lock/namespace/idempotent cleanup/recovery | Existing selected synthetic ownership/cleanup accepted; add mutation contracts and recovery for every protocol family. |
 | P2-10 | Positive lower and upper session-lifetime bounds | [x] Source/native validation and fresh identity-bound live staging2 measurement pass: strictly positive and at most 30 days. Append-only v2 proof is accepted; complete authentication report/catalog wiring remains P2-11. |
-| P2-11 | Exact Phase 2 control coverage | 22 authentication controls. The active report still has only the selected authorization result wired. Reuse the accepted live reset/session and passwordless evidence when composing the complete artifact. All three throttle scopes passed live qualification. Comparison and report assembly remain open. Whole-runtime coverage belongs to Phase 3. |
+| P2-11 | Exact Phase 2 control coverage | [x] All 22 controls have live staging2 qualification evidence and a validated candidate artifact with zero errors. Integrated scanner execution and coordinated ingestion activation remain open as separate exit gates. Whole-runtime coverage belongs to Phase 3. |
 | P2-12 | Behavioral tests for all outcome classes | Shared selected-category tests accepted; add protocol malformed/domain/transport/inconclusive/violation regressions and supported Meteor proof at the integration milestone. |
 | P2-13 | Minimal child environments | Existing selected browser/repository/upload separation accepted; extend to protocol/mailbox callers without supplying unrelated secrets. |
 
