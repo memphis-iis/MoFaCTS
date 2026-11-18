@@ -50,7 +50,8 @@ export async function runStagingFixtureStorageActionV2(action, payload, runtime)
   }
   if (action.startsWith('reset-')) {
     if (typeof value.recipient !== 'string' || value.recipient.length > 254
-      || !new RegExp(`^[a-z0-9._-]+\\+${value.namespace}-(reset|expiry)@gmail\\.com$`).test(value.recipient)
+      || (!new RegExp(`^[a-z0-9._-]+\\+${value.namespace}-(reset|expiry)@gmail\\.com$`).test(value.recipient)
+        && !(action === 'reset-observe' && value.userId === null && value.recipient === `${value.namespace}-missing@localhost.invalid`))
       || value.userId !== null && (typeof value.userId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value.userId))
       || !Number.isSafeInteger(value.startedAt) || !Number.isSafeInteger(value.deadlineMs)
       || value.startedAt < 0 || value.deadlineMs <= value.startedAt || value.deadlineMs - value.startedAt > 7200000) invalid();

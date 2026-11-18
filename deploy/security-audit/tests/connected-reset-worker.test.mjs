@@ -6,6 +6,7 @@ import { runConnectedResetWorkerV2 } from '../connected-reset-worker.mjs';
 const namespace = 'mofacts_audit_fixture_0123456789ab';
 async function run(mode) {
   const protocol = mode.startsWith('protocol-');
+  const comparison = mode === 'comparison';
   const input = new PassThrough(), output = new PassThrough();
   let text = '', ready = false, launched = 0, transportClosed = 0, browserClosed = 0, cleanupAccepted = false;
   output.on('data', bytes => {
@@ -24,13 +25,16 @@ async function run(mode) {
       queueMicrotask(() => input.write(JSON.stringify(response) + '\n'));
     } else if (['current-age-needed', 'expiry-age-needed'].includes(frame.operation)) queueMicrotask(() => input.write(JSON.stringify({
       operation:frame.operation,metadata:{owned:true,unused:true,ageMs:0,lifetimeMs:3600000,remainingMs:3600000} })+'\n'));
+    else if (frame.operation === 'comparison-ownership-needed') queueMicrotask(() => input.write(JSON.stringify({
+      operation: frame.operation, verified: true }) + '\n'));
     else if (frame.operation === 'cleanup-required') queueMicrotask(() => input.write(JSON.stringify({
       operation: 'cleanup-required', namespace: mode === 'wrong-namespace' ? 'mofacts_audit_fixture_aaaaaaaaaaaa' : namespace,
       verified: mode !== 'cleanup-denied' }) + '\n'));
   });
   let result, error;
   try {
-    result = await runConnectedResetWorkerV2({ namespace, deadlineMs: Date.now() + (protocol ? 6000000 : 2000), scope: protocol ? 'protocol' : 'current',
+    result = await runConnectedResetWorkerV2({ namespace, deadlineMs: Date.now() + (protocol ? 6000000 : 2000),
+      scope: protocol ? 'protocol' : comparison ? 'comparison' : 'current',
       socketPath: '/private/scanner.sock', leaseDirectory: '/private/lease', input, output }, {
       withHandoff: async options => {
         if (mode === 'lease-denied') throw new Error('PRIVATE_LEASE_DETAIL');
@@ -39,7 +43,7 @@ async function run(mode) {
         try { value = await options.run({ acquireMail: async () => { if (!protocol) throw new Error('Unexpected mail'); return {plainText:'PRIVATE'}; },
           acquireVerificationMail: async binding => ({ metadata: { messageId: 'owned', recipients: [binding.recipient], receivedAtMs: binding.requestedAtMs },
             plainText: `${binding.target}/auth/verify-email?token=PRIVATE_NATIVE_TOKEN` }),
-          beginResetWindow: async () => {}, beginExpiryWindow:async()=>{}, confirmMailLease:async()=>{} }); }
+          beginResetWindow: async () => { assert.equal(comparison, false); }, beginExpiryWindow:async()=>{}, confirmMailLease:async()=>{} }); }
         catch (caught) { failure = caught; }
         cleanupAccepted = await options.verifyClean();
         if (!cleanupAccepted) throw new Error('Cleanup not verified');
@@ -51,6 +55,12 @@ async function run(mode) {
         assert.equal(token, 'PRIVATE_NATIVE_TOKEN');
         return { state: 'owned-fixture-email-verified', nativeVerificationSucceeded: true, ownedIdentityMatched: true };
       }, async close() { transportClosed++; } }),
+      captureComparisons: async options => {
+        assert.equal(await options.requireOwnership(), true);
+        assert.equal(options.actor.userId, 'owned');
+        await options.confirmLease();
+        return { proofs: [{ status: 'PASS' }, { status: 'PASS' }] };
+      },
       capture: async options => {
         assert.equal(options.actor.password, 'PRIVATE_SYNTHETIC_PASSWORD');
         assert.equal(options.newPassword, 'PRIVATE_SYNTHETIC_NEW_PASSWORD');
@@ -78,6 +88,13 @@ async function run(mode) {
   assert.equal(text.includes('PRIVATE'), false);
   return { result, error, text, launched, transportClosed, browserClosed, cleanupAccepted };
 }
+
+test('comparison scope verifies the fixture and cleanup without opening a reset mail handoff', async () => {
+  const value = await run('comparison');
+  assert.equal(value.error, undefined);
+  assert.equal(value.result.proofs.length, 2);
+  assert.equal(value.cleanupAccepted, true);
+});
 
 test('combined protocol keeps separate verified actors and evaluates all six reset cases before independent cleanup',async()=>{
   const value=await run('protocol-success');assert.equal(value.error,undefined);
