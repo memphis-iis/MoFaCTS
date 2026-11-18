@@ -13,8 +13,7 @@ function observation() {
 describe('passwordless protocol evidence in Meteor', function() {
   it('retains exact source references for all 22 Phase 2 controls without activating a report', function() {
     expect(AUTHENTICATION_CONTROL_CASES).to.have.length(22);
-    expect(AUDIT_VERIFICATIONS).to.have.length(68);
-    const ids = new Set(AUDIT_VERIFICATIONS.map(row => row.verificationId));
+    const ids = new Set(AUDIT_VERIFICATIONS.filter(row => row.kind !== 'integrationTest').map(row => row.verificationId));
     expect(ids.size).to.equal(68);
     expect(AUTHENTICATION_CONTROL_CASES.every(row => row.verificationIds.every(id => ids.has(id)))).to.equal(true);
   });

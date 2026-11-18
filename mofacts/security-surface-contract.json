@@ -1231,7 +1231,8 @@
     },
     {
       "name": "/health",
-      "access": "public-rate-limited"
+      "access": "public",
+      "review": "2026-11-18: Mounted GET/HEAD operational status. The application handler has no rate limiter. Deployment ingress policy is reviewed separately."
     },
     {
       "name": "/cdn/storage/Assets",

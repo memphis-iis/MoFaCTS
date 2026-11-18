@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { WebApp } from 'meteor/webapp';
 import { buildHealthPayload } from './health';
+import { registeredPublicHttpMounts } from '../securitySurfaces/registerHttpRoutes.ts';
 
 describe('/health endpoint payload', function() {
   it('returns a stable shape for monitoring', function() {
@@ -22,6 +23,16 @@ describe('/health mounted HTTP behavior', function() {
     const address = WebApp.httpServer.address();
     if (!address || typeof address === 'string') throw new Error('Application TCP listener is unavailable');
     origin = `http://127.0.0.1:${address.port}`;
+  });
+
+  it('registers the live mounted middleware with its reviewed public policy and verification', function() {
+    const routes = registeredPublicHttpMounts().filter(route => route.mount === '/health');
+    expect(routes).to.have.length(1);
+    expect(routes[0]).to.include({ surfaceId: 'middleware:health', stack: 'connectHandlers', dispatch: 'mounted-prefix' });
+    expect(routes[0]?.policy).to.deep.equal({ kind: 'public', applicationRateLimit: 'none' });
+    expect(routes[0]?.dataEgress).to.deep.equal({ kind: 'public-operational-metadata' });
+    expect(routes[0]?.verification.endpoints.map(entry => entry.surfaceId)).to.deep.equal(['http:get:/health', 'http:head:/health']);
+    expect(routes[0]?.verification.fallthrough.verificationId).to.equal('http.health.fallthrough');
   });
 
   it('serves health for GET through the mounted path and its suffixes', async function() {

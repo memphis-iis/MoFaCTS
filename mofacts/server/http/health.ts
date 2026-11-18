@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { WebApp } from 'meteor/webapp';
-import type { IncomingMessage, ServerResponse } from 'http';
+import { HTTP_HEALTH_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registerPublicHttpMount } from '../securitySurfaces/registerHttpRoutes.ts';
 
 export function buildHealthPayload(now = new Date()) {
   return {
@@ -12,11 +13,10 @@ export function buildHealthPayload(now = new Date()) {
   };
 }
 
-WebApp.connectHandlers.use('/health', function(req: IncomingMessage, res: ServerResponse, next: () => void) {
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    next();
-    return;
-  }
+registerPublicHttpMount(WebApp.connectHandlers, '/health', {
+  verification: HTTP_HEALTH_VERIFICATIONS,
+  dataEgress: { kind: 'public-operational-metadata' },
+}, (_request, res) => {
   const payload = buildHealthPayload();
 
   res.writeHead(200, {

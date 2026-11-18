@@ -259,13 +259,46 @@ for (const entry of entries) {
     }
   }
 }
+type HttpIntegrationVerification = Readonly<{
+  kind: 'integrationTest';
+  lane: 'meteor';
+  verificationId: string;
+  suite: string;
+  cases: readonly [string, ...string[]];
+  expectedOutcome: 'pass';
+  mutation: 'none';
+}>;
+
+export type PublicHttpVerification = Readonly<{
+  endpoints: readonly (HttpIntegrationVerification & {
+    method: 'GET' | 'HEAD';
+    surfaceId: `http:${'get' | 'head'}:/${string}`;
+  })[];
+  fallthrough: HttpIntegrationVerification & { surfaceId: `middleware:${string}` };
+}>;
+
+const healthSuite = '/health mounted HTTP behavior';
+const healthTest = { kind: 'integrationTest', lane: 'meteor', suite: healthSuite, expectedOutcome: 'pass', mutation: 'none' } as const;
+export const HTTP_HEALTH_VERIFICATIONS = Object.freeze({
+  endpoints: Object.freeze([
+    Object.freeze({ ...healthTest, verificationId: 'http.health.get', method: 'GET', surfaceId: 'http:get:/health',
+      cases: Object.freeze(['serves health for GET through the mounted path and its suffixes'] as const) }),
+    Object.freeze({ ...healthTest, verificationId: 'http.health.head', method: 'HEAD', surfaceId: 'http:head:/health',
+      cases: Object.freeze(['preserves HEAD without a response body'] as const) }),
+  ]),
+  fallthrough: Object.freeze({ ...healthTest, verificationId: 'http.health.fallthrough', surfaceId: 'middleware:health',
+    cases: Object.freeze(['leaves an unsupported method to the application default handler',
+      'leaves an adjacent prefix to the application rather than serving health JSON'] as const) }),
+} satisfies PublicHttpVerification);
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
 export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS,
   AUTHENTICATION_COMPARISON_BASELINE, ...AUTHENTICATION_PROTOCOL_VERIFICATIONS, ...RESET_PROTOCOL_VERIFICATIONS,
   ...PASSWORDLESS_PROTOCOL_VERIFICATIONS, ...AUTHENTICATION_THROTTLE_CASES, ...AUTHENTICATION_MATERIAL_CASES,
-  ...AUTHENTICATION_SESSION_VERIFICATIONS]);
+  ...AUTHENTICATION_SESSION_VERIFICATIONS,
+  ...HTTP_HEALTH_VERIFICATIONS.endpoints, HTTP_HEALTH_VERIFICATIONS.fallthrough]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }
