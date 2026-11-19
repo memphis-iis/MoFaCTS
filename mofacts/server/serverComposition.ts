@@ -107,6 +107,8 @@ import { createMediaReferenceHelpers } from './lib/mediaReferences';
 import { getMemphisSamlClientConfig } from './lib/memphisSaml';
 import { createTdfLookupHelpers } from './lib/tdfLookup';
 import { registerSparcRetrievalPublication } from './lib/sparcRetrievalPublication';
+import { DEFAULT_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
+import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
 import { createSparcDemoAccess } from './lib/sparcDemoAccess';
 import { createSparcLessonAuthorizer, requireSparcLessonAccess } from './lib/sparcLessonAccess';
 import {
@@ -668,7 +670,7 @@ const {
 } = experimentMethods;
 
 // Published to all clients (even without subscription calls)
-Meteor.publish(null, function() {
+registerDefaultPublication(Meteor, 'publication:default:account-self', DEFAULT_PUBLICATION_VERIFICATIONS.account, function publishCurrentAccount() {
   // Only valid way to get the user ID for publications
   const userId = this.userId;
 

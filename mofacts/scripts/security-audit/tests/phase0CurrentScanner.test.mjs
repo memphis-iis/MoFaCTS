@@ -141,7 +141,7 @@ test('P0-2 WITNESS: an already-expired session lifetime is accepted as PASS', ()
   }), 'PASS');
 });
 
-test('P0-1 WITNESS: the current checker misses handlers-stack routes and collapses default publications', () => {
+test('the source checker lists the migrated middleware and distinguishes both default publications', () => {
   const inventory = JSON.parse(execFileSync(process.execPath, [
     'scripts/security-audit/check-security-surfaces.mjs', '--discover',
   ], { cwd: appRoot, windowsHide: true, timeout: 15000, encoding: 'utf8', env: {
@@ -149,14 +149,12 @@ test('P0-1 WITNESS: the current checker misses handlers-stack routes and collaps
   } }));
   const pwa = sourceFile('server/http/pwa.ts');
   assert.equal(findNodes(pwa, (node) => ts.isCallExpression(node)
-    && node.expression.getText(pwa) === 'WebAppAny.handlers.use').length, 1);
+    && node.expression.getText(pwa) === 'registerHttpMiddleware'
+    && node.arguments[1]?.getText(pwa) === "'handlers'").length, 1);
   assert.ok(pwa.text.includes("'/site.webmanifest'"));
   assert.equal(inventory.httpRoutes.includes('/site.webmanifest'), false);
-  const countDefaults = (relative) => {
-    const source = sourceFile(relative);
-    return findNodes(source, (node) => ts.isCallExpression(node)
-      && node.expression.getText(source) === 'Meteor.publish' && node.arguments[0]?.kind === ts.SyntaxKind.NullKeyword).length;
-  };
-  assert.ok(countDefaults('server/publications.ts') + countDefaults('server/serverComposition.ts') >= 2);
-  assert.equal(inventory.publications.filter((name) => name === '<default>').length, 1);
+  assert.ok(inventory.httpMiddleware.includes('middleware:pwa-assets'));
+  assert.deepEqual(inventory.publications.filter(name => name.startsWith('publication:default:')),
+    ['publication:default:account-self', 'publication:default:role-assignments-self']);
+  assert.equal(inventory.publications.includes('<default>'), false);
 });

@@ -1081,7 +1081,11 @@
   ],
   "publications": [
     {
-      "name": "<default>",
+      "name": "publication:default:account-self",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "publication:default:role-assignments-self",
       "access": "authenticated-self"
     },
     {

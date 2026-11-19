@@ -324,6 +324,22 @@ export const HTTP_FILE_VERIFICATIONS = Object.freeze({
 
 const middlewareTest = { kind: 'integrationTest', lane: 'meteor', suite: 'application HTTP registration',
   expectedOutcome: 'pass', mutation: 'none' } as const;
+export const HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION = Object.freeze({
+  ...middlewareTest,
+  surfaceId: 'framework:webapp:external-runtime-config',
+  verificationId: 'http.meteor.external-runtime-config',
+  cases: Object.freeze(['binds the Meteor runtime configuration as a same-origin external script'] as const),
+});
+const defaultPublicationTest = { kind: 'integrationTest', lane: 'meteor', suite: 'application default publications',
+  expectedOutcome: 'pass', mutation: 'none' } as const;
+export const DEFAULT_PUBLICATION_VERIFICATIONS = Object.freeze({
+  account: Object.freeze({ ...defaultPublicationTest, surfaceId: 'publication:default:account-self',
+    verificationId: 'publication.default.account-self',
+    cases: Object.freeze(['automatically publishes only the current account projection'] as const) }),
+  roles: Object.freeze({ ...defaultPublicationTest, surfaceId: 'publication:default:role-assignments-self',
+    verificationId: 'publication.default.role-assignments-self',
+    cases: Object.freeze(['automatically publishes only the current role assignments'] as const) }),
+});
 const samlMethodCases = Object.freeze(['retains SAML method handling on all three exact paths'] as const);
 const socialPreviewCases = Object.freeze(['serves social crawler metadata and lets an ordinary request reach the app'] as const);
 export const HTTP_MIDDLEWARE_VERIFICATIONS = Object.freeze({

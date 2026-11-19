@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Meteor } from 'meteor/meteor';
 import { WebApp } from 'meteor/webapp';
 import { SPARC_PROMPT_IMAGE_PURPOSE } from '../../common/lib/sparcPromptImage';
-import { HTTP_FILE_VERIFICATIONS, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { HTTP_FILE_VERIFICATIONS, HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
 import { getLocalStoragePaths } from '../lib/storageBoundary';
 import { registeredHttpSurfaces } from '../securitySurfaces/registerHttpRoutes.ts';
 
@@ -16,6 +16,27 @@ describe('application HTTP registration', function() {
     const address = WebApp.httpServer.address();
     if (!address || typeof address === 'string') throw new Error('Application TCP listener is unavailable');
     origin = `http://127.0.0.1:${address.port}`;
+  });
+
+  it('binds the Meteor runtime configuration as a same-origin external script', async function() {
+    const found = registeredHttpSurfaces().filter(entry => entry.surfaceId === 'framework:webapp:external-runtime-config');
+    expect(found).to.have.length(1);
+    expect(found[0]).to.include({ stack: 'framework', dispatch: 'framework-owned',
+      mount: '/meteor_runtime_config.js', verification: HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION });
+    expect(found[0]?.policy).to.deep.equal({ kind: 'external-runtime-config', inlineScriptsAllowed: false });
+
+    const page = await fetch(`${origin}/`, { signal: AbortSignal.timeout(5000) });
+    expect(page.status).to.equal(200);
+    const markup = await page.text();
+    expect(markup).not.to.match(/<script[^>]*>\s*__meteor_runtime_config__\s*=/);
+    const script = /<script\b[^>]*\bsrc="([^"]*\/meteor_runtime_config\.js[^"]*)"/.exec(markup)?.[1];
+    expect(script).to.be.a('string');
+    const scriptUrl = new URL(script!, origin);
+    expect(scriptUrl.origin).to.equal(origin);
+    const response = await fetch(scriptUrl, { signal: AbortSignal.timeout(5000) });
+    expect(response.status).to.equal(200);
+    expect(response.headers.get('content-type')).to.match(/javascript/);
+    expect(await response.text()).to.include('__meteor_runtime_config__');
   });
 
   it('binds each file handler once on its existing HTTP stack', function() {

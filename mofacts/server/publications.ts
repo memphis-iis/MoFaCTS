@@ -22,6 +22,8 @@ import { ensurePublishedDeploymentBrandProfile } from './lib/deploymentBrandProf
 import { DEPLOYMENT_BRAND_PROFILE_KEY } from '../common/deploymentBrandProfile';
 import { assignmentMemberTdfIds } from '../common/progressiveAssignments';
 import { publishAdminUserPage } from './lib/adminUserPagePublication';
+import { DEFAULT_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
+import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
 
 // Use Meteor.roleAssignment — set unconditionally by alanning:roles v4 at
 // package load time. The named export RoleAssignmentCollection resolves to
@@ -57,7 +59,7 @@ function buildFilteredUsersSelector(filter: unknown) {
 
 // Auto-publish the current user's role assignments so client-side
 // minimongo is populated for synchronous role checks in roleUtils.ts.
-Meteor.publish(null, function() {
+registerDefaultPublication(Meteor, 'publication:default:role-assignments-self', DEFAULT_PUBLICATION_VERIFICATIONS.roles, function publishCurrentRoleAssignments() {
   if (!this.userId) return this.ready();
   return getRoleAssignment().find({'user._id': this.userId});
 });

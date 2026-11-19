@@ -698,10 +698,12 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   const index = fs.readFileSync(new URL('../../client/index.html', import.meta.url), 'utf8');
   const serverMain = fs.readFileSync(new URL('../../server/main.ts', import.meta.url), 'utf8');
   const cspRuntime = fs.readFileSync(new URL('../../server/runtime/contentSecurityPolicy.ts', import.meta.url), 'utf8');
+  const httpRegistration = fs.readFileSync(new URL('../../server/securitySurfaces/registerHttpRoutes.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(index, /<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index, /<style\b/i);
   assert.match(serverMain, /runtime\/contentSecurityPolicy/);
-  assert.match(cspRuntime, /setInlineScriptsAllowed\(false\)/);
+  assert.match(cspRuntime, /await bindFrameworkRuntimeConfig\(webAppInternals, HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION\)/);
+  assert.match(httpRegistration, /await webAppInternals\.setInlineScriptsAllowed\(false\)/);
   assert.doesNotMatch(apache, /ws:\/\/localhost:3000/);
   const auditAdmin = fs.readFileSync(new URL('../../client/views/adminSecurityAuditsV2.ts', import.meta.url), 'utf8');
   assert.match(auditAdmin, /text\(key, options\?\.hash\)/);

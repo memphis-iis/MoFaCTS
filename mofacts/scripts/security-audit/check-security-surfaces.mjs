@@ -80,6 +80,7 @@ export async function discoverSecuritySurfaces() {
     httpMiddleware.push(...regexMatches(text, /registerHttpMiddleware\(\s*\w+,\s*'(?:handlers|connectHandlers)',\s*\{\s*surfaceId:\s*'(middleware:[^']+)'/g, (match) => match[1]));
     publications.push(...regexMatches(text, /Meteor\.publish\(\s*(?:'([^']+)'|null)/g,
       (match) => match[1] || '<default>'));
+    publications.push(...regexMatches(text, /registerDefaultPublication\(\s*Meteor,\s*'(publication:default:[^']+)'/g, (match) => match[1]));
     httpRoutes.push(...regexMatches(text, /(?:connectHandlers|rawConnectHandlers)\.use\(\s*'([^']+)'/g, (match) => match[1]));
     httpRoutes.push(...regexMatches(text, /registerPublicHttpMount\(\s*WebApp\.connectHandlers,\s*'([^']+)'/g, (match) => match[1]));
     httpRoutes.push(...regexMatches(text, /registerProtocolHttpMount\(\s*WebApp,\s*'(?:rawConnectHandlers|connectHandlers)',\s*'([^']+)'/g, (match) => match[1]));
@@ -98,8 +99,9 @@ export async function discoverSecuritySurfaces() {
   const ownership = await fs.readFile(path.join(appRoot, 'common', 'collectionOwnership.ts'), 'utf8');
   const assetName = ownership.match(/DynamicAssets:\s*\{\s*mongoName:\s*'([^']+)'/)?.[1];
   if (!assetName || !collections.includes("collectionName: collectionMongoName('DynamicAssets')")
-      || !collections.includes('allowClientCode: false') || !collections.includes('disableSetTokenCookie: true')) {
-    throw new Error('Review the DynamicAssets package security binding before classifying its methods.');
+      || !collections.includes('allowClientCode: false') || !collections.includes('disableSetTokenCookie: true')
+      || !collections.includes('disableDownload: true')) {
+    throw new Error('Review the DynamicAssets package binding before classifying its DDP-only surface.');
   }
   methods.push(...Object.values(uploadMethodNames(assetName)));
   const uniqueMethods = [...new Set(methods)].sort();

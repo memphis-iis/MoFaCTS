@@ -48,7 +48,16 @@ type HttpMiddlewareDescriptor = Readonly<{
 );
 
 type HttpMiddleware = HttpMiddlewareDescriptor & Readonly<{ mount: null; stack: MiddlewareStack; dispatch: 'handler-owned' }>;
-type HttpRegistration = PublicHttpMount | ProtocolHttpMount | HttpMiddleware;
+type FrameworkRuntimeConfig = Readonly<{
+  surfaceId: 'framework:webapp:external-runtime-config';
+  mount: '/meteor_runtime_config.js';
+  stack: 'framework';
+  dispatch: 'framework-owned';
+  policy: Readonly<{ kind: 'external-runtime-config'; inlineScriptsAllowed: false }>;
+  dataEgress: Readonly<{ kind: 'public-runtime-config' }>;
+  verification: HttpIntegrationVerification & { surfaceId: 'framework:webapp:external-runtime-config' };
+}>;
+type HttpRegistration = PublicHttpMount | ProtocolHttpMount | HttpMiddleware | FrameworkRuntimeConfig;
 
 const registrations: HttpRegistration[] = [];
 
@@ -103,6 +112,23 @@ export function registerHttpMiddleware<Stack extends MiddlewareStack>(
 ): void {
   stacks[stack].use(handler);
   registrations.push(Object.freeze({ ...descriptor, stack, mount: null, dispatch: 'handler-owned' }));
+}
+
+export async function bindFrameworkRuntimeConfig(
+  webAppInternals: { setInlineScriptsAllowed(allowed: boolean): Promise<void> },
+  verification: FrameworkRuntimeConfig['verification'],
+): Promise<void> {
+  // Meteor owns the route and response. Preserve the awaited startup hook.
+  await webAppInternals.setInlineScriptsAllowed(false);
+  registrations.push(Object.freeze({
+    surfaceId: verification.surfaceId,
+    mount: '/meteor_runtime_config.js',
+    stack: 'framework',
+    dispatch: 'framework-owned',
+    policy: Object.freeze({ kind: 'external-runtime-config', inlineScriptsAllowed: false }),
+    dataEgress: Object.freeze({ kind: 'public-runtime-config' }),
+    verification,
+  }));
 }
 
 // Coverage and sealing belong to final composition after every owner is accounted for.
