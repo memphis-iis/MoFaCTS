@@ -248,11 +248,23 @@ two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 2
   lesson content in another study requires its own condition identity.
   The defensive read rule covers inconsistent references and does not
   imply support for shared-condition progress storage.
-- [ ] Close the package-upload validation gap for single-root ownership.
-  Identity remapping requires the child in the package. The upload path
-  rejects conflicting visibility across roots but lacks an unconditional
-  single-root check. Verify new and updated packages, including competing
-  updates, without reassigning or deleting existing progress.
+- [x] Trace TDF condition writers and their persistence ordering. Both ZIP
+  upload and private-repository import write canonical condition IDs.
+  Per-root revisions cannot serialize writes by two different roots.
+- [x] Implement shared package identity preflight. Reject a child claimed
+  by multiple incoming roots or already referenced by another persisted
+  root. Allow same-root updates and copies with new condition identities.
+  Confirmed ZIP updates rerun the same check before content writes.
+- [ ] Verify package preflight and candidate database uniqueness on the
+  isolated Meteor worker. Include a rejected ZIP before mutation, the
+  same-root update, a valid copy and simultaneous competing root writes.
+- [ ] Decide the rollout for a database constraint across experiment roots.
+  A partial unique index on existing condition IDs can enforce this across
+  concurrent writers. It requires a count-only preflight on the deployment
+  data and a defined response if there are duplicate references. Leave
+  existing condition assignments and learner progress untouched. Confirm
+  failed package recovery can only restore writes owned by that package
+  before activating a constraint on a shared database.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 

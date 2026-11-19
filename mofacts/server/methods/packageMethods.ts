@@ -6,6 +6,7 @@ import { isPublicDemoTutor } from '../../common/publicDemoContract';
 import { check, Match } from 'meteor/check';
 import { parsePackageZip, disposeParsedPackage, type UploadedPackageFile } from '../lib/packageParser';
 import { processPackageUploadWorkflow } from '../lib/packageUpload';
+import { assertPackageConditionOwnership } from '../lib/packageTdfIdentity';
 import { uploadPackageMedia } from '../lib/mediaUploader';
 import type { PackageUploadIntegrity, ProcessPackageUploadDeps } from '../lib/packageUploadShared';
 import type { createStorageBoundary } from '../lib/storageBoundary';
@@ -978,6 +979,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         throw new Meteor.Error('invalid-private-repo-tdf', `${entry.record.sourceFileName}: ${validation.errors.join('; ')}`);
       }
     }
+
+    await assertPackageConditionOwnership(deps.Tdfs, entries.map(({ tdfId, record }) => ({
+      tdfId, conditionTdfIds: record.tdfs.tutor.setspec.conditionTdfIds ?? [],
+    })));
 
     const results = [];
     for (const entry of entries) {

@@ -29,6 +29,10 @@ async function writeIdentityPackage(tdfId: string) {
     },
   }));
   zip.file('stimuli.json', JSON.stringify({ setspec: { clusters: [] } }));
+  return writePackage(zip);
+}
+
+async function writePackage(zip: any) {
   const zipPath = path.join(os.tmpdir(), `mofacts-package-identity-${Date.now()}-${Math.random()}.zip`);
   fs.writeFileSync(zipPath, await zip.generateAsync({ type: 'nodebuffer' }));
   return zipPath;
@@ -176,6 +180,28 @@ describe('package upload identity confirmation integration', function() {
   afterEach(function() {
     if (zipPath && fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
     zipPath = '';
+  });
+
+  it('rejects two roots claiming one condition before starting an upload mutation', async function() {
+    const zip = new JSZip();
+    for (const lessonname of ['First root', 'Second root']) {
+      zip.file(`${lessonname}.json`, JSON.stringify({ tutor: { setspec: {
+        lessonname, stimulusfile: 'stimuli.json', condition: ['child.json'],
+      } } }));
+    }
+    zip.file('child.json', JSON.stringify({ tutor: {
+      setspec: { lessonname: 'Condition', stimulusfile: 'stimuli.json' }, unit: [{}],
+    } }));
+    zip.file('stimuli.json', JSON.stringify({ setspec: { clusters: [] } }));
+    zipPath = await writePackage(zip);
+    const state: IntegrationState = { contentWrites: 0, removedAssetIds: [], storedTdf: null };
+    const deps = createWorkflowDeps(state);
+    const asset = { _id: 'asset-shared-condition', path: zipPath, userId: 'owner-1', ext: 'zip',
+      name: 'identity-package.zip', size: fs.statSync(zipPath).size };
+    await assert.rejects(() => processPackageUploadWorkflow({ userId: 'owner-1' }, asset, 'owner-1', false, deps),
+      /Each condition TDF must belong to one experiment root/);
+    assert.equal(state.mutationJob, undefined);
+    assert.equal(state.contentWrites, 0);
   });
 
   it('preflights without writes, rejects stale confirmation, then commits the exact TDF id', async function() {

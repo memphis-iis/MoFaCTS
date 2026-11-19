@@ -2,6 +2,8 @@ import { strict as assert } from 'node:assert';
 
 import type { UploadedPackageFile } from './packageParser';
 import { preflightPackageTdfIdentities } from './packageTdfIdentity';
+import { Random } from 'meteor/random';
+import { Tdfs } from '../../common/Collections';
 
 function tdfFile(name: string, options: {
   tdfId?: unknown;
@@ -57,6 +59,10 @@ function deps(existing: any[] = [], manageable = true) {
             const targets = selector?.['content.tdfs.tutor.setspec.experimentTarget']?.$in;
             if (targets) {
               return existing.filter((doc) => targets.includes(doc?.content?.tdfs?.tutor?.setspec?.experimentTarget));
+            }
+            const childIds = selector?.['content.tdfs.tutor.setspec.conditionTdfIds']?.$in;
+            if (childIds) {
+              return existing.filter((doc) => doc.content?.tdfs?.tutor?.setspec?.conditionTdfIds?.some((id: string) => childIds.includes(id)));
             }
             const names = [
               ...(selector?.$or?.[0]?.['content.fileName']?.$in || []),
@@ -243,6 +249,69 @@ describe('packageTdfIdentity', function() {
       ownerId: 'owner-1',
       deps: deps([{ _id: 'unrelated-child', content: { fileName: 'missing.json' } }]),
     }), /child is not in the package/);
+  });
+
+  it('rejects two roots claiming the same packaged child regardless of import mode', async function() {
+    const files = packageFiles(
+      tdfFile('first.json', { conditions: ['child.json'] }),
+      tdfFile('second.json', { conditions: ['child.json'] }),
+      tdfFile('child.json'),
+    );
+    for (const identityMode of ['preserve', 'copy'] as const) {
+      await assert.rejects(() => preflightPackageTdfIdentities({ unzippedFiles: files, identityMode,
+        packageAssetId: 'shared-child-package', ownerId: 'owner', deps: deps() }),
+      (error: any) => error?.error === 'condition-root-conflict');
+    }
+  });
+
+  it('preserves an existing child for its own root and rejects reassignment to another root', async function() {
+    const existingRoot = { _id: 'root-id', ownerId: 'owner',
+      content: { tdfs: { tutor: { setspec: { conditionTdfIds: ['child-id'] } } } } };
+    const existing = [existingRoot, { _id: 'child-id', ownerId: 'owner' }];
+    const root = tdfFile('root.json', { tdfId: 'root-id', conditions: ['child.json'], conditionTdfIds: ['child-id'] });
+    const child = tdfFile('child.json', { tdfId: 'child-id' });
+    const plan = await preflightPackageTdfIdentities({ unzippedFiles: packageFiles(root, child),
+      packageAssetId: 'existing-family', ownerId: 'owner', deps: deps(existing) });
+    assert.deepEqual(plan.entries.find(entry => entry.tdfId === 'root-id')?.conditionTdfIds, ['child-id']);
+
+    const newRoot = tdfFile('new-root.json', { conditions: ['child.json'], conditionTdfIds: ['child-id'] });
+    const args = { unzippedFiles: packageFiles(newRoot, child), packageAssetId: 'new-family', ownerId: 'owner', deps: deps(existing) };
+    await assert.rejects(() => preflightPackageTdfIdentities(args),
+      (error: any) => error?.error === 'condition-root-conflict');
+
+    const copy = await preflightPackageTdfIdentities({ ...args, identityMode: 'copy' });
+    const copiedChild = copy.entries.find(entry => entry.fileName === 'child.json');
+    assert.notEqual(copiedChild?.tdfId, 'child-id');
+    assert.deepEqual(copy.entries.find(entry => entry.fileName === 'new-root.json')?.conditionTdfIds, [copiedChild?.tdfId]);
+  });
+
+  it('characterizes single-parent database enforcement and its existing-data requirement', async function() {
+    const collection = Tdfs.rawDatabase().collection<{ _id: string }>(`testConditionOwnership_${Random.id()}`);
+    const field = 'content.tdfs.tutor.setspec.conditionTdfIds';
+    const root = (_id: string, conditionTdfIds: string[]) => ({ _id, content: { tdfs: { tutor: { setspec: { conditionTdfIds } } } } });
+    const requireUniqueChild = () => collection.createIndex({ [field]: 1 }, {
+      unique: true, partialFilterExpression: { [`${field}.0`]: { $exists: true } },
+    });
+    const duplicateKey = (error: any) => error?.code === 11000;
+    try {
+      await collection.insertMany([root('legacy-a', ['legacy']), root('legacy-b', ['legacy'])]);
+      await assert.rejects(requireUniqueChild, duplicateKey);
+      assert.equal(await collection.countDocuments({ [field]: 'legacy' }), 2);
+      await collection.deleteMany({ _id: { $in: ['legacy-a', 'legacy-b'] } });
+
+      await requireUniqueChild();
+      await collection.insertMany([root('standalone-a', []), root('standalone-b', []), root('root-a', ['a']), root('root-b', ['b'])]);
+      const results = await Promise.allSettled([
+        collection.updateOne({ _id: 'root-a' }, { $set: { [field]: ['a', 'competing-child'] } }),
+        collection.updateOne({ _id: 'root-b' }, { $set: { [field]: ['b', 'competing-child'] } }),
+      ]);
+      assert.equal(results.filter(result => result.status === 'fulfilled' && result.value.modifiedCount === 1).length, 1);
+      assert.equal(results.filter(result => result.status === 'rejected' && duplicateKey(result.reason)).length, 1);
+      assert.equal(await collection.countDocuments({ [field]: 'competing-child' }), 1);
+      assert.equal(await collection.countDocuments({ [field]: { $in: ['a', 'b'] } }), 2);
+    } finally {
+      await collection.drop();
+    }
   });
 
   it('rekeys every TDF and remaps condition ids when importing as a copy', async function() {
