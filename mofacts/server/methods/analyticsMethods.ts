@@ -1,4 +1,5 @@
 import { participantConnectionRoot } from '../lib/participantSession';
+import { participantProgressLessonIds, requireAccountProgressSession, requireParticipantProgressLesson } from '../lib/participantProgressScope';
 import { requireSparcLessonAccess } from '../lib/sparcLessonAccess';
 import { isSparcAdminPolicy, SPARC_INSTRUCTIONAL_POLICY_IDS } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import { worksheetHistoryWriteId } from '../lib/worksheetHistoryWrite';
@@ -557,15 +558,16 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
 
   async function createExperimentState(
     curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string },
-    actorUserId: string | null,
+    context: MethodContext,
     options: { replaceExistingState?: boolean; allocateCondition?: boolean } = {},
   ) {
-    const resolvedUserId = requireAuthenticatedUser(actorUserId, 'Must be logged in', 401);
+    const resolvedUserId = requireAuthenticatedUser(context.userId, 'Must be logged in', 401);
     const rootTdfId = deps.normalizeCanonicalId((curExperimentState as any)?.currentRootTdfId)
       || deps.normalizeCanonicalId(curExperimentState.currentTdfId);
     if (!rootTdfId) {
       throw new Meteor.Error(400, 'createExperimentState requires currentRootTdfId/currentTdfId');
     }
+    await requireParticipantProgressLesson(context, deps.Tdfs, rootTdfId);
     await validateExperimentStateMutation(resolvedUserId, rootTdfId, curExperimentState, 'createExperimentState');
     const conditionState = await deps.writeConditionState({
       userId: resolvedUserId as string, rootTdfId, state: curExperimentState, ...options,
@@ -788,9 +790,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }
   }
 
-  async function getLastTDFAccessed(userId: string) {
+  async function getLastTDFAccessed(userId: string, lessonIds: string[] | null) {
     const lastExperimentStateUpdated = await deps.GlobalExperimentStates.findOneAsync(
-      { userId },
+      { userId, ...(lessonIds ? { TDFId: { $in: lessonIds } } : {}) },
       { sort: { 'experimentState.lastActionTimeStamp': -1 }, limit: 1 }
     );
     if (!lastExperimentStateUpdated?.TDFId) {
@@ -1054,8 +1056,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     );
   }
 
-  async function getUserRecentTDFs(userId: string) {
-    const history = await deps.Histories.find({ userId, ...operationalHistorySelector() }, { sort: { time: -1 }, limit: 5 }).fetchAsync();
+  async function getUserRecentTDFs(userId: string, lessonIds: string[] | null) {
+    const history = await deps.Histories.find({
+      userId, ...operationalHistorySelector(),
+      ...(lessonIds ? { TDFId: { $in: lessonIds } } : {}),
+    }, { sort: { time: -1 }, limit: 5 }).fetchAsync();
     const recentTdfIds = history
       .map((historyRecord: any) => deps.normalizeCanonicalId(historyRecord?.TDFId))
       .filter((tdfId: string | null): tdfId is string => typeof tdfId === 'string');
@@ -1071,6 +1076,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   }
 
   async function getClassPerformanceByTDF(this: MethodContext, classId: string, tdfId: string, date: number | false = false) {
+    requireAccountProgressSession(this);
     if (!this.userId) {
       throw new Meteor.Error(401, 'Must be logged in');
     }
@@ -1323,7 +1329,8 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     TDFId: string,
     levelUnit: number,
     unitScopedOnly = false,
-    options: LearningHistoryReadOptions = {}
+    options: LearningHistoryReadOptions = {},
+    studyLessonIds: string[] | null = null,
   ) {
     await rejectMissingCourseAssignmentContextForAssignedTdf(
       userId,
@@ -1334,6 +1341,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const selector = options.courseAssignment
       ? await buildCourseLearningHistoryScopeMatch(userId, TDFId, options)
       : buildLearningHistoryScopeMatch(userId, TDFId, levelUnit, unitScopedOnly);
+    if (studyLessonIds && options.courseAssignment) selector.TDFId = { $in: studyLessonIds };
     return await deps.Histories.find(selector, {
       fields: {
         TDFId: 1,
@@ -1673,6 +1681,12 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     return normalizedTdfId;
   }
 
+  async function requireProgressTdfId(context: MethodContext, TDFId: unknown) {
+    const lessonId = requireNormalizedTdfId(TDFId);
+    await requireParticipantProgressLesson(context, deps.Tdfs, lessonId);
+    return lessonId;
+  }
+
   const downloadMethods = createAnalyticsDownloadMethods(deps);
   const conditionCountMethods = createAnalyticsConditionCountMethods(deps, { validateExperimentStateMutation });
 
@@ -1692,7 +1706,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       ) {
         throw new Meteor.Error(400, 'Invalid experiment state write options');
       }
-      return await createExperimentState(curExperimentState, this.userId || null, options);
+      return await createExperimentState(curExperimentState, this, options);
     },
     getClassPerformanceByTDF,
     getStudentPerformanceByIdAndTDFIdFromHistory: async function(
@@ -1702,7 +1716,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       returnRows: number | null = null
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getStudentPerformanceByIdAndTDFIdFromHistory(scopedUserId, requireNormalizedTdfId(TDFId), returnRows);
+      return await getStudentPerformanceByIdAndTDFIdFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), returnRows);
     },
     getStudentPerformanceForUnitFromHistory: async function(
       this: MethodContext,
@@ -1712,7 +1726,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       unitScopedOnly = false
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getStudentPerformanceForUnitFromHistory(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, unitScopedOnly);
+      return await getStudentPerformanceForUnitFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit, unitScopedOnly);
     },
     getAssessmentCompletedTrialCountFromHistory: async function(
       this: MethodContext,
@@ -1721,7 +1735,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       levelUnit: number
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getAssessmentCompletedTrialCountFromHistory(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit);
+      return await getAssessmentCompletedTrialCountFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit);
     },
     getVideoCompletedCheckpointQuestionCountFromHistory: async function(
       this: MethodContext,
@@ -1730,7 +1744,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       levelUnit: number
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getVideoCompletedCheckpointQuestionCountFromHistory(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit);
+      return await getVideoCompletedCheckpointQuestionCountFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit);
     },
     getLearningHistoryForUnit: async function(
       this: MethodContext,
@@ -1741,7 +1755,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       options: LearningHistoryReadOptions = {}
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getLearningHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, unitScopedOnly, options);
+      const lessonId = requireNormalizedTdfId(TDFId);
+      const studyLessonIds = await requireParticipantProgressLesson(this, deps.Tdfs, lessonId);
+      return await getLearningHistoryForUnit(scopedUserId, lessonId, levelUnit, unitScopedOnly, options, studyLessonIds);
     },
     getSparcHistoryForUnit: async function(
       this: MethodContext,
@@ -1751,11 +1767,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       options: Pick<LearningHistoryReadOptions, 'courseAssignment'> & { worksheetPageKey?: string; worksheetCheckpointIndex?: number } = {}
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getSparcHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, options);
+      return await getSparcHistoryForUnit(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit, options);
     },
     getHiddenStimulusKCsFromHistory: async function(this: MethodContext, userId: string, TDFId: string) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getHiddenStimulusKCsFromHistory(scopedUserId, requireNormalizedTdfId(TDFId));
+      return await getHiddenStimulusKCsFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId));
     },
     getAdaptiveOutcomeRows: async function(this: MethodContext, userId: string, TDFId: string) {
       const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
@@ -1763,6 +1779,10 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       const normalizedTdfId = deps.normalizeCanonicalId(TDFId);
       if (!normalizedTdfId) {
         throw new Meteor.Error(400, 'Invalid TDF');
+      }
+      await requireParticipantProgressLesson(this, deps.Tdfs, normalizedTdfId);
+      if (participantConnectionRoot(this) && requestedUserId !== actingUserId) {
+        throw new Meteor.Error(403, 'Can only read adaptive outcomes for the current user');
       }
       await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
         actingUserId,
@@ -1791,9 +1811,10 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     },
     getNumDroppedItemsByUserIDAndTDFId: async function(this: MethodContext, userId: string, TDFId: string) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getNumDroppedItemsByUserIDAndTDFId(scopedUserId, requireNormalizedTdfId(TDFId));
+      return await getNumDroppedItemsByUserIDAndTDFId(scopedUserId, await requireProgressTdfId(this, TDFId));
     },
     getStudentPerformanceForClassAndTdfId: async function(this: MethodContext, instructorId: string, date: number | null = null) {
+      requireAccountProgressSession(this);
       if (!this.userId) {
         throw new Meteor.Error(401, 'Must be logged in');
       }
@@ -1812,7 +1833,8 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     getStimSetFromLearningSessionByClusterList,
     getExperimentState: async function(this: MethodContext, userId: string, TDFId: string) {
       const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only read experiment state for the current user');
-      return await getExperimentState(scopedUserId, requireNormalizedTdfId(TDFId));
+      const lessonId = await requireProgressTdfId(this, TDFId);
+      return await getExperimentState(scopedUserId, lessonId);
     },
     setExperimentState: async function(
       this: MethodContext,
@@ -1823,9 +1845,10 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       where: string
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only mutate experiment state for the current user');
+      const lessonId = await requireProgressTdfId(this, TDFId);
       return await setExperimentState(
         scopedUserId,
-        requireNormalizedTdfId(TDFId),
+        lessonId,
         experimentStateId,
         newExperimentState,
         where || 'methods.setExperimentState'
@@ -1833,14 +1856,14 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     },
     getLastTDFAccessed: async function(this: MethodContext, userId: string | null = null) {
       const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only read recent TDFs for the current user');
-      return await getLastTDFAccessed(scopedUserId);
+      return await getLastTDFAccessed(scopedUserId, await participantProgressLessonIds(this, deps.Tdfs));
     },
     insertHistory,
     getHistoryByTDFID,
     getStimulusCrowdStatsForDeck,
     getUserRecentTDFs: async function(this: MethodContext, userId: string | null = null) {
       const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only read recent TDFs for the current user');
-      return await getUserRecentTDFs(scopedUserId);
+      return await getUserRecentTDFs(scopedUserId, await participantProgressLessonIds(this, deps.Tdfs));
     },
     getUserLastFeedbackTypeFromHistory,
 
@@ -1853,6 +1876,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       const requestedUserId = typeof targetUserId === 'string' && targetUserId.trim().length
         ? targetUserId.trim()
         : currentUserId;
+      if (participantConnectionRoot(this) && requestedUserId !== currentUserId) {
+        throw new Meteor.Error('not-authorized', 'Insufficient privileges to inspect another learner');
+      }
       await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
         actingUserId: currentUserId,
         subjectUserId: requestedUserId,
@@ -1863,8 +1889,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         forbiddenCode: 'not-authorized',
       });
 
+      const lessonIds = await participantProgressLessonIds(this, deps.Tdfs);
       const docs = await deps.GlobalExperimentStates.find(
-        { userId: requestedUserId },
+        { userId: requestedUserId, ...(lessonIds ? { TDFId: { $in: lessonIds } } : {}) },
         { fields: { TDFId: 1, experimentState: 1 } }
       ).fetchAsync();
 
@@ -1894,8 +1921,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     ) {
       let existingExperimentDoc: { userId?: string; TDFId?: string } | null = null;
       if (experimentId) {
+        const lessonIds = await participantProgressLessonIds(this, deps.Tdfs);
         existingExperimentDoc = await deps.GlobalExperimentStates.findOneAsync(
-          { _id: experimentId },
+          { _id: experimentId, ...(lessonIds ? { userId: this.userId, TDFId: { $in: lessonIds } } : {}) },
           { fields: { userId: 1, TDFId: 1 } }
         );
         if (!existingExperimentDoc) {
@@ -1933,7 +1961,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
           'methods.updateExperimentState'
         );
       }
-      return await createExperimentState(curExperimentState, this.userId || null);
+      return await createExperimentState(curExperimentState, this);
     },
 
     ...downloadMethods,

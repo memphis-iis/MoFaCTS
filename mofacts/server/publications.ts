@@ -25,6 +25,8 @@ import { publishAdminUserPage } from './lib/adminUserPagePublication';
 import { DEFAULT_PUBLICATION_VERIFICATIONS, NAMED_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
 import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
 import { registerNamedPublication } from './securitySurfaces/registerNamedPublication.ts';
+import { participantProgressLessonIds } from './lib/participantProgressScope';
+import { participantConnectionRoot } from './lib/participantSession';
 
 const publicBranding = Object.freeze({ kind: 'public', applicationRateLimit: 'none' } as const);
 const adminPublication = Object.freeze({ kind: 'role', role: 'admin' } as const);
@@ -138,6 +140,7 @@ registerNamedPublication(Meteor, 'filteredUsersCount', {
 registerNamedPublication(Meteor, 'userAdminDashboardUsage', {
     policy: adminPublication, dataEgress: 'admin-dashboard-usage', verification: NAMED_PUBLICATION_VERIFICATIONS.userAdminDashboardUsage,
 }, async function(userIds: any[] = []) {
+    if (participantConnectionRoot(this)) return this.ready();
     const normalizedUserIds = normalizeIdList(userIds).slice(0, 100);
     if (normalizedUserIds.length === 0) {
         return this.ready();
@@ -186,6 +189,7 @@ registerNamedPublication(Meteor, 'dashboardCache', {
     policy: { kind: 'authenticated-self', delivery: 'sync' },
     dataEgress: 'own-dashboard-cache', verification: NAMED_PUBLICATION_VERIFICATIONS.dashboardCache,
 }, function() {
+    if (participantConnectionRoot(this)) return this.ready();
     return UserDashboardCache.find(
         { userId: this.userId },
         {
@@ -276,20 +280,20 @@ registerNamedPublication(Meteor, 'userExperimentState', {
     policy: { kind: 'authenticated-self', delivery: 'sync' },
     dataEgress: 'own-experiment-progress', verification: NAMED_PUBLICATION_VERIFICATIONS.userExperimentState,
 }, function(tdfId: any) {
-    if (tdfId && typeof tdfId === 'object') {
-        const normalizedIds = normalizeIdList(tdfId);
-        if (!normalizedIds.length) {
-            return this.ready();
-        }
-        return GlobalExperimentStates.find({userId: this.userId, TDFId: {$in: normalizedIds}});
-    } else if (tdfId !== null && tdfId !== undefined) {
-        const normalizedTdfId = normalizeOptionalStringId(tdfId);
-        if (!normalizedTdfId) {
-            return this.ready();
-        }
-        return GlobalExperimentStates.find({userId: this.userId, TDFId: normalizedTdfId});
+    const multiple = tdfId && typeof tdfId === 'object';
+    const lessonId = multiple ? null : normalizeOptionalStringId(tdfId);
+    const requested = multiple ? normalizeIdList(tdfId) : lessonId ? [lessonId] : [];
+    if (!requested.length) return this.ready();
+    const userId = this.userId;
+    const scope = participantProgressLessonIds(this, Tdfs);
+    if (!scope) {
+        return GlobalExperimentStates.find({ userId, TDFId: multiple ? { $in: requested } : lessonId });
     }
-    return this.ready();
+    return scope.then(allowed => {
+        const visible = requested.filter(id => allowed.includes(id));
+        if (!visible.length) return this.ready();
+        return GlobalExperimentStates.find({ userId, TDFId: { $in: visible } });
+    });
 });
 
 async function publishRuntimeTdfsByIds(publication: any, tdfIdOrIds: any) {

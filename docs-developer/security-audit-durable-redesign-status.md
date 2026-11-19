@@ -224,12 +224,17 @@ two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 2
   An ordinary account can enter a credentialed study through a separate
   study-bound connection. The application keeps its existing passwordless
   return through the participant session binding.
-- [ ] Decide study-scoped progress reads. The progress publication and the
-  direct state and progress-summary methods currently authorize by account
-  or existing role; they do not enforce the connection's study boundary.
-  The proposed policy limits a study-bound connection to its canonical
-  study and its condition lessons. Ordinary account sessions would retain
-  their existing scope. This is a separate access-policy decision.
+- [x] Approve the study scope and preserve progress-backed passwordless return.
+  Study sessions are limited to the canonical study and its condition lessons.
+- [x] Implement the bound-study selectors for saved state, recent lessons,
+  progress signals, lesson-level history and state-returning writes.
+  Account-wide dashboard, course summaries and exports require ordinary
+  sessions. A lesson export must also satisfy the existing owner checks.
+  A standalone progress row for a condition shared by multiple roots has no
+  unique study assignment in its stored key. Scope excludes that row and
+  continues to include the bound root and its root-keyed assigned progress.
+- [ ] Verify passwordless return, scoped reads and same-user subscription
+  recomputation on an actual DDP connection in native Meteor.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 

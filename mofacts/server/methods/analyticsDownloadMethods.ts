@@ -1,5 +1,5 @@
 import { studyOnlyAccount } from '../../common/participantPrivacy';
-import { participantConnectionRoot } from '../lib/participantSession';
+import { participantProgressLessonIds, requireAccountProgressSession } from '../lib/participantProgressScope';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
@@ -15,6 +15,7 @@ import { createOwnedHistoryDownloadToken } from '../lib/ownedHistoryDownloadToke
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
   userId?: string | null;
+  connection?: { id?: string } | null;
 };
 
 type AnalyticsDownloadDeps = {
@@ -44,6 +45,7 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
   return {
     downloadDataByTeacher: async function(this: MethodContext, targetUserId: string) {
       check(targetUserId, String);
+      requireAccountProgressSession(this);
 
       await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
         actingUserId: this.userId,
@@ -61,7 +63,7 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
       if (!user) {
         throw new Meteor.Error(404, 'User not found');
       }
-      const userName = studyOnlyAccount(user) || participantConnectionRoot(this) ? 'participant'
+      const userName = studyOnlyAccount(user) ? 'participant'
         : sanitizeFileNameSegment(user.username || user.emails?.[0]?.address || targetUserId, targetUserId);
       const fileName = `learning-data_${userName}_all-lessons.tsv`;
 
@@ -70,6 +72,7 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
 
     downloadOwnHistoryAcrossTdfs: async function(this: MethodContext) {
       const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+      requireAccountProgressSession(this);
 
       const history = await deps.Histories.findOneAsync({ userId: actingUserId, ...operationalHistorySelector() }, { fields: { _id: 1 } });
       if (!history) {
@@ -81,7 +84,7 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
         throw new Meteor.Error(404, 'User not found');
       }
 
-      const hasStudyHistory = studyOnlyAccount(user) || participantConnectionRoot(this) ||
+      const hasStudyHistory = studyOnlyAccount(user) ||
         await deps.GlobalExperimentStates.findOneAsync({ userId: actingUserId, 'experimentState.experimentTarget': { $type: 'string', $ne: '' } }, { fields: { _id: 1 } });
       const label = hasStudyHistory ? 'participant'
         : sanitizeFileNameSegment(user.username || user.emails?.[0]?.address || actingUserId, actingUserId);
@@ -111,7 +114,14 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
       }
 
       const request = { kind: 'lesson', tdfId, includeConditions } as const;
+      const studyLessonIds = await participantProgressLessonIds(this, deps.Tdfs);
+      if (studyLessonIds && !studyLessonIds.includes(tdfId)) {
+        throw new Meteor.Error(403, 'Progress is unavailable outside the current study');
+      }
       const { tdfIds, lessonName } = await resolveOwnedHistoryDownloadScope(deps, this.userId, request);
+      if (studyLessonIds && tdfIds.some(id => !studyLessonIds.includes(id))) {
+        throw new Meteor.Error(403, 'Progress is unavailable outside the current study');
+      }
       const fileName = `${sanitizeFileNameSegment(lessonName, `tdf-${tdfId}`)}-data.tsv`;
       return { fileName, contentType: 'text/tab-separated-values', downloadUrl: createOwnedHistoryDownloadToken(this.userId, request, tdfIds, fileName).url };
     },

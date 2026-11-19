@@ -12,6 +12,7 @@ import {
 } from './dashboardCacheShared';
 import { createDashboardLearnerConfigMethods } from './dashboardLearnerConfigMethods';
 import { createDashboardPracticeSnapshotMethods } from './dashboardPracticeSnapshotMethods';
+import { requireAccountProgressSession } from '../lib/participantProgressScope';
 import {
   createLessonFamilyResolver,
   getLessonFamilySetspec,
@@ -457,6 +458,7 @@ export function createDashboardCacheMethods({
     ...learnerConfigMethods,
 
     initializeDashboardCache: async function(this: any, userId: string | null = null) {
+      requireAccountProgressSession(this);
       const targetUserId = userId || this.userId;
       if (!targetUserId) throw new Meteor.Error('not-authorized', 'Must be logged in');
       if (targetUserId !== this.userId && !(await Roles.userIsInRoleAsync(this.userId, ['admin']))) {
@@ -471,6 +473,7 @@ export function createDashboardCacheMethods({
 
     ensureDashboardCacheCurrent: async function(this: any) {
       if (!this.userId) throw new Meteor.Error('not-authorized', 'Must be logged in');
+      requireAccountProgressSession(this);
       return await redisBoundary.withLock(`dashboard-cache:ensure:${this.userId}`, 120000,
         async () => await refreshDashboardHistory(this.userId));
     },
@@ -479,6 +482,7 @@ export function createDashboardCacheMethods({
       if (!this.userId) {
         throw new Meteor.Error('not-authorized');
       }
+      requireAccountProgressSession(this);
 
       await UserDashboardCache.removeAsync({ userId: this.userId });
       return await methods.initializeDashboardCache.call(this);
@@ -488,6 +492,7 @@ export function createDashboardCacheMethods({
       if (!this.userId) {
         throw new Meteor.Error('not-authorized', 'Must be logged in');
       }
+      requireAccountProgressSession(this);
       if (!GlobalExperimentStates) {
         throw new Meteor.Error('server-misconfigured', 'Experiment state collection is unavailable');
       }

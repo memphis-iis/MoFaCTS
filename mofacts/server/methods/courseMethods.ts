@@ -30,6 +30,7 @@ import {
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
 import { courseIsDateVisible, createCourseLearnerSnapshotCacheHelpers } from '../lib/courseLearnerSnapshotCache';
+import { requireAccountProgressSession } from '../lib/participantProgressScope';
 import { prepareStimuliSetForRuntime } from '../lib/stimulusLookup';
 
 type UnknownRecord = Record<string, unknown>;
@@ -1062,6 +1063,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
 
   async function getLearnerCoursesSnapshot(this: MethodContext): Promise<LearnerCoursesSnapshot> {
     const userId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+    requireAccountProgressSession(this);
     return await getCourseSnapshotCache().ensureLearnerCoursesSnapshot(userId);
   }
 

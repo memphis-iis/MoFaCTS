@@ -344,14 +344,14 @@ const brandingPublications = 'preserves public branding cursors and their exact 
 const selfPublications = 'preserves authenticated dashboard, runtime setting, and audio scope';
 const adminPublications = 'preserves administrator-only snapshots, cursor scope and readiness';
 function namedPublicationVerification<N extends string>(
-  name: N, observedCase: string, suite = 'named application publications',
+  name: N, observedCase: string, suite = 'named application publications', ...additionalCases: string[]
 ) {
   return Object.freeze({
     ...defaultPublicationTest,
     suite,
     surfaceId: `publication:${name}` as const,
     verificationId: `publication.named.${name}` as const,
-    cases: Object.freeze([observedCase] as const),
+    cases: Object.freeze([observedCase, ...additionalCases] as const),
   });
 }
 export const NAMED_PUBLICATION_VERIFICATIONS = Object.freeze({
@@ -363,7 +363,8 @@ export const NAMED_PUBLICATION_VERIFICATIONS = Object.freeze({
   userAudioSettings: namedPublicationVerification('userAudioSettings', selfPublications),
   userExperimentState: namedPublicationVerification('userExperimentState',
     'finishes logged-out subscriptions without a progress cursor',
-    'approved progress-privacy selection on the registered Meteor publication'),
+    'approved progress-privacy selection on the registered Meteor publication',
+    'resumes a passwordless study session and scopes progress on its real DDP connection'),
   settings: namedPublicationVerification('settings', adminPublications),
   filteredUsers: namedPublicationVerification('filteredUsers', adminPublications),
   filteredUsersCount: namedPublicationVerification('filteredUsersCount', adminPublications),

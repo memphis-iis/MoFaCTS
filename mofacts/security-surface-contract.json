@@ -222,19 +222,19 @@
     {
       "name": "downloadDataById",
       "access": "authenticated-self",
-      "notes": "Owner and exact condition-family authorization issues a single-use download capability; the HTTP handler revalidates the same scope before reading and before streaming. Projected, bounded history reads exclude historical assessment copies.",
+      "notes": "Owner and exact condition-family authorization issues a single-use download capability; a study session must also contain every selected lesson. The HTTP handler revalidates the issued scope before reading and before streaming. Projected, bounded history reads exclude historical assessment copies.",
       "review": "2026-11-11: Existing export ownership and scope preserved; bounded simulation activity JSON included, internal simulation trace rows omitted."
     },
     {
       "name": "downloadDataByTeacher",
       "access": "authenticated-self",
-      "notes": "Authenticated self-only issuance for owned lessons; a single-use HTTP capability revalidates user existence and the exact owned scope before reading and before streaming. Histories use bounded projected reads and exclude historical assessment copies.",
+      "notes": "Ordinary authenticated sessions issue self-only exports for owned lessons; a single-use HTTP capability revalidates user existence and the exact owned scope before reading and before streaming. Histories use bounded projected reads and exclude historical assessment copies.",
       "review": "2026-11-11: Existing export ownership and scope preserved; bounded simulation activity JSON included, internal simulation trace rows omitted."
     },
     {
       "name": "downloadOwnHistoryAcrossTdfs",
       "access": "authenticated-self",
-      "notes": "Existing authenticated-self token issuance retained; ordinary exports exclude historical assessment copies.",
+      "notes": "Account-wide token issuance requires an ordinary authenticated session and excludes historical assessment copies.",
       "review": "2026-11-11: Existing export ownership and scope preserved; bounded simulation activity JSON included, internal simulation trace rows omitted."
     },
     {
@@ -253,7 +253,7 @@
     {
       "name": "ensureDashboardCacheCurrent",
       "access": "role-checked",
-      "notes": "Authenticated-self only. Normal refresh reads only committed history after the saved source sequence. Initial or explicitly invalidated caches rebuild inside a Mongo snapshot; history and summary positions are never accepted from the client."
+      "notes": "Ordinary authenticated-self only. Normal refresh reads only committed history after the saved source sequence. Initial or explicitly invalidated caches rebuild inside a Mongo snapshot; history and summary positions are never accepted from the client."
     },
     {
       "name": "exportDeploymentBrandProfile",
@@ -376,7 +376,7 @@
     {
       "name": "getExperimentState",
       "access": "authenticated-self",
-      "notes": "Self-scoped reads exclude retained records marked tdfDeletedAt."
+      "notes": "Self-scoped reads exclude retained records marked tdfDeletedAt. Study sessions also require the bound root or a condition lesson attributable to that study."
     },
     {
       "name": "getHiddenStimulusKCsFromHistory",
@@ -452,7 +452,8 @@
     },
     {
       "name": "getPracticeDashboardSnapshot",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "The account-wide dashboard snapshot requires an ordinary authenticated session."
     },
     {
       "name": "getProgressiveAssignmentLaunch",
@@ -1127,7 +1128,8 @@
     },
     {
       "name": "dashboardCache",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Own-account cache for an ordinary session. A study connection receives readiness without account-wide progress."
     },
     {
       "name": "dashboardTdfsListing",
@@ -1202,7 +1204,7 @@
     {
       "name": "userExperimentState",
       "access": "authenticated-self",
-      "notes": "A logged-out connection completes without opening a progress cursor. Signed-in connections receive only saved progress bound to the current account and requested lesson IDs."
+      "notes": "A logged-out connection completes without opening a progress cursor. Signed-in connections receive current-account rows for requested lesson IDs. Study sessions intersect the request with the server-bound root and its unambiguous condition lessons."
     },
     {
       "name": "contentUploadMetadata",
