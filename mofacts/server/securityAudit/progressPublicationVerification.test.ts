@@ -17,13 +17,23 @@ describe('approved progress-privacy selection on the registered Meteor publicati
   });
   after(async function() { await GlobalExperimentStates.removeAsync({ _id: { $in: [...ids, extraId] } }); });
 
-  for (const actor of ['anonymous', ...actors] as const) {
+  it('finishes logged-out subscriptions without a progress cursor', function() {
+    const handler = (Meteor as any).server.publish_handlers.userExperimentState;
+    for (const request of [lesson, [lesson, lesson + '-other']]) {
+      let readyCalls = 0;
+      const result = handler.call({ userId: null, ready() { readyCalls++; } }, request);
+      expect(result).to.equal(undefined);
+      expect(readyCalls).to.equal(1);
+    }
+  });
+
+  for (const actor of actors) {
     it(`returns only the bound own canary and no other actor's progress for ${actor}`, async function() {
       const handler = (Meteor as any).server.publish_handlers.userExperimentState;
       expect(handler, 'actual application publication registration').to.be.a('function');
-      const cursor = await handler.call({ userId: actor === 'anonymous' ? null : users[actor], ready() {} }, lesson);
+      const cursor = await handler.call({ userId: users[actor], ready() {} }, lesson);
       const rows = await cursor.fetchAsync();
-      const expected = actor === 'anonymous' ? [] : [ids[actors.indexOf(actor)]];
+      const expected = [ids[actors.indexOf(actor)]];
       expect(rows.map((row: { _id: string }) => row._id)).to.deep.equal(expected);
       for (const row of rows) { expect(row.userId).to.equal(users[actor]); expect(row.TDFId).to.equal(lesson); }
     });

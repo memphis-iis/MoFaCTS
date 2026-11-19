@@ -967,6 +967,9 @@ describe('public TDF and stimulus method authorization', function() {
     expect(after.services.resume.loginTokens.some((row: any) => row.hashedToken === (Accounts as any)._hashLoginToken(first.loginToken))).to.equal(true);
     expect(after.services.resume.loginTokens.some((row: any) => row.hashedToken === (Accounts as any)._hashLoginToken(second.loginToken))).to.equal(true);
     expect(await GlobalExperimentStatesAny.findOneAsync({ _id: progressId })).to.deep.equal(before);
+    const publishProgress = (Meteor as any).server.publish_handlers.userExperimentState;
+    const cursor = publishProgress.call({ userId: first.userId, ready() {} }, 'progress-return-root');
+    expect((await cursor.fetchAsync()).map((row: { _id: string }) => row._id)).to.deep.equal([progressId]);
   });
 
   it('retains the recorded experiment binding when a progress-backed participant tries another target', async function() {

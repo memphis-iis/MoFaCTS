@@ -272,7 +272,10 @@ Meteor.publish('assets', async function(ownerId: any, stimSetId: any) {
     );
 });
 
-Meteor.publish('userExperimentState', function(tdfId: any) {
+registerNamedPublication(Meteor, 'userExperimentState', {
+    policy: { kind: 'authenticated-self', delivery: 'sync' },
+    dataEgress: 'own-experiment-progress', verification: NAMED_PUBLICATION_VERIFICATIONS.userExperimentState,
+}, function(tdfId: any) {
     if (tdfId && typeof tdfId === 'object') {
         const normalizedIds = normalizeIdList(tdfId);
         if (!normalizedIds.length) {

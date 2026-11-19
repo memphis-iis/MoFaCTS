@@ -210,12 +210,11 @@ two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 2
   the baseline. Exact-source typecheck and lint passed (335 classified surfaces).
   Linux source, compatibility and catalog checks passed (633 passes, ten skips).
 
-- [ ] Decide the policy for a learner-progress request with no signed-in
-  session. Source review found the current lookup can match a missing owner,
-  while existing privacy fixtures cover records with assigned owners.
-  The accepted progress-backed passwordless flow already establishes an
-  account session before requesting progress. This decision applies to the
-  publication boundary. The behavior and retained progress are unchanged.
+- [x] Approve requiring a signed-in session at the learner-progress publication.
+  The passwordless return still provisions the existing pseudonymous account
+  session before progress is requested. The change is at the read boundary.
+- [ ] Verify logged-out readiness, own progress, and progress-backed return
+  against the registered publication in Meteor.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 

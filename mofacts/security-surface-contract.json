@@ -1201,7 +1201,8 @@
     },
     {
       "name": "userExperimentState",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "A logged-out connection completes without opening a progress cursor. Signed-in connections receive only saved progress bound to the current account and requested lesson IDs."
     },
     {
       "name": "contentUploadMetadata",

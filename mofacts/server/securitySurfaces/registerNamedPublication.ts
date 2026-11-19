@@ -12,7 +12,8 @@ type Policy =
   | Readonly<{ kind: 'role'; role: 'admin' }>;
 type Egress =
   | 'theme-settings' | 'deployment-brand-profile' | 'own-dashboard-cache' | 'client-log-setting'
-  | 'own-audio-settings' | 'system-settings' | 'admin-user-page' | 'admin-user-count' | 'admin-dashboard-usage';
+  | 'own-audio-settings' | 'own-experiment-progress' | 'system-settings'
+  | 'admin-user-page' | 'admin-user-count' | 'admin-dashboard-usage';
 type Descriptor = Readonly<{ policy: Policy; dataEgress: Egress; verification: Verification }>;
 type Registration = Descriptor & Readonly<{ name: Name; surfaceId: `publication:${Name}` }>;
 const registrations: Registration[] = [];
