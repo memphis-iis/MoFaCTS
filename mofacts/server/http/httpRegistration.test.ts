@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import { randomUUID } from 'node:crypto';
 import { WebApp } from 'meteor/webapp';
 import { HTTP_FILE_VERIFICATIONS, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
 import { registeredHttpSurfaces } from '../securitySurfaces/registerHttpRoutes.ts';
@@ -48,6 +49,15 @@ describe('application HTTP registration', function() {
       expect(await response.text()).to.include('HTTP uploads are retired');
     }
   });
+
+  it('routes a canonical missing CDN asset through the application raw handler', async function() {
+    const assetId = randomUUID();
+    const response = await fetch(`${origin}/cdn/storage/Assets/${assetId}/original/fixture.txt`, { signal: AbortSignal.timeout(5000) });
+    expect(response.status).to.equal(404);
+    // The overlapping FilesCollection handler emits a different missing-file response.
+    expect(await response.text()).to.equal('File not found');
+  });
+
   it('records each unmounted owner once on its existing stack', function() {
     for (const [surfaceId, stack, policy, verification] of [
       ['middleware:memphis-saml', 'connectHandlers', 'saml-protocol', HTTP_MIDDLEWARE_VERIFICATIONS.saml],

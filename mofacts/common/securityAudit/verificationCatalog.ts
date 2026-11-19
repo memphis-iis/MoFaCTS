@@ -317,7 +317,8 @@ export const HTTP_FILE_VERIFICATIONS = Object.freeze({
   asset: Object.freeze({ ...fileHttpTest, verificationId: 'http.assets.dynamic-mount',
     surfaceId: 'middleware:dynamic-assets', cases: assetResponses }),
   cdn: Object.freeze({ ...fileHttpTest, verificationId: 'http.assets.cdn-mount',
-    surfaceId: 'middleware:cdn-public-assets', cases: assetResponses }),
+    surfaceId: 'middleware:cdn-public-assets', cases: Object.freeze([...assetResponses,
+      'routes a canonical missing CDN asset through the application raw handler'] as const) }),
 });
 
 const middlewareTest = { kind: 'integrationTest', lane: 'meteor', suite: 'application HTTP registration',
