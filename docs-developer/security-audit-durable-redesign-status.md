@@ -1514,7 +1514,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 20 total, 19 consumed, 0 reserved, 0 available for continued Phase 3 work, and 1 for the earlier `/health` batch only.**
+**Current allowance: 25 total, 19 consumed, 0 reserved, 5 available for continued Phase 3 work, and 1 for the earlier `/health` batch only.**
+
+Phil authorized five additional Phase 3 invocations on the same isolated worker after slot 20.
 
 On November 19 Phil authorized up to five further runs for Phase 3 work, including retries, until an important design decision.
 Phil approved the sole app download owner and continued use of the three remaining runs as needed.
