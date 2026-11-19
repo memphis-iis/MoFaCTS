@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { Meteor } from 'meteor/meteor';
 import { Random } from 'meteor/random';
+import { WebApp } from 'meteor/webapp';
 import { FilesCollection } from 'meteor/ostrio:files';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -28,7 +29,10 @@ if (Meteor.isServer) describe('maintained upload package ownership', function() 
   }
   before(async () => {
     directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-upload-test-'));
-    files = new FilesCollection({ collectionName: `uploadTest${Random.id(8)}`, storagePath: directory, allowClientCode: false, disableSetTokenCookie: true });
+    files = new FilesCollection({
+      collectionName: `uploadTest${Random.id(8)}`, storagePath: directory,
+      allowClientCode: false, disableSetTokenCookie: true, disableDownload: true,
+    });
   });
   beforeEach(() => { ids = []; });
   afterEach(async () => {
@@ -41,6 +45,19 @@ if (Meteor.isServer) describe('maintained upload package ownership', function() 
   });
   after(async () => { await fs.rm(directory, { recursive: true, force: true }); });
   function id() { const value = Random.id(17); ids.push(value); return value; }
+
+  it('skips package HTTP registration while retaining the DDP methods', async () => {
+    const address = WebApp.httpServer.address();
+    if (!address || typeof address === 'string') throw new Error('Application TCP listener is unavailable');
+    const url = `http://127.0.0.1:${address.port}/cdn/storage/${files.collectionName}/__upload`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    // Only a registered package handler for this test collection would answer 410.
+    expect(response.status).not.to.equal(410);
+    await response.text();
+    const uploadId = id();
+    await invoke('_Start', owner, options(uploadId));
+    await invoke('_Abort', owner, uploadId);
+  });
 
   it('ignores forged ownership and denies anonymous start', async () => {
     const uploadId = id();

@@ -11,7 +11,7 @@ export const SPARC_PROMPT_IMAGE_SETTINGS = Object.freeze({
 });
 export const SPARC_PROMPT_IMAGE_PURPOSE = 'sparc-prompt-image';
 
-/** The generic FilesCollection route cannot authorize these session-owned images. */
+/** Session-owned images may only be served through the authorized owner reader. */
 export function allowsGenericSparcImageDownload(asset: { meta?: { uploadPurpose?: unknown } }): boolean {
   return asset.meta?.uploadPurpose !== SPARC_PROMPT_IMAGE_PURPOSE;
 }

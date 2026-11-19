@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { Meteor } from 'meteor/meteor';
+import { SPARC_PROMPT_IMAGE_PURPOSE } from '../../common/lib/sparcPromptImage';
 import { serveDynamicAssetById } from './dynamicAssetsRoute';
 
 if (Meteor.isServer) describe('dynamic asset download boundary', () => {
@@ -13,8 +14,12 @@ if (Meteor.isServer) describe('dynamic asset download boundary', () => {
     expect(status).to.equal(410);
     expect(body).to.contain('HTTP uploads are retired');
   });
-  for (const asset of [null, { _id: 'private', path: '/ignored', meta: { public: false } }]) {
-    it(`denies ${asset ? 'private' : 'missing'} assets before storage access`, async () => {
+  for (const [kind, asset] of [
+    ['missing', null],
+    ['private', { _id: 'private', path: '/ignored', meta: { public: false } }],
+    ['session-owned', { _id: 'private', path: '/ignored', meta: { public: true, uploadPurpose: SPARC_PROMPT_IMAGE_PURPOSE } }],
+  ] as const) {
+    it(`denies ${kind} assets before storage access`, async () => {
       let status = 0;
       await serveDynamicAssetById({
         DynamicAssets: { findOneAsync: async () => asset },
