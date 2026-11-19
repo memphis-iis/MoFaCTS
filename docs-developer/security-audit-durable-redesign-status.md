@@ -104,10 +104,11 @@ remains with that production window.
   The registry records signed ingestion, the single-use report capability
   and the current issuing-administrator check. Full typecheck, lint, Linux
   source-security and focused regressions passed.
-- [ ] Verify the migrated audit pair in Meteor. Its mounted listener tests
-  cover registry entries, handler-specific 404/405 responses, admin-minted
-  download and replay rejection. Existing signed-ingestion and retained-record
-  tests remain in the suite. The remaining /health retry is scoped to that batch.
+- [x] Verify the migrated audit pair in Meteor. The mounted listener tests
+  passed for both registry entries, handler-specific 404/405 responses,
+  admin-minted download and replay rejection. The full suite passed on the
+  exact source in slot 15, including signed-ingestion, retained-record and
+  SPARC MongoDB coverage. Slot 14 records the original timeout separately.
 
 Remaining HTTP owners, composition sealing, full registry coverage and
 staging qualification stay open.
@@ -1429,7 +1430,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 13 total, 12 consumed, 0 reserved, 1 available.**
+**Current allowance: 15 total, 14 consumed, 0 reserved, 1 available for the earlier `/health` batch only.**
 The original allowance of ten is exhausted. On 2026-11-18 Phil authorized up
 to three additional runs on the same 6 GiB/two-CPU worker for the Phase 3 HTTP
 baseline and first migration, including a retry if needed.
@@ -1455,6 +1456,9 @@ within this allowance. Do not import historical invocations into this counter.
 | 10 | 93b7d444ba2216cf68c9b930a2e51052f7d022bb | PASS 2026-11-18T19:02:02Z to 19:03:18Z. Server 1,019 passes, client 1,249 passes, zero failures or hook failures, 15/seven existing pending. The v2 active/v1 retained case passed. The exact Linux source gate passed 172/172. Original receipt: /var/tmp/mofacts-integration.f2EE5Wh4/results/native-verification.json. The test environment passed isolation proof. The existing local JEDM scheduler had the same container and image with a later start timestamp, and Docker recorded repeated exit-255 restarts continuing after this run ended without an OOM event in the observed interval. Other existing local service records matched. Native test evidence only. |
 | 11 | 81f3ed29bc2ff20b455c902494ece3a42a277d2d | PASS 2026-11-18T22:10:29Z to 22:11:43Z. 1,041 server, 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. All four mounted health cases passed. No owned containers, cache or network remained. The existing JEDM scheduler continued its exit-255 restarts after this run. Other service records matched. Private receipt: /var/tmp/mofacts-integration.7zzDbZD9/results/native-verification.json. |
 | 12 | 40f4384f60ea6cc95902e7ac49b4a9eb0e598049 | PASS 2026-11-18T22:17:51Z to 22:19:02Z. 1,042 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. All four baseline route cases and the new registered-policy case passed. Source capture, worker isolation, resource limits and owned resource cleanup verified. The pre-existing JEDM scheduler continued its exit-255 restart cycle before and during verification; no OOM event was observed in the checked interval. Other local service records matched. Private receipt: /var/tmp/mofacts-integration.Sd1z4cuc/results/native-verification.json. SHA-256 98f6948e1a48f8c4fcfdef29a2eaf8c6b972ab836fd6be8c7d6dfa1d0a529be0. |
+| 13 | Pending | Unused allowance for retrying the first Phase 3 `/health` batch only. |
+| 14 | 39c6226fbfc9a49a738fdde48a0f991b4a3c20b2 | FAIL 2026-11-19T03:19:51Z to 03:21:00Z (November 18 local). 1,042 server passes, one server failure, 1,249 Chromium passes and zero client failures, 15/seven pending. All activated V2 route tests passed. The existing SPARC instructional-library Mongo test timed out at 2,000 ms while testing interrupted image cleanup. It passed in slots 11 and 12. The worker exited 1 without OOM. Owned resources were removed. The pre-existing JEDM scheduler had a later start time; other service records matched. Private failed-run evidence: /var/tmp/mofacts-integration.blDcnafL/results. |
+| 15 | 39c6226fbfc9a49a738fdde48a0f991b4a3c20b2 | PASS 2026-11-19T12:31:58Z to 12:33:17Z, one authorized retry of the exact slot 14 source. 1,043 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. The migrated audit route cases passed. The previously timed-out SPARC MongoDB test passed in 38 ms. Source identity, isolation and exact cleanup verified. The existing JEDM scheduler had a later start time; other local service records matched. Private receipt: /var/tmp/mofacts-integration.0qJxytYK/results/native-verification.json. SHA-256 9eabc625a205823265b44d2d1ff06ce5b8e25b2183111211c9cd2e4e9d610eef. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
