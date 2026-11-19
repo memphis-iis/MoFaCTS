@@ -8,8 +8,9 @@ import { runRepositoryCommandV2 } from '../repository/commandV2.mjs';
 import { fileURLToPath } from 'node:url';
 
 const raw = value => ({ exitCode: 0, stdout: Buffer.from(value) });
-const inventory = { methods: ['method-one'], publications: ['publication-one'], httpRoutes: [], exports: [], managementRoutes: [] };
-const discovery = () => raw(JSON.stringify(inventory)), checked = () => raw('Security surface contract covers 2 surfaces.\n');
+const inventory = { methods: ['method-one'], publications: ['publication-one'], httpRoutes: [],
+  httpMiddleware: ['middleware:fixture'], exports: [], managementRoutes: [] };
+const discovery = () => raw(JSON.stringify(inventory)), checked = () => raw('Security surface contract covers 3 surfaces.\n');
 const environment = { PATH: process.env.PATH, NODE_OPTIONS: '' };
 const complete = value => ({ state: 'observed', value: { expectedCaseCount: value, completedCaseCount: value,
   matchedCaseCount: value, domainRejectionCount: 0, transportErrorCount: 0, inconclusiveCaseCount: 0 } });
@@ -19,17 +20,17 @@ async function directory(t) {
 }
 
 test('V2 surface coverage counts actual discovered facets against the unchanged checker completion protocol', () => {
-  assert.deepEqual(parseSurfaceCoverageObservationV2(discovery(), checked()), complete(2));
+  assert.deepEqual(parseSurfaceCoverageObservationV2(discovery(), checked()), complete(3));
   for (const input of [{ ...inventory, methods: ['duplicate', 'duplicate'] }, { ...inventory, methods: 'not-an-array' },
     { ...inventory, methods: ['invalid\nname'] }, { ...inventory, newFacet: [] }, { ...inventory, methods: [], publications: [] }]) {
     assert.equal(parseSurfaceCoverageObservationV2(raw(JSON.stringify(input)), checked()).state, 'unavailable');
   }
-  for (const result of [raw(''), raw('Security surface contract covers 3 surfaces.\n'),
+  for (const result of [raw(''), raw('Security surface contract covers 2 surfaces.\n'),
     { ...checked(), exitCode: 1 }, { exitCode: -1, failure: 'timeout' }, raw('PRIVATE unrelated crash')]) {
     const parsed = parseSurfaceCoverageObservationV2(discovery(), result);
     assert.equal(parsed.state, 'unavailable'); assert.equal(JSON.stringify(parsed).includes('PRIVATE'), false);
   }
-  const duplicate = raw('{"methods":[],"methods":["hidden"],"publications":[],"httpRoutes":[],"exports":[],"managementRoutes":[]}');
+  const duplicate = raw('{"methods":[],"methods":["hidden"],"publications":[],"httpRoutes":[],"httpMiddleware":[],"exports":[],"managementRoutes":[]}');
   assert.equal(parseSurfaceCoverageObservationV2(duplicate, checked()).reason, 'producer-malformed');
 });
 
@@ -70,7 +71,7 @@ test('V2 source acquisition wires exact Node invocations and preserves independe
   });
   assert.equal(calls.length, 3);
   assert.deepEqual(calls.at(-1).args, ['--test', '--test-reporter=tap', path.join(root, 'mofacts', 'scripts', 'security-audit', 'source-security-v2.test.mjs')]);
-  assert.deepEqual(observations['repository.security-surface-contract'], complete(2));
+  assert.deepEqual(observations['repository.security-surface-contract'], complete(3));
   assert.equal(observations['repository.sensitive-logging'].state, 'observed');
   assert.equal(observations['repository.source-security-tests'].reason, 'timeout');
   assert.equal(JSON.stringify(observations).includes('PRIVATE'), false);

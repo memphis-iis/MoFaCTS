@@ -306,7 +306,8 @@ export const HTTP_AUDIT_VERIFICATIONS = Object.freeze({
 const fileHttpTest = { kind: 'integrationTest', lane: 'meteor', suite: 'application HTTP registration',
   expectedOutcome: 'pass', mutation: 'none' } as const;
 const capabilityResponses = Object.freeze(['retains download method and invalid-capability responses at the mounted paths'] as const);
-const assetResponses = Object.freeze(['preserves the retired upload response on both asset mounts'] as const);
+const assetResponses = Object.freeze(['preserves the retired upload response on both asset mounts',
+  'preserves existing asset URLs and keeps private files behind both mounts'] as const);
 export const HTTP_FILE_VERIFICATIONS = Object.freeze({
   backup: Object.freeze({ ...fileHttpTest, verificationId: 'http.backup.download',
     surfaceId: 'http:get:/admin/backups/download/:token/:filename', cases: capabilityResponses }),

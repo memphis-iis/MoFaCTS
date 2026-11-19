@@ -300,6 +300,7 @@ declare module 'meteor/ostrio:files' {
     responseHeaders?: { [x: string]: string } | ((responseCode?: string, fileObj?: FileObj, versionRef?: Version, version?: string) => { [x: string]: string });
     throttle?: number | boolean;
     downloadRoute?: string;
+    disableDownload?: boolean;
     schema?: Record<string, unknown>;
     chunkSize?: number | 'dynamic';
     namingFunction?: (fileObj: FileObj) => string;

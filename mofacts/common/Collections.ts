@@ -3,7 +3,6 @@ import { Mongo } from 'meteor/mongo';
 import { Roles } from 'meteor/alanning:roles';
 import { FilesCollection } from 'meteor/ostrio:files';
 import { collectionMongoName } from './collectionOwnership';
-import { allowsGenericSparcImageDownload } from './lib/sparcPromptImage';
 import { contentMediaStimuliSetId, validateDynamicAssetUpload, type DynamicAssetUploadMeta } from './fileUploadPolicy';
 
 /*
@@ -57,11 +56,8 @@ const DynamicAssets = new FilesCollection({
   collectionName: collectionMongoName('DynamicAssets'),
   ...(Meteor.isServer ? { storagePath: configuredDynamicAssetsStoragePath() } : {}),
   disableSetTokenCookie: true,
+  disableDownload: true, // The application owns both public asset HTTP mounts.
   allowClientCode: false, // Security: Disallow file operations from client (use server methods)
-  // Session figures are served exclusively through the authorized owner reader.
-  downloadCallback(_http: unknown, file: { meta?: { uploadPurpose?: unknown } }) {
-    return allowsGenericSparcImageDownload(file);
-  },
   onBeforeUpload(this: { userId?: string }, file: { name?: string; extension?: string; type?: string; meta?: DynamicAssetUploadMeta }) {
     if (!this.userId) {
       return 'Must be logged in to upload files';

@@ -137,14 +137,22 @@ remains with that production window.
   `serverComposition.ts` publishes the current account fields and
   `publications.ts` publishes the current user role assignments. Each needs its
   own descriptor and runtime verification.
-- [ ] Decide ownership of HTTP download bytes under the shared CDN prefix.
-  The active source config registers the package normal-stack handler as well
-  as the raw application mount. The raw app requires the public asset marker.
-  The package owns a different download check and file-version handling.
-  Current evidence covers the canonical request on the tested source. Any
-  retirement of package HTTP download serving requires a compatibility review
-  of links, public/private asset delivery and DDP upload behavior. The registry
-  must identify the package binding and the framework inline-script hook.
+- [x] Decide ownership of HTTP download bytes under the shared CDN prefix.
+  Phil chose the application as the sole Assets download owner. The
+  `disableDownload` setting suppresses the package HTTP binding for Assets
+  while leaving its DDP methods registered. The public marker and the
+  session-owned SPARC figure exclusion now run together on both app mounts.
+- [x] Review the asset URL producers. The package link helper and the app media
+  references generate `/cdn/storage/Assets/:id/original/:filename`.
+  The existing short CDN and `/dynamic-assets/:id` paths use the same
+  stored original. Raw dispatch, storage and filename handling are preserved.
+- [x] Align the static source checker and V2 source-evidence inventory.
+  Discovery had omitted the four classified middleware while the verifier
+  counted them. Both now include the same six categories, with the V2
+  parser requiring the complete inventory and matching total.
+- [ ] Verify generated and existing URLs, private-file denial, the retired
+  upload response and DDP continuity in Meteor. The framework inline-script
+  hook and generated package DDP bindings still need inventory coverage.
 
 Composition sealing, full registry coverage and staging qualification stay open.
 

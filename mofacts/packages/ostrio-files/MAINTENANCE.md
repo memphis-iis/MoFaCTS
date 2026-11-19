@@ -14,6 +14,9 @@ Local changes (including behavior-preserving regex/case-block syntax cleanup for
 
 - Uploads require DDP. Explicit HTTP or other transports throw; HTTP upload code
   and file-session authentication are removed. The retired endpoint returns 410.
+  With `disableDownload: true` the collection registers no HTTP handler and still
+  registers its DDP upload methods. MoFaCTS sets this for Assets and owns the
+  retired route and public downloads through its application HTTP mounts.
 - `disableSetTokenCookie` must be true. The client expires the former host-only
   `x_mtok` cookie at `/` and never renews it on login or reconnect.
 - Start records the authenticated caller in the existing pending `file.userId`.

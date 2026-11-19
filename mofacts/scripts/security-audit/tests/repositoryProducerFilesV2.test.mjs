@@ -31,7 +31,7 @@ async function fixture(t) {
     calls.push(spec);
     if (spec.command === process.execPath) {
       if (spec.args[0] === '--test') return runRepositoryCommandV2(spec);
-      if (spec.args.includes('--discover')) return { exitCode: 0, stdout: encode({ methods: ['fixture-method'], publications: [], httpRoutes: [], exports: [], managementRoutes: [] }) };
+      if (spec.args.includes('--discover')) return { exitCode: 0, stdout: encode({ methods: ['fixture-method'], publications: [], httpRoutes: [], httpMiddleware: [], exports: [], managementRoutes: [] }) };
       return { exitCode: 0, stdout: Buffer.from('Security surface contract covers 1 surfaces.\n') };
     }
     if (spec.command === 'npm') return { exitCode: 0, stdout: encode(zeroNpm) };

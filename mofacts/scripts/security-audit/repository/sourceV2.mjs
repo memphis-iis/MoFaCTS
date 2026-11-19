@@ -28,7 +28,7 @@ export function parseSurfaceCoverageObservationV2(discovery, check) {
   try {
     if (discovery?.exitCode !== 0 || check?.exitCode !== 0) return unavailable('evidence-incomplete');
     const inventory = proofRecord(parseCiEvidenceJson(discovery.stdout, 2 * 1024 * 1024),
-      ['methods', 'publications', 'httpRoutes', 'exports', 'managementRoutes']);
+      ['methods', 'publications', 'httpRoutes', 'httpMiddleware', 'exports', 'managementRoutes']);
     let expected = 0;
     for (const names of Object.values(inventory)) {
       if (!Array.isArray(names) || names.length > 10000 || new Set(names).size !== names.length

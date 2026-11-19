@@ -512,119 +512,9 @@ class FilesCollection extends FilesCollectionCore {
 
     this._methodNames = uploadMethodNames(this.collectionName);
 
-    if (this.disableUpload && this.disableDownload) {
-      return;
+    if (!this.disableDownload) {
+      this._registerHttpHandlers();
     }
-    WebApp.connectHandlers.use(async (httpReq, httpResp, next) => {
-      if (this.allowedOrigins && httpReq._parsedUrl.path.includes(`${this.downloadRoute}/`) && !httpResp.headersSent) {
-        if (httpReq.headers.origin && this.allowedOrigins.test(httpReq.headers.origin)) {
-          httpResp.setHeader('Access-Control-Allow-Credentials', 'true');
-          httpResp.setHeader('Access-Control-Allow-Origin', httpReq.headers.origin);
-        }
-
-        if (httpReq.method === 'OPTIONS') {
-          httpResp.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-          httpResp.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type');
-          httpResp.setHeader('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Encoding, Content-Length, Content-Range');
-          httpResp.setHeader('Allow', 'GET, POST, OPTIONS');
-          httpResp.writeHead(200);
-          httpResp.end();
-          return;
-        }
-      }
-
-      if (httpReq._parsedUrl.pathname === `${this.downloadRoute}/${this.collectionName}/__upload`) {
-        httpResp.writeHead(410, { 'Content-Type': 'text/plain; charset=utf-8' });
-        httpResp.end('HTTP uploads are retired. Use DDP.');
-        return;
-      }
-
-      if (this.disableDownload) {
-        next();
-        return;
-      }
-      let uri;
-
-      if (this.public) {
-        // HANDLE FILES UPLOADED TO DIRECTORY ACCESSIBLE BY WEB SERVER
-        // AND/OR WITHOUT PERMISSION CONTROL
-        if (!httpReq._parsedUrl.path.includes(`${this.downloadRoute}`)) {
-          next();
-          return;
-        }
-        uri = httpReq._parsedUrl.path.replace(`${this.downloadRoute}`, '');
-        if (uri.indexOf('/') === 0) {
-          uri = uri.substring(1);
-        }
-
-        const uris = uri.split('/');
-        let _file = uris[uris.length - 1];
-        if (!_file) {
-          next();
-          return;
-        }
-        let version;
-        if (_file.includes('-')) {
-          version = _file.split('-')[0];
-          _file = _file.split('-')[1].split('?')[0];
-        } else {
-          version = 'original';
-          _file = _file.split('?')[0];
-        }
-
-        const params = {
-          query: httpReq._parsedUrl.query ? nodeQs.parse(httpReq._parsedUrl.query) : {},
-          file: _file,
-          _id: _file.split('.')[0],
-          version,
-          name: _file
-        };
-        const http = {request: httpReq, response: httpResp, params};
-
-        // CHECK IF SETUP HAS CUSTOM FUNCTION TO SERVE UPLOADED FILES VIA `interceptRequest`
-        if (this.interceptRequest && helpers.isFunction(this.interceptRequest) && (await this.interceptRequest(http)) === true) {
-          return;
-        }
-        await this.download(http, version, await this.collection.findOneAsync(params._id));
-        return;
-      }
-
-      // HANDLE FILES UPLOADED TO OBFUSCATED STORAGE WITH PERMISSION CONTROL
-      if (!httpReq._parsedUrl.path.includes(`${this.downloadRoute}/${this.collectionName}`)) {
-        next();
-        return;
-      }
-
-      uri = httpReq._parsedUrl.path.replace(`${this.downloadRoute}/${this.collectionName}`, '');
-      if (uri.indexOf('/') === 0) {
-        uri = uri.substring(1);
-      }
-
-      const uris = uri.split('/');
-      if (uris.length !== 3) {
-        next();
-        return;
-      }
-
-      const params = {
-        _id: uris[0],
-        query: httpReq._parsedUrl.query ? nodeQs.parse(httpReq._parsedUrl.query) : {},
-        name: uris[2].split('?')[0],
-        version: uris[1]
-      };
-
-      const http = {request: httpReq, response: httpResp, params};
-
-      // CHECK IF SETUP HAS CUSTOM FUNCTION TO SERVE UPLOADED FILES VIA `interceptRequest`
-      if (this.interceptRequest && helpers.isFunction(this.interceptRequest) && (await this.interceptRequest(http)) === true) {
-        return;
-      }
-
-      if (await this._checkAccess(http)) {
-        await this.download(http, uris[1], await this.collection.findOneAsync(uris[0]));
-      }
-      return;
-    });
 
     this._debug('[FilesCollection] initiated', this);
 
@@ -796,6 +686,115 @@ class FilesCollection extends FilesCollectionCore {
     };
 
     Meteor.methods(_methods);
+  }
+
+  _registerHttpHandlers() {
+    WebApp.connectHandlers.use(async (httpReq, httpResp, next) => {
+      if (this.allowedOrigins && httpReq._parsedUrl.path.includes(`${this.downloadRoute}/`) && !httpResp.headersSent) {
+        if (httpReq.headers.origin && this.allowedOrigins.test(httpReq.headers.origin)) {
+          httpResp.setHeader('Access-Control-Allow-Credentials', 'true');
+          httpResp.setHeader('Access-Control-Allow-Origin', httpReq.headers.origin);
+        }
+
+        if (httpReq.method === 'OPTIONS') {
+          httpResp.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+          httpResp.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type');
+          httpResp.setHeader('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Encoding, Content-Length, Content-Range');
+          httpResp.setHeader('Allow', 'GET, POST, OPTIONS');
+          httpResp.writeHead(200);
+          httpResp.end();
+          return;
+        }
+      }
+
+      if (httpReq._parsedUrl.pathname === `${this.downloadRoute}/${this.collectionName}/__upload`) {
+        httpResp.writeHead(410, { 'Content-Type': 'text/plain; charset=utf-8' });
+        httpResp.end('HTTP uploads are retired. Use DDP.');
+        return;
+      }
+
+      let uri;
+
+      if (this.public) {
+        // HANDLE FILES UPLOADED TO DIRECTORY ACCESSIBLE BY WEB SERVER
+        // AND/OR WITHOUT PERMISSION CONTROL
+        if (!httpReq._parsedUrl.path.includes(`${this.downloadRoute}`)) {
+          next();
+          return;
+        }
+        uri = httpReq._parsedUrl.path.replace(`${this.downloadRoute}`, '');
+        if (uri.indexOf('/') === 0) {
+          uri = uri.substring(1);
+        }
+
+        const uris = uri.split('/');
+        let _file = uris[uris.length - 1];
+        if (!_file) {
+          next();
+          return;
+        }
+        let version;
+        if (_file.includes('-')) {
+          version = _file.split('-')[0];
+          _file = _file.split('-')[1].split('?')[0];
+        } else {
+          version = 'original';
+          _file = _file.split('?')[0];
+        }
+
+        const params = {
+          query: httpReq._parsedUrl.query ? nodeQs.parse(httpReq._parsedUrl.query) : {},
+          file: _file,
+          _id: _file.split('.')[0],
+          version,
+          name: _file
+        };
+        const http = {request: httpReq, response: httpResp, params};
+
+        // CHECK IF SETUP HAS CUSTOM FUNCTION TO SERVE UPLOADED FILES VIA `interceptRequest`
+        if (this.interceptRequest && helpers.isFunction(this.interceptRequest) && (await this.interceptRequest(http)) === true) {
+          return;
+        }
+        await this.download(http, version, await this.collection.findOneAsync(params._id));
+        return;
+      }
+
+      // HANDLE FILES UPLOADED TO OBFUSCATED STORAGE WITH PERMISSION CONTROL
+      if (!httpReq._parsedUrl.path.includes(`${this.downloadRoute}/${this.collectionName}`)) {
+        next();
+        return;
+      }
+
+      uri = httpReq._parsedUrl.path.replace(`${this.downloadRoute}/${this.collectionName}`, '');
+      if (uri.indexOf('/') === 0) {
+        uri = uri.substring(1);
+      }
+
+      const uris = uri.split('/');
+      if (uris.length !== 3) {
+        next();
+        return;
+      }
+
+      const params = {
+        _id: uris[0],
+        query: httpReq._parsedUrl.query ? nodeQs.parse(httpReq._parsedUrl.query) : {},
+        name: uris[2].split('?')[0],
+        version: uris[1]
+      };
+
+      const http = {request: httpReq, response: httpResp, params};
+
+      // CHECK IF SETUP HAS CUSTOM FUNCTION TO SERVE UPLOADED FILES VIA `interceptRequest`
+      if (this.interceptRequest && helpers.isFunction(this.interceptRequest) && (await this.interceptRequest(http)) === true) {
+        return;
+      }
+
+      if (await this._checkAccess(http)) {
+        await this.download(http, uris[1], await this.collection.findOneAsync(uris[0]));
+      }
+      return;
+    });
   }
 
   /**

@@ -129,10 +129,8 @@ function compare(kind, actual, expected) {
 }
 
 if (process.argv.includes('--discover')) {
-  // The existing repository producer consumes the five-field discovery profile.
-  const { httpMiddleware: localMiddleware, ...profile } = await discoverSecuritySurfaces();
-  void localMiddleware;
-  process.stdout.write(`${JSON.stringify(profile, null, 2)}\n`);
+  const actual = await discoverSecuritySurfaces();
+  process.stdout.write(`${JSON.stringify(actual, null, 2)}\n`);
 } else {
   const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
   const actual = await discoverSecuritySurfaces();

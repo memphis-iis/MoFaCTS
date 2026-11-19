@@ -1230,6 +1230,7 @@
     {
       "name": "/dynamic-assets",
       "access": "public",
+      "notes": "Shared application download policy requires an explicit public marker and excludes session-owned SPARC figures. The owner reader handles those figures separately.",
       "review": "2026-11-14: Existing public marker, exact-ID lookup, containment and opaque HTML CSP retained. S3 and local bodies stream with backpressure; client disconnects close sources. Errors after headers terminate the response rather than returning partial successful assets."
     },
     {
@@ -1240,6 +1241,7 @@
     {
       "name": "/cdn/storage/Assets",
       "access": "public",
+      "notes": "The application is the only HTTP handler for Assets. It applies the shared public marker and SPARC figure exclusion. The upload endpoint returns 410 and the package registers DDP methods only for Assets.",
       "review": "2026-11-14: Existing public marker, exact-ID lookup, containment and opaque HTML CSP retained. S3 and local bodies stream with backpressure; client disconnects close sources. Errors after headers terminate the response rather than returning partial successful assets."
     }
   ],

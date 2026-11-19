@@ -1,5 +1,6 @@
 import { WebApp } from 'meteor/webapp';
 import { HTTP_FILE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { allowsGenericSparcImageDownload } from '../../common/lib/sparcPromptImage';
 import { registerProtocolHttpMount } from '../securitySurfaces/registerHttpRoutes.ts';
 import type { IncomingMessage, ServerResponse } from 'http';
 import * as fs from 'fs';
@@ -19,6 +20,7 @@ type DynamicAssetLike = {
   size?: number;
   meta?: {
     public?: boolean;
+    uploadPurpose?: unknown;
     storageBackend?: string;
     storageKey?: string;
   };
@@ -119,7 +121,7 @@ export async function serveDynamicAssetById(
       res.end('File not found');
       return;
     }
-    if (asset.meta?.public !== true) {
+    if (asset.meta?.public !== true || !allowsGenericSparcImageDownload(asset)) {
       deps.serverConsole('[dynamic-assets] Refused non-public asset', assetId);
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('File not found');

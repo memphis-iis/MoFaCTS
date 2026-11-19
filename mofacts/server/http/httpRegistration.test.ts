@@ -1,7 +1,12 @@
 import { expect } from 'chai';
 import { randomUUID } from 'node:crypto';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { Meteor } from 'meteor/meteor';
 import { WebApp } from 'meteor/webapp';
+import { SPARC_PROMPT_IMAGE_PURPOSE } from '../../common/lib/sparcPromptImage';
 import { HTTP_FILE_VERIFICATIONS, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { getLocalStoragePaths } from '../lib/storageBoundary';
 import { registeredHttpSurfaces } from '../securitySurfaces/registerHttpRoutes.ts';
 
 describe('application HTTP registration', function() {
@@ -54,8 +59,56 @@ describe('application HTTP registration', function() {
     const assetId = randomUUID();
     const response = await fetch(`${origin}/cdn/storage/Assets/${assetId}/original/fixture.txt`, { signal: AbortSignal.timeout(5000) });
     expect(response.status).to.equal(404);
-    // The overlapping FilesCollection handler emits a different missing-file response.
     expect(await response.text()).to.equal('File not found');
+  });
+
+  it('preserves existing asset URLs and keeps private files behind both mounts', async function() {
+    const id = randomUUID();
+    const root = getLocalStoragePaths(Meteor.settings, process.env).dynamicAssetsPath;
+    const name = 'synthetic asset.txt';
+    const bytes = 'synthetic download fixture';
+    const file = {
+      _id: id, name, type: 'text/plain', size: Buffer.byteLength(bytes), extension: 'txt',
+      _downloadRoute: DynamicAssets.downloadRoute, _collectionName: DynamicAssets.collectionName,
+    };
+    const generatedPath = new URL(DynamicAssets.link(file, 'original', origin)).pathname;
+    const paths = [
+      generatedPath,
+      `/cdn/storage/Assets/${id}/original/${encodeURIComponent(name)}`,
+      `/cdn/storage/Assets/${id}`,
+      `/dynamic-assets/${id}`,
+    ];
+    const directory = await mkdtemp(join(root, 'download-test-'));
+    const filePath = join(directory, name);
+
+    try {
+      expect(generatedPath).to.equal(`/cdn/storage/Assets/${id}/original/${id}.txt`);
+      await writeFile(filePath, bytes);
+      await DynamicAssets.collection.insertAsync({ ...file, path: filePath, meta: { public: true } });
+      for (const pathname of paths) {
+        const response = await fetch(`${origin}${pathname}`, { signal: AbortSignal.timeout(5000) });
+        expect(response.status, pathname).to.equal(200);
+        expect(await response.text(), pathname).to.equal(bytes);
+      }
+      for (const meta of [
+        { public: false },
+        {},
+        { public: true, uploadPurpose: SPARC_PROMPT_IMAGE_PURPOSE },
+      ]) {
+        await DynamicAssets.collection.updateAsync(id, { $set: { meta } });
+        for (const pathname of paths) {
+          const response = await fetch(`${origin}${pathname}`, { signal: AbortSignal.timeout(5000) });
+          expect(response.status, pathname).to.equal(404);
+          expect(await response.text(), pathname).to.equal('File not found');
+        }
+      }
+    } finally {
+      try {
+        await DynamicAssets.collection.removeAsync(id);
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
   });
 
   it('records each unmounted owner once on its existing stack', function() {
