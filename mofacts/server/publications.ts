@@ -22,8 +22,12 @@ import { ensurePublishedDeploymentBrandProfile } from './lib/deploymentBrandProf
 import { DEPLOYMENT_BRAND_PROFILE_KEY } from '../common/deploymentBrandProfile';
 import { assignmentMemberTdfIds } from '../common/progressiveAssignments';
 import { publishAdminUserPage } from './lib/adminUserPagePublication';
-import { DEFAULT_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
+import { DEFAULT_PUBLICATION_VERIFICATIONS, NAMED_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
 import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
+import { registerNamedPublication } from './securitySurfaces/registerNamedPublication.ts';
+
+const publicBranding = Object.freeze({ kind: 'public', applicationRateLimit: 'none' } as const);
+const adminPublication = Object.freeze({ kind: 'role', role: 'admin' } as const);
 
 // Use Meteor.roleAssignment — set unconditionally by alanning:roles v4 at
 // package load time. The named export RoleAssignmentCollection resolves to
@@ -97,18 +101,9 @@ export const TDF_RUNTIME_SECRET_EXCLUSION_FIELDS = {
 // ===== Admin user-page snapshots =====
 // User membership is a page snapshot: Change Streams cannot represent a moving
 // skip/limit window without polling. Role assignments stay live for those IDs.
-Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50) {
-    // Security check - must be admin
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-
-    if (!isAdmin) {
-        return this.ready();
-    }
-
+registerNamedPublication(Meteor, 'filteredUsers', {
+    policy: adminPublication, dataEgress: 'admin-user-page', verification: NAMED_PUBLICATION_VERIFICATIONS.filteredUsers,
+}, async function(filter = '', page = 0, limit = 50) {
     const pageRequest = normalizePageRequest(page, limit);
     if (!pageRequest) return this.ready();
     const query = buildFilteredUsersSelector(filter);
@@ -124,18 +119,9 @@ Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50
 });
 
 // Publish total count for pagination UI
-Meteor.publish('filteredUsersCount', async function(filter = '') {
-    // Security check - must be admin
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-
-    if (!isAdmin) {
-        return this.ready();
-    }
-
+registerNamedPublication(Meteor, 'filteredUsersCount', {
+    policy: adminPublication, dataEgress: 'admin-user-count', verification: NAMED_PUBLICATION_VERIFICATIONS.filteredUsersCount,
+}, async function(filter = '') {
     const query = buildFilteredUsersSelector(filter);
 
     // Use Counts package pattern - publish to a virtual collection
@@ -149,16 +135,9 @@ Meteor.publish('filteredUsersCount', async function(filter = '') {
     // No reactivity needed - count updates on re-subscribe
 });
 
-Meteor.publish('userAdminDashboardUsage', async function(userIds: any[] = []) {
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-    if (!isAdmin) {
-        return this.ready();
-    }
-
+registerNamedPublication(Meteor, 'userAdminDashboardUsage', {
+    policy: adminPublication, dataEgress: 'admin-dashboard-usage', verification: NAMED_PUBLICATION_VERIFICATIONS.userAdminDashboardUsage,
+}, async function(userIds: any[] = []) {
     const normalizedUserIds = normalizeIdList(userIds).slice(0, 100);
     if (normalizedUserIds.length === 0) {
         return this.ready();
@@ -180,18 +159,22 @@ Meteor.publish('userAdminDashboardUsage', async function(userIds: any[] = []) {
 // ===== PHASE 1.5 OPTIMIZATION: Theme Publication =====
 // Publish theme settings reactively instead of using method calls
 // This allows clients to get automatic updates when theme changes
-Meteor.publish('theme', async function() {
-    // Theme is public data - available to all users (even unauthenticated)
-    // This is safe because theme only contains visual styling, no sensitive data
+registerNamedPublication(Meteor, 'theme', {
+    policy: publicBranding, dataEgress: 'theme-settings', verification: NAMED_PUBLICATION_VERIFICATIONS.theme,
+}, async function() {
     await themeRegistry.ensureActiveTheme();
     return DynamicSettings.find({key: 'customTheme'});
 });
 
-Meteor.publish('themeLibrary', function() {
+registerNamedPublication(Meteor, 'themeLibrary', {
+    policy: publicBranding, dataEgress: 'theme-settings', verification: NAMED_PUBLICATION_VERIFICATIONS.themeLibrary,
+}, function() {
     return DynamicSettings.find({key: 'themeLibrary'});
 });
 
-Meteor.publish('deploymentBrandProfile', async function() {
+registerNamedPublication(Meteor, 'deploymentBrandProfile', {
+    policy: publicBranding, dataEgress: 'deployment-brand-profile', verification: NAMED_PUBLICATION_VERIFICATIONS.deploymentBrandProfile,
+}, async function() {
     await ensurePublishedDeploymentBrandProfile();
     return DynamicSettings.find({ key: DEPLOYMENT_BRAND_PROFILE_KEY });
 });
@@ -199,13 +182,10 @@ Meteor.publish('deploymentBrandProfile', async function() {
 // ===== PHASE 2: Dashboard Cache Publication =====
 // Publish user's pre-computed dashboard statistics
 // This provides O(1) dashboard loading instead of N queries
-Meteor.publish('dashboardCache', function() {
-    // Security check - must be authenticated
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    // Only publish user's own cache
+registerNamedPublication(Meteor, 'dashboardCache', {
+    policy: { kind: 'authenticated-self', delivery: 'sync' },
+    dataEgress: 'own-dashboard-cache', verification: NAMED_PUBLICATION_VERIFICATIONS.dashboardCache,
+}, function() {
     return UserDashboardCache.find(
         { userId: this.userId },
         {
@@ -737,20 +717,16 @@ Meteor.publish('Assignments', async function(courseId: any) {
     } });
 });
 
-Meteor.publish('settings', async function() {
-    // Security: Only admins should see system settings
-    // METEOR 3 FIX: await the async Roles.userIsInRoleAsync() call
-    if (!this.userId || !(await Roles.userIsInRoleAsync(this.userId, ['admin']))) {
-        return this.ready();
-    }
+registerNamedPublication(Meteor, 'settings', {
+    policy: adminPublication, dataEgress: 'system-settings', verification: NAMED_PUBLICATION_VERIFICATIONS.settings,
+}, function() {
     return DynamicSettings.find();
 });
 
-Meteor.publish('clientRuntimeSettings', function() {
-    if (!this.userId) {
-        return this.ready();
-    }
-
+registerNamedPublication(Meteor, 'clientRuntimeSettings', {
+    policy: { kind: 'authenticated', delivery: 'sync' },
+    dataEgress: 'client-log-setting', verification: NAMED_PUBLICATION_VERIFICATIONS.clientRuntimeSettings,
+}, function() {
     return DynamicSettings.find(
         { _id: CLIENT_VERBOSITY_SETTING.id },
         { fields: { key: 1, value: 1 } }
@@ -758,11 +734,10 @@ Meteor.publish('clientRuntimeSettings', function() {
 });
 
 // Publish user's audio settings
-Meteor.publish('userAudioSettings', async function() {
-    if (!this.userId) {
-        return this.ready();
-    }
-
+registerNamedPublication(Meteor, 'userAudioSettings', {
+    policy: { kind: 'authenticated-self', delivery: 'async' },
+    dataEgress: 'own-audio-settings', verification: NAMED_PUBLICATION_VERIFICATIONS.userAudioSettings,
+}, async function() {
     const user = await (Meteor.users as any).findOneAsync({ _id: this.userId }, { fields: { audioSettings: 1, audioPromptMode: 1, audioInputMode: 1 } });
 
     if (!user.audioSettings) {
@@ -795,7 +770,7 @@ Meteor.publish('userAudioSettings', async function() {
     // When this subscription merges with client minimongo, it needs to preserve
     // essential fields like roles and preferences, otherwise helpers will temporarily fail
     return Meteor.users.find(
-        { _id: this.userId },
+        { _id: this.userId! },
         {
             fields: {
                 audioSettings: 1,

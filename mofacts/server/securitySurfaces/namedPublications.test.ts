@@ -5,6 +5,8 @@ import { Random } from 'meteor/random';
 import { DynamicSettings, UserDashboardCache } from '../../common/Collections';
 import { DEPLOYMENT_BRAND_PROFILE_KEY } from '../../common/deploymentBrandProfile';
 import { CLIENT_VERBOSITY_SETTING } from '../../common/loggingSettings';
+import { NAMED_PUBLICATION_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registeredNamedPublications } from './registerNamedPublication.ts';
 
 describe('named application publications', function() {
   const prefix = `publication-${Random.id()}`;
@@ -47,6 +49,16 @@ describe('named application publications', function() {
     await UserDashboardCache.removeAsync({ _id: { $in: [ownerCache, adminCache] } });
     await DynamicSettings.removeAsync({ _id: { $in: [unrelated, library] } });
     if (createdClientSetting) await DynamicSettings.removeAsync(CLIENT_VERBOSITY_SETTING.id);
+  });
+
+  it('binds each characterized publication to one reviewed descriptor', function() {
+    const cases = Object.entries(NAMED_PUBLICATION_VERIFICATIONS);
+    expect(registeredNamedPublications()).to.have.length(cases.length);
+    for (const [name, verification] of cases) {
+      const matches = registeredNamedPublications().filter(item => item.name === name);
+      expect(matches).to.have.length(1);
+      expect(matches[0]).to.include({ surfaceId: verification.surfaceId, verification });
+    }
   });
 
   it('preserves public branding cursors and their exact setting keys', async function() {

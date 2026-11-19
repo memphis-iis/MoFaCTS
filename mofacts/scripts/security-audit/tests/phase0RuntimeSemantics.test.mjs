@@ -3,6 +3,8 @@ import test from 'node:test';
 import fs from 'node:fs';
 import { sourceFile, oneNode, evaluateNode, namedFunction, ts } from './helpers/sourceWitnesses.mjs';
 import { canAccessContentUploadTdf, canDownloadOwnedTdfData, canViewDashboardTdf } from '../../../server/lib/contentAccessPolicy.ts';
+import { registerPublicHttpMount } from '../../../server/securitySurfaces/registerHttpRoutes.ts';
+import { HTTP_HEALTH_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 
 function registration(source, expression) {
   return oneNode(source, (node) => ts.isCallExpression(node) && node.expression.getText(source) === expression);
@@ -66,9 +68,9 @@ test('Phase 0 compatibility: all brand methods authorize before reading, parsing
 test('Phase 0 compatibility: anonymous brand publication selects the published key, not the draft', async () => {
   const source = sourceFile('server/publications.ts');
   const call = oneNode(source, (node) => ts.isCallExpression(node)
-    && node.expression.getText(source) === 'Meteor.publish' && node.arguments[0]?.text === 'deploymentBrandProfile');
+    && node.expression.getText(source) === 'registerNamedPublication' && node.arguments[1]?.text === 'deploymentBrandProfile');
   const events = [];
-  const callback = evaluateNode(call.arguments[1], source, {
+  const callback = evaluateNode(call.arguments[3], source, {
     ensurePublishedDeploymentBrandProfile: async () => { events.push('ensure'); },
     DEPLOYMENT_BRAND_PROFILE_KEY: 'synthetic-published-key',
     DynamicSettings: { find: (query) => { events.push(JSON.parse(JSON.stringify(query))); return 'synthetic-cursor'; } },
@@ -101,10 +103,11 @@ test('Phase 0 compatibility: progressive launch uses caller snapshot and denies 
 test('Phase 0 compatibility: publication denial remains ready(), not a new exception', () => {
   const source = sourceFile('server/publications.ts');
   const call = oneNode(source, (node) => ts.isCallExpression(node)
-    && node.expression.getText(source) === 'Meteor.publish' && node.arguments[0]?.kind === ts.SyntaxKind.NullKeyword);
+    && node.expression.getText(source) === 'registerDefaultPublication'
+    && node.arguments[1]?.text === 'publication:default:role-assignments-self');
   let readyCalls = 0;
   let query;
-  const callback = evaluateNode(call.arguments[1], source, {
+  const callback = evaluateNode(call.arguments[3], source, {
     getRoleAssignment: () => ({ find: (value) => { query = value; return 'synthetic-cursor'; } }),
   });
   assert.equal(callback.call({ userId: null, ready() { readyCalls++; return 'synthetic-ready'; } }), 'synthetic-ready');
@@ -172,8 +175,14 @@ test('Phase 0 compatibility: public/shared/owned content routes retain different
 
 test('Phase 0 compatibility: health GET/HEAD stay public and other methods fall through', () => {
   const source = sourceFile('server/http/health.ts');
-  const call = registration(source, 'WebApp.connectHandlers.use');
-  const callback = evaluateNode(call.arguments[1], source, { buildHealthPayload: () => ({ status: 'ok' }) });
+  const call = registration(source, 'registerPublicHttpMount');
+  assert.equal(call.arguments[0].getText(source), 'WebApp.connectHandlers');
+  assert.equal(call.arguments[1].text, '/health');
+  assert.equal(call.arguments[2].properties[0].initializer.getText(source), 'HTTP_HEALTH_VERIFICATIONS');
+  const respond = evaluateNode(call.arguments[3], source, { buildHealthPayload: () => ({ status: 'ok' }) });
+  let callback;
+  registerPublicHttpMount({ use(_path, handler) { callback = handler; } }, '/health',
+    { verification: HTTP_HEALTH_VERIFICATIONS, dataEgress: { kind: 'public-operational-metadata' } }, respond);
   for (const method of ['GET', 'HEAD', 'POST', 'OPTIONS']) {
     const events = [];
     callback({ method }, { writeHead: (status) => events.push(status), end: () => events.push('end') }, () => events.push('next'));
@@ -183,7 +192,9 @@ test('Phase 0 compatibility: health GET/HEAD stay public and other methods fall 
 
 test('Phase 0 compatibility: PWA middleware falls through without touching theme storage for other paths/methods', async () => {
   const source = sourceFile('server/http/pwa.ts');
-  const callback = evaluateNode(registration(source, 'WebAppAny.handlers.use').arguments[0], source, {
+  const call = registration(source, 'registerHttpMiddleware');
+  assert.equal(call.arguments[1].text, 'handlers');
+  const callback = evaluateNode(call.arguments[3], source, {
     URL, APPLE_TOUCH_ICON_ROUTE: '/apple-touch-icon.png', APPLE_TOUCH_ICON_PRECOMPOSED_ROUTE: '/apple-touch-icon-precomposed.png',
     PWA_ICON_ROUTE_PREFIX: '/theme-install-icon/', DEPLOYMENT_BRAND_SOCIAL_IMAGE_ROUTE: '/synthetic-social-image',
   });
@@ -198,8 +209,9 @@ test('Phase 0 compatibility: both asset stacks consume the already-stripped moun
   const source = sourceFile('server/runtime/dynamicAssetsRoute.ts');
   const observed = [];
   for (const stack of ['rawConnectHandlers', 'connectHandlers']) {
-    const call = registration(source, `WebApp.${stack}.use`);
-    const callback = evaluateNode(call.arguments[1], source, {
+    const call = oneNode(source, node => ts.isCallExpression(node)
+      && node.expression.getText(source) === 'registerProtocolHttpMount' && node.arguments[1]?.text === stack);
+    const callback = evaluateNode(call.arguments[4], source, {
       deps: {}, getFirstPathSegment: namedFunction(source, 'getFirstPathSegment'),
       serveDynamicAssetById: async (_deps, _res, id) => { observed.push([stack, id]); },
     });
@@ -211,7 +223,9 @@ test('Phase 0 compatibility: both asset stacks consume the already-stripped moun
 test('Phase 0 compatibility: SAML wrong-method 405 and unmatched-path fallthrough remain distinct', () => {
   const source = sourceFile('server/lib/memphisSaml.ts');
   const events = [];
-  const callback = evaluateNode(registration(source, 'WebAppCompat.connectHandlers.use').arguments[0], source, {
+  const call = registration(source, 'registerHttpMiddleware');
+  assert.equal(call.arguments[1].text, 'connectHandlers');
+  const callback = evaluateNode(call.arguments[3], source, {
     getPathname: (req) => req.url,
     MEMPHIS_SAML_LOGIN_PATH: '/synthetic-login', MEMPHIS_SAML_ACS_PATH: '/synthetic-acs', MEMPHIS_SAML_METADATA_PATH: '/synthetic-metadata',
     writeTextResponse: (_res, status) => events.push(status),

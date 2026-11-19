@@ -197,6 +197,23 @@ Named publications, method and package bindings, composition sealing, full
 registry coverage and Phase 3 staging qualification remain open. The remaining
 two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 20.
 
+## Phase 3 named publications (2026-11-19)
+
+- [x] Characterize ten existing named publications in native Meteor (slot 21).
+  Public branding, signed-in dashboard/log/audio, and admin settings/user
+  snapshots kept their existing DDP names, cursor/event shapes, denied
+  readiness, ownership projections and audio initialization.
+- [ ] Verify their typed bindings and authorization in native Meteor. The
+  migration gives each publication a matching verification and data-egress
+  descriptor and moves the equivalent entry guard out of the domain callback.
+
+- [ ] Decide the policy for a learner-progress request with no signed-in
+  session. Source review found the current lookup can match a missing owner,
+  while existing privacy fixtures cover records with assigned owners.
+  The accepted progress-backed passwordless flow already establishes an
+  account session before requesting progress. This decision applies to the
+  publication boundary. The behavior and retained progress are unchanged.
+
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 
 Phil confirmed P1-04 remains at the coordinated production cutover and
@@ -1514,7 +1531,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 25 total, 19 consumed, 0 reserved, 5 available for continued Phase 3 work, and 1 for the earlier `/health` batch only.**
+**Current allowance: 25 total, 20 consumed, 0 reserved, 4 available for continued Phase 3 work, and 1 for the earlier `/health` batch only.**
 
 Phil authorized five additional Phase 3 invocations on the same isolated worker after slot 20.
 
@@ -1553,6 +1570,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 18 | bf3c9da18a48f4bc6b32613cba9587628d7f5cca | PASS 2026-11-19T18:31:46Z to 18:33:09Z. 1,053 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. Both new Assets and DDP cases passed. Full typecheck/lint and the Linux source-security gate passed (610 passes, 10 existing skips). Exact source, isolation, limits and job cleanup verified. The pre-existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.e1XOu3F0/results/native-verification.json. SHA-256 69801f7de13e8676a37572e00e2912105e493f9a8f692af9b863ab08b42a24fb. |
 | 19 | bd3520f2ef4c368c128cb331ee19aba3af385147 | PASS 2026-11-19T18:58:05Z to 18:59:31Z. Narrow Assets fix over accepted staging2 base 93b7d444. 1,021 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. Typecheck, lint and the exact-revision Linux source gates passed (433 passes, six skips). Earlier source-test attempts used incompatible Windows Git/file modes or a restrictive test umask and did not consume a Meteor slot. Exact capture, isolation, limits and owned cleanup verified; the existing JEDM scheduler record changed during the run. Private receipt: /var/tmp/mofacts-integration.8ASccmum/results/native-verification.json. SHA-256 c28274a39f21169a4488d1c6e423f9e29270d933f14cc8f3f15d9f9ee070ccb6. |
 | 20 | 2cab7a5bb5eb66238f53b139b743d70a5ff3069c | PASS 2026-11-19T19:23:22Z to 19:25:06Z. 1,056 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. The external runtime-config listener and both default publication tests passed. Exact source, isolation, limits and worker cleanup verified. The pre-existing JEDM scheduler record changed during the run; other existing records matched. Private receipt: /var/tmp/mofacts-integration.bbgnZzS1/results/native-verification.json. SHA-256 a3bf70edb7cd32c4df45cb9a5d1dabc563d961f8846e1abab182eb36a817eda0. |
+| 21 | b7882ab838c514ddd467eff110ad4fc99b382c83 | PASS 2026-11-19T19:42:37Z to 19:44:09Z. 1,059 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. All three baseline groups exercised the ten named publications with existing registrations and guards. Exact source, isolation, limits and job cleanup verified. Existing JEDM scheduler, MoFaCTS app and Mongo replica-init service records changed during the run. Private receipt: /var/tmp/mofacts-integration.eAYZtXrP/results/native-verification.json. SHA-256 686ec08f3a66f139e9f0f2049ffa1d3be124c16c3c94317d20797623e6699ba2. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.

@@ -1102,7 +1102,8 @@
     },
     {
       "name": "clientRuntimeSettings",
-      "access": "public-rate-limited"
+      "access": "authenticated",
+      "notes": "Signed-in users receive the single client verbosity setting. No application subscription rate limit is registered."
     },
     {
       "name": "contentUploadOwners",
@@ -1131,12 +1132,12 @@
     },
     {
       "name": "filteredUsers",
-      "access": "role-checked",
+      "access": "admin-only",
       "notes": "Admin-authorized, bounded user page; reactive role assignments are limited to that page's user IDs and projected to user._id and inheritedRoles._id."
     },
     {
       "name": "filteredUsersCount",
-      "access": "role-checked"
+      "access": "admin-only"
     },
     {
       "name": "ownedTdfs",
@@ -1148,7 +1149,7 @@
     },
     {
       "name": "settings",
-      "access": "role-checked"
+      "access": "admin-only"
     },
     {
       "name": "tdfByExperimentTarget",
@@ -1173,15 +1174,15 @@
     },
     {
       "name": "theme",
-      "access": "public-rate-limited"
+      "access": "public"
     },
     {
       "name": "themeLibrary",
-      "access": "public-rate-limited"
+      "access": "public"
     },
     {
       "name": "userAdminDashboardUsage",
-      "access": "role-checked"
+      "access": "admin-only"
     },
     {
       "name": "userAudioSettings",

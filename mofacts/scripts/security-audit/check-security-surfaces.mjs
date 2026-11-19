@@ -81,6 +81,7 @@ export async function discoverSecuritySurfaces() {
     publications.push(...regexMatches(text, /Meteor\.publish\(\s*(?:'([^']+)'|null)/g,
       (match) => match[1] || '<default>'));
     publications.push(...regexMatches(text, /registerDefaultPublication\(\s*Meteor,\s*'(publication:default:[^']+)'/g, (match) => match[1]));
+    publications.push(...regexMatches(text, /registerNamedPublication\(\s*Meteor,\s*'([^']+)'/g, (match) => match[1]));
     httpRoutes.push(...regexMatches(text, /(?:connectHandlers|rawConnectHandlers)\.use\(\s*'([^']+)'/g, (match) => match[1]));
     httpRoutes.push(...regexMatches(text, /registerPublicHttpMount\(\s*WebApp\.connectHandlers,\s*'([^']+)'/g, (match) => match[1]));
     httpRoutes.push(...regexMatches(text, /registerProtocolHttpMount\(\s*WebApp,\s*'(?:rawConnectHandlers|connectHandlers)',\s*'([^']+)'/g, (match) => match[1]));
@@ -147,7 +148,7 @@ if (process.argv.includes('--discover')) {
   const invalidPolicies = Object.entries(manifest)
     .filter(([, entries]) => Array.isArray(entries))
     .flatMap(([kind, entries]) => entries.filter((entry) =>
-      !['disabled', 'public', 'public-rate-limited', 'authenticated-self', 'role-checked', 'admin-only', 'signed-ingestion', 'single-use-download', 'saml-protocol', 'response-headers'].includes(entry.access))
+      !['disabled', 'public', 'public-rate-limited', 'authenticated', 'authenticated-self', 'role-checked', 'admin-only', 'signed-ingestion', 'single-use-download', 'saml-protocol', 'response-headers'].includes(entry.access))
       .map((entry) => ({ kind, name: entry.name, access: entry.access })));
   const failures = comparisons.filter((comparison) => comparison.missing.length || comparison.removed.length);
   if (failures.length || invalidPolicies.length) {

@@ -340,6 +340,30 @@ export const DEFAULT_PUBLICATION_VERIFICATIONS = Object.freeze({
     verificationId: 'publication.default.role-assignments-self',
     cases: Object.freeze(['automatically publishes only the current role assignments'] as const) }),
 });
+const brandingPublications = 'preserves public branding cursors and their exact setting keys';
+const selfPublications = 'preserves authenticated dashboard, runtime setting, and audio scope';
+const adminPublications = 'preserves administrator-only snapshots, cursor scope and readiness';
+function namedPublicationVerification<N extends string>(name: N, observedCase: string) {
+  return Object.freeze({
+    ...defaultPublicationTest,
+    suite: 'named application publications',
+    surfaceId: `publication:${name}` as const,
+    verificationId: `publication.named.${name}` as const,
+    cases: Object.freeze([observedCase] as const),
+  });
+}
+export const NAMED_PUBLICATION_VERIFICATIONS = Object.freeze({
+  theme: namedPublicationVerification('theme', brandingPublications),
+  themeLibrary: namedPublicationVerification('themeLibrary', brandingPublications),
+  deploymentBrandProfile: namedPublicationVerification('deploymentBrandProfile', brandingPublications),
+  dashboardCache: namedPublicationVerification('dashboardCache', selfPublications),
+  clientRuntimeSettings: namedPublicationVerification('clientRuntimeSettings', selfPublications),
+  userAudioSettings: namedPublicationVerification('userAudioSettings', selfPublications),
+  settings: namedPublicationVerification('settings', adminPublications),
+  filteredUsers: namedPublicationVerification('filteredUsers', adminPublications),
+  filteredUsersCount: namedPublicationVerification('filteredUsersCount', adminPublications),
+  userAdminDashboardUsage: namedPublicationVerification('userAdminDashboardUsage', adminPublications),
+});
 const samlMethodCases = Object.freeze(['retains SAML method handling on all three exact paths'] as const);
 const socialPreviewCases = Object.freeze(['serves social crawler metadata and lets an ordinary request reach the app'] as const);
 export const HTTP_MIDDLEWARE_VERIFICATIONS = Object.freeze({
