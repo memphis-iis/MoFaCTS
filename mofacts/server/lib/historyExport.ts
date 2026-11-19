@@ -3,13 +3,12 @@ import { getHistory } from '../orm';
 import { legacyTrim } from '../../common/underscoreCompat';
 import { isOperationalHistoryRecord } from '../../common/historyEnvelope';
 
-const PROLIFIC_COLUMNS = ['Prolific Participant ID', 'Prolific Study ID', 'Prolific Submission ID'];
-const FIELDSDS: string[] = [...outputFields.filter(field => field !== 'CF (Simulation Activity)'), ...PROLIFIC_COLUMNS, 'CF (Simulation Activity)'];
+const FIELDSDS = outputFields;
 
 /** Source contract shared by cursor exports and the formatter/order adapter. */
 export const HISTORY_EXPORT_SOURCE_PROJECTION: Record<string, 0 | 1> = {
   _id: 0,
-  TDFId: 1, userId: 1, anonStudentId: 1, userIdTDFId: 1, eventId: 1, recordedServerTime: 1,
+  TDFId: 1, currentRootTdfId: 1, userId: 1, anonStudentId: 1, userIdTDFId: 1, eventId: 1, recordedServerTime: 1,
   time: 1, problemStartTime: 1, CFStartLatency: 1, outcome: 1,
   selection: 1, action: 1, levelUnitType: 1, CFVideoAction: 1, CFButtonOrder: 1,
   CFNote: 1, itemId: 1, KCId: 1, responseDuration: 1, probabilityEstimate: 1,
@@ -70,7 +69,7 @@ export async function writeHistoryExport(
   histories: Iterable<any> | AsyncIterable<any>,
   writeRecord: (chunk: string) => void | Promise<void>,
   onRecordError: (error: unknown) => void,
-  loadParticipationIdentities?: (userIds: string[]) => Promise<Array<{ userId: string; participantId: string; studyId: string; submissionId: string }>>,
+  loadParticipantKeys?: (rows: any[]) => Promise<(row: any) => string | undefined>,
 ) {
   const header: Record<string, string> = {};
   const listOfDynamicStimTags: any[] = [];
@@ -94,20 +93,16 @@ export async function writeHistoryExport(
 
   let batch: any[] = [];
   async function flush() {
-    const userIds = [...new Set(batch.map(h => h.userId).filter(id => typeof id === 'string'))] as string[];
-    const identities = new Map((loadParticipationIdentities ? await loadParticipationIdentities(userIds) : []).map(p => [p.userId, p]));
+    const participantKey = await loadParticipantKeys?.(batch);
     for (const raw of batch) {
       if (!isOperationalHistoryRecord(raw)) continue;
       if (raw.sparc?.simulationActivity?.recordRole === 'internal') continue;
+      const key = participantKey?.(raw);
       let record: string;
       try {
         const history = getHistory(raw);
-        const p = identities.get(raw.userId);
-        record = await delimitedRecord({ ...history,
-          [PROLIFIC_COLUMNS[0]!]: p?.participantId || '',
-          [PROLIFIC_COLUMNS[1]!]: p?.studyId || '',
-          [PROLIFIC_COLUMNS[2]!]: p?.submissionId || '',
-        }, listOfDynamicStimTags, false);
+        if (key) history['Anon Student Id'] = key;
+        record = await delimitedRecord(history, listOfDynamicStimTags, false);
       } catch (error) { onRecordError(error); continue; }
       // Transport failures must terminate the stream, not be treated as malformed rows.
       await writeRecord(record);

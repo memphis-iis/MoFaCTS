@@ -9,7 +9,7 @@ import { assertUnchangedOwnedHistoryScope, resolveOwnedHistoryDownloadScope } fr
 import { sortedOwnedHistoryRecords } from '../lib/sortedHistoryExport';
 import type { HistoryExportCollection } from '../lib/sortedHistoryExport';
 import { writeHistoryExport } from '../lib/historyExport';
-import { ProlificParticipations } from '../lib/prolificCollections';
+import { loadParticipantExportKeys } from '../lib/participantExport';
 import { serverConsole } from '../serverComposition';
 
 registerProtocolHttpMount(WebApp, 'connectHandlers', '/data-download/owned-history', {
@@ -27,8 +27,7 @@ registerProtocolHttpMount(WebApp, 'connectHandlers', '/data-download/owned-histo
   openHistory: (record, signal) => sortedOwnedHistoryRecords(Histories.rawCollection() as unknown as HistoryExportCollection, record.tdfIds, { signal }),
   writeHistory: async (histories, write) => {
     let skipped = 0;
-    await writeHistoryExport(histories, write, () => { skipped += 1; }, async userIds =>
-      ProlificParticipations.find({ userId: { $in: userIds } }, { fields: { userId: 1, participantId: 1, studyId: 1, submissionId: 1 } }).fetchAsync());
+    await writeHistoryExport(histories, write, () => { skipped += 1; }, loadParticipantExportKeys);
     if (skipped) serverConsole('Owned history export skipped malformed records', { count: skipped });
   },
 }));

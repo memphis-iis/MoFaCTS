@@ -1,4 +1,4 @@
-import { ProlificParticipations } from './lib/prolificCollections';
+import { loadParticipantExportKeys } from './lib/participantExport';
 /* experiment_times.js
  *
  * This script exports all user trial information in the DataShop tab-delimited
@@ -34,5 +34,5 @@ export async function writeExperimentExportFromHistoryIterable(
 ) {
   await writeHistoryExport(histories, writeRecord, (error) => {
     serverConsole('There was an error populating the record - it will be skipped', error);
-  }, async userIds => ProlificParticipations.find({ userId: { $in: userIds } }, { fields: { userId: 1, participantId: 1, studyId: 1, submissionId: 1 } }).fetchAsync());
+  }, loadParticipantExportKeys);
 }

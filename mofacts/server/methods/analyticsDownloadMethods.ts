@@ -1,3 +1,5 @@
+import { studyOnlyAccount } from '../../common/participantPrivacy';
+import { participantConnectionRoot } from '../lib/participantSession';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
@@ -16,6 +18,7 @@ type MethodContext = {
 };
 
 type AnalyticsDownloadDeps = {
+  GlobalExperimentStates: { findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any> };
   Histories: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
@@ -54,11 +57,12 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
       const request = { kind: 'owned-lessons' } as const;
       const { tdfIds } = await resolveOwnedHistoryDownloadScope(deps, targetUserId, request);
 
-      const user = await deps.usersCollection.findOneAsync({ _id: targetUserId }, { fields: { username: 1, emails: 1 } });
+      const user = await deps.usersCollection.findOneAsync({ _id: targetUserId }, { fields: { username: 1, emails: 1, 'profile.experiment': 1, 'profile.createdBy': 1 } });
       if (!user) {
         throw new Meteor.Error(404, 'User not found');
       }
-      const userName = sanitizeFileNameSegment(user.username || user.emails?.[0]?.address || targetUserId, targetUserId);
+      const userName = studyOnlyAccount(user) || participantConnectionRoot(this) ? 'participant'
+        : sanitizeFileNameSegment(user.username || user.emails?.[0]?.address || targetUserId, targetUserId);
       const fileName = `learning-data_${userName}_all-lessons.tsv`;
 
       return { fileName, contentType: 'text/tab-separated-values', downloadUrl: createOwnedHistoryDownloadToken(targetUserId, request, tdfIds, fileName).url };
@@ -72,13 +76,16 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
         throw new Meteor.Error(404, 'No history found for current user');
       }
 
-      const user = await deps.usersCollection.findOneAsync({ _id: actingUserId }, { fields: { username: 1, emails: 1 } });
+      const user = await deps.usersCollection.findOneAsync({ _id: actingUserId }, { fields: { username: 1, emails: 1, 'profile.experiment': 1, 'profile.createdBy': 1 } });
       if (!user) {
         throw new Meteor.Error(404, 'User not found');
       }
 
-      const userName = sanitizeFileNameSegment(user.username || user.emails?.[0]?.address || actingUserId, actingUserId);
-      const fileName = `learning-data_${userName}_own-history_all-lessons.tsv`;
+      const hasStudyHistory = studyOnlyAccount(user) || participantConnectionRoot(this) ||
+        await deps.GlobalExperimentStates.findOneAsync({ userId: actingUserId, 'experimentState.experimentTarget': { $type: 'string', $ne: '' } }, { fields: { _id: 1 } });
+      const label = hasStudyHistory ? 'participant'
+        : sanitizeFileNameSegment(user.username || user.emails?.[0]?.address || actingUserId, actingUserId);
+      const fileName = `learning-data_${label}_own-history_all-lessons.tsv`;
       return {
         fileName,
         contentType: 'text/tab-separated-values',

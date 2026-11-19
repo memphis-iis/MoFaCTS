@@ -1,3 +1,4 @@
+import { participantConnectionRoot } from '../lib/participantSession';
 import { requireSparcLessonAccess } from '../lib/sparcLessonAccess';
 import { isSparcAdminPolicy, SPARC_INSTRUCTIONAL_POLICY_IDS } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import { worksheetHistoryWriteId } from '../lib/worksheetHistoryWrite';
@@ -702,6 +703,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       dynamicTagFields: [],
       recordedServerTime: (new Date()).getTime(),
     });
+    delete (sanitizedHistoryRecord as UnknownRecord).currentRootTdfId;
+    const studyRoot = participantConnectionRoot(context);
+    if (studyRoot) Object.assign(sanitizedHistoryRecord, { currentRootTdfId: studyRoot });
     const recordBuildMs = elapsedMsSince(recordBuildStartTime);
     return { sanitizedHistoryRecord, actingUserId, decompressMs, sanitizeMs, authorizationMs, recordBuildMs };
   }

@@ -7,6 +7,7 @@ describe('instructor export method capabilities', () => {
     const calls: Array<{ selector: Record<string, unknown>; options?: Record<string, unknown> }> = [];
     const tdf = { _id: 'synthetic-lesson', ownerId: 'synthetic-owner', content: { tdfs: { tutor: { setspec: { lessonname: 'Synthetic lesson' }, unit: [{ type: 'model' }] } } } };
     const methods = createAnalyticsDownloadMethods({
+      GlobalExperimentStates: { findOneAsync: async () => null },
       Histories: {
         find: () => { throw new Error('A method must not buffer history rows'); },
         findOneAsync: async () => { throw new Error('An instructor method must not read history rows'); },
