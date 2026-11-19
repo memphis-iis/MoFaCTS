@@ -189,9 +189,13 @@ remains with that production window.
   projection and role assignments and preserved anonymous behavior.
   Full typecheck, lint (335 classified source entries) and the affected
   Linux source-security, catalog and Phase 0 regression tests passed.
-- [ ] Inventory generated package DDP methods on their owning boundary.
-  The existing source checker now rejects re-enabling package HTTP download
-  registration on Assets. Runtime DDP descriptors remain open.
+- [x] Identify the four generated Assets DDP names and their source owner.
+  The maintained ostrio:files constructor registers Start, Write, Abort and
+  Remove. Write handles both chunk and finish. The application config
+  disables client Remove and package HTTP downloads; the DDP Remove name
+  is still registered and must be represented as denied.
+- [ ] Bind the generated Assets methods and verify exact runtime ownership.
+  Existing source coverage rejects re-enabling package HTTP downloads.
 
 Named publications, method and package bindings, composition sealing, full
 registry coverage and Phase 3 staging qualification remain open. The remaining
@@ -233,8 +237,17 @@ two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 2
   A standalone progress row for a condition shared by multiple roots has no
   unique study assignment in its stored key. Scope excludes that row and
   continues to include the bound root and its root-keyed assigned progress.
-- [ ] Verify passwordless return, scoped reads and same-user subscription
-  recomputation on an actual DDP connection in native Meteor.
+- [x] Verify passwordless return, scoped reads and same-user subscription
+  recomputation on a real DDP connection (slot 24). The same synthetic
+  account retained its root and unique condition rows on study sign-in.
+  The active subscription removed out-of-study and shared-condition rows.
+  Direct methods, recent history, state-returning writes and account-wide
+  dashboard/export gating passed. Exact-source typecheck, lint and affected
+  Linux source-security, runtime semantics and catalog checks passed.
+- [ ] Decide whether to store standalone shared-condition progress by study.
+  Root-keyed progress already supports return. To show separate standalone
+  progress for one condition reused by several studies, new records would
+  need a server-verified study key. Existing ambiguous rows remain preserved.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 
@@ -1553,7 +1566,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 25 total, 22 consumed, 0 reserved, 2 available for continued Phase 3 work, and 1 for the earlier `/health` batch only.**
+**Current allowance: 25 total, 23 consumed, 0 reserved, 1 available for continued Phase 3 work, and 1 for the earlier `/health` batch only.**
 
 Phil authorized five additional Phase 3 invocations on the same isolated worker after slot 20.
 
@@ -1595,6 +1608,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 21 | b7882ab838c514ddd467eff110ad4fc99b382c83 | PASS 2026-11-19T19:42:37Z to 19:44:09Z. 1,059 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. All three baseline groups exercised the ten named publications with existing registrations and guards. Exact source, isolation, limits and job cleanup verified. Existing JEDM scheduler, MoFaCTS app and Mongo replica-init service records changed during the run. Private receipt: /var/tmp/mofacts-integration.eAYZtXrP/results/native-verification.json. SHA-256 686ec08f3a66f139e9f0f2049ffa1d3be124c16c3c94317d20797623e6699ba2. |
 | 22 | 744581b5fc33868e1c47540e2bcfb0ac83a86aa7 | PASS 2026-11-19T19:50:32Z to 19:52:17Z. 1,060 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. All four named-publication cases passed with exact source, limits, isolation and owned-resource cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.ItLdgOrX/results/native-verification.json. SHA-256 f31b65fe763a65a43b9e10da14f408819e97922c1514b205be04c692094a705d. |
 | 23 | 0b9fefa2a3fe2f0cffdb330954989c6229887a97 | PASS 2026-11-19T21:58:14Z to 21:59:51Z. 1,060 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Logged-out readiness, all four own-progress cases, multi-lesson progress and passwordless return passed. Exact source, isolation, limits and owned cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.Q49eKaT8/results/native-verification.json. SHA-256 685f706dc17a355dc082302a5c73664d8b29af1ea1808f74b8dd19a03943853b. |
+| 24 | 748dc6eecbceccab650fd224893f71fef391ddfe | PASS 2026-11-19T22:25:06Z to 22:26:46Z. 1,061 server and 1,249 Chromium passes, no failures/hooks, 15/seven pending. The real-DDP study scope and passwordless return case passed. Exact source, limits, isolation and owned cleanup verified. Existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.YBcb2u3v/results/native-verification.json. SHA-256 3ce5844e97a82a0c8552b4e4e8a4be0c1caceb990e3d295a84ddd47782662371. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.

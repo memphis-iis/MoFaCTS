@@ -4,6 +4,8 @@ A Prolific launch exchanges its full identity triple for an Accounts credential 
 
 The browser removes Prolific query values after exchange. The participant entry response uses `no-referrer`. Study responses, saved condition, timing and progress remain available to the authored experience. Participant diagnostic reports, sign-in status, debug messages and profile edits are suppressed. Study download keys depend on the existing encryption secret. Rotating that secret changes derived keys for other experiments. Prolific participation record IDs survive rotation.
 
+Saved progress can still qualify a returning manual participant for passwordless access. After sign-in, the study session limits progress and activity reads to the bound study and its condition lessons. The saved assignment and progress recorded under the study root remain available even when two studies use the same condition lesson. Old standalone rows for a shared condition are withheld because they carry no reliable study identity. Account-wide dashboards, course progress summaries and all-lessons exports require an ordinary account session. Lesson exports still require ownership, including when requested from a study session.
+
 ## Existing records
 
 The count-only inventory and cleanup decision logic live in `mofacts/server/lib/participantPrivacyCleanup.ts`. They have no startup or network entry point. The operator must obtain separate approval before applying a cleanup to existing data. Supply the intended database to `participantPrivacyCleanupStores(db)` and pass that adapter to `inspectParticipantPrivacy(stores)` for counts. Only the explicit second argument `cleanup` enables writes.
