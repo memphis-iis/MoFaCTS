@@ -244,10 +244,15 @@ two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 2
   Direct methods, recent history, state-returning writes and account-wide
   dashboard/export gating passed. Exact-source typecheck, lint and affected
   Linux source-security, runtime semantics and catalog checks passed.
-- [ ] Decide whether to store standalone shared-condition progress by study.
-  Root-keyed progress already supports return. To show separate standalone
-  progress for one condition reused by several studies, new records would
-  need a server-verified study key. Existing ambiguous rows remain preserved.
+- [x] Confirm that each condition TDF belongs to one study root. Reusing
+  lesson content in another study requires its own condition identity.
+  The defensive read rule covers inconsistent references and does not
+  imply support for shared-condition progress storage.
+- [ ] Close the package-upload validation gap for single-root ownership.
+  Identity remapping requires the child in the package. The upload path
+  rejects conflicting visibility across roots but lacks an unconditional
+  single-root check. Verify new and updated packages, including competing
+  updates, without reassigning or deleting existing progress.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 
