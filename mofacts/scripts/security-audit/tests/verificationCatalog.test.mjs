@@ -4,6 +4,32 @@ import test from 'node:test';
 import { AUTHORIZATION_VERIFICATIONS, auditVerification, AUDIT_VERIFICATIONS, AUTHENTICATION_CONTROL_CASES,
   AUTHENTICATION_PROTOCOL_MUTATIONS, AUTHORIZATION_MUTATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 
+import { HTTP_FILE_VERIFICATIONS, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
+import { registerHttpMiddleware, registerProtocolHttpMount, registeredHttpSurfaces } from '../../../server/securitySurfaces/registerHttpRoutes.ts';
+
+test('file and unmounted registrations use the original callback and framework call shape', () => {
+  const calls = [];
+  const stack = name => ({ use(...args) { calls.push([name, this, ...args]); } });
+  const stacks = { connectHandlers: stack('normal'), rawConnectHandlers: stack('raw'), handlers: stack('handlers') };
+  const handler = () => {};
+  registerProtocolHttpMount(stacks, 'rawConnectHandlers', '/cdn/storage/Assets', {
+    surfaceId: 'middleware:cdn-public-assets', policy: { kind: 'public-asset-marker' },
+    dataEgress: { kind: 'public-asset' }, verification: HTTP_FILE_VERIFICATIONS.cdn,
+  }, handler);
+  registerHttpMiddleware(stacks, 'handlers', {
+    surfaceId: 'middleware:security-headers', policy: { kind: 'response-headers' },
+    dataEgress: { kind: 'none' }, verification: HTTP_MIDDLEWARE_VERIFICATIONS.headers,
+  }, handler);
+  assert.deepEqual(calls, [
+    ['raw', stacks.rawConnectHandlers, '/cdn/storage/Assets', handler],
+    ['handlers', stacks.handlers, handler],
+  ]);
+  const captured = registeredHttpSurfaces();
+  assert.equal(captured[0]?.verification, HTTP_FILE_VERIFICATIONS.cdn);
+  assert.equal(captured[1]?.verification, HTTP_MIDDLEWARE_VERIFICATIONS.headers);
+  assert.ok(Object.isFrozen(captured));
+});
+
 const manifest = JSON.parse(fs.readFileSync(new URL('../../../security-surface-contract.json', import.meta.url)));
 test('Phase 2 source intent closes exactly over the 22 catalog controls without claiming executed coverage', () => {
   const catalog = JSON.parse(fs.readFileSync(new URL('../../../common/securityAudit/catalogs/control-catalog.v1.json', import.meta.url)));

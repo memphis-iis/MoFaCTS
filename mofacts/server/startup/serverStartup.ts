@@ -3,6 +3,8 @@ import { Accounts } from 'meteor/accounts-base';
 import { Roles } from 'meteor/alanning:roles';
 import { ServiceConfiguration } from 'meteor/service-configuration';
 import { WebApp } from 'meteor/webapp';
+import { HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registerHttpMiddleware } from '../securitySurfaces/registerHttpRoutes.ts';
 import { curSemester } from '../../common/Definitions';
 import { displayify } from '../../common/globalHelpers';
 import type { NextFunction } from 'connect';
@@ -163,7 +165,12 @@ const WebAppAny = WebApp as unknown as {
 };
 
 function registerSecurityHeaders() {
-  WebAppAny.handlers.use((req: IncomingMessage, res: ServerResponse<IncomingMessage>, next: NextFunction) => {
+  registerHttpMiddleware(WebAppAny, 'handlers', {
+    surfaceId: 'middleware:security-headers',
+    policy: Object.freeze({ kind: 'response-headers' }),
+    dataEgress: Object.freeze({ kind: 'none' }),
+    verification: HTTP_MIDDLEWARE_VERIFICATIONS.headers,
+  }, (req: IncomingMessage, res: ServerResponse<IncomingMessage>, next: NextFunction) => {
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-XSS-Protection', '1; mode=block');

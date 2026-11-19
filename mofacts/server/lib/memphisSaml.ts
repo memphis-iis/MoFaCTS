@@ -2,6 +2,8 @@ import { Accounts } from 'meteor/accounts-base';
 import { Meteor } from 'meteor/meteor';
 import { Random } from 'meteor/random';
 import { WebApp } from 'meteor/webapp';
+import { HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registerHttpMiddleware } from '../securitySurfaces/registerHttpRoutes.ts';
 import { XMLParser } from 'fast-xml-parser';
 import { SAML, SamlStatusError, type Profile, type SamlConfig } from '@node-saml/node-saml';
 import { createHash } from 'crypto';
@@ -782,7 +784,12 @@ function registerMemphisSamlRoutes() {
     return;
   }
 
-  WebAppCompat.connectHandlers.use((req, res, next) => {
+  registerHttpMiddleware(WebAppCompat, 'connectHandlers', {
+    surfaceId: 'middleware:memphis-saml',
+    policy: Object.freeze({ kind: 'saml-protocol' }),
+    dataEgress: Object.freeze({ kind: 'saml-protocol-response' }),
+    verification: HTTP_MIDDLEWARE_VERIFICATIONS.saml,
+  }, (req, res, next) => {
     const pathname = getPathname(req);
     if (pathname === MEMPHIS_SAML_LOGIN_PATH) {
       if (req.method !== 'GET') {

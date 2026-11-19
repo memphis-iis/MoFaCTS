@@ -5,7 +5,7 @@ import { Roles } from 'meteor/alanning:roles';
 import { randomBytes } from 'node:crypto';
 import { collectionMongoName } from '../../common/collectionOwnership.ts';
 import { HTTP_AUDIT_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
-import { registeredHttpMounts } from '../securitySurfaces/registerHttpRoutes.ts';
+import { registeredHttpSurfaces } from '../securitySurfaces/registerHttpRoutes.ts';
 import { auditDigest } from '../../common/securityAudit/canonicalReport.ts';
 import { errorReport, ingestionContext } from '../../scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
 import { SecurityAuditReportsV2 } from './securityAuditCollectionsV2.ts';
@@ -19,7 +19,7 @@ function applicationOrigin(): string {
 
 describe('activated V2 audit application boundaries', function() {
   it('registers the signed receiver and single-use download on the normal HTTP stack', function() {
-    const mounts = registeredHttpMounts();
+    const mounts = registeredHttpSurfaces();
     const ingest = mounts.filter(entry => entry.mount === '/internal/security-audits/v2');
     const download = mounts.filter(entry => entry.mount === '/admin/security-audits/download');
     expect(ingest).to.have.length(1);

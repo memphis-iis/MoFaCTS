@@ -1,5 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { WebApp } from 'meteor/webapp';
+import { HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registerHttpMiddleware } from '../securitySurfaces/registerHttpRoutes.ts';
 import { execFile } from 'child_process';
 import fs from 'fs';
 import os from 'os';
@@ -477,6 +479,11 @@ async function handleSocialPreviewRequest(req: IncomingMessage, res: ServerRespo
   res.end(html);
 }
 
-WebAppAny.handlers.use((req: IncomingMessage, res: ServerResponse, next: NextFunction) => {
+registerHttpMiddleware(WebAppAny, 'handlers', {
+  surfaceId: 'middleware:social-preview',
+  policy: Object.freeze({ kind: 'public', applicationRateLimit: 'none' }),
+  dataEgress: Object.freeze({ kind: 'public-preview' }),
+  verification: HTTP_MIDDLEWARE_VERIFICATIONS.socialPreview,
+}, (req: IncomingMessage, res: ServerResponse, next: NextFunction) => {
   void handleSocialPreviewRequest(req, res, next);
 });

@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { WebApp } from 'meteor/webapp';
 import { buildHealthPayload } from './health';
-import { registeredHttpMounts } from '../securitySurfaces/registerHttpRoutes.ts';
+import { registeredHttpSurfaces } from '../securitySurfaces/registerHttpRoutes.ts';
 
 describe('/health endpoint payload', function() {
   it('returns a stable shape for monitoring', function() {
@@ -26,7 +26,7 @@ describe('/health mounted HTTP behavior', function() {
   });
 
   it('registers the live mounted middleware with its reviewed public policy and verification', function() {
-    const routes = registeredHttpMounts().filter(route => route.mount === '/health');
+    const routes = registeredHttpSurfaces().filter(route => route.mount === '/health');
     expect(routes).to.have.length(1);
     expect(routes[0]).to.include({ surfaceId: 'middleware:health', stack: 'connectHandlers', dispatch: 'mounted-prefix' });
     expect(routes[0]?.policy).to.deep.equal({ kind: 'public', applicationRateLimit: 'none' });

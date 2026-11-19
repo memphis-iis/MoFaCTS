@@ -110,8 +110,31 @@ remains with that production window.
   exact source in slot 15, including signed-ingestion, retained-record and
   SPARC MongoDB coverage. Slot 14 records the original timeout separately.
 
-Remaining HTTP owners, composition sealing, full registry coverage and
-staging qualification stay open.
+- [x] Register the backup and both learner-history download mounts. The
+  original callbacks still own token consumption, issuer authorization, scope,
+  and streaming. Service and data-egress claims are explicit in the registry.
+- [x] Register the two public asset mounts on their actual raw and normal
+  stacks. Both callbacks require the existing public asset marker. The source
+  audit entry for the normal path now reflects that check.
+- [x] Register the SAML, PWA, social-preview and security-header middleware
+  with the original unmounted framework calls and handlers. The source check
+  compares explicit middleware classifications and preserves the producer
+  discovery profile.
+- [x] Run source checks for the nine-owner HTTP batch. Full typecheck, lint
+  (334 classified source entries), Linux source-security and focused tests
+  passed. The adapter test verifies the framework stack and call shape retain
+  the original callback.
+- [ ] Verify the nine-owner batch in Meteor. Listener cases cover downloads,
+  retired upload responses, SAML method handling, manifest and crawler
+  dispatch, response headers, and single registration on each original stack.
+  The unused earlier allowance is scoped to the health-route batch.
+- [ ] Resolve package and framework ownership explicitly. Source inspection
+  identified the `ostrio:files` normal-stack handler whose configured asset
+  prefix overlaps the raw application mount, and the `WebAppInternals`
+  inline-script configuration hook. Neither source observation certifies
+  deployed order, reachability, or provider login behavior.
+
+Composition sealing, full registry coverage and staging qualification stay open.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 

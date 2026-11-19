@@ -303,6 +303,41 @@ export const HTTP_AUDIT_VERIFICATIONS = Object.freeze({
       'serves V2 through registered admin methods without reading or changing retained V1 records'] as const) }),
 });
 
+const fileHttpTest = { kind: 'integrationTest', lane: 'meteor', suite: 'application HTTP registration',
+  expectedOutcome: 'pass', mutation: 'none' } as const;
+const capabilityResponses = Object.freeze(['retains download method and invalid-capability responses at the mounted paths'] as const);
+const assetResponses = Object.freeze(['preserves the retired upload response on both asset mounts'] as const);
+export const HTTP_FILE_VERIFICATIONS = Object.freeze({
+  backup: Object.freeze({ ...fileHttpTest, verificationId: 'http.backup.download',
+    surfaceId: 'http:get:/admin/backups/download/:token/:filename', cases: capabilityResponses }),
+  history: Object.freeze({ ...fileHttpTest, verificationId: 'http.history.own-download',
+    surfaceId: 'http:get:/data-download/own-history/:token/:filename', cases: capabilityResponses }),
+  ownedHistory: Object.freeze({ ...fileHttpTest, verificationId: 'http.history.owned-download',
+    surfaceId: 'http:get:/data-download/owned-history/:token/:filename', cases: capabilityResponses }),
+  asset: Object.freeze({ ...fileHttpTest, verificationId: 'http.assets.dynamic-mount',
+    surfaceId: 'middleware:dynamic-assets', cases: assetResponses }),
+  cdn: Object.freeze({ ...fileHttpTest, verificationId: 'http.assets.cdn-mount',
+    surfaceId: 'middleware:cdn-public-assets', cases: assetResponses }),
+});
+
+const middlewareTest = { kind: 'integrationTest', lane: 'meteor', suite: 'application HTTP registration',
+  expectedOutcome: 'pass', mutation: 'none' } as const;
+const samlMethodCases = Object.freeze(['retains SAML method handling on all three exact paths'] as const);
+const socialPreviewCases = Object.freeze(['serves social crawler metadata and lets an ordinary request reach the app'] as const);
+export const HTTP_MIDDLEWARE_VERIFICATIONS = Object.freeze({
+  saml: Object.freeze([
+    Object.freeze({ ...middlewareTest, verificationId: 'http.saml.login', surfaceId: 'http:get:/auth/saml/memphis/login', cases: samlMethodCases }),
+    Object.freeze({ ...middlewareTest, verificationId: 'http.saml.acs', surfaceId: 'http:post:/auth/saml/memphis/acs', cases: samlMethodCases }),
+    Object.freeze({ ...middlewareTest, verificationId: 'http.saml.metadata', surfaceId: 'http:get:/auth/saml/memphis/metadata', cases: samlMethodCases }),
+  ] as const),
+  pwa: Object.freeze([Object.freeze({ ...middlewareTest, verificationId: 'http.pwa.manifest', surfaceId: 'middleware:pwa-assets',
+    cases: Object.freeze(['serves the public app manifest and leaves unsupported methods to Meteor'] as const) })] as const),
+  socialPreview: Object.freeze([Object.freeze({ ...middlewareTest, verificationId: 'http.social-preview.dispatch',
+    surfaceId: 'middleware:social-preview', cases: socialPreviewCases })] as const),
+  headers: Object.freeze([Object.freeze({ ...middlewareTest, verificationId: 'http.response-headers.public-page',
+    surfaceId: 'middleware:security-headers', cases: socialPreviewCases })] as const),
+});
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -311,7 +346,8 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...PASSWORDLESS_PROTOCOL_VERIFICATIONS, ...AUTHENTICATION_THROTTLE_CASES, ...AUTHENTICATION_MATERIAL_CASES,
   ...AUTHENTICATION_SESSION_VERIFICATIONS,
   ...HTTP_HEALTH_VERIFICATIONS.endpoints, HTTP_HEALTH_VERIFICATIONS.fallthrough,
-  HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download]);
+  HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download, ...Object.values(HTTP_FILE_VERIFICATIONS),
+  ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat()]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

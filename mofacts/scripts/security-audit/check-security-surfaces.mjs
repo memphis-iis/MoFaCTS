@@ -72,14 +72,17 @@ export async function discoverSecuritySurfaces() {
   const methods = [];
   const publications = [];
   const httpRoutes = [];
+  const httpMiddleware = [];
   for (const file of serverFiles) {
     const text = await fs.readFile(file, 'utf8');
     const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     methods.push(...discoverMethods(source));
+    httpMiddleware.push(...regexMatches(text, /registerHttpMiddleware\(\s*\w+,\s*'(?:handlers|connectHandlers)',\s*\{\s*surfaceId:\s*'(middleware:[^']+)'/g, (match) => match[1]));
     publications.push(...regexMatches(text, /Meteor\.publish\(\s*(?:'([^']+)'|null)/g,
       (match) => match[1] || '<default>'));
     httpRoutes.push(...regexMatches(text, /(?:connectHandlers|rawConnectHandlers)\.use\(\s*'([^']+)'/g, (match) => match[1]));
-    httpRoutes.push(...regexMatches(text, /register(?:Public|Audit)HttpMount\(\s*WebApp\.connectHandlers,\s*'([^']+)'/g, (match) => match[1]));
+    httpRoutes.push(...regexMatches(text, /registerPublicHttpMount\(\s*WebApp\.connectHandlers,\s*'([^']+)'/g, (match) => match[1]));
+    httpRoutes.push(...regexMatches(text, /registerProtocolHttpMount\(\s*WebApp,\s*'(?:rawConnectHandlers|connectHandlers)',\s*'([^']+)'/g, (match) => match[1]));
   }
   const routePolicyText = await fs.readFile(
     path.join(appRoot, 'client', 'lib', 'adminUi', 'managementRoutePresentationPolicies.ts'), 'utf8',
@@ -109,6 +112,7 @@ export async function discoverSecuritySurfaces() {
     methods: uniqueMethods,
     publications: [...new Set(publications)].sort(),
     httpRoutes: uniqueHttpRoutes,
+    httpMiddleware: [...new Set(httpMiddleware)].sort(),
     exports,
     managementRoutes: [...new Set(managementRoutes)].sort(),
   };
@@ -125,7 +129,10 @@ function compare(kind, actual, expected) {
 }
 
 if (process.argv.includes('--discover')) {
-  process.stdout.write(`${JSON.stringify(await discoverSecuritySurfaces(), null, 2)}\n`);
+  // The existing repository producer consumes the five-field discovery profile.
+  const { httpMiddleware: localMiddleware, ...profile } = await discoverSecuritySurfaces();
+  void localMiddleware;
+  process.stdout.write(`${JSON.stringify(profile, null, 2)}\n`);
 } else {
   const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
   const actual = await discoverSecuritySurfaces();
@@ -133,13 +140,14 @@ if (process.argv.includes('--discover')) {
     compare('methods', actual.methods, names(manifest.methods)),
     compare('publications', actual.publications, names(manifest.publications)),
     compare('httpRoutes', actual.httpRoutes, names(manifest.httpRoutes)),
+    compare('httpMiddleware', actual.httpMiddleware, names(manifest.httpMiddleware)),
     compare('exports', actual.exports, names(manifest.exports)),
     compare('managementRoutes', actual.managementRoutes, names(manifest.managementRoutes)),
   ];
   const invalidPolicies = Object.entries(manifest)
     .filter(([, entries]) => Array.isArray(entries))
     .flatMap(([kind, entries]) => entries.filter((entry) =>
-      !['disabled', 'public', 'public-rate-limited', 'authenticated-self', 'role-checked', 'admin-only', 'signed-ingestion', 'single-use-download'].includes(entry.access))
+      !['disabled', 'public', 'public-rate-limited', 'authenticated-self', 'role-checked', 'admin-only', 'signed-ingestion', 'single-use-download', 'saml-protocol', 'response-headers'].includes(entry.access))
       .map((entry) => ({ kind, name: entry.name, access: entry.access })));
   const failures = comparisons.filter((comparison) => comparison.missing.length || comparison.removed.length);
   if (failures.length || invalidPolicies.length) {

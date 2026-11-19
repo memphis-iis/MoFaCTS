@@ -1,4 +1,6 @@
 import { WebApp } from 'meteor/webapp';
+import { HTTP_FILE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registerProtocolHttpMount } from '../securitySurfaces/registerHttpRoutes.ts';
 import type { IncomingMessage, ServerResponse } from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -218,7 +220,12 @@ export function registerDynamicAssetsRoute(deps: DynamicAssetsRouteDeps) {
   }
   routeRegistered = true;
 
-  WebApp.rawConnectHandlers.use('/cdn/storage/Assets', async (
+  registerProtocolHttpMount(WebApp, 'rawConnectHandlers', '/cdn/storage/Assets', {
+    surfaceId: 'middleware:cdn-public-assets',
+    policy: Object.freeze({ kind: 'public-asset-marker' }),
+    dataEgress: Object.freeze({ kind: 'public-asset' }),
+    verification: HTTP_FILE_VERIFICATIONS.cdn,
+  }, async (
     req: IncomingMessage,
     res: ServerResponse<IncomingMessage>,
     _next: unknown
@@ -226,7 +233,12 @@ export function registerDynamicAssetsRoute(deps: DynamicAssetsRouteDeps) {
     await serveDynamicAssetById(deps, res, getFirstPathSegment(String(req.url || '')));
   });
 
-  WebApp.connectHandlers.use('/dynamic-assets', async (
+  registerProtocolHttpMount(WebApp, 'connectHandlers', '/dynamic-assets', {
+    surfaceId: 'middleware:dynamic-assets',
+    policy: Object.freeze({ kind: 'public-asset-marker' }),
+    dataEgress: Object.freeze({ kind: 'public-asset' }),
+    verification: HTTP_FILE_VERIFICATIONS.asset,
+  }, async (
     req: IncomingMessage,
     res: ServerResponse<IncomingMessage>,
     _next: unknown

@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Server } from 'connect';
+import type { NextFunction, Server } from 'connect';
 import type { HttpIntegrationVerification, PublicHttpVerification } from '../../common/securityAudit/verificationCatalog.ts';
 
 type MountPath = `/${string}`;
-type HttpHandler = (request: IncomingMessage, response: ServerResponse, next: () => void) => void | Promise<void>;
+type HttpHandler = (request: IncomingMessage, response: ServerResponse, next: NextFunction) => void | Promise<void>;
 type HttpMount = Readonly<{
   surfaceId: `middleware:${string}`;
-  stack: 'connectHandlers';
+  stack: 'connectHandlers' | 'rawConnectHandlers';
   mount: MountPath;
   dispatch: 'mounted-prefix';
 }>;
@@ -15,23 +15,44 @@ type PublicHttpPolicy = Readonly<{ kind: 'public'; applicationRateLimit: 'none' 
 type PublicHttpMount = HttpMount & Readonly<{
   policy: PublicHttpPolicy;
   dataEgress: Readonly<{ kind: 'public-operational-metadata' }>;
+  stack: 'connectHandlers';
   verification: PublicHttpVerification;
 }>;
 
-type AuditHttpDescriptor = Pick<HttpMount, 'surfaceId'> & Readonly<{
-  verification: HttpIntegrationVerification & { surfaceId: `http:${'post' | 'get'}:/${string}` };
+type ProtocolHttpDescriptor = Pick<HttpMount, 'surfaceId'> & Readonly<{
+  verification: HttpIntegrationVerification & { surfaceId: `http:${'post' | 'get'}:/${string}` | HttpMount['surfaceId'] };
 }> & (
   | Readonly<{ policy: Readonly<{ kind: 'signed-ingestion'; protocol: 'security-audit-v2-hmac' }>;
     dataEgress: Readonly<{ kind: 'none' }> }>
   | Readonly<{ policy: Readonly<{ kind: 'single-use-capability'; issuerAuthorization: 'current-admin' }>;
-    dataEgress: Readonly<{ kind: 'security-audit-report' }> }>
+    dataEgress: Readonly<{ kind: 'security-audit-report' | 'backup-archive' }> }>
+  | Readonly<{ policy: Readonly<{ kind: 'single-use-capability'; issuerAuthorization: 'bound-user-exists' | 'current-lesson-owner' }>;
+    dataEgress: Readonly<{ kind: 'learner-history' }> }>
+  | Readonly<{ policy: Readonly<{ kind: 'public-asset-marker' }>;
+    dataEgress: Readonly<{ kind: 'public-asset' }> }>
 );
 
-type AuditHttpMount = HttpMount & AuditHttpDescriptor;
+type ProtocolHttpMount = HttpMount & ProtocolHttpDescriptor;
 
-const registrations: (PublicHttpMount | AuditHttpMount)[] = [];
+type MiddlewareStack = 'connectHandlers' | 'handlers';
+type HttpMiddlewareVerification = HttpIntegrationVerification & {
+  surfaceId: HttpMount['surfaceId'] | `http:${'get' | 'post'}:/${string}`;
+};
+type HttpMiddlewareDescriptor = Readonly<{
+  surfaceId: HttpMount['surfaceId'];
+  verification: readonly [HttpMiddlewareVerification, ...HttpMiddlewareVerification[]];
+}> & (
+  | Readonly<{ policy: PublicHttpPolicy; dataEgress: Readonly<{ kind: 'public-brand-assets' | 'public-preview' }> }>
+  | Readonly<{ policy: Readonly<{ kind: 'saml-protocol' }>; dataEgress: Readonly<{ kind: 'saml-protocol-response' }> }>
+  | Readonly<{ policy: Readonly<{ kind: 'response-headers' }>; dataEgress: Readonly<{ kind: 'none' }> }>
+);
 
-function registerHttpMount(stack: Pick<Server, 'use'>, registration: PublicHttpMount | AuditHttpMount, handler: HttpHandler): void {
+type HttpMiddleware = HttpMiddlewareDescriptor & Readonly<{ mount: null; stack: MiddlewareStack; dispatch: 'handler-owned' }>;
+type HttpRegistration = PublicHttpMount | ProtocolHttpMount | HttpMiddleware;
+
+const registrations: HttpRegistration[] = [];
+
+function registerHttpMount(stack: Pick<Server, 'use'>, registration: PublicHttpMount | ProtocolHttpMount, handler: HttpHandler): void {
   stack.use(registration.mount, handler);
   registrations.push(Object.freeze(registration));
 }
@@ -57,23 +78,34 @@ export function registerPublicHttpMount(
   });
 }
 
-export function registerAuditHttpMount(
-  stack: Pick<Server, 'use'>,
+export function registerProtocolHttpMount(
+  stacks: Record<HttpMount['stack'], Pick<Server, 'use'>>,
+  stack: HttpMount['stack'],
   mount: MountPath,
-  descriptor: AuditHttpDescriptor,
+  descriptor: ProtocolHttpDescriptor,
   handler: HttpHandler,
 ): void {
   // The protocol handler owns its path and method checks and the order in
   // which it validates the request. Register the callback on the same stack.
-  registerHttpMount(stack, {
+  registerHttpMount(stacks[stack], {
     ...descriptor,
-    stack: 'connectHandlers',
+    stack,
     mount,
     dispatch: 'mounted-prefix',
   }, handler);
 }
 
+export function registerHttpMiddleware<Stack extends MiddlewareStack>(
+  stacks: Record<Stack, { use: (handler: HttpHandler) => void }>,
+  stack: Stack,
+  descriptor: HttpMiddlewareDescriptor,
+  handler: HttpHandler,
+): void {
+  stacks[stack].use(handler);
+  registrations.push(Object.freeze({ ...descriptor, stack, mount: null, dispatch: 'handler-owned' }));
+}
+
 // Coverage and sealing belong to final composition after every owner is accounted for.
-export function registeredHttpMounts(): readonly (PublicHttpMount | AuditHttpMount)[] {
+export function registeredHttpSurfaces(): readonly HttpRegistration[] {
   return Object.freeze([...registrations]);
 }

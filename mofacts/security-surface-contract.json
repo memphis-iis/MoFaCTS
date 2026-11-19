@@ -1201,7 +1201,8 @@
   "httpRoutes": [
     {
       "name": "/admin/backups/download",
-      "access": "single-use-download"
+      "access": "single-use-download",
+      "notes": "Mounted GET consumes a single-use capability, rechecks the issuing administrator and validates the backup job before streaming the archive."
     },
     {
       "name": "/admin/security-audits/download",
@@ -1228,7 +1229,7 @@
     },
     {
       "name": "/dynamic-assets",
-      "access": "role-checked",
+      "access": "public",
       "review": "2026-11-14: Existing public marker, exact-ID lookup, containment and opaque HTML CSP retained. S3 and local bodies stream with backpressure; client disconnects close sources. Errors after headers terminate the response rather than returning partial successful assets."
     },
     {
@@ -1241,6 +1242,12 @@
       "access": "public",
       "review": "2026-11-14: Existing public marker, exact-ID lookup, containment and opaque HTML CSP retained. S3 and local bodies stream with backpressure; client disconnects close sources. Errors after headers terminate the response rather than returning partial successful assets."
     }
+  ],
+  "httpMiddleware": [
+    { "name": "middleware:memphis-saml", "access": "saml-protocol", "review": "Existing SAML login, ACS and metadata dispatch and method checks remain in the normal-stack protocol handler." },
+    { "name": "middleware:pwa-assets", "access": "public", "review": "Existing handlers-stack manifest and public brand-asset dispatch with exact handler-owned fallthrough." },
+    { "name": "middleware:social-preview", "access": "public", "review": "Existing handlers-stack public image and crawler presentation dispatch with ordinary request fallthrough." },
+    { "name": "middleware:security-headers", "access": "response-headers", "review": "Existing startup-owned handlers-stack response headers and schema cache policy." }
   ],
   "exports": [
     {
