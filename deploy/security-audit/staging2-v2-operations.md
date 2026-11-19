@@ -1,5 +1,9 @@
 # Staging2 V2 operating baseline
 
+The current staging2 application release and rollback revision are recorded in
+the [audit status](../../docs-developer/security-audit-durable-redesign-status.md).
+The image and receipt coordinates below describe the November 11 baseline.
+
 On 2026-11-11 the clean Meteor-accepted application revision
 `1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140` was accepted on staging2.
 It uses the published tag `ppavlikmemphis/mofacts-staging2:audit-v2-1c72734b-20261111-2303`.

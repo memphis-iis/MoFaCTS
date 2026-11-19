@@ -1,8 +1,8 @@
 # Security Audit Durable Redesign Status
 
 Last baseline with passing CI, Security and image checks: `251022369812dd07417cc4d248e91a1c1f1d8b6a`.
-Staging2 application: `93b7d444ba2216cf68c9b930a2e51052f7d022bb` (accepted 2026-11-18),
-with `1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140` retained for rollback. The
+Staging2 application: `bd3520f2ef4c368c128cb331ee19aba3af385147` (accepted 2026-11-19),
+with `93b7d444ba2216cf68c9b930a2e51052f7d022bb` retained for rollback. The
 retained auditor-policy baseline `c7444b4e` has separate evidence and identity.
 
 
@@ -160,20 +160,42 @@ remains with that production window.
   bringing over unrelated changes on main. Release branch bd3520f2 applies
   the sole download owner and keeps the deployed storage and catalog path.
   Source gates and Meteor slot 19 passed.
-- [ ] Verify the staging2 release image, live asset URLs, private-file
-  denial, DDP upload and synthetic cleanup before accepting the rollout.
+- [x] Verify and accept the staging2-only download release bd3520f2.
+  The canonical captured-source Compose build matched slot 19 in-image.
+  Registry digest sha256:4b6938772851da10920bfff2d1c474fff92ac353dcc33053725f57ca14560298;
+  config digest sha256:90224d4aac9a424856ef9113e55c34f0ffb08773920d07cae0a70c72c757f1a1.
+  Live Chrome completed two synthetic DDP uploads. All four public
+  URL forms returned matching bytes; the four private requests returned
+  404, retired HTTP upload returned 410, and fixture/session cleanup passed.
+  The ordinary learner survived reload with the same identity and role.
+  The first finalization submitted an untagged image value and the saved
+  93b7d444 app/environment/receipt were restored and verified healthy.
+  A corrected record passed preflight; the exact candidate was reapplied
+  after restoration and previously measured browser evidence was reused.
+  Actual running image, protected V2 receipt MATCH, public HTTPS and
+  unchanged Apache configuration and service identities were verified.
+  The new authoritative record digest is 973263c4be589e6f3973818663d7faa9ee61cffc3893bc36f9bb80bc94d511ec.
+  Protected evidence: staging2-assets-bd3520f2. The prior image and
+  protected deployment configuration remain available for rollback.
 - [x] Bind the framework runtime-config hook at its existing awaited
   startup call. Meteor still owns the script response. The descriptor
   records external same-origin configuration and the matching listener case.
 - [x] Bind both application default publications to distinct descriptors.
   The account projection and role assignment selectors keep their existing
   subscription context, automatic delivery and readiness behavior.
-- [ ] Verify these three framework/default bindings in native Meteor.
+- [x] Verify these three framework/default bindings in native Meteor (slot
+  20). The listener followed the same-origin runtime-config script. The
+  registered publication callbacks exposed only the current synthetic account
+  projection and role assignments and preserved anonymous behavior.
+  Full typecheck, lint (335 classified source entries) and the affected
+  Linux source-security, catalog and Phase 0 regression tests passed.
 - [ ] Inventory generated package DDP methods on their owning boundary.
   The existing source checker now rejects re-enabling package HTTP download
   registration on Assets. Runtime DDP descriptors remain open.
 
-Composition sealing, full registry coverage and staging qualification stay open.
+Named publications, method and package bindings, composition sealing, full
+registry coverage and Phase 3 staging qualification remain open. The remaining
+two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 20.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 
@@ -1492,7 +1514,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 20 total, 18 consumed, 0 reserved, 1 available for continued Phase 3 work, and 1 for the earlier `/health` batch only.**
+**Current allowance: 20 total, 19 consumed, 0 reserved, 0 available for continued Phase 3 work, and 1 for the earlier `/health` batch only.**
 
 On November 19 Phil authorized up to five further runs for Phase 3 work, including retries, until an important design decision.
 Phil approved the sole app download owner and continued use of the three remaining runs as needed.
@@ -1527,7 +1549,8 @@ within this allowance. Do not import historical invocations into this counter.
 | 16 | b73e187db6cc345ab2f76a786d279c186a9d649d | PASS 2026-11-19T15:38:53Z to 15:40:16Z. 1,050 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. All seven new HTTP cases passed. Exact source identity, worker isolation and owned-resource cleanup verified. The pre-existing JEDM scheduler had a later start time; other local service records matched. Private receipt: /var/tmp/mofacts-integration.rdRRWcLo/results/native-verification.json. SHA-256 b336bdf7ed765fe465faf7d28a045e0a9cd6d5822b8449a44561affef6e99872. |
 | 17 | d52f75003a2157fbff0d63675590ac102b489eeb | PASS 2026-11-19T15:45:36Z to 15:46:51Z. 1,051 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. The canonical missing CDN asset returned the raw application handler response. Source identity, worker isolation and owned-resource cleanup verified. The pre-existing JEDM scheduler showed a restart; other service records matched. Private receipt: /var/tmp/mofacts-integration.rtsyPget/results/native-verification.json. SHA-256 fce79e96721327df7cc90e8443c32cdac56656e4f480c4647d2030cd0442a35b. |
 | 18 | bf3c9da18a48f4bc6b32613cba9587628d7f5cca | PASS 2026-11-19T18:31:46Z to 18:33:09Z. 1,053 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. Both new Assets and DDP cases passed. Full typecheck/lint and the Linux source-security gate passed (610 passes, 10 existing skips). Exact source, isolation, limits and job cleanup verified. The pre-existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.e1XOu3F0/results/native-verification.json. SHA-256 69801f7de13e8676a37572e00e2912105e493f9a8f692af9b863ab08b42a24fb. |
-| 19 | bd3520f2ef4c368c128cb331ee19aba3af385147 | PASS 2026-11-19T18:58:05Z to 18:59:31Z. Narrow Assets fix over accepted staging2 base 93b7d444. 1,021 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. Typecheck, lint and the exact-revision Linux source gates passed (433 passes, six skips). Earlier source-test attempts used incompatible Windows Git/file modes or a restrictive test umask and did not consume a Meteor slot. Exact capture, isolation, limits and owned cleanup verified; the existing JEDM scheduler changed independently. Private receipt: /var/tmp/mofacts-integration.8ASccmum/results/native-verification.json. SHA-256 c28274a39f21169a4488d1c6e423f9e29270d933f14cc8f3f15d9f9ee070ccb6. |
+| 19 | bd3520f2ef4c368c128cb331ee19aba3af385147 | PASS 2026-11-19T18:58:05Z to 18:59:31Z. Narrow Assets fix over accepted staging2 base 93b7d444. 1,021 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. Typecheck, lint and the exact-revision Linux source gates passed (433 passes, six skips). Earlier source-test attempts used incompatible Windows Git/file modes or a restrictive test umask and did not consume a Meteor slot. Exact capture, isolation, limits and owned cleanup verified; the existing JEDM scheduler record changed during the run. Private receipt: /var/tmp/mofacts-integration.8ASccmum/results/native-verification.json. SHA-256 c28274a39f21169a4488d1c6e423f9e29270d933f14cc8f3f15d9f9ee070ccb6. |
+| 20 | 2cab7a5bb5eb66238f53b139b743d70a5ff3069c | PASS 2026-11-19T19:23:22Z to 19:25:06Z. 1,056 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. The external runtime-config listener and both default publication tests passed. Exact source, isolation, limits and worker cleanup verified. The pre-existing JEDM scheduler record changed during the run; other existing records matched. Private receipt: /var/tmp/mofacts-integration.bbgnZzS1/results/native-verification.json. SHA-256 a3bf70edb7cd32c4df45cb9a5d1dabc563d961f8846e1abab182eb36a817eda0. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
