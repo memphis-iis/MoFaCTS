@@ -124,10 +124,10 @@ remains with that production window.
   (334 classified source entries), Linux source-security and focused tests
   passed. The adapter test verifies the framework stack and call shape retain
   the original callback.
-- [ ] Verify the nine-owner batch in Meteor. Listener cases cover downloads,
-  retired upload responses, SAML method handling, manifest and crawler
-  dispatch, response headers, and single registration on each original stack.
-  The unused earlier allowance is scoped to the health-route batch.
+- [x] Verify the nine-owner batch in Meteor (slot 16). All seven listener
+  cases passed, including downloads, retired upload responses, SAML method
+  handling, manifest and crawler dispatch, response headers, and single
+  registration on each original stack.
 - [ ] Resolve package and framework ownership explicitly. Source inspection
   identified the `ostrio:files` normal-stack handler whose configured asset
   prefix overlaps the raw application mount, and the `WebAppInternals`
@@ -1453,7 +1453,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 15 total, 14 consumed, 0 reserved, 1 available for the earlier `/health` batch only.**
+**Current allowance: 20 total, 15 consumed, 0 reserved, 4 available for continued Phase 3 work, and 1 for the earlier `/health` batch only.**
+
+On November 19 Phil authorized up to five further runs for Phase 3 work, including retries, until an important design decision.
 The original allowance of ten is exhausted. On 2026-11-18 Phil authorized up
 to three additional runs on the same 6 GiB/two-CPU worker for the Phase 3 HTTP
 baseline and first migration, including a retry if needed.
@@ -1482,6 +1484,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 13 | Pending | Unused allowance for retrying the first Phase 3 `/health` batch only. |
 | 14 | 39c6226fbfc9a49a738fdde48a0f991b4a3c20b2 | FAIL 2026-11-19T03:19:51Z to 03:21:00Z (November 18 local). 1,042 server passes, one server failure, 1,249 Chromium passes and zero client failures, 15/seven pending. All activated V2 route tests passed. The existing SPARC instructional-library Mongo test timed out at 2,000 ms while testing interrupted image cleanup. It passed in slots 11 and 12. The worker exited 1 without OOM. Owned resources were removed. The pre-existing JEDM scheduler had a later start time; other service records matched. Private failed-run evidence: /var/tmp/mofacts-integration.blDcnafL/results. |
 | 15 | 39c6226fbfc9a49a738fdde48a0f991b4a3c20b2 | PASS 2026-11-19T12:31:58Z to 12:33:17Z, one authorized retry of the exact slot 14 source. 1,043 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. The migrated audit route cases passed. The previously timed-out SPARC MongoDB test passed in 38 ms. Source identity, isolation and exact cleanup verified. The existing JEDM scheduler had a later start time; other local service records matched. Private receipt: /var/tmp/mofacts-integration.0qJxytYK/results/native-verification.json. SHA-256 9eabc625a205823265b44d2d1ff06ce5b8e25b2183111211c9cd2e4e9d610eef. |
+| 16 | b73e187db6cc345ab2f76a786d279c186a9d649d | PASS 2026-11-19T15:38:53Z to 15:40:16Z. 1,050 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. All seven new HTTP cases passed. Exact source identity, worker isolation and owned-resource cleanup verified. The pre-existing JEDM scheduler had a later start time; other local service records matched. Private receipt: /var/tmp/mofacts-integration.rdRRWcLo/results/native-verification.json. SHA-256 b336bdf7ed765fe465faf7d28a045e0a9cd6d5822b8449a44561affef6e99872. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
