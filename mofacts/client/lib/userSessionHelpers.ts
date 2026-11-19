@@ -1,3 +1,4 @@
+import { participantActivity } from './participantPrivacy';
 // Extracted to break circular dependency between index.js and home.js
 import { clientConsole, loadClientSettings } from './clientLogger';
 import { sessionCleanUp } from './sessionUtils';
@@ -92,6 +93,7 @@ function forceLogoutForNewTab(reason: string) {
 }
 
 export async function checkUserSession(): Promise<void> {
+  if (participantActivity()) return;
   // Guard against null user or connection
   if (!Meteor.user() || !Meteor.default_connection || !Meteor.default_connection._lastSessionId) {
     return;

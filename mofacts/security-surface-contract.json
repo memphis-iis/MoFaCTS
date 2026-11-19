@@ -699,8 +699,18 @@
       "review": "2026-11-14: Existing role, owner, public-demo and identity checks retained. Bounded disk-backed extraction hashes bytes on the server before persistence. Declared simulation dependencies are stored only in their lesson scopes; ordinary media behavior is unchanged. Staging is disposed on confirmation, success and failure."
     },
     {
+      "name": "enterCredentialedExperiment",
+      "access": "public",
+      "notes": "Requires a server-resolved credentialed study and its bound password account or an ordinary authenticated account."
+    },
+    {
+      "name": "reconnectExperimentParticipant",
+      "access": "public",
+      "notes": "Requires a current Accounts token issued for the resolved canonical study."
+    },
+    {
       "name": "provisionExperimentUser",
-      "access": "public-rate-limited"
+      "access": "public"
     },
     {
       "name": "publishDeploymentBrandProfile",
@@ -1024,11 +1034,11 @@
     },
     {
       "name": "resumeProlificParticipation",
-      "access": "public-rate-limited"
+      "access": "public"
     },
     {
       "name": "startProlificParticipation",
-      "access": "public-rate-limited"
+      "access": "public"
     },
     {
       "name": "listSparcMoveLibrary",
@@ -1082,7 +1092,8 @@
   "publications": [
     {
       "name": "publication:default:account-self",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Includes the authenticated learner's saved per-lesson lockouts for countdown restoration."
     },
     {
       "name": "publication:default:role-assignments-self",

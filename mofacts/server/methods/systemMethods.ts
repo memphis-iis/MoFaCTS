@@ -1,3 +1,4 @@
+import { privateParticipantActivity } from '../lib/participantSession';
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
 import {
@@ -212,6 +213,7 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
       if (userID && userID !== actingUserId) {
         throw new Meteor.Error(403, 'Can only submit error reports for the current user');
       }
+      if (await privateParticipantActivity(this)) return;
       assertJsonSize(sessionVars, MAX_ERROR_REPORT_JSON_LENGTH, 'Session snapshot');
       assertJsonSize(currentExperimentState, MAX_ERROR_REPORT_JSON_LENGTH, 'Experiment state snapshot');
       const errorReport = {
@@ -235,12 +237,14 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
       if (userID !== this.userId) {
         throw new Meteor.Error(403, 'Can only update your own login status');
       }
+      if (await privateParticipantActivity(this)) return;
       const loginTime = new Date();
       return await deps.usersCollection.updateAsync({ _id: userID }, { $set: { status: { lastLogin: loginTime, userAgent } } });
     },
 
     serverLog: async function(this: MethodContext, data: unknown) {
       requireAuthenticatedUser(this.userId, 'Must be logged in to write server logs', 401);
+      if (await privateParticipantActivity(this)) return;
       const currentUser = await deps.getCurrentUser();
       if (currentUser) {
         const logData = 'User:' + currentUser._id + ', log:' + truncateText(data, MAX_DEBUG_LOG_LENGTH);
@@ -250,6 +254,7 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
 
     debugLog: async function(this: MethodContext, logtxt: unknown) {
       requireAuthenticatedUser(this.userId, 'Must be logged in to write debug logs', 401);
+      if (await privateParticipantActivity(this)) return;
       let usr = await deps.getCurrentUser();
       if (!usr) {
         usr = '[No Current User]';

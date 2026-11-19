@@ -357,7 +357,7 @@ const serverUtilities = createServerUtilityHelpers({
   ErrorReports,
   findUsersByIds: (userIds) => MeteorAny.users.find(
     { _id: { $in: userIds } },
-    { fields: { _id: 1, username: 1, emails: 1 } }
+    { fields: { _id: 1, username: 1, emails: 1, 'profile.experiment': 1, 'profile.createdBy': 1 } }
   ).fetchAsync(),
   adminUsers,
   ownerEmail,
@@ -651,6 +651,10 @@ const prolificManagement = createProlificManagementService({ resolveExperimentTa
 });
 
 const experimentMethods = createExperimentMethods({
+  validateProlificBinding: async (userId, studyId, rootTdfId) => {
+    const participant = await ProlificParticipations.findOneAsync({ userId, studyId, rootTdfId }, { fields: { ownerId: 1 } });
+    return Boolean(participant && await ProlificStudies.findOneAsync({ studyId, rootTdfId, ownerId: participant.ownerId }, { fields: { _id: 1 } }));
+  },
   isProlificAccount: async userId => Boolean(await ProlificParticipations.findOneAsync({ userId }, { fields: { _id: 1 } })),
   serverConsole,
   Tdfs,
@@ -682,6 +686,7 @@ registerDefaultPublication(Meteor, 'publication:default:account-self', DEFAULT_P
         username: 1,
         profile: 1,
         loginParams: 1,
+        lockouts: 1,
         authState: 1,
         emails: 1,
         email_canonical: 1,

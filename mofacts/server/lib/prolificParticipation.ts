@@ -10,7 +10,7 @@ export type ProlificParticipantDeps = {
   Tdfs: any; states: any; users: any;
   resolveExperimentTargetFamily: (target: string) => Promise<{ root: any } | null>;
   createUser: (username: string, password: string, profile: any, options: any) => Promise<string>;
-  issueToken: (userId: string) => Promise<string>;
+  issueToken: (userId: string, binding: { target: string; rootId: string }) => Promise<string>;
   withLock: <T>(key: string, work: () => Promise<T>) => Promise<T>;
   encrypt: (value: string) => string;
   decrypt: (value: string) => string;
@@ -97,7 +97,7 @@ export function createProlificParticipationService(deps: ProlificParticipantDeps
         await stores.participations.updateAsync({ _id: p._id, userId: p.userId }, { $set: { userId: user._id } });
         p = await stores.participations.findOneAsync({ _id: p._id });
       }
-      return { loginToken: await deps.issueToken(p.userId), experimentTarget: studyId, completed: Boolean(p.completedAt) };
+      return { loginToken: await deps.issueToken(p.userId, { target: p.studyId, rootId: p.rootTdfId }), experimentTarget: studyId, completed: Boolean(p.completedAt) };
     });
   }
 
@@ -107,9 +107,9 @@ export function createProlificParticipationService(deps: ProlificParticipantDeps
     if (!reminder) throw new Error('prolific.invalidIdentity');
     const p = await stores.participations.findOneAsync({ _id: reminder.participationId });
     if (!p || p.completedAt) throw new Error('prolific.finished');
-    await configuration(p.studyId);
+    const { state } = await progress(p);
     // Entry before the due time is allowed to show the existing countdown, never to bypass it.
-    return { loginToken: await deps.issueToken(p.userId), experimentTarget: p.studyId, experimentXCond: String((await progress(p)).state.experimentXCond ?? '') };
+    return { loginToken: await deps.issueToken(p.userId, { target: p.studyId, rootId: p.rootTdfId }), experimentTarget: p.studyId, experimentXCond: String(state.experimentXCond ?? '') };
   }
 
   async function checkpoint(userId: string, retryInitialReturn = false) {

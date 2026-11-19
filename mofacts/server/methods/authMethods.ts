@@ -1,3 +1,4 @@
+import { privateParticipantActivity, participantConnectionRoot } from '../lib/participantSession';
 import { Meteor } from 'meteor/meteor';
 import { ensurePublishedDeploymentBrandProfile } from '../lib/deploymentBrandProfileRegistry';
 import { Accounts } from 'meteor/accounts-base';
@@ -166,7 +167,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       curClass: unknown = undefined,
       assignedTdfs: unknown = undefined
     ) {
-      deps.serverConsole('setUserLoginData called with:', entryPoint, loginMode, curTeacher, curClass, assignedTdfs);
+      const studyRoot = participantConnectionRoot(this);
 
       const userId = requireCurrentUserId(this.userId, 'Must be logged in to set login data');
       const user = await deps.usersCollection.findOneAsync({ _id: userId });
@@ -182,7 +183,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       loginParams.curClass = curClass;
       loginParams.loginMode = loginMode;
       loginParams.assignedTdfs = assignedTdfs;
-      loginParams.authSessionState = deps.buildSessionAuthState(
+      if (!studyRoot) loginParams.authSessionState = deps.buildSessionAuthState(
         loginMode,
         loginMode === 'google' || loginMode === 'microsoft' || loginMode === 'memphisSaml' ? 'federated' : 'password'
       );
@@ -192,7 +193,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
           .filter((id: string | null): id is string => typeof id === 'string')
         : [];
 
-      deps.serverConsole('setUserLoginData updating with loginParams:', loginParams);
+
       const userUpdate: UnknownRecord = { $set: { loginParams } };
       if (normalizedAssignedTdfIds.length > 0) {
         userUpdate.$addToSet = { accessedTDFs: { $each: normalizedAssignedTdfIds } };
@@ -383,6 +384,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
         forbiddenCode: 403,
       });
 
+      if (await privateParticipantActivity(this)) return;
       const user = await deps.usersCollection.findOneAsync({ _id: userId });
       if (user && user.services) {
         const service = Object.keys(user.services)[0];
@@ -441,7 +443,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       loginParams.loginMode = null;
       loginParams.authSessionState = null;
       await deps.usersCollection.updateAsync({ _id: userId }, { $set: { loginParams } });
-      await deps.writeAuditLog('auth.sessionRevoked', userId, userId, {
+      if (!await privateParticipantActivity(this)) await deps.writeAuditLog('auth.sessionRevoked', userId, userId, {
         reason: 'clearLoginData',
       });
     },
@@ -512,6 +514,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     },
 
     setUserSessionId: async function(this: MethodContext, sessionId: string, sessionIdTimestamp: number) {
+      if (await privateParticipantActivity(this)) return;
       deps.serverConsole('setUserSessionId request received');
       const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
       if (!userId) {
@@ -526,7 +529,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     recordSessionRevocation: async function(this: MethodContext, reason: string) {
       check(reason, String);
       const userId = requireCurrentUserId(this.userId);
-      await deps.writeAuditLog('auth.sessionRevoked', userId, userId, {
+      if (!await privateParticipantActivity(this)) await deps.writeAuditLog('auth.sessionRevoked', userId, userId, {
         reason: reason.trim() || 'unspecified',
       });
       return { success: true };

@@ -1,3 +1,5 @@
+import { studyOnlyAccount } from '../../common/participantPrivacy';
+import { bindParticipantConnection, participantTokenBinding, participantConnectionRoot, encodeParticipantToken } from '../lib/participantSession';
 import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import { check } from 'meteor/check';
@@ -18,10 +20,11 @@ export function generatePublicDemoUsername(kind: PublicDemoKind): string {
 type MethodContext = {
   userId?: string | null;
   unblock?: () => void;
-  connection?: { id?: string; clientAddress?: string | null } | null;
+  connection?: { id: string; onClose: (fn: () => void) => void; clientAddress?: string | null } | null;
 };
 
 type ExperimentMethodsDeps = {
+  validateProlificBinding: (userId: string, target: string, rootId: string) => Promise<boolean>;
   isProlificAccount: (userId: string) => Promise<boolean>;
   serverConsole: (...args: unknown[]) => void;
   Tdfs: {
@@ -53,7 +56,7 @@ type ExperimentMethodsDeps = {
   ) => Promise<void>;
 };
 
-export async function issueExperimentLoginToken(userId: string) {
+export async function issueExperimentLoginToken(userId: string, binding?: { target: string; rootId: string }) {
   const accountsAny = Accounts as any;
   if (
     typeof accountsAny._generateStampedLoginToken !== 'function' ||
@@ -66,6 +69,7 @@ export async function issueExperimentLoginToken(userId: string) {
   if (!stampedToken?.token) {
     throw new Meteor.Error('experiment-login-token-missing', 'Experiment login token could not be created');
   }
+  if (binding) stampedToken.token = encodeParticipantToken(binding, stampedToken.token);
   await accountsAny._insertLoginToken(userId, stampedToken);
   return stampedToken.token;
 }
@@ -73,14 +77,8 @@ export async function issueExperimentLoginToken(userId: string) {
 export function createExperimentMethods(deps: ExperimentMethodsDeps) {
 
   async function getTdfByExperimentTarget(experimentTarget: string) {
-    try {
-      deps.serverConsole('getTdfByExperimentTarget:' + experimentTarget);
-      const family = await deps.resolveExperimentTargetFamily(experimentTarget);
-      return family?.root || null;
-    } catch (e: unknown) {
-      deps.serverConsole('getTdfByExperimentTarget ERROR,', experimentTarget, ',', e);
-      throw e;
-    }
+    const family = await deps.resolveExperimentTargetFamily(experimentTarget);
+    return family?.root || null;
   }
 
   async function createPasswordlessExperimentUser(
@@ -128,163 +126,131 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
 
     const normalizedTarget = experimentTarget.trim().toLowerCase();
     const normalizedUserName = deps.normalizeAccountUsername(rawUserName).toUpperCase();
-    deps.serverConsole('[EXPERIMENT-PROVISION] start', {
-      experimentTarget: normalizedTarget,
-      normalizedUsername: normalizedUserName
-    });
-
-    try {
-      if (!normalizedTarget) {
-        throw new Meteor.Error(400, 'Experiment target is required');
-      }
-      if (!deps.experimentUsernameRegex.test(normalizedUserName)) {
-        throw new Meteor.Error(400, 'Experiment username must be 3-32 chars using A-Z, 0-9, ., _, or -');
-      }
-
-      const tdf = await getTdfByExperimentTarget(normalizedTarget);
-      if (!tdf) {
-        throw new Meteor.Error(404, 'Experiment target not found');
-      }
-
-      const requiresPassword = tdf?.content?.tdfs?.tutor?.setspec?.experimentPasswordRequired;
-      if (requiresPassword === true || requiresPassword === 'true') {
-        throw new Meteor.Error('experiment-password-required', 'This experiment requires instructor-provided credentials');
-      }
-
-      return await deps.withSignUpLock(normalizedUserName, async () => {
-        const usernameExactCI = new RegExp(`^${deps.escapeRegexLiteral(normalizedUserName)}$`, 'i');
-        const existingUser = await deps.usersCollection.findOneAsync({ username: usernameExactCI });
-
-        if (existingUser) {
-          // The account marker also covers the brief reservation-to-account binding step.
-          if (existingUser.profile?.createdBy === 'startProlificParticipation' || await deps.isProlificAccount(existingUser._id)) throw new Meteor.Error(403, 'Use the Prolific study link');
-          const hasAnyExperimentHistory = !!(await deps.GlobalExperimentStates.findOneAsync({
-            userId: existingUser._id
-          }));
-          let isExperimentUser =
-            existingUser?.profile?.experiment === true ||
-            existingUser?.profile?.experiment === 'true' ||
-            existingUser?.profile?.createdBy === 'provisionExperimentUser' ||
-            (typeof existingUser?.profile?.experimentTarget === 'string' && existingUser.profile.experimentTarget.trim() !== '') ||
-            hasAnyExperimentHistory;
-          let existingTarget = typeof existingUser?.profile?.experimentTarget === 'string'
-            ? existingUser.profile.experimentTarget.trim().toLowerCase()
-            : '';
-
-          if (!isExperimentUser) {
-            const hasExperimentHistoryForTarget = !!(await deps.GlobalExperimentStates.findOneAsync({
-              userId: existingUser._id,
-              TDFId: tdf?._id
-            }));
-
-            if ((existingTarget && existingTarget === normalizedTarget) || hasExperimentHistoryForTarget || hasAnyExperimentHistory) {
-              isExperimentUser = true;
-              const healPayload: Record<string, unknown> = {
-                'profile.experiment': true,
-                'profile.lastExperimentProvisionedAt': new Date()
-              };
-              if (!existingTarget) {
-                existingTarget = normalizedTarget;
-                healPayload['profile.experimentTarget'] = normalizedTarget;
-              }
-              await deps.usersCollection.updateAsync(
-                { _id: existingUser._id },
-                { $set: healPayload }
-              );
-              await deps.writeAuditLog('experiment.userProfileHealed', this.userId || null, existingUser._id, {
-                username: normalizedUserName,
-                experimentTarget: normalizedTarget
-              });
-            }
-          }
-
-          if (!isExperimentUser) {
-            await deps.writeAuditLog('experiment.rejected_non_experiment_user', this.userId || null, existingUser._id, {
-              username: normalizedUserName,
-              experimentTarget: normalizedTarget
-            });
-            throw new Meteor.Error(
-              'duplicate-user',
-              'This participation ID is already in use'
-            );
-          }
-
-          if (existingTarget && existingTarget !== normalizedTarget) {
-            throw new Meteor.Error(
-              'experiment-target-mismatch',
-              'This participation ID is already linked to a different experiment'
-            );
-          }
-
-          const alreadyComplete = await hasCompletedExperimentTarget(existingUser._id, tdf);
-          if (alreadyComplete) {
-            await deps.writeAuditLog('experiment.userAlreadyComplete', this.userId || null, existingUser._id, {
-              username: normalizedUserName,
-              experimentTarget: normalizedTarget
-            });
-            return { userExists: true, userId: existingUser._id, status: 'already_complete' };
-          }
-
-          const profileSetPayload: Record<string, unknown> = {
-            'profile.lastExperimentProvisionedAt': new Date()
-          };
-          if (!existingTarget) {
-            profileSetPayload['profile.experimentTarget'] = normalizedTarget;
-          }
-          await deps.usersCollection.updateAsync(
-            { _id: existingUser._id },
-            {
-              $set: profileSetPayload
-            }
-          );
-
-          await deps.writeAuditLog('experiment.userProvisioned', this.userId || null, existingUser._id, {
-            username: normalizedUserName,
-            experimentTarget: normalizedTarget,
-            userExists: true
-          });
-
-          const loginToken = await issueExperimentLoginToken(existingUser._id);
-          return { userExists: true, userId: existingUser._id, loginToken, status: 'resumed' };
-        }
-
-        let createdId: string;
-        try {
-          createdId = await createPasswordlessExperimentUser(
-            normalizedUserName,
-            normalizedTarget,
-            {
-              createdBy: 'provisionExperimentUser'
-            },
-          );
-        } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
-          if (/username already exists|duplicate key|E11000/i.test(message)) {
-            throw new Meteor.Error('duplicate-user', 'This participation ID is already in use');
-          }
-          throw error;
-        }
-
-        await deps.writeAuditLog('experiment.userProvisioned', this.userId || null, createdId, {
-          username: normalizedUserName,
-          experimentTarget: normalizedTarget,
-          userExists: false
-        });
-
-        const loginToken = await issueExperimentLoginToken(createdId);
-        return { userExists: false, userId: createdId, loginToken, status: 'created' };
-      });
-    } catch (error: unknown) {
-      const meteorErr = error as { error?: unknown; reason?: unknown; message?: unknown };
-      deps.serverConsole('[EXPERIMENT-PROVISION] failure', {
-        experimentTarget: normalizedTarget,
-        normalizedUsername: normalizedUserName,
-        code: meteorErr?.error,
-        reason: meteorErr?.reason,
-        message: meteorErr?.message
-      });
-      throw error;
+    if (!normalizedTarget) {
+      throw new Meteor.Error(400, 'Experiment target is required');
     }
+    if (!deps.experimentUsernameRegex.test(normalizedUserName)) {
+      throw new Meteor.Error(400, 'Experiment username must be 3-32 chars using A-Z, 0-9, ., _, or -');
+    }
+
+    const tdf = await getTdfByExperimentTarget(normalizedTarget);
+    if (!tdf) {
+      throw new Meteor.Error(404, 'Experiment target not found');
+    }
+
+    const requiresPassword = tdf?.content?.tdfs?.tutor?.setspec?.experimentPasswordRequired;
+    if (requiresPassword === true || requiresPassword === 'true') {
+      throw new Meteor.Error('experiment-password-required', 'This experiment requires instructor-provided credentials');
+    }
+
+    return await deps.withSignUpLock(normalizedUserName, async () => {
+      const usernameExactCI = new RegExp(`^${deps.escapeRegexLiteral(normalizedUserName)}$`, 'i');
+      const existingUser = await deps.usersCollection.findOneAsync({ username: usernameExactCI });
+
+      if (existingUser) {
+        // The account marker also covers the brief reservation-to-account binding step.
+        if (existingUser.profile?.createdBy === 'startProlificParticipation' || await deps.isProlificAccount(existingUser._id)) throw new Meteor.Error(403, 'Use the Prolific study link');
+        const existingTarget = existingUser.profile?.experimentTarget?.trim().toLowerCase();
+        const provisioned = existingUser.profile?.createdBy === 'provisionExperimentUser';
+        const passwordless = existingUser.profile?.experiment !== false && !existingUser.roles?.length && !existingUser.services?.password && !existingUser.emails?.length
+          && !Object.keys(existingUser.services || {}).some(key => key !== 'resume');
+        const boundProgress = passwordless && await deps.GlobalExperimentStates.findOneAsync({
+          userId: existingUser._id, TDFId: tdf._id,
+        });
+        if (existingTarget && existingTarget !== normalizedTarget && (provisioned || passwordless)) {
+          throw new Meteor.Error('experiment-target-mismatch', 'This participation ID is already linked to a different experiment');
+        }
+        if (!(provisioned && existingTarget) && !boundProgress) {
+          throw new Meteor.Error('duplicate-user', 'This participation ID is already in use');
+        }
+
+        const alreadyComplete = await hasCompletedExperimentTarget(existingUser._id, tdf);
+        if (alreadyComplete) {
+          return { userExists: true, userId: existingUser._id, status: 'already_complete' };
+        }
+
+        if (!existingTarget || !studyOnlyAccount(existingUser)) {
+          const bound = await deps.usersCollection.updateAsync({
+            _id: existingUser._id, 'profile.experimentTarget': existingTarget ? existingUser.profile.experimentTarget : { $in: [null, ''] },
+          }, { $set: { 'profile.experiment': true, 'profile.experimentTarget': normalizedTarget } });
+          if (!bound) throw new Meteor.Error('experiment-target-mismatch', 'Participant study binding changed');
+        }
+
+        const loginToken = await issueExperimentLoginToken(existingUser._id, { target: normalizedTarget, rootId: tdf._id });
+        return { userExists: true, userId: existingUser._id, loginToken, status: 'resumed' };
+      }
+
+      let createdId: string;
+      try {
+        createdId = await createPasswordlessExperimentUser(
+          normalizedUserName,
+          normalizedTarget,
+          {
+            createdBy: 'provisionExperimentUser'
+          },
+        );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/username already exists|duplicate key|E11000/i.test(message)) {
+          throw new Meteor.Error('duplicate-user', 'This participation ID is already in use');
+        }
+        throw error;
+      }
+
+      const loginToken = await issueExperimentLoginToken(createdId, { target: normalizedTarget, rootId: tdf._id });
+      return { userExists: false, userId: createdId, loginToken, status: 'created' };
+    });
+  }
+
+  async function enterCredentialedExperiment(this: MethodContext, target: string, username?: string, password?: { digest: string; algorithm: string }) {
+    check(target, String);
+    const root = await getTdfByExperimentTarget(target);
+    const spec = root?.content?.tdfs?.tutor?.setspec;
+    if (!root || ![true, 'true'].includes(spec?.experimentPasswordRequired)) {
+      throw new Meteor.Error(403, 'Invalid experiment credentials');
+    }
+    const binding = { target: spec.experimentTarget, rootId: root._id };
+    if (username === undefined && password === undefined && this.userId) {
+      const account = await deps.usersCollection.findOneAsync({ _id: this.userId });
+      if (participantConnectionRoot(this) || !account || studyOnlyAccount(account) || account.profile?.createdBy === 'publicDemo') throw new Meteor.Error(403, 'Invalid experiment credentials');
+      return { loginToken: await issueExperimentLoginToken(this.userId, binding) };
+    }
+    check(username, String);
+    check(password, { digest: String, algorithm: String });
+    if (!username || !password || username.length > 320 || password.algorithm !== 'sha-256' || !/^[a-f0-9]{64}$/.test(password.digest)) throw new Meteor.Error(403, 'Invalid experiment credentials');
+    const account = await deps.usersCollection.findOneAsync({ username: new RegExp('^' + deps.escapeRegexLiteral(username) + '$', 'i') });
+    if (!account && !username.includes('@')) throw new Meteor.Error(403, 'Invalid experiment credentials');
+    if (!studyOnlyAccount(account)) return { ordinaryLoginRequired: true };
+    if (account.profile.experimentTarget !== binding.target || account.profile.createdBy === 'startProlificParticipation'
+      || !account.services?.password || (await (Accounts as any)._checkPasswordAsync(account, password)).error) {
+      throw new Meteor.Error(403, 'Invalid experiment credentials');
+    }
+    return { loginToken: await issueExperimentLoginToken(account._id, binding) };
+  }
+
+  async function reconnectExperimentParticipant(this: MethodContext, token: string) {
+    const binding = participantTokenBinding(token);
+    if (!binding || !this.connection) throw new Meteor.Error(403, 'Invalid participant session');
+    const accounts = Accounts as any;
+    const result = await accounts._runLoginHandlers(this, { resume: token });
+    if (!result?.userId || result.error || !result.stampedLoginToken) throw new Meteor.Error(403, 'Invalid participant session');
+    const root = await getTdfByExperimentTarget(binding.target);
+    if (!root || root._id !== binding.rootId) throw new Meteor.Error(403, 'Invalid participant session');
+    const account = result.user || await deps.usersCollection.findOneAsync({ _id: result.userId }, { fields: { profile: 1 } });
+    if (!account) throw new Meteor.Error(403, 'Invalid participant session');
+    const credentialed = [true, 'true'].includes(root.content?.tdfs?.tutor?.setspec?.experimentPasswordRequired);
+    if (studyOnlyAccount(account)) {
+      if (account.profile.experimentTarget?.toLowerCase() !== binding.target.toLowerCase()) throw new Meteor.Error(403, 'Invalid participant session');
+      if (account.profile.createdBy === 'startProlificParticipation') {
+        if (credentialed || !await deps.validateProlificBinding(result.userId, binding.target, root._id)) throw new Meteor.Error(403, 'Invalid participant session');
+      } else if (account.profile.createdBy === 'provisionExperimentUser' && credentialed) {
+        throw new Meteor.Error(403, 'Invalid participant session');
+      }
+    } else if (!credentialed) {
+      throw new Meteor.Error(403, 'Invalid participant session');
+    }
+    bindParticipantConnection(this.connection, result.userId, token, root._id);
+    return accounts._attemptLogin(this, 'reconnectExperimentParticipant', [], { ...result, type: 'experimentParticipant' });
   }
 
   async function startPublicDemo(this: MethodContext, params: unknown) {
@@ -340,6 +306,8 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
 
   return {
     getTdfByExperimentTarget,
+    enterCredentialedExperiment,
+    reconnectExperimentParticipant,
     provisionExperimentUser,
     startPublicDemo,
   };

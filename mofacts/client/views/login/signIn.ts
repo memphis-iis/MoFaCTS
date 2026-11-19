@@ -1,3 +1,4 @@
+import { Accounts } from 'meteor/accounts-base';
 import { finalizeProlificSession, showParticipationSaveError } from '../../lib/prolificParticipation';
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
@@ -393,6 +394,11 @@ Template.signIn.onRendered(async function(this: any) {
           Session.set('prolificResumeEntry', null);
           sessionCleanUp();
           await new Promise<void>((resolve, reject) => Meteor.loginWithToken(result.loginToken, (error?: any) => error ? reject(error) : resolve()));
+          if (entry.mode === 'automatic') {
+            const url = new URL(window.location.href);
+            for (const key of ['PROLIFIC_PID', 'STUDY_ID', 'SESSION_ID']) url.searchParams.delete(key);
+            window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+          }
           if (resumeEntry) sessionStorage.removeItem('prolificInitialReturn');
           else sessionStorage.setItem('prolificInitialReturn', Meteor.userId()!);
           setExperimentParticipantContext({ experimentTarget: result.experimentTarget, userId: Meteor.userId() }, 'signIn.prolific');
@@ -933,7 +939,7 @@ export async function completeExperimentSignIn(template?: any) {
       true
     );
 
-    signInNotify(false);
+    // The study session is already established. Keep other clients and their credentials intact.
   } catch (error) {
     restoreVisibleSignInScreen(template);
     throw error;
@@ -1067,17 +1073,23 @@ async function userPasswordCheck(template?: any) {
     if (experimentPasswordRequired) {
       sessionCleanUp();
       Session.set('experimentPasswordRequired', true);
-      clientConsole(2, '[EXPERIMENT-LOGIN] credentialed sign-in attempt for', newUsername);
+
 
       // METEOR 3 FIX: Use promisified version instead of callback
       const loginWithPasswordAsync = MeteorAny.promisify(Meteor.loginWithPassword);
 
       try {
-        await loginWithPasswordAsync(newUsername, newPassword);
+        const target = Session.get('experimentTarget');
+        let entry = await meteorCallAsync<any>('enterCredentialedExperiment', target, newUsername, (Accounts as any)._hashPassword(newPassword));
+        if (entry.ordinaryLoginRequired) {
+          await loginWithPasswordAsync(newUsername, newPassword);
+          entry = await meteorCallAsync<any>('enterCredentialedExperiment', target);
+        }
+        await MeteorAny.promisify(Meteor.loginWithToken)(entry.loginToken);
         await completeExperimentSignIn(template);
         clientConsole(2, '[EXPERIMENT-LOGIN] Complete');
       } catch (error) {
-        clientConsole(1, 'ERROR: The user was not logged in on experiment sign in?', newUsername, 'Error:', error);
+
         restoreVisibleSignInScreen(template);
         showInlineSignInError(authText('auth.experimentLoginFailed', { username: newUsername }), {}, template);
         $('#experimentSignin').prop('disabled', false);
@@ -1116,12 +1128,6 @@ async function userPasswordCheck(template?: any) {
         try {
           await loginWithTokenAsync(provisionResult.loginToken);
         } catch (error) {
-          clientConsole(1, '[EXPERIMENT-LOGIN] Token login failed', {
-            username: newUsername,
-            errorCode: getMeteorErrorCode(error),
-            reason: getMeteorErrorReason(error),
-            error
-          });
           showInlineSignInError(
             authText('auth.experimentTokenLoginFailed', {
               username: newUsername,
@@ -1139,13 +1145,6 @@ async function userPasswordCheck(template?: any) {
           await completeExperimentSignIn(template);
           clientConsole(2, '[EXPERIMENT-LOGIN-2] Complete');
         } catch (error) {
-          clientConsole(1, '[EXPERIMENT-LOGIN] Post-login experiment setup failed', {
-            username: newUsername,
-            userId: Meteor.userId(),
-            errorCode: getMeteorErrorCode(error),
-            reason: getMeteorErrorReason(error),
-            error
-          });
           restoreVisibleSignInScreen(template);
           showInlineSignInError(
             authText('auth.experimentStartFailed', {

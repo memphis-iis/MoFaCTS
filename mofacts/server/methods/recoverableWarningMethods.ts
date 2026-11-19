@@ -1,3 +1,4 @@
+import { privateParticipantActivity } from '../lib/participantSession';
 import { check, Match } from 'meteor/check';
 import {
   RECOVERABLE_WARNING_ACTION,
@@ -26,6 +27,7 @@ export function createRecoverableWarningMethods(deps: Dependencies) {
   return {
     async reportRecoverableWarning(this: Context, warning: RecoverableWarning) {
       const userId = requireAuthenticatedUser(this.userId);
+      if (await privateParticipantActivity(this)) return false;
       const boundedSize = Match.Where((value: unknown) => Number.isInteger(value) && Number(value) > 0 && Number(value) <= 10000000);
       const questionIdentifier = Match.Where((value: unknown) => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,512}$/.test(value));
       const nullableQuestionIdentifier = Match.OneOf(null, questionIdentifier);

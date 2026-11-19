@@ -5,6 +5,7 @@
    * Supports question checkpoints at specific timestamps
    */
   import { onMount, onDestroy, createEventDispatcher, tick } from 'svelte';
+  import { participantActivity } from '../../../../lib/participantPrivacy';
   import { Meteor } from 'meteor/meteor';
   import { Session } from 'meteor/session';
   import Plyr from 'plyr';
@@ -797,6 +798,7 @@
   }
 
   function buildVideoDiagnostic(rawUrl, iframeSrc) {
+    if (participantActivity()) return {};
     return {
       loginMode: Session.get('loginMode') || null,
       isExperiment: Session.get('loginMode') === 'experiment',

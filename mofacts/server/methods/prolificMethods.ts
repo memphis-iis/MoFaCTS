@@ -14,7 +14,7 @@ export function createProlificMethods(deps: Deps) {
   async function run(context: Context, access: 'public' | 'self' | 'researcher', action: string, work: (userId: string) => Promise<unknown>) {
     const userId = access === 'public' ? '' : access === 'self' ? requireAuthenticatedUser(context.userId)
       : await requireUserWithRoles(deps.authorization(), { userId: context.userId, roles: ['admin', 'teacher'] });
-    await deps.rateLimit(`prolific-${action}`, context.connection?.clientAddress || 'unknown', userId || context.connection?.clientAddress || 'unknown', { ipLimit: 120, identifierLimit: 30, windowMs: 60000 });
+    if (access === 'researcher') await deps.rateLimit(`prolific-${action}`, context.connection?.clientAddress || 'unknown', userId || context.connection?.clientAddress || 'unknown', { ipLimit: 120, identifierLimit: 30, windowMs: 60000 });
     try { return await work(userId); } catch (error: any) {
       // Never send upstream responses, tokens, message bodies, or raw database errors to clients.
       const key = typeof error?.message === 'string' && /^prolific\.[A-Za-z]+$/.test(error.message) ? error.message : 'prolific.failed';

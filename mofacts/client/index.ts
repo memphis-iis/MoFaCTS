@@ -1,3 +1,4 @@
+import { participantActivity } from './lib/participantPrivacy';
 import { clearContentUploadSnapshots } from './lib/contentUploadSnapshotStore';
 import './views/shared/prolificSaveError';
 import {ENTER_KEY} from '../common/Definitions';
@@ -445,7 +446,7 @@ Accounts.onLogin(function() {
     if (user && user.profile) {
       computation.stop(); // Only run once
 
-      if (user.profile.experiment === true || user.profile.createdBy === 'provisionExperimentUser') {
+      if (participantActivity()) {
         return;
       }
 
@@ -557,7 +558,7 @@ Meteor.startup(function() {
   });
 
   Accounts.onLoginFailure(function(error: unknown) {
-    clientConsole(1, '[AUTH] Login failure:', error);
+    if (!participantActivity()) clientConsole(1, '[AUTH] Login failure:', error);
   });
 
   // Initialize multi-tab detection
@@ -794,6 +795,7 @@ Template.DefaultLayout.events({
 
   'click #errorReportButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
+    if (participantActivity()) return;
     incrementPausedLocks();
     Session.set('errorReportStart', new Date());
     //set the modalTemplate session variable to the reportError template
@@ -813,6 +815,7 @@ Template.DefaultLayout.events({
   }, 
   'click #errorReportingSaveButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
+    if (participantActivity()) return;
     clientConsole(2, 'save error reporting button pressed');
     const errorDescription = $('#errorDescription').val();
     //if error description is empty, alert the user to enter a description

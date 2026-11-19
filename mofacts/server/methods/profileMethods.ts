@@ -1,3 +1,4 @@
+import { privateParticipantActivity, participantConnectionRoot } from '../lib/participantSession';
 import { Meteor } from 'meteor/meteor';
 import { parseSparcStudentPersona } from '../../../learning-components/runtime/sparcPersonas';
 import { check, Match } from 'meteor/check';
@@ -147,6 +148,7 @@ async function requireOrdinaryOpenRouterAccount(
   deps: Pick<ProfileMethodsDeps, 'usersCollection'>,
   userId: string | null | undefined,
   action: string,
+  context: MethodContext,
 ): Promise<string> {
   const authenticatedUserId = requireAuthenticatedUser(userId, `Must be logged in to ${action}`, 401);
   const user = await deps.usersCollection.findOneAsync({ _id: authenticatedUserId }, {
@@ -160,7 +162,7 @@ async function requireOrdinaryOpenRouterAccount(
     || user?.profile?.experiment === 'true'
     || user?.profile?.createdBy === 'provisionExperimentUser'
     || (typeof user?.profile?.experimentTarget === 'string' && user.profile.experimentTarget.trim() !== '');
-  if (experimentOnly) {
+  if (experimentOnly || participantConnectionRoot(context)) {
     throw new Meteor.Error(
       'experiment-account-restricted',
       'Passwordless experiment participants cannot access ordinary account settings',
@@ -201,6 +203,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
   return {
     async updateOwnSparcPersona(this: MethodContext, persona: unknown) {
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to update your persona', 401);
+      if (await privateParticipantActivity(this)) throw new Meteor.Error('experiment-account-restricted', 'Profile changes are unavailable during an experiment');
       const description = parseSparcStudentPersona(persona);
       await deps.usersCollection.updateAsync({ _id: userId }, {
         $set: { 'profile.sparcPersona': description },
@@ -217,6 +220,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
         avatarImageData: Match.Maybe(Match.OneOf(String, null)),
       });
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to update your profile', 401);
+      if (await privateParticipantActivity(this)) throw new Meteor.Error('experiment-account-restricted', 'Profile changes are unavailable during an experiment');
       const data = params as {
         name?: string;
         displayName?: string;
@@ -281,6 +285,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
         uiLocale: String,
       });
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to update your language', 401);
+      if (await privateParticipantActivity(this)) throw new Meteor.Error('experiment-account-restricted', 'Profile changes are unavailable during an experiment');
       const data = params as { uiLocale: string };
       await deps.usersCollection.updateAsync({ _id: userId }, {
         $set: {
@@ -297,7 +302,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
         model: Match.Maybe(String),
         reasoningLevel: Match.Maybe(String),
       });
-      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'update OpenRouter settings');
+      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'update OpenRouter settings', this);
       const data = params as { apiKey?: string; model?: string; reasoningLevel?: OpenRouterReasoningLevel };
       const apiKey = normalizeOpenRouterKey(data.apiKey);
       const model = normalizeOpenRouterModel(data.model);
@@ -333,7 +338,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
     },
 
     getOwnOpenRouterSettings: async function(this: MethodContext) {
-      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'read OpenRouter settings');
+      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'read OpenRouter settings', this);
       const user = await deps.usersCollection.findOneAsync({ _id: userId }, {
         fields: {
           'profile.openRouterDefaultModel': 1,
@@ -353,7 +358,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
     },
 
     deleteOwnOpenRouterKey: async function(this: MethodContext) {
-      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'delete your OpenRouter key');
+      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'delete your OpenRouter key', this);
       await deps.usersCollection.updateAsync({ _id: userId }, {
         $set: {
           'profile.openRouterHasKey': false,
@@ -374,7 +379,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
         model: Match.Maybe(String),
         reasoningLevel: Match.Maybe(String),
       });
-      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'test OpenRouter settings');
+      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'test OpenRouter settings', this);
       void userId;
       const data = params as { apiKey?: string; model?: string; reasoningLevel?: OpenRouterReasoningLevel };
       const apiKey = normalizeOpenRouterKey(data.apiKey);

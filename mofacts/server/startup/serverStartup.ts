@@ -1,3 +1,4 @@
+import { PARTICIPANT_TOKEN_PREFIX, studyOnlyAccount } from '../../common/participantPrivacy';
 import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import { Roles } from 'meteor/alanning:roles';
@@ -174,7 +175,7 @@ function registerSecurityHeaders() {
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Referrer-Policy', /^\/(?:experiment|prolific\/resume)(?:[/?]|$)/i.test(req.url || '') ? 'no-referrer' : 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(self)');
     if (req.url === '/stimSchema.json' || req.url === '/tdfSchema.json') {
       res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -493,6 +494,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     allowed?: boolean;
     connection?: { clientAddress?: string | null };
   }) => {
+    if (loginInfo.type === 'experimentParticipant' || (loginInfo.type === 'resume' && studyOnlyAccount(loginInfo.user))) return;
     deps.serverConsole('[ACCOUNTS.ONLOGIN] Login detected:', {
       type: loginInfo.type,
       methodName: loginInfo.methodName,
@@ -596,6 +598,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   };
 
   (Accounts as any).config({
+    forbidClientAccountCreation: true,
     loginExpirationInDays: 30,
     ambiguousErrorMessages: true,
     argon2Enabled: deps.isArgon2Enabled(),
@@ -666,6 +669,10 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     error?: { error?: string; reason?: string; message?: string };
     methodArguments?: unknown[];
   }) => {
+    if (attempt.type === 'experimentParticipant') return attempt.allowed === true;
+    const resume = (attempt.methodArguments?.[0] as { resume?: unknown })?.resume;
+    if (typeof resume === 'string' && resume.startsWith(PARTICIPANT_TOKEN_PREFIX)) return false;
+    if (attempt.allowed && attempt.type === 'resume' && studyOnlyAccount(attempt.user)) return true;
     const identifier = deps.extractLoginAttemptIdentifier(attempt);
     const clientIp = deps.getAuthClientIp(attempt);
     if (attempt.type === 'password') {

@@ -44,8 +44,8 @@ export async function finalizeProlificSession(): Promise<boolean> {
   })();
   try { return await finalizing; } finally { finalizing = null; }
 }
-export async function checkpointProlificLockout(): Promise<boolean> {
+export async function checkpointProlificLockout(retryInstructions: () => Promise<void>): Promise<boolean> {
   if (!isProlificAccount()) return false;
   try { return await finalizeProlificSession(); }
-  catch { showParticipationSaveError(async () => { await finalizeProlificSession(); }); return true; }
+  catch { showParticipationSaveError(retryInstructions); return true; }
 }

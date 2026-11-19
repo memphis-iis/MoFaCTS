@@ -1,3 +1,4 @@
+import { participantRootForConnection } from '../lib/participantSession';
 import { DDPRateLimiter } from 'meteor/ddp-rate-limiter';
 
 type RateLimitResult = {
@@ -36,9 +37,24 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     return;
   }
   rateLimitsRegistered = true;
-  DDPRateLimiter.addRule({ type: 'method', name: 'ingestSimulationResearchBatch',
+  // Meteor includes every matcher field in its counter key. Apply the connection
+  // predicate after matching and before counting so ordinary per-user budgets
+  // stay shared across tabs. Only the learner-facing rules registered here qualify.
+  const studyActivityRules = new Set<string>();
+  const limiter = DDPRateLimiter as typeof DDPRateLimiter & {
+    findAllMatchingRulesAsync: (input: { connectionId: string; userId: string | null }) => Promise<{ id: string }[]>;
+  };
+  const matchRules = limiter.findAllMatchingRulesAsync.bind(limiter);
+  limiter.findAllMatchingRulesAsync = async input => {
+    const rules = await matchRules(input);
+    if (!rules.some(rule => studyActivityRules.has(rule.id)) || !participantRootForConnection(input.connectionId, input.userId)) return rules;
+    return rules.filter(rule => !studyActivityRules.has(rule.id));
+  };
+  const addStudyActivityRule = (...args: Parameters<typeof DDPRateLimiter.addRule>) =>
+    studyActivityRules.add(DDPRateLimiter.addRule(...args));
+  addStudyActivityRule({ type: 'method', name: 'ingestSimulationResearchBatch',
     connectionId() { return true; } }, 40, 1000);
-  DDPRateLimiter.addRule({ type: 'method', name(name: string) {
+  addStudyActivityRule({ type: 'method', name(name: string) {
     return ['startSimulationResearchAttempt', 'interruptSimulationResearchActivity', 'endSimulationResearchAttempt'].includes(name);
   }, connectionId() { return true; } }, 30, 60000);
   DDPRateLimiter.addRule({ type: 'method', name: 'exportSimulationResearchTrace',
@@ -46,10 +62,10 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
 
   DDPRateLimiter.addRule({ type: 'method', name: 'deleteSparcInstructionalComponent',
     userId(userId: string | null | undefined) { return !!userId; } }, 60, 60000);
-  DDPRateLimiter.addRule({ type: 'method', name: 'getSparcAdministrativeRemovals',
+  addStudyActivityRule({ type: 'method', name: 'getSparcAdministrativeRemovals',
     userId(userId: string | null | undefined) { return !!userId; } }, 180, 60000);
 
-  DDPRateLimiter.addRule({
+  addStudyActivityRule({
     type: 'method',
     name: 'reportRecoverableWarning',
     userId() { return true; }
@@ -90,12 +106,6 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     name: 'signUpUser',
     connectionId() { return true; }
   }, 5, 3600000);
-
-  DDPRateLimiter.addRule({
-    type: 'method',
-    name: 'provisionExperimentUser',
-    connectionId() { return true; }
-  }, 20, 3600000);
 
   DDPRateLimiter.addRule({
     type: 'method',
@@ -144,7 +154,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     userId(userId: string | null | undefined) { return !!userId; }
   }, 30, 3600000);
 
-  DDPRateLimiter.addRule({
+  addStudyActivityRule({
     type: 'method',
     name(name: string) {
       return [
@@ -163,7 +173,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     userId(userId: string | null | undefined) { return !!userId; }
   }, 30, 3600000);
 
-  DDPRateLimiter.addRule({
+  addStudyActivityRule({
     type: 'method',
     name: isRateLimitedOpenRouterMethod,
     userId(userId: string | null | undefined) { return !!userId; }

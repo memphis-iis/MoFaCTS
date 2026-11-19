@@ -1,4 +1,5 @@
-import { showParticipationSaveError, isProlificAccount, participationSaveFailed } from '../../../../lib/prolificParticipation';
+import { participantActivity } from '../../../../lib/participantPrivacy';
+import { showParticipationSaveError, participationSaveFailed } from '../../../../lib/prolificParticipation';
 /**
  * Unit Progression Service
  *
@@ -267,7 +268,7 @@ export async function unitIsFinished(_reason: string): Promise<void> {
     if (leaveTarget === '/content') restartContentSurface();
   };
   try { await saveAndLeave(); } catch (error) {
-    if (!isProlificAccount()) throw error;
+    if (!participantActivity()) throw error;
     showParticipationSaveError(saveAndLeave);
   }
 }
