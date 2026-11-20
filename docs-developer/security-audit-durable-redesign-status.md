@@ -285,7 +285,13 @@ remains with that production window.
   checks, attempt-owner enforcement inside services and admin trace exports.
   Typecheck, lint, Linux audit source checks (453 passes, seven skips) and
   all 16 existing simulation source tests passed.
-- [ ] Verify the warning and simulation telemetry families together in Meteor.
+- [x] Verify the warning and simulation telemetry families together (slot 35).
+  Exact registered handler identity, private participant warning suppression,
+  denial of non-owner attempt writes, and admin-only trace export passed.
+- [x] Trace experiment entry as the next method family. Preserve passwordless
+  progress-backed return, credentialed entry, scoped reconnect and public demo
+  behavior. Record observed DDP limits without adding new study restrictions.
+- [ ] Bind the experiment entry methods to their existing admission policies.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry
@@ -1740,7 +1746,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 38 total, 33 consumed, 0 reserved, 4 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 38 total, 34 consumed, 0 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 20 Phil authorized five more Phase 3 Meteor invocations, with fewer
 full runs where related source-checked changes can share one exact-source run.
@@ -1799,6 +1805,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 32 | 9f7e662e3dcb11052d690d2a2fdc628702f90d7c | PASS 2026-11-20T16:49:24Z to 16:51:04Z. 1,081 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Five handler identities, administrator denials, draft read, export redaction and invalid-import preservation passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.KIvMELh0/results/native-verification.json. SHA-256 2fb4dad0a170d4dac14ebcc8bdaad2ce2d56c96aa517f99a9bea05df48177485. |
 | 33 | 2e9ae5e2fef8af6226d5197fee3a79ccd37e75f2 | PASS 2026-11-20T16:57:48Z to 16:59:19Z. 1,082 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact migration handler and denial precedence, synthetic dry run, pagination, fingerprint and write-conflict checks passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.YfyAG7Va/results/native-verification.json. SHA-256 3be459370e4f6287e1ac17cfe2345b2f5c1febc748c4fcd454282fcbe415d400. |
 | 34 | 715eb02c186edf3490271d239a263c11ce53be95 | PASS 2026-11-20T18:10:58Z to 18:12:34Z. 1,086 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Seven exact handlers, assigned-condition controls and download session/scope regressions passed. Source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.riku5IGJ/results/native-verification.json. SHA-256 e9854f46a0457ffeb792657bc60fe04191f0d943d338ab68b8896deaa0c58691. |
+| 35 | c04cd8e802c17331dc589940c65abc22542e8911 | PASS 2026-11-20T18:22:38Z to 18:24:30Z. 1,091 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Seven registered handlers, private warning suppression, simulation attempt ownership, and admin-only trace export passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.IegOflsU/results/native-verification.json. SHA-256 4ced551f2b85f1372a9213f4ac5714563300ed128692a8e4130f78d3df68bf8d. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
