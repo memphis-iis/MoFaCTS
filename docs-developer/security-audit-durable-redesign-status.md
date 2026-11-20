@@ -275,7 +275,10 @@ remains with that production window.
   disabled and the other methods issue the existing download capabilities.
   The combined source batch passed typecheck, lint and Linux checks
   (453 passes, seven skips, zero failures).
-- [ ] Verify both analytics families together in one exact-source Meteor run.
+- [x] Verify both analytics families in one exact-source Meteor run (slot 34).
+  All seven installed handlers matched their policies. Assigned-condition
+  acceptance and denial, disabled class export, ownership, ordinary/participant
+  session boundaries, and existing download regression cases passed.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry
@@ -1730,7 +1733,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 38 total, 32 consumed, 0 reserved, 5 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 38 total, 33 consumed, 0 reserved, 4 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 20 Phil authorized five more Phase 3 Meteor invocations, with fewer
 full runs where related source-checked changes can share one exact-source run.
@@ -1788,6 +1791,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 31 | 5d664d7496a99b8cf96c077c750c285eb04318a5 | PASS 2026-11-20T16:37:47Z to 16:39:44Z. 1,079 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Eight registered backup bindings and denials, disposable archive workflow, restore confirmation and synthetic restore service passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.1vVqVaIH/results/native-verification.json. SHA-256 50c64fa2dc5345dbc28e6ac2b53821da6fb201520890f899accb887769b1ca16. |
 | 32 | 9f7e662e3dcb11052d690d2a2fdc628702f90d7c | PASS 2026-11-20T16:49:24Z to 16:51:04Z. 1,081 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Five handler identities, administrator denials, draft read, export redaction and invalid-import preservation passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.KIvMELh0/results/native-verification.json. SHA-256 2fb4dad0a170d4dac14ebcc8bdaad2ce2d56c96aa517f99a9bea05df48177485. |
 | 33 | 2e9ae5e2fef8af6226d5197fee3a79ccd37e75f2 | PASS 2026-11-20T16:57:48Z to 16:59:19Z. 1,082 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact migration handler and denial precedence, synthetic dry run, pagination, fingerprint and write-conflict checks passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.YfyAG7Va/results/native-verification.json. SHA-256 3be459370e4f6287e1ac17cfe2345b2f5c1febc748c4fcd454282fcbe415d400. |
+| 34 | 715eb02c186edf3490271d239a263c11ce53be95 | PASS 2026-11-20T18:10:58Z to 18:12:34Z. 1,086 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Seven exact handlers, assigned-condition controls and download session/scope regressions passed. Source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.riku5IGJ/results/native-verification.json. SHA-256 e9854f46a0457ffeb792657bc60fe04191f0d943d338ab68b8896deaa0c58691. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
