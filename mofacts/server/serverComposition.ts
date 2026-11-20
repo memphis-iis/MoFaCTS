@@ -54,7 +54,8 @@ import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
 import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
-import { createAccessMethods } from './methods/accessMethods';
+import { LESSON_SHARING_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { createAccessMethods, lessonSharingPolicy } from './methods/accessMethods';
 import { transferTdfOwnership } from './lib/tdfOwnershipTransferMongo';
 import { createAdminMethods } from './methods/adminMethods';
 import { createAnalyticsMethodRegistration } from './methods/analyticsMethods';
@@ -1193,6 +1194,7 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...warningRegistration.methodBindings,
   ...simulationTelemetry.methodBindings,
   ...experimentRegistration.methodBindings,
+  { verification: LESSON_SHARING_VERIFICATION, handler: methods.assignAccessors, policy: lessonSharingPolicy, dataEgress: 'none' },
   ...prolificRegistration.methodBindings,
 ], () => MeteorAny.server?.method_handlers);
 bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);

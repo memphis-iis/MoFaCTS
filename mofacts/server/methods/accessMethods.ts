@@ -1,9 +1,13 @@
+import { withLessonSharingTransaction } from '../lib/lessonSharingMongo';
+import { isTdfOwner } from '../lib/contentAccessPolicy';
 import { Meteor } from 'meteor/meteor';
 import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
 import {
   requireUserMatchesOrHasRole,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
+
+export const lessonSharingPolicy = Object.freeze({ kind: 'lesson-sharing', operation: 'owner-assignment', authorize: isTdfOwner } as const);
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -231,110 +235,112 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
         throw new Meteor.Error(400, 'Invalid accessor payload');
       }
 
-      const tdf = await deps.Tdfs.findOneAsync({ _id: TDFId });
-      if (!tdf) {
-        throw new Meteor.Error(404, 'TDF not found');
-      }
-      if (!deps.isTdfOwner(this.userId, tdf)) {
-        throw new Meteor.Error(403, 'Only TDF owner can assign accessors');
-      }
+      const caller = this.userId;
+      await withLessonSharingTransaction(async storage => {
+        const tdf = await storage.findLesson(TDFId);
+        if (!tdf) {
+          throw new Meteor.Error(404, 'TDF not found');
+        }
+        if (!lessonSharingPolicy.authorize(caller, { ownerId: tdf.ownerId })) {
+          throw new Meteor.Error(403, 'Only TDF owner can assign accessors');
+        }
 
-      const normalizedRevoked = [...new Set(
-        revokedAccessors
-          .filter((id) => typeof id === 'string' && id.trim().length > 0)
-      )];
+        const normalizedRevoked = [...new Set(
+          revokedAccessors
+            .filter((id) => typeof id === 'string' && id.trim().length > 0)
+        )];
 
-      const currentAccessors = Array.isArray(tdf.accessors) ? tdf.accessors : [];
-      const currentById = new Map();
-      for (const accessor of currentAccessors) {
-        const accessorId = accessor?.userId;
-        if (typeof accessorId === 'string' && accessorId.trim().length > 0) {
-          currentById.set(accessorId, {
+        const currentAccessors = Array.isArray(tdf.accessors) ? tdf.accessors : [];
+        const currentById = new Map();
+        for (const accessor of currentAccessors) {
+          const accessorId = accessor?.userId;
+          if (typeof accessorId === 'string' && accessorId.trim().length > 0) {
+            currentById.set(accessorId, {
+              userId: accessorId,
+              username: accessor?.username || '',
+            });
+          }
+        }
+
+        const requestedById = new Map();
+        for (const accessor of accessors) {
+          const accessorId = accessor?.userId;
+          if (typeof accessorId !== 'string' || accessorId.trim().length === 0) {
+            throw new Meteor.Error(400, 'Invalid accessor entry');
+          }
+          if (accessorId === tdf.ownerId) {
+            continue;
+          }
+          requestedById.set(accessorId, {
             userId: accessorId,
             username: accessor?.username || '',
           });
         }
-      }
 
-      const requestedById = new Map();
-      for (const accessor of accessors) {
-        const accessorId = accessor?.userId;
-        if (typeof accessorId !== 'string' || accessorId.trim().length === 0) {
-          throw new Meteor.Error(400, 'Invalid accessor entry');
+        const finalById = new Map(currentById);
+        for (const revokedId of normalizedRevoked) {
+          finalById.delete(revokedId);
         }
-        if (accessorId === tdf.ownerId) {
-          continue;
-        }
-        requestedById.set(accessorId, {
-          userId: accessorId,
-          username: accessor?.username || '',
-        });
-      }
-
-      const finalById = new Map(currentById);
-      for (const revokedId of normalizedRevoked) {
-        finalById.delete(revokedId);
-      }
-      for (const [accessorId, accessorInfo] of requestedById.entries()) {
-        if (!finalById.has(accessorId)) {
-          finalById.set(accessorId, accessorInfo);
-        }
-      }
-
-      const normalizedAccessors = Array.from(finalById.values());
-      const finalAccessorIds = new Set(normalizedAccessors.map((x: { userId: string }) => x.userId));
-      const actuallyRemovedIds = [];
-      for (const existingId of currentById.keys()) {
-        if (!finalAccessorIds.has(existingId)) {
-          actuallyRemovedIds.push(existingId);
-        }
-      }
-
-      deps.serverConsole('assignAccessors', TDFId, normalizedAccessors, normalizedRevoked);
-      await deps.Tdfs.updateAsync({ _id: TDFId }, { $set: { accessors: normalizedAccessors }, $inc: { tdfRevision: 1 } });
-      const userIds = normalizedAccessors.map((x: { userId: string }) => x.userId);
-      if (userIds.length > 0) {
-        await deps.usersCollection.updateAsync({ _id: { $in: userIds } }, { $addToSet: { accessedTDFs: TDFId } }, { multi: true });
-      }
-      if (actuallyRemovedIds.length > 0) {
-        await deps.usersCollection.updateAsync({ _id: { $in: actuallyRemovedIds } }, { $pull: { accessedTDFs: TDFId } }, { multi: true });
-      }
-
-      const familyValidation = validateConditionFamilyTutor(tdf.content?.tdfs?.tutor, { requireCanonicalIds: true });
-      if (familyValidation.errors.length > 0) {
-        throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
-      }
-      const conditionIds = familyValidation.conditionTdfIds;
-      if (conditionIds.length > 0) {
-        const childIds = [...new Set(conditionIds)].filter((id) => typeof id === 'string' && id !== TDFId);
-        for (const childId of childIds) {
-          const child = await deps.Tdfs.findOneAsync({ _id: childId }, { fields: { ownerId: 1, accessors: 1 } });
-          if (!child || child.ownerId !== tdf.ownerId) {
-            continue;
+        for (const [accessorId, accessorInfo] of requestedById.entries()) {
+          if (!finalById.has(accessorId)) {
+            finalById.set(accessorId, accessorInfo);
           }
+        }
 
-          const childAccessors = Array.isArray(child.accessors) ? child.accessors : [];
-          const childExistingIds = new Set<string>(
-            childAccessors
-              .map((a: { userId?: string }) => a.userId)
-              .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
-          );
-          const childRemovedIds = [];
-          for (const existingId of childExistingIds) {
-            if (!finalAccessorIds.has(existingId)) {
-              childRemovedIds.push(existingId);
+        const normalizedAccessors = Array.from(finalById.values());
+        const finalAccessorIds = new Set(normalizedAccessors.map((x: { userId: string }) => x.userId));
+        const actuallyRemovedIds = [];
+        for (const existingId of currentById.keys()) {
+          if (!finalAccessorIds.has(existingId)) {
+            actuallyRemovedIds.push(existingId);
+          }
+        }
+
+        const familyValidation = validateConditionFamilyTutor(tdf.content?.tdfs?.tutor, { requireCanonicalIds: true });
+        if (familyValidation.errors.length > 0) {
+          throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
+        }
+        await storage.setAccessors(TDFId, normalizedAccessors);
+        const userIds = normalizedAccessors.map((x: { userId: string }) => x.userId);
+        if (userIds.length > 0) {
+          await storage.grant(TDFId, userIds);
+        }
+        if (actuallyRemovedIds.length > 0) {
+          await storage.revoke(TDFId, actuallyRemovedIds);
+        }
+
+        const conditionIds = familyValidation.conditionTdfIds;
+        if (conditionIds.length > 0) {
+          const childIds = [...new Set(conditionIds)].filter((id) => typeof id === 'string' && id !== TDFId);
+          for (const childId of childIds) {
+            const child = await storage.findChild(childId);
+            if (!child || child.ownerId !== tdf.ownerId) {
+              continue;
+            }
+
+            const childAccessors = Array.isArray(child.accessors) ? child.accessors : [];
+            const childExistingIds = new Set<string>(
+              childAccessors
+                .map((a: { userId?: string }) => a.userId)
+                .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+            );
+            const childRemovedIds = [];
+            for (const existingId of childExistingIds) {
+              if (!finalAccessorIds.has(existingId)) {
+                childRemovedIds.push(existingId);
+              }
+            }
+
+            await storage.setAccessors(childId, normalizedAccessors);
+            if (userIds.length > 0) {
+              await storage.grant(childId, userIds);
+            }
+            if (childRemovedIds.length > 0) {
+              await storage.revoke(childId, childRemovedIds);
             }
           }
-
-          await deps.Tdfs.updateAsync({ _id: childId }, { $set: { accessors: normalizedAccessors }, $inc: { tdfRevision: 1 } });
-          if (userIds.length > 0) {
-            await deps.usersCollection.updateAsync({ _id: { $in: userIds } }, { $addToSet: { accessedTDFs: childId } }, { multi: true });
-          }
-          if (childRemovedIds.length > 0) {
-            await deps.usersCollection.updateAsync({ _id: { $in: childRemovedIds } }, { $pull: { accessedTDFs: childId } }, { multi: true });
-          }
         }
-      }
+      });
     },
 
     transferDataOwnership: async function(this: MethodContext, tdfId: string, newOwner: { _id?: string; username?: string } | string) {

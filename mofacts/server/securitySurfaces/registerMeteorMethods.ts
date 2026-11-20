@@ -17,6 +17,10 @@ export type MeteorMethodBinding = Readonly<{
     operation: 'replace' | 'increment' | 'reset';
     authorize: (...args: never[]) => Promise<void>;
   }> | Readonly<{
+    kind: 'lesson-sharing';
+    operation: 'owner-assignment';
+    authorize: (...args: never[]) => boolean;
+  }> | Readonly<{
     kind: 'history-download';
     operation: 'owned-lessons' | 'own-history' | 'disabled-class' | 'owned-lesson';
     authorize: (...args: never[]) => unknown;

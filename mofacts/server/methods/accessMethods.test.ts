@@ -1,4 +1,7 @@
 import { strict as assert } from 'node:assert';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
+import { randomUUID } from 'node:crypto';
+import { Tdfs } from '../../common/Collections';
 import { Meteor } from 'meteor/meteor';
 import { createAccessMethods } from './accessMethods';
 import { isTdfOwner } from '../lib/contentAccessPolicy';
@@ -73,5 +76,54 @@ describe('accessor identity query authorization', () => {
     }
     assert.equal(f.lessonReads(), 0);
     assert.equal(f.calls.length, 0);
+  });
+});
+
+describe('atomic lesson sharing', () => {
+  it('rolls back a late child failure and commits owner grants and revocations together', async () => {
+    const observation = registeredMeteorMethodSurfaces();
+    assert.equal(observation.state, 'observed');
+    const binding = observation.surfaces.find(row => row.name === 'assignAccessors');
+    assert.deepEqual(binding?.policy, { kind: 'lesson-sharing', operation: 'owner-assignment' });
+    assert.equal(binding?.dataEgress, 'none');
+    const prefix = randomUUID();
+    const root = prefix + '-root';
+    const child = prefix + '-child';
+    const foreign = prefix + '-foreign';
+    const owner = prefix + '-owner';
+    const learner = prefix + '-learner';
+    const lessons = Tdfs.rawCollection() as unknown as import('mongodb').Collection<{ _id: string; ownerId: string; tdfRevision: number | string; accessors: unknown[]; content?: unknown }>;
+    const users = Meteor.users.rawCollection() as unknown as import('mongodb').Collection<{ _id: string; accessedTDFs: string[] }>;
+    const assign = (Meteor as any).server.method_handlers.assignAccessors;
+    const accessors = [{ userId: learner, username: 'Synthetic learner' }];
+    const tutor = { setspec: { condition: ['child.json', 'foreign.json'], conditionTdfIds: [child, foreign] } };
+    try {
+      await lessons.insertMany([
+        { _id: root, ownerId: owner, tdfRevision: 0, accessors: [], content: { tdfs: { tutor } } },
+        { _id: child, ownerId: owner, tdfRevision: 'invalid', accessors: [] },
+        { _id: foreign, ownerId: learner, tdfRevision: 0, accessors: [] },
+      ]);
+      await users.insertOne({ _id: learner, accessedTDFs: [] });
+      await assert.rejects(assign.call({ userId: learner }, root, accessors, []), { error: 403 });
+      await assert.rejects(assign.call({ userId: owner }, root, accessors, []), /non.numeric/i);
+      assert.equal((await lessons.findOne({ _id: root }))!.tdfRevision, 0);
+      assert.deepEqual((await lessons.findOne({ _id: root }))!.accessors, []);
+      assert.deepEqual((await users.findOne({ _id: learner }))!.accessedTDFs, []);
+      await lessons.updateOne({ _id: child }, { $set: { tdfRevision: 0 } });
+      await assign.call({ userId: owner }, root, accessors, []);
+      for (const id of [root, child]) assert.deepEqual((await lessons.findOne({ _id: id }))!.accessors, accessors);
+      assert.deepEqual((await users.findOne({ _id: learner }))!.accessedTDFs.sort(), [root, child].sort());
+      await assign.call({ userId: owner }, root, [], [learner]);
+      for (const id of [root, child]) {
+        const lesson = await lessons.findOne({ _id: id });
+        assert.equal(lesson!.tdfRevision, 2);
+        assert.deepEqual(lesson!.accessors, []);
+      }
+      assert.deepEqual((await users.findOne({ _id: learner }))!.accessedTDFs, []);
+      assert.equal((await lessons.findOne({ _id: foreign }))!.tdfRevision, 0);
+    } finally {
+      await lessons.deleteMany({ _id: { $in: [root, child, foreign] } });
+      await users.deleteOne({ _id: learner });
+    }
   });
 });

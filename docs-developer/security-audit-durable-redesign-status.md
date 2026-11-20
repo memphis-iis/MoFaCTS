@@ -315,12 +315,11 @@ remains with that production window.
   All 16 installed handlers retained participant/researcher access boundaries.
   The retired method was absent from the actual handler table, and the owned
   lesson and accessor readers remained registered.
-- [ ] Resolve the lesson-sharing write boundary before migrating it. The current
-  owner-only method updates the root and user references before validating its
-  condition references, and applies child writes outside a transaction. A late
-  error can leave changes in place. Recommend validating and committing all
-  applicable lesson and user updates together while preserving who may change
-  access. This is a source finding; no live lesson was modified.
+- [x] Apply the approved all-or-nothing lesson-sharing design. The owner check,
+  family validation, authorized lesson changes and user references share one
+  MongoDB transaction. Children belonging to other owners remain excluded.
+- [ ] Verify installed sharing-method identity, owner authorization, rollback
+  after a late child write failure, grants and revocations on the Linux worker.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry
