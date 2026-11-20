@@ -321,9 +321,9 @@ remains with that production window.
 - [x] Verify installed sharing-method identity, owner authorization, rollback
   after a late child write failure, grants and revocations on the Linux worker.
   Slot 38 passed the named case, including exclusion of a different owner's child.
-- [ ] Decide whether the owner-facing accessor lookup should return only the
-  user ID and display username. It currently forwards all stored accessor fields;
-  the tracked grant and revoke interfaces use only those two fields.
+- [x] Limit the owner-facing accessor lookup to user ID and display username.
+  Bind both accessor reads to their existing owner check.
+- [ ] Verify both installed lookup responses and owner checks on the isolated worker.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry
@@ -1778,7 +1778,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 38 total, 37 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 39 total, 37 consumed, 0 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
+
+One additional general run approved for the combined accessor-read batch.
 
 Slot 38 consumed on 92e3a04d. Native Linux integration passed at 20:04:19 to 20:06:40 UTC on 2026-11-20 (1,096 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 2e72ebe6915a5c5a4f46f09ee282a88619ab21feb6a3a6fff019b058ac339ca4.
 

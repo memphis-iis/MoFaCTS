@@ -14,6 +14,38 @@ describe('accessor identity query authorization', () => {
     assert.equal(typeof handlers.getAccessors, 'function');
   });
 
+  it('limits both installed owner lookups to their documented identity fields', async () => {
+    const lessonId = randomUUID();
+    const owner = randomUUID();
+    const learner = randomUUID();
+    const lessons = Tdfs.rawCollection() as unknown as import('mongodb').Collection<{ _id: string; ownerId: string; accessors: unknown[] }>;
+    const users = Meteor.users.rawCollection() as unknown as import('mongodb').Collection<{ _id: string; username: string; accessedTDFs: string[] }>;
+    const handlers = (Meteor as any).server.method_handlers;
+    const observation = registeredMeteorMethodSurfaces();
+    assert.equal(observation.state, 'observed');
+    try {
+      await lessons.insertOne({ _id: lessonId, ownerId: owner, accessors: [
+        { userId: learner, username: 'old', extra: 'synthetic' },
+        { userId: 'missing-account', username: 'Stored display name', extra: 'synthetic' },
+      ] });
+      await users.insertOne({ _id: learner, username: learner, accessedTDFs: [lessonId] });
+      for (const name of ['getAccessorsTDFID', 'getAccessors']) {
+        const binding: typeof observation.surfaces[number] | undefined = observation.surfaces.find(row => row.name === name);
+        assert.deepEqual(binding?.policy, { kind: 'lesson-sharing', operation: 'owner-read' });
+        assert.equal(binding?.dataEgress, 'accessor-identities');
+        await assert.rejects(handlers[name].call({}, lessonId), { error: 401 });
+        await assert.rejects(handlers[name].call({ userId: learner }, lessonId), { error: 403 });
+      }
+      assert.deepEqual(await handlers.getAccessorsTDFID.call({ userId: owner }, lessonId), [
+        { userId: learner, username: learner }, { userId: 'missing-account', username: 'Stored display name' },
+      ]);
+      assert.deepEqual(await handlers.getAccessors.call({ userId: owner }, lessonId), [{ _id: learner, username: learner }]);
+    } finally {
+      await lessons.deleteOne({ _id: lessonId });
+      await users.deleteOne({ _id: learner });
+    }
+  });
+
   function fixture(tdf: { ownerId: string } | null = { ownerId: 'synthetic-owner' }) {
     const calls: Array<{ selector: Record<string, unknown>; options?: Record<string, unknown> }> = [];
     let lessonReads = 0;

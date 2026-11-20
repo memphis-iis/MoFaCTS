@@ -18,7 +18,7 @@ export type MeteorMethodBinding = Readonly<{
     authorize: (...args: never[]) => Promise<void>;
   }> | Readonly<{
     kind: 'lesson-sharing';
-    operation: 'owner-assignment';
+    operation: 'owner-assignment' | 'owner-read';
     authorize: (...args: never[]) => boolean;
   }> | Readonly<{
     kind: 'history-download';
@@ -50,7 +50,7 @@ export type MeteorMethodBinding = Readonly<{
     | 'filename-reference-migration-report' | 'history-download-capability' | 'none'
     | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'
     | 'experiment-login-token' | 'participant-session' | 'public-demo-launch'
-    | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
+    | 'accessor-identities' | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
 }>;
 
 let observe: (() => ReturnType<typeof observeMeteorMethodBindings>) | undefined;

@@ -9,6 +9,8 @@ import {
 
 export const lessonSharingPolicy = Object.freeze({ kind: 'lesson-sharing', operation: 'owner-assignment', authorize: isTdfOwner } as const);
 
+export const accessorReadPolicy = Object.freeze({ kind: 'lesson-sharing', operation: 'owner-read', authorize: isTdfOwner } as const);
+
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
   userId?: string | null;
@@ -43,15 +45,15 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
         throw new Meteor.Error(401, 'Must be logged in');
       }
 
-      const tdf = await deps.Tdfs.findOneAsync({ _id: TDFId });
+      const tdf = await deps.Tdfs.findOneAsync({ _id: TDFId }, { fields: { ownerId: 1, 'accessors.userId': 1, 'accessors.username': 1 } });
       if (tdf) {
-        if (!deps.isTdfOwner(this.userId, tdf)) {
+        if (!accessorReadPolicy.authorize(this.userId, tdf)) {
           throw new Meteor.Error(403, 'Access denied');
         }
-        const accessors = Array.isArray(tdf.accessors) ? tdf.accessors : [];
-        const accessorIds = accessors
-          .map((accessor: any) => accessor?.userId)
-          .filter((userId: unknown) => typeof userId === 'string' && userId.trim().length > 0);
+        const accessors = (Array.isArray(tdf.accessors) ? tdf.accessors : []).filter(
+          (entry: any) => typeof entry?.userId === 'string' && entry.userId.trim().length > 0
+        );
+        const accessorIds = accessors.map((entry: any) => entry.userId);
         const accessorUsers = accessorIds.length > 0
           ? await deps.usersCollection.find(
               { _id: { $in: accessorIds } },
@@ -62,8 +64,8 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
         return accessors.map((accessor: any) => {
           const accessorUser = accessorMap.get(accessor?.userId);
           return {
-            ...accessor,
-            username: deps.getUserDisplayIdentifier(accessorUser) || accessor?.username || '',
+            userId: accessor.userId,
+            username: deps.getUserDisplayIdentifier(accessorUser) || (typeof accessor.username === 'string' ? accessor.username : ''),
           };
         });
       }
@@ -82,7 +84,7 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
       if (!tdf) {
         throw new Meteor.Error(404, 'TDF not found');
       }
-      if (!deps.isTdfOwner(this.userId, tdf)) {
+      if (!accessorReadPolicy.authorize(this.userId, tdf)) {
         throw new Meteor.Error(403, 'Access denied');
       }
 

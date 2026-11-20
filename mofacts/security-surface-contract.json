@@ -302,7 +302,8 @@
     },
     {
       "name": "getAccessorsTDFID",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Only the lesson owner can read the sharing list. Each entry contains only userId and the display username."
     },
     {
       "name": "getAdaptiveOutcomeRows",

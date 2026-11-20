@@ -619,6 +619,12 @@ export const LESSON_SHARING_VERIFICATION = Object.freeze({
   cases: Object.freeze(['rolls back a late child failure and commits owner grants and revocations together']),
 } as const);
 
+export const ACCESSOR_READ_VERIFICATIONS = Object.freeze((['getAccessorsTDFID', 'getAccessors'] as const).map(method => Object.freeze({
+  ...middlewareTest, suite: 'accessor identity query authorization', method, surfaceId: `method:${method}` as const,
+  verificationId: `method.lesson-sharing.${method}` as const,
+  cases: Object.freeze(['limits both installed owner lookups to their documented identity fields']),
+})));
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -633,7 +639,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

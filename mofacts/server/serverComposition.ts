@@ -54,8 +54,8 @@ import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
 import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
-import { LESSON_SHARING_VERIFICATION } from '../common/securityAudit/verificationCatalog';
-import { createAccessMethods, lessonSharingPolicy } from './methods/accessMethods';
+import { ACCESSOR_READ_VERIFICATIONS, LESSON_SHARING_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy } from './methods/accessMethods';
 import { transferTdfOwnership } from './lib/tdfOwnershipTransferMongo';
 import { createAdminMethods } from './methods/adminMethods';
 import { createAnalyticsMethodRegistration } from './methods/analyticsMethods';
@@ -1194,6 +1194,7 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...warningRegistration.methodBindings,
   ...simulationTelemetry.methodBindings,
   ...experimentRegistration.methodBindings,
+  ...ACCESSOR_READ_VERIFICATIONS.map(verification => ({ verification, handler: methods[verification.method], policy: accessorReadPolicy, dataEgress: 'accessor-identities' as const })),
   { verification: LESSON_SHARING_VERIFICATION, handler: methods.assignAccessors, policy: lessonSharingPolicy, dataEgress: 'none' },
   ...prolificRegistration.methodBindings,
 ], () => MeteorAny.server?.method_handlers);
