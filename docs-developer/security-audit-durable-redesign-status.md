@@ -308,8 +308,30 @@ two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 2
   All public/private package-order, parent visibility, failed-upload
   ownership and restart recovery cases passed. The pure harness passed
   26 tests separately. Slot 26 qualified main only.
-- [ ] Verify the scoped staging2 image, competing uploads and live index
-  activation. The production count-only check stays at cutover.
+- [x] Build and publish staging2-only 26197f91 through canonical Compose.
+  Verified the already-built image against slot 27 source. The first local
+  observer lacked a dependency and the first WSL registry push was denied.
+  Dependency-backed observation and the existing Windows registry sign-in
+  recovered the same image without another build or Meteor invocation.
+  Registry digest sha256:bae0588676e9060b5bd2d343cf3b0d0c0509076b51716b19cb2ac49f43eea7fc;
+  config digest sha256:2ab2e4c29d3b814ebcdfa04ef4379f05a9db0a69c46107bfa0b75d65886c3dcd.
+- [x] Qualify and accept the staging2 application and condition-root index.
+  The first controller invocation stopped before changing the app or data
+  because mongosh returned a display object. The corrected JSON formatting
+  passed in disposable MongoDB before the same guarded cutover resumed.
+  Two live browser upload confirmations competed for the same synthetic
+  condition. One completed, one returned an explicit conflict. The winning
+  root, child, and visibility were correct. The exact fixture namespace and
+  IDs had zero lesson rows, completed assets and pending uploads afterward.
+  The healthy running image, installed index, zero shared/invalid condition
+  IDs, and protected V2 receipt MATCH were verified. The previous image,
+  environment and receipt remain available. Mongo/Redis service identities
+  and Apache/audit configuration were preserved by the controller.
+  The new authoritative record digest is fb966fe10358ca739b15db3683d922709529dba8d6087de0f9f4f1976e1a02d1.
+  Protected evidence: staging2-packages-26197f91.
+- [ ] At production cutover, perform the separately scoped count-only
+  check before considering the index. Preserve any conflicting existing
+  records for review. Production was outside this staging2 operation.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 
