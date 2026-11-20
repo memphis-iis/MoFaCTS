@@ -4,9 +4,10 @@ import test from 'node:test';
 import { AUTHORIZATION_VERIFICATIONS, auditVerification, AUDIT_VERIFICATIONS, AUTHENTICATION_CONTROL_CASES,
   AUTHENTICATION_PROTOCOL_MUTATIONS, AUTHORIZATION_MUTATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 
-import { FILES_DDP_VERIFICATIONS, HTTP_FILE_VERIFICATIONS, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
+import { AUDIT_ADMIN_METHOD_VERIFICATIONS, FILES_DDP_VERIFICATIONS, HTTP_FILE_VERIFICATIONS, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 import { registerHttpMiddleware, registerProtocolHttpMount, registeredHttpSurfaces } from '../../../server/securitySurfaces/registerHttpRoutes.ts';
 import { observeAssetUploadSurfaces } from '../../../server/securitySurfaces/bindAssetUploadSurfaces.ts';
+import { observeMeteorMethodBindings, registerMeteorMethods, registeredMeteorMethodSurfaces } from '../../../server/securitySurfaces/registerMeteorMethods.ts';
 
 test('file and unmounted registrations use the original callback and framework call shape', () => {
   const calls = [];
@@ -32,6 +33,37 @@ test('file and unmounted registrations use the original callback and framework c
 });
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../../../security-surface-contract.json', import.meta.url)));
+test('audit method observation requires identity in both the submitted and installed maps', () => {
+  const bindings = Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS).map(verification => ({
+    verification,
+    handler() { throw new Error('Observation must not invoke a method'); },
+    policy: { kind: 'role', role: 'admin', authorize() { throw new Error('Observation must not authorize'); } },
+    dataEgress: 'audit-report-summary',
+  }));
+  const submitted = Object.fromEntries(bindings.map(({ verification, handler }) => [verification.method, handler]));
+  submitted.unrelatedMethod = function() {};
+  let installed;
+  const calls = [];
+  const server = { methods(handlers) { calls.push([this, handlers]); installed = { ...handlers }; } };
+  registerMeteorMethods(server, submitted, bindings, () => installed);
+  assert.deepEqual(calls, [[server, submitted]]);
+  const observation = registeredMeteorMethodSurfaces();
+  assert.equal(observation.state, 'observed');
+  assert.deepEqual(observation.surfaces.map(surface => surface.name), Object.keys(AUDIT_ADMIN_METHOD_VERIFICATIONS));
+  for (const surface of observation.surfaces) {
+    assert.deepEqual(surface.policy, { kind: 'role', role: 'admin' });
+    assert.ok(AUDIT_VERIFICATIONS.includes(surface.verification));
+    assert.ok(manifest.methods.some(method => method.name === surface.name && method.access === 'admin-only'));
+  }
+
+  assert.equal(observeMeteorMethodBindings(bindings, submitted, undefined).state, 'unavailable');
+  assert.equal(observeMeteorMethodBindings([...bindings, bindings[0]], submitted, installed).state, 'unavailable');
+  const { method } = bindings[0].verification;
+  assert.equal(observeMeteorMethodBindings(bindings, { ...submitted, [method]: () => {} }, installed).state, 'unavailable');
+  installed[method] = () => {};
+  assert.equal(registeredMeteorMethodSurfaces().state, 'unavailable');
+});
+
 test('Assets ownership requires the exact registered package handlers and disabled client removal', () => {
   const operations = Object.keys(FILES_DDP_VERIFICATIONS);
   const methods = operations.map(operation => ({ operation, name: `_FilesCollection${operation.slice(1)}_Assets`,

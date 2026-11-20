@@ -208,9 +208,20 @@ remains with that production window.
   methods use the receiver for administrator authorization before report
   lookup or download issuance. Its existing native tests cover registered
   denials, positive report readback and V1 record preservation.
-- [ ] Add runtime descriptors for the V2 admin audit method family.
-  Bind the existing receiver authorization and retain each method name,
-  behavior and report data or single-use capability egress.
+- [x] Add runtime descriptors for the V2 admin audit method family.
+  All three descriptors carry the shared receiver administrator policy and
+  describe their distinct egress: report list, report summary or single-use
+  download capability. The method adapter retains the exact registered
+  handlers and checks their identity in the live Meteor method table.
+  Typecheck, lint (337 classified surfaces) and source-security checks passed
+  with 441 passes, seven skips and zero failures.
+- [ ] Verify the three V2 admin audit method bindings in native Meteor.
+  Require the descriptor identity case and the existing registered denial,
+  successful report readback, single-use download and V1 preservation cases.
+- [x] Trace the deployment-readiness method as a subsequent registration.
+  Its anonymous and non-admin denials use distinct existing error messages
+  and precede deployment diagnostics. Factory tests cover both denials and
+  the admin result. Preserve that ordering and the readiness payload.
 
 Named publications, method and package bindings, composition sealing, full
 registry coverage and Phase 3 staging qualification remain open. The remaining

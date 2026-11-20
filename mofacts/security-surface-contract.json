@@ -91,15 +91,18 @@
     },
     {
       "name": "admin.securityAudits.downloadToken",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The V2 audit receiver checks administrator access before issuing a single-use download capability."
     },
     {
       "name": "admin.securityAudits.get",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The V2 audit receiver checks administrator access before looking up a bounded report summary."
     },
     {
       "name": "admin.securityAudits.list",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The V2 audit receiver checks administrator access before listing bounded report summaries."
     },
     {
       "name": "adminCreateOrUpdateUser",

@@ -110,6 +110,7 @@ import { registerSparcRetrievalPublication } from './lib/sparcRetrievalPublicati
 import { DEFAULT_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
 import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
 import { bindAssetUploadSurfaceOwner } from './securitySurfaces/bindAssetUploadSurfaces.ts';
+import { registerMeteorMethods } from './securitySurfaces/registerMeteorMethods.ts';
 import { createSparcDemoAccess } from './lib/sparcDemoAccess';
 import { createSparcLessonAuthorizer, requireSparcLessonAccess } from './lib/sparcLessonAccess';
 import {
@@ -1171,7 +1172,8 @@ export const asyncMethods: Record<string, unknown> = {
 }
 
 // Server-side startup logic
-Meteor.methods({...methods, ...asyncMethods});
+registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, securityAuditRuntime.methodBindings,
+  () => MeteorAny.server?.method_handlers);
 bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);
 
 registerServerRuntime({

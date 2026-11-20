@@ -4,8 +4,9 @@ import { WebApp } from 'meteor/webapp';
 import { Roles } from 'meteor/alanning:roles';
 import { randomBytes } from 'node:crypto';
 import { collectionMongoName } from '../../common/collectionOwnership.ts';
-import { HTTP_AUDIT_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { AUDIT_ADMIN_METHOD_VERIFICATIONS, HTTP_AUDIT_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
 import { registeredHttpSurfaces } from '../securitySurfaces/registerHttpRoutes.ts';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods.ts';
 import { auditDigest } from '../../common/securityAudit/canonicalReport.ts';
 import { errorReport, ingestionContext } from '../../scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
 import { SecurityAuditReportsV2 } from './securityAuditCollectionsV2.ts';
@@ -32,7 +33,23 @@ describe('activated V2 audit application boundaries', function() {
     expect(ingest[0]?.verification).to.equal(HTTP_AUDIT_VERIFICATIONS.ingest);
     expect(download[0]?.verification).to.equal(HTTP_AUDIT_VERIFICATIONS.download);
   });
-  for (const name of ['admin.securityAudits.list', 'admin.securityAudits.get', 'admin.securityAudits.downloadToken']) {
+  it('binds the three audit descriptors to the registered Meteor handlers', function() {
+    const observation = registeredMeteorMethodSurfaces();
+    if (observation.state !== 'observed') throw new Error(observation.reason);
+    const egress = {
+      'admin.securityAudits.list': 'audit-report-list',
+      'admin.securityAudits.get': 'audit-report-summary',
+      'admin.securityAudits.downloadToken': 'audit-download-capability',
+    } as const;
+    expect(observation.surfaces).to.have.length(3);
+    for (const entry of observation.surfaces) {
+      expect(entry.surfaceId).to.equal(`method:${entry.name}`);
+      expect(entry.verification).to.equal(AUDIT_ADMIN_METHOD_VERIFICATIONS[entry.name]);
+      expect(entry.policy).to.deep.equal({ kind: 'role', role: 'admin' });
+      expect(entry.dataEgress).to.equal(egress[entry.name]);
+    }
+  });
+  for (const name of Object.keys(AUDIT_ADMIN_METHOD_VERIFICATIONS)) {
     for (const userId of [null, 'synthetic-missing-audit-learner', 'synthetic-missing-audit-teacher']) {
       it(`keeps the registered ${name} admin guarded for ${userId ?? 'anonymous'}`, async function() {
         const handler = (Meteor as any).server.method_handlers[name];

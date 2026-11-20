@@ -406,6 +406,29 @@ export const FILES_DDP_VERIFICATIONS = Object.freeze({
   _Remove: filesDdpVerification('remove', 'keeps client removal disabled on the registered Assets collection'),
 });
 
+function auditAdminMethodVerification<N extends string>(operation: N) {
+  const method = `admin.securityAudits.${operation}` as const;
+  return Object.freeze({
+    ...middlewareTest, suite: 'activated V2 audit application boundaries',
+    verificationId: `method.admin-security-audits.${operation}` as const,
+    surfaceId: `method:${method}` as const,
+    method,
+    cases: Object.freeze([
+      'binds the three audit descriptors to the registered Meteor handlers',
+      `keeps the registered ${method} admin guarded for anonymous`,
+      `keeps the registered ${method} admin guarded for synthetic-missing-audit-learner`,
+      `keeps the registered ${method} admin guarded for synthetic-missing-audit-teacher`,
+      'serves V2 through registered admin methods without reading or changing retained V1 records',
+    ]),
+  });
+}
+
+export const AUDIT_ADMIN_METHOD_VERIFICATIONS = Object.freeze({
+  'admin.securityAudits.list': auditAdminMethodVerification('list'),
+  'admin.securityAudits.get': auditAdminMethodVerification('get'),
+  'admin.securityAudits.downloadToken': auditAdminMethodVerification('downloadToken'),
+});
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -415,7 +438,8 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...AUTHENTICATION_SESSION_VERIFICATIONS,
   ...HTTP_HEALTH_VERIFICATIONS.endpoints, HTTP_HEALTH_VERIFICATIONS.fallthrough,
   HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download, ...Object.values(HTTP_FILE_VERIFICATIONS),
-  ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat(), ...Object.values(FILES_DDP_VERIFICATIONS)]);
+  ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat(), ...Object.values(FILES_DDP_VERIFICATIONS),
+  ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }
