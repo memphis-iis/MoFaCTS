@@ -276,10 +276,12 @@ two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 2
   and the root-based learner access policy. Use the same ownership-aware
   TDF restore for upload failure and startup recovery. Keep interrupted
   legacy jobs without write ownership evidence for review.
-- [ ] Verify full package rollback and visibility in Meteor. Four synthetic
-  database-backed package cases cover public and private roots and both
-  archive orders. The supported suite also checks parent-based visibility
-  and the existing failure and startup recovery paths.
+- [x] Verify full package rollback and visibility in Meteor (slot 26).
+  The real package-method cases passed against isolated MongoDB for public
+  and private roots in both archive orders. Conditions retained restricted
+  standalone visibility and access through the root. The failure case
+  preserved the competing writer and startup recovery passed. Exact-source
+  typecheck, lint and the affected source-security checks also passed.
 - [x] Verify the operator script in disposable MongoDB. Its read-only run
   counted a synthetic shared ID, and apply refused without changing the two
   existing rows. On clean data it installed the index. Two competing
@@ -289,6 +291,9 @@ two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 2
   explicit database name and an explicit apply flag. It refuses to install
   over shared condition IDs or invalid IDs, without editing the records.
   Production inventory and any index installation remain at cutover.
+  The accepted staging2 baseline bd3520f2 and the verified main source
+  differ across 372 paths. Preserve the audit-only staging2 release scope
+  and qualify the exact staging candidate separately before deployment.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 
@@ -1607,7 +1612,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 26 total, 24 consumed, 0 reserved, 1 available for the approved package rollback and visibility batch, and 1 for the earlier `/health` batch only.**
+**Current allowance: 26 total, 25 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 Phil authorized five additional Phase 3 invocations on the same isolated worker after slot 20.
 
@@ -1651,6 +1656,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 23 | 0b9fefa2a3fe2f0cffdb330954989c6229887a97 | PASS 2026-11-19T21:58:14Z to 21:59:51Z. 1,060 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Logged-out readiness, all four own-progress cases, multi-lesson progress and passwordless return passed. Exact source, isolation, limits and owned cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.Q49eKaT8/results/native-verification.json. SHA-256 685f706dc17a355dc082302a5c73664d8b29af1ea1808f74b8dd19a03943853b. |
 | 24 | 748dc6eecbceccab650fd224893f71fef391ddfe | PASS 2026-11-19T22:25:06Z to 22:26:46Z. 1,061 server and 1,249 Chromium passes, no failures/hooks, 15/seven pending. The real-DDP study scope and passwordless return case passed. Exact source, limits, isolation and owned cleanup verified. Existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.YBcb2u3v/results/native-verification.json. SHA-256 3ce5844e97a82a0c8552b4e4e8a4be0c1caceb990e3d295a84ddd47782662371. |
 | 25 | 45b064a79318db7a37a4051ec3be832f5345ee70 | PASS 2026-11-20T00:03:08Z to 00:04:32Z. 1,065 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. All four new package validation and MongoDB concurrency/compatibility cases passed. Exact source, limits, isolation and owned cleanup verified. The existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.lbo94WPE/results/native-verification.json. SHA-256 79a6d76ab0dd3906a8424e50f097bd837154cf6223deb011cd31451a428e7cd1. |
+| 26 | 48cdcaba5a6749871324050ba6d37f06ad5f220f | PASS 2026-11-20T13:05:17Z to 13:06:47Z. 1,073 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. The four real package-method visibility cases, existing root-based access and rollback/recovery cases passed. Exact source, container isolation, resource limits and owned cleanup verified. The existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.LACeusnk/results/native-verification.json. SHA-256 dfe2f0524e5ba7d5e44db8ac12d8066dcb4241874e68c510184de180a2a95328. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
