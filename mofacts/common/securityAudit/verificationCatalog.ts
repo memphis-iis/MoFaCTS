@@ -586,6 +586,33 @@ export const EXPERIMENT_ENTRY_VERIFICATIONS = Object.freeze({
   startPublicDemo: experimentEntryVerification('startPublicDemo', experimentBindingCase, experimentDenialCase),
 });
 
+function prolificMethodVerification<N extends string>(method: N) {
+  return Object.freeze({
+    ...middlewareTest, suite: 'Prolific runtime bindings', method, surfaceId: `method:${method}` as const,
+    verificationId: `method.prolific.${method}` as const,
+    cases: Object.freeze(['binds the installed Prolific methods and preserves their access boundaries']),
+  });
+}
+
+export const PROLIFIC_METHOD_VERIFICATIONS = Object.freeze({
+  startProlificParticipation: prolificMethodVerification('startProlificParticipation'),
+  resumeProlificParticipation: prolificMethodVerification('resumeProlificParticipation'),
+  completeProlificParticipation: prolificMethodVerification('completeProlificParticipation'),
+  prolificConnect: prolificMethodVerification('prolificConnect'),
+  prolificCreateTestParticipant: prolificMethodVerification('prolificCreateTestParticipant'),
+  prolificPrepareTestStudy: prolificMethodVerification('prolificPrepareTestStudy'),
+  prolificExecuteTestStudy: prolificMethodVerification('prolificExecuteTestStudy'),
+  prolificTestSetupStatus: prolificMethodVerification('prolificTestSetupStatus'),
+  prolificList: prolificMethodVerification('prolificList'),
+  prolificBindStudy: prolificMethodVerification('prolificBindStudy'),
+  prolificDashboard: prolificMethodVerification('prolificDashboard'),
+  prolificMessages: prolificMethodVerification('prolificMessages'),
+  prolificPrepareOperation: prolificMethodVerification('prolificPrepareOperation'),
+  prolificConfirmOperation: prolificMethodVerification('prolificConfirmOperation'),
+  prolificReviewOperation: prolificMethodVerification('prolificReviewOperation'),
+  prolificRetryReminder: prolificMethodVerification('prolificRetryReminder'),
+});
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -600,7 +627,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS)]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

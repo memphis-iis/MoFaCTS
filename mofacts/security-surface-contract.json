@@ -355,10 +355,6 @@
       "access": "role-checked"
     },
     {
-      "name": "getAssignableTDFSForUser",
-      "access": "role-checked"
-    },
-    {
       "name": "getAuthClientConfig",
       "access": "public-rate-limited"
     },
@@ -1007,7 +1003,8 @@
     },
     {
       "name": "prolificConfirmOperation",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "The shared Prolific researcher policy requires admin or teacher role and existing per-action throttling before the service applies its operation ownership checks."
     },
     {
       "name": "prolificCreateTestParticipant",

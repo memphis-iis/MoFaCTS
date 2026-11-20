@@ -303,6 +303,15 @@ remains with that production window.
 - [x] Trace the adjacent Prolific method family. Preserve public participant
   entry and resume, authenticated completion, and the existing admin/teacher
   role gate, per-action limits and service-owned study restrictions.
+- [x] Bind all 16 Prolific methods to their existing participant/researcher
+  authorization and preserve the existing projected service results.
+- [x] Retire the unused assignable-lesson method with Phil's approval.
+  The course workflow removed its last tracked caller in 320fbb7e. There were
+  no remaining tracked callers in the app, wiki or config repository. Remove
+  the method and manifest entry together. Typecheck, lint (336 surfaces),
+  Linux audit source checks (453 passes, seven skips) and all 50 synthetic
+  Prolific checks passed.
+- [ ] Verify the Prolific bindings and retired method absence together in Meteor.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry

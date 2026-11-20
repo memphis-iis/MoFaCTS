@@ -12,7 +12,7 @@ Module._load = function(name, ...args) {
 };
 const { createProlificParticipationService } = require('../server/lib/prolificParticipation.ts');
 const { createProlificManagementService } = require('../server/lib/prolificManagement.ts');
-const { createProlificMethods } = require('../server/methods/prolificMethods.ts');
+const { createProlificMethodRegistration } = require('../server/methods/prolificMethods.ts');
 const { prolificRequest, ProlificApiError } = require('../server/lib/prolificApi.ts');
 const { prolificCompletionUrl, prolificAmount } = require('../common/prolific.ts');
 const { savedLessonCompleted } = require('../common/experimentCompletion.ts');
@@ -317,7 +317,7 @@ describe('researcher operations and reminders', () => {
   });
   it('enforces roles, self authentication, rate limiting and sanitized errors at method boundaries', async () => {
     const f = fixture(), rateCalls = [];
-    const methods = createProlificMethods({ participation: f.participation, management: f.management, authorization: () => ({ userIsInRoleAsync: async id => id === 'owner' }), rateLimit: async (...args) => rateCalls.push(args) });
+    const { methods } = createProlificMethodRegistration({ participation: f.participation, management: f.management, authorization: () => ({ userIsInRoleAsync: async id => id === 'owner' }), rateLimit: async (...args) => rateCalls.push(args) });
     await assert.rejects(methods.prolificDashboard.call({ userId: 'student' }, { studyId }));
     for (const name of ['prolificCreateTestParticipant', 'prolificPrepareTestStudy', 'prolificExecuteTestStudy', 'prolificTestSetupStatus']) {
       await assert.rejects(methods[name].call({ userId: 'student' }, {}));

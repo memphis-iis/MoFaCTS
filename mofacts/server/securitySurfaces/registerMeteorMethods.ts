@@ -29,13 +29,24 @@ export type MeteorMethodBinding = Readonly<{
     operation: 'passwordless' | 'credentialed' | 'scoped-reconnect' | 'public-demo';
     rateLimit: Readonly<{ requests: number; windowMs: number; scope: 'connection' }> | null;
     authorize: (...args: never[]) => unknown;
+  }> | Readonly<{
+    kind: 'prolific';
+    operation: 'participant-entry' | 'participant-resume' | 'own-completion';
+    authorize: (...args: never[]) => unknown;
+  }> | Readonly<{
+    kind: 'prolific';
+    operation: 'researcher';
+    roles: readonly ['admin', 'teacher'];
+    rateLimit: Readonly<{ ipLimit: number; identifierLimit: number; windowMs: number }>;
+    authorize: (...args: never[]) => unknown;
   }>;
   dataEgress: 'audit-report-list' | 'audit-report-summary' | 'audit-download-capability' | 'deployment-diagnostics'
     | 'backup-configuration' | 'backup-job-metadata' | 'backup-download-capability'
     | 'brand-profile-draft' | 'published-brand-profile' | 'redacted-brand-profile-export'
     | 'filename-reference-migration-report' | 'history-download-capability' | 'none'
     | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'
-    | 'experiment-login-token' | 'participant-session' | 'public-demo-launch';
+    | 'experiment-login-token' | 'participant-session' | 'public-demo-launch'
+    | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
 }>;
 
 let observe: (() => ReturnType<typeof observeMeteorMethodBindings>) | undefined;
@@ -60,6 +71,8 @@ export function observeMeteorMethodBindings(
       ? { kind: policy.kind, role: policy.role }
       : policy.kind === 'experiment-entry'
       ? { kind: policy.kind, operation: policy.operation, rateLimit: policy.rateLimit }
+      : policy.kind === 'prolific' && policy.operation === 'researcher'
+      ? { kind: policy.kind, operation: policy.operation, roles: policy.roles, rateLimit: policy.rateLimit }
       : { kind: policy.kind, operation: policy.operation };
     surfaces.push(Object.freeze({ name, surfaceId, verification, policy: Object.freeze(policyMetadata), dataEgress }));
   }

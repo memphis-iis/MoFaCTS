@@ -1,8 +1,16 @@
 import { strict as assert } from 'node:assert';
+import { Meteor } from 'meteor/meteor';
 import { createAccessMethods } from './accessMethods';
 import { isTdfOwner } from '../lib/contentAccessPolicy';
 
 describe('accessor identity query authorization', () => {
+  it('omits the retired assignable-lesson method from the live Meteor registry', () => {
+    const handlers = (Meteor as any).server.method_handlers;
+    assert.equal(Object.hasOwn(handlers, 'getAssignableTDFSForUser'), false);
+    assert.equal(typeof handlers.getAccessableTDFSForUser, 'function');
+    assert.equal(typeof handlers.getAccessors, 'function');
+  });
+
   function fixture(tdf: { ownerId: string } | null = { ownerId: 'synthetic-owner' }) {
     const calls: Array<{ selector: Record<string, unknown>; options?: Record<string, unknown> }> = [];
     let lessonReads = 0;

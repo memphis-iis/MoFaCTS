@@ -10,7 +10,7 @@ import { createSparcMoveLibraryMethods } from './methods/sparcMoveLibraryMethods
 import { createSparcInstructionalBrowseMethods } from './methods/sparcInstructionalBrowseMethods';
 import { createInstructionalBrowseStore } from './lib/sparcInstructionalBrowseStorage';
 import { createSparcMoveStore, ensureSparcMoveLibraryIndexes, removeSparcMoveUserRecords } from './lib/sparcMoveLibraryStorage';
-import { createProlificMethods } from './methods/prolificMethods';
+import { createProlificMethodRegistration } from './methods/prolificMethods';
 import { createProlificTestExperiment } from './lib/prolificTestExperiment';
 import { createProlificParticipationService } from './lib/prolificParticipation';
 import { createProlificManagementService } from './lib/prolificManagement';
@@ -730,8 +730,12 @@ function normalizeCanonicalId(value: unknown): string | null {
 
 const brandProfileRegistration = createDeploymentBrandProfileRegistration({ requireAdminUser });
 const warningRegistration = createRecoverableWarningRegistration({ auditLog: AuditLog, requireAdminUser });
+const prolificRegistration = createProlificMethodRegistration({
+  participation: prolificParticipation, management: prolificManagement,
+  authorization: getMethodAuthorizationDeps, rateLimit: applyMethodRateLimit,
+});
 export const methods: any = {
-  ...createProlificMethods({ participation: prolificParticipation, management: prolificManagement, authorization: getMethodAuthorizationDeps, rateLimit: applyMethodRateLimit }),
+  ...prolificRegistration.methods,
   ...warningRegistration.methods,
   ...createSystemMethods({
     validateProlificLockout: prolificParticipation.validateLockout,
@@ -1189,6 +1193,7 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...warningRegistration.methodBindings,
   ...simulationTelemetry.methodBindings,
   ...experimentRegistration.methodBindings,
+  ...prolificRegistration.methodBindings,
 ], () => MeteorAny.server?.method_handlers);
 bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);
 

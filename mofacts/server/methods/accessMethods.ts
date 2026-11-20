@@ -111,22 +111,6 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
       }).fetchAsync();
     },
 
-    getAssignableTDFSForUser: async function(this: MethodContext, userId: string) {
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
-        subjectUserId: userId,
-        roles: ['admin', 'teacher'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Can only access your own TDFs',
-        forbiddenCode: 403,
-      });
-      deps.serverConsole('getAssignableTDFSForUser', userId);
-      const assignableTDFs = await deps.Tdfs.find({ $or: [{ ownerId: userId }, { 'accessors.userId': userId }] }).fetchAsync();
-      deps.serverConsole('assignableTDFs', assignableTDFs);
-      return assignableTDFs;
-    },
-
     resolveUsersForTdf: async function(this: MethodContext, tdfId: string, identifiers: unknown[]) {
       if (!this.userId) {
         throw new Meteor.Error(401, 'Must be logged in');
