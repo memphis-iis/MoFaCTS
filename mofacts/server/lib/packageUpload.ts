@@ -13,6 +13,7 @@ import {
 import { uploadParsedPackageMedia } from './packageUploadMedia';
 import { processParsedPackageTdfs } from './packageUploadPersistence';
 import { postProcessUploadedTdfs } from './packageUploadPostProcess';
+import { PACKAGE_WRITE_OWNERSHIP, rollbackPackageTdfWrite } from './tdfMutationRecovery';
 import { applyPackageUploadSideEffects } from './packageUploadSideEffects';
 import { preflightPackageTdfIdentities, type PackageTdfIdentityMode } from './packageTdfIdentity';
 import { assertValidTdfExpressions } from '../../common/lib/tdfExpressionValidation';
@@ -282,6 +283,7 @@ export async function processPackageUploadWorkflow(
       uploadPlanExpiresAt = expiresAt;
       state.mutationJobId = await deps.TdfMutationJobs.insertAsync({
         kind: 'package-upload',
+        contentWriteOwnership: PACKAGE_WRITE_OWNERSHIP,
         status: identityPlan.updates.length > 0 ? 'awaiting-confirmation' : 'committing',
         actorUserId: context.userId,
         ownerId: owner,
@@ -359,21 +361,8 @@ export async function processPackageUploadWorkflow(
       results,
       stimSetId: state.stimSetId,
     };
-    for (const mediaMutation of state.mediaMutations) {
-      await deps.DynamicAssets.collection.updateAsync?.(
-        { _id: mediaMutation.newAssetId },
-        { $unset: { 'meta.mutationJobId': '' } },
-      );
-      for (const previousAsset of mediaMutation.previousAssets) {
-        try {
-          await deps.DynamicAssets.removeAsync?.({ _id: previousAsset._id });
-        } catch (cleanupError) {
-          deps.serverConsole('Committed package media backup cleanup failed:', previousAsset._id, cleanupError);
-        }
-      }
-    }
     if (state.mutationJobId) {
-      await deps.TdfMutationJobs.updateAsync(
+      const committed = await deps.TdfMutationJobs.updateAsync(
         { _id: state.mutationJobId, status: 'committing' },
         {
           $set: {
@@ -385,6 +374,20 @@ export async function processPackageUploadWorkflow(
           $unset: { confirmationExpiresAt: '' },
         },
       );
+      if (committed !== 1) throw new Error('Package mutation job changed before commit');
+    }
+    for (const mediaMutation of state.mediaMutations) {
+      try {
+        await deps.DynamicAssets.collection.updateAsync?.(
+          { _id: mediaMutation.newAssetId, 'meta.mutationJobId': state.mutationJobId },
+          { $unset: { 'meta.mutationJobId': '' } },
+        );
+        for (const previousAsset of mediaMutation.previousAssets) {
+          await deps.DynamicAssets.removeAsync?.({ _id: previousAsset._id, 'meta.mutationBackupFor': state.mutationJobId });
+        }
+      } catch (cleanupError) {
+        deps.serverConsole('Committed package media cleanup failed:', mediaMutation.newAssetId, cleanupError);
+      }
     }
     const supersededPackageAssetIds = new Set(
       identityPlan.entries
@@ -412,10 +415,10 @@ export async function processPackageUploadWorkflow(
       let rollbackFailed = false;
       for (const mediaMutation of [...state.mediaMutations].reverse()) {
         try {
-          await deps.DynamicAssets.removeAsync?.({ _id: mediaMutation.newAssetId });
+          await deps.DynamicAssets.removeAsync?.({ _id: mediaMutation.newAssetId, 'meta.mutationJobId': state.mutationJobId });
           for (const previousAsset of mediaMutation.previousAssets) {
             const restored = await deps.DynamicAssets.collection.updateAsync?.(
-              { _id: previousAsset._id },
+              { _id: previousAsset._id, 'meta.mutationBackupFor': state.mutationJobId },
               { $set: { name: previousAsset.name, fileName: previousAsset.fileName, meta: previousAsset.meta || {} } },
             );
             if (restored === undefined) throw new Error('DynamicAssets.collection.updateAsync is unavailable');
@@ -427,31 +430,7 @@ export async function processPackageUploadWorkflow(
       }
       for (const entry of [...state.identityPlan.entries].reverse()) {
         try {
-          if (entry.action === 'create') {
-            await deps.Tdfs.removeAsync({ _id: entry.tdfId, packageAssetId });
-            continue;
-          }
-          const before = entry.beforeImage || {};
-          const current = await deps.Tdfs.findOneAsync(
-            { _id: entry.tdfId },
-            { fields: { _id: 1, tdfRevision: 1 } },
-          );
-          const currentRevision = Number.isInteger(current?.tdfRevision) ? current.tdfRevision : 0;
-          if (currentRevision === entry.targetRevision) continue;
-          if (currentRevision !== entry.targetRevision + 1) {
-            throw new Error(`TDF "${entry.tdfId}" changed again before rollback.`);
-          }
-          const setFields: Record<string, unknown> = { tdfRevision: entry.targetRevision };
-          const unsetFields: Record<string, string> = {};
-          for (const field of ['tdfFileName', 'content', 'ownerId', 'stimuliSetId', 'rawStimuliFile', 'stimuli', 'packageFile', 'packageAssetId', 'conditionCounts', 'tdfAvailability', 'tdfIdentityState']) {
-            if (Object.prototype.hasOwnProperty.call(before, field) && before[field] !== undefined) setFields[field] = before[field];
-            else unsetFields[field] = '';
-          }
-          const restored = await deps.Tdfs.updateAsync(
-            { _id: entry.tdfId, tdfRevision: entry.targetRevision + 1 },
-            { $set: setFields, ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}) },
-          );
-          if (restored !== 1) throw new Error(`TDF "${entry.tdfId}" could not be restored.`);
+          await rollbackPackageTdfWrite(deps.Tdfs, state.mutationJobId, entry);
         } catch (rollbackError) {
           rollbackFailed = true;
           deps.serverConsole('Package rollback failed for TDF:', entry.tdfId, rollbackError);

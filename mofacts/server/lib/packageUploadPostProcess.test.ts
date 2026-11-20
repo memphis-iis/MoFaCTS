@@ -14,7 +14,7 @@ function packageState(): PackageUploadRuntimeState {
     stimSetId: 7,
     uploadedMediaPathMapsByStimSetId: new Map(),
     mediaMutations: [],
-    mutationJobId: null,
+    mutationJobId: 'upload-plan-1',
     identityPlan: {
       fingerprint: 'fingerprint',
       updates: [],

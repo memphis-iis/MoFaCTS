@@ -159,7 +159,10 @@ export async function postProcessUploadedTdfs(args: {
     if (!identity) {
       throw new Error(`Package identity preflight did not assign an id to TDF "${tdfFile.name}".`);
     }
-    const tdf = await deps.Tdfs.findOneAsync({ _id: identity.tdfId });
+    if (!state.mutationJobId) throw new Error('Package post-processing requires a mutation job');
+    const selector = { _id: identity.tdfId, tdfRevision: identity.targetRevision + 1, packageWriteJobId: state.mutationJobId };
+    const tdf = await deps.Tdfs.findOneAsync(selector);
+    if (!tdf) throw new Error(`TDF "${tdfFile.name}" changed before package post-processing.`);
     const setspec = tdf?.content?.tdfs?.tutor?.setspec;
     if (setspec && Array.isArray(setspec.condition) && setspec.condition.length > 0) {
       const conditionTdfIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
@@ -210,7 +213,7 @@ export async function postProcessUploadedTdfs(args: {
     }
     if (tdf) {
       const updated = await deps.Tdfs.updateAsync(
-        { _id: tdf._id, tdfRevision: identity.targetRevision + 1 },
+        selector,
         { $set: { content: tdf.content, rawStimuliFile: tdf.rawStimuliFile, stimuli: tdf.stimuli } },
       );
       if (updated !== 1) {

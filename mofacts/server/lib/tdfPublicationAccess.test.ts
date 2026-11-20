@@ -14,6 +14,31 @@ function cursor(rows: any[]) {
 }
 
 describe('tdfPublicationAccess', function() {
+  it('uses root visibility to include condition content even when a child is not independently selectable', async function() {
+    const roots = ['true', 'false'].map((userselect, index) => ({
+      _id: `root-${index}`, ownerId: 'owner', content: { tdfs: { tutor: { setspec: {
+        userselect, condition: [`child-${index}.json`], conditionTdfIds: [`child-${index}`],
+      } } } },
+    }));
+    const resolver = createTdfPublicationAccessResolver({
+      tdfs: {
+        find({ $or }) {
+          return cursor(roots.filter(root => $or.some((term: PublicationSelector) =>
+            term._id?.$in?.includes(root._id) || term['content.tdfs.tutor.setspec.userselect'] === root.content.tdfs.tutor.setspec.userselect)));
+        },
+        async findOneAsync() { return null; },
+      },
+      users: { async findOneAsync() { return null; } },
+      roles: { async userIsInRoleAsync() { return false; } },
+      async resolveAssignedRootTdfIdsForUser(userId) { return userId === 'assigned' ? ['root-1'] : []; },
+    });
+    const ordinary = await resolver.resolveDashboardSelector('ordinary');
+    expect(ordinary.$or).to.deep.include({ _id: { $in: ['child-0'] } });
+    expect(ordinary.$or.flatMap((term: PublicationSelector) => term._id?.$in ?? [])).not.to.include('child-1');
+    const assigned = await resolver.resolveDashboardSelector('assigned');
+    expect(assigned.$or).to.deep.include({ _id: { $in: ['child-0', 'child-1'] } });
+  });
+
   it('expands dashboard visibility to conditions from accessible roots', async function() {
     const findCalls: PublicationSelector[] = [];
     const resolver = createTdfPublicationAccessResolver({

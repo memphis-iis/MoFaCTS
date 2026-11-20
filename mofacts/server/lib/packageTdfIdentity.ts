@@ -9,6 +9,7 @@ import {
 import type { UploadedPackageFile } from './packageParser';
 import { assertNoH5PContent } from '../../common/lib/unsupportedContent';
 import { TDF_CONTENT_SCHEMA } from '../../common/lib/tdfContentSchema';
+import { buildParentRootSelector } from './tdfLessonFamilyResolver';
 
 const crypto = require('crypto');
 
@@ -41,6 +42,35 @@ type IdentityDeps = {
   };
   userCanManageTdf: (userId: string, tdf: any) => boolean | Promise<boolean>;
 };
+
+export async function assertPackageConditionOwnership(
+  Tdfs: IdentityDeps['Tdfs'],
+  roots: ReadonlyArray<{ tdfId: string; conditionTdfIds: ReadonlyArray<string | null> }>,
+) {
+  const parentByChild = new Map<string, string>();
+  const rejectSharedChild = () => {
+    throw new Meteor.Error('condition-root-conflict', 'Each condition TDF must belong to one experiment root. Give each root its own copy of the condition lesson.');
+  };
+  for (const { tdfId, conditionTdfIds } of roots) {
+    for (const childId of conditionTdfIds) {
+      if (!childId) continue;
+      const parent = parentByChild.get(childId);
+      if (parent && parent !== tdfId) rejectSharedChild();
+      parentByChild.set(childId, tdfId);
+    }
+  }
+  const selector = buildParentRootSelector([...parentByChild.keys()]);
+  if (!selector) return;
+  const parents = await Tdfs.find(selector, {
+    fields: { _id: 1, 'content.tdfs.tutor.setspec.conditionTdfIds': 1 },
+  }).fetchAsync();
+  for (const parent of parents) {
+    const refs = parent.content?.tdfs?.tutor?.setspec?.conditionTdfIds;
+    if (Array.isArray(refs) && refs.some(childId => parentByChild.has(childId) && parentByChild.get(childId) !== parent._id)) {
+      rejectSharedChild();
+    }
+  }
+}
 
 function hashValue(value: unknown) {
   return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -293,6 +323,7 @@ export async function preflightPackageTdfIdentities(args: {
         stimuli: existingById.get(tdfId).stimuli,
         packageFile: existingById.get(tdfId).packageFile,
         packageAssetId: existingById.get(tdfId).packageAssetId,
+        packageWriteJobId: existingById.get(tdfId).packageWriteJobId,
         conditionCounts: existingById.get(tdfId).conditionCounts,
         tdfAvailability: existingById.get(tdfId).tdfAvailability,
         tdfIdentityState: existingById.get(tdfId).tdfIdentityState,
@@ -405,6 +436,7 @@ export async function preflightPackageTdfIdentities(args: {
     }
   }
 
+  await assertPackageConditionOwnership(deps.Tdfs, entries);
   const fingerprint = hashValue({
     packageAssetId,
     identityMode,

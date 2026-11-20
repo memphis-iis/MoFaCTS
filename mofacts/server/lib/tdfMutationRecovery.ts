@@ -28,11 +28,44 @@ const PACKAGE_FIELDS = [
   'stimuli',
   'packageFile',
   'packageAssetId',
+  'packageWriteJobId',
   'conditionCounts',
   'tdfAvailability',
   'tdfIdentityState',
 ] as const;
 const TERMINAL_JOB_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+export const PACKAGE_WRITE_OWNERSHIP = 'job-id-v1';
+
+export async function rollbackPackageTdfWrite(Tdfs: RecoveryDeps['Tdfs'], jobId: string, operation: {
+  tdfId: string;
+  action: 'create' | 'update';
+  targetRevision: number;
+  beforeImage: UnknownRecord | null;
+}) {
+  const owner = { _id: operation.tdfId, packageWriteJobId: jobId };
+  const current = await Tdfs.findOneAsync(owner, { fields: { tdfRevision: 1 } });
+  if (!current) return;
+  const selector = { ...owner, tdfRevision: operation.targetRevision + 1 };
+  if (current.tdfRevision !== selector.tdfRevision) {
+    throw new Error('Package-owned TDF revision changed before rollback');
+  }
+  if (operation.action === 'create') {
+    if (await Tdfs.removeAsync(selector) !== 1) throw new Error('Package-owned TDF changed during rollback');
+    return;
+  }
+  if (!operation.beforeImage) throw new Error('Package update has no rollback snapshot');
+  const before = operation.beforeImage;
+  const setFields: UnknownRecord = { tdfRevision: operation.targetRevision };
+  const unsetFields: UnknownRecord = {};
+  for (const field of PACKAGE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(before, field) && before[field] !== undefined) setFields[field] = before[field];
+    else unsetFields[field] = '';
+  }
+  const changed = await Tdfs.updateAsync(selector, {
+    $set: setFields, ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}),
+  });
+  if (changed !== 1) throw new Error('Package-owned TDF changed during rollback');
+}
 
 export async function reconcileInterruptedTdfMutationJobs(deps: RecoveryDeps) {
   const jobs = await deps.TdfMutationJobs.find(
@@ -41,6 +74,14 @@ export async function reconcileInterruptedTdfMutationJobs(deps: RecoveryDeps) {
   ).fetchAsync();
   let recovered = 0;
   for (const job of jobs) {
+    if (job.contentWriteOwnership !== PACKAGE_WRITE_OWNERSHIP) {
+      await deps.TdfMutationJobs.updateAsync({ _id: job._id, status: 'committing' }, {
+        $set: { status: 'recovery-required', updatedAt: new Date() },
+        $unset: { cleanupAt: '', confirmationExpiresAt: '' },
+      });
+      deps.serverConsole('[TDF mutation recovery] legacy job requires operator review', job._id);
+      continue;
+    }
     let failed = false;
     try {
       await deps.DynamicAssets.removeAsync({ 'meta.mutationJobId': job._id });
@@ -52,12 +93,12 @@ export async function reconcileInterruptedTdfMutationJobs(deps: RecoveryDeps) {
     for (const mediaMutation of mediaMutations) {
       try {
         if (mediaMutation?.newAssetId) {
-          await deps.DynamicAssets.removeAsync({ _id: mediaMutation.newAssetId });
+          await deps.DynamicAssets.removeAsync({ _id: mediaMutation.newAssetId, 'meta.mutationJobId': job._id });
         }
         const previousAssets = Array.isArray(mediaMutation?.previousAssets) ? mediaMutation.previousAssets : [];
         for (const previousAsset of previousAssets) {
           await deps.DynamicAssets.collection.updateAsync(
-            { _id: previousAsset._id },
+            { _id: previousAsset._id, 'meta.mutationBackupFor': job._id },
             { $set: { name: previousAsset.name, fileName: previousAsset.fileName, meta: previousAsset.meta || {} } },
           );
         }
@@ -69,39 +110,7 @@ export async function reconcileInterruptedTdfMutationJobs(deps: RecoveryDeps) {
     const operations = Array.isArray(job.operations) ? [...job.operations].reverse() : [];
     for (const operation of operations) {
       try {
-        if (operation?.action === 'create') {
-          await deps.Tdfs.removeAsync({ _id: operation.tdfId, packageAssetId: job.packageAssetId });
-          continue;
-        }
-        const before = operation?.beforeImage && typeof operation.beforeImage === 'object'
-          ? operation.beforeImage as UnknownRecord
-          : {};
-        const targetRevision = Number.isInteger(operation?.targetRevision) ? operation.targetRevision : 0;
-        const current = await deps.Tdfs.findOneAsync(
-          { _id: operation.tdfId },
-          { fields: { _id: 1, tdfRevision: 1 } },
-        );
-        const currentRevision = Number.isInteger(current?.tdfRevision) ? current.tdfRevision : 0;
-        if (currentRevision === targetRevision) {
-          continue;
-        }
-        const setFields: UnknownRecord = { tdfRevision: targetRevision };
-        const unsetFields: UnknownRecord = {};
-        for (const field of PACKAGE_FIELDS) {
-          if (Object.prototype.hasOwnProperty.call(before, field) && before[field] !== undefined) setFields[field] = before[field];
-          else unsetFields[field] = '';
-        }
-        const changed = await deps.Tdfs.updateAsync(
-          { _id: operation.tdfId, tdfRevision: targetRevision + 1 },
-          { $set: setFields, ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}) },
-        );
-        if (changed !== 1) {
-          await deps.Tdfs.updateAsync(
-            { _id: operation.tdfId },
-            { $set: { tdfAvailability: 'repair-required' } },
-          );
-          failed = true;
-        }
+        await rollbackPackageTdfWrite(deps.Tdfs, job._id, operation);
       } catch (error) {
         failed = true;
         deps.serverConsole('[TDF mutation recovery] rollback error', job._id, operation?.tdfId, error);

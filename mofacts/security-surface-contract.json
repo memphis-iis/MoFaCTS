@@ -154,7 +154,7 @@
     {
       "name": "confirmPackageUpload",
       "access": "role-checked",
-      "notes": "Existing authenticated plan ownership and revision checks retained; deleted systems cannot be recreated as active updates."
+      "notes": "Authenticated plan ownership and revision checks retained. Identity preflight rechecks each condition's persisted root before writes. Rollback compares the writer job ID and revision. Deleted systems cannot be recreated as active updates."
     },
     {
       "name": "copyTdf",
@@ -687,7 +687,7 @@
     {
       "name": "processPackageUpload",
       "access": "role-checked",
-      "notes": "Existing content-management authorization and package identity preflight remain required. Public demo uploads and replacements require the acting uploader to be an admin. Update summaries include structuralWarnings before content writes."
+      "notes": "Content-management authorization and package identity preflight remain required. Preflight rejects condition IDs assigned to another root or claimed by multiple roots in the submitted package. The guarded condition record write stores the visibility restriction and the writer job ID together. Public demo uploads and replacements require the acting uploader to be an admin. Update summaries include structuralWarnings before content writes."
     },
     {
       "name": "provisionExperimentUser",

@@ -128,12 +128,11 @@ export async function processParsedPackageTdfs(args: {
           value: tdfContents.tutor.setspec.openRouterApiKey,
         });
       }
-      if (!isTeacherOrAdmin) {
+      // Preserve the package condition-child visibility guard in the actual
+      // job-owned child write. The root's own visibility and the root-based
+      // access checks remain authoritative for entering the study.
+      if (!isTeacherOrAdmin || childUserSelectByFileName.has(packageEntryKey(tdf.name))) {
         tdfContents.tutor.setspec.userselect = 'false';
-      }
-      const inheritedUserSelect = childUserSelectByFileName.get(packageEntryKey(tdf.name));
-      if (inheritedUserSelect) {
-        tdfContents.tutor.setspec.userselect = inheritedUserSelect;
       }
 
       const packageResult: SaveContentResult = { result: null, errmsg: 'No action taken?', action: 'None' };
@@ -173,6 +172,7 @@ export async function processParsedPackageTdfs(args: {
           packageAssetId,
           conditionTdfIds: identity.conditionTdfIds,
           expectedRevision: identity.targetRevision,
+          mutationJobId: state.mutationJobId,
           action: identity.action,
         };
         const ret = await deps.upsertPackage(record, owner);
