@@ -297,8 +297,12 @@ remains with that production window.
   the demo limit (10 per connection per hour) with the actual DDP rule. Record
   the absence of a dedicated DDP rule for the other three. Typecheck, lint and
   Linux audit source checks passed (453 passes, seven skips).
-- [ ] Verify exact experiment method bindings, their rate-rule observations,
-  and existing experiment session/return regressions in Meteor.
+- [x] Verify experiment entry in Meteor (slot 36). The four installed handlers
+  and rate-rule observation passed, as did the existing real-Mongo passwordless
+  return and different-study denial cases.
+- [x] Trace the adjacent Prolific method family. Preserve public participant
+  entry and resume, authenticated completion, and the existing admin/teacher
+  role gate, per-action limits and service-owned study restrictions.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry
@@ -1753,7 +1757,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 38 total, 34 consumed, 0 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 38 total, 35 consumed, 0 reserved, 2 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 20 Phil authorized five more Phase 3 Meteor invocations, with fewer
 full runs where related source-checked changes can share one exact-source run.
@@ -1813,6 +1817,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 33 | 2e9ae5e2fef8af6226d5197fee3a79ccd37e75f2 | PASS 2026-11-20T16:57:48Z to 16:59:19Z. 1,082 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact migration handler and denial precedence, synthetic dry run, pagination, fingerprint and write-conflict checks passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.YfyAG7Va/results/native-verification.json. SHA-256 3be459370e4f6287e1ac17cfe2345b2f5c1febc748c4fcd454282fcbe415d400. |
 | 34 | 715eb02c186edf3490271d239a263c11ce53be95 | PASS 2026-11-20T18:10:58Z to 18:12:34Z. 1,086 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Seven exact handlers, assigned-condition controls and download session/scope regressions passed. Source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.riku5IGJ/results/native-verification.json. SHA-256 e9854f46a0457ffeb792657bc60fe04191f0d943d338ab68b8896deaa0c58691. |
 | 35 | c04cd8e802c17331dc589940c65abc22542e8911 | PASS 2026-11-20T18:22:38Z to 18:24:30Z. 1,091 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Seven registered handlers, private warning suppression, simulation attempt ownership, and admin-only trace export passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.IegOflsU/results/native-verification.json. SHA-256 4ced551f2b85f1372a9213f4ac5714563300ed128692a8e4130f78d3df68bf8d. |
+| 36 | 6d8a42596320b6f4e854c156b27339e8ecb747ae | PASS 2026-11-20T18:33:53Z to 18:35:54Z. 1,093 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Four installed entries, observed DDP rules, passwordless progress return and cross-study denial passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.R2fGsxYi/results/native-verification.json. SHA-256 3ce69678ce90180d010a8650df46c171fa36738662c6ed6fcb09855816311092. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
