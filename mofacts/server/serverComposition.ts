@@ -94,7 +94,7 @@ import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods } from './methods/systemMethods';
 import { createRecoverableWarningMethods } from './methods/recoverableWarningMethods';
-import { createTdfIdentityMigrationMethods } from './methods/tdfIdentityMigrationMethods';
+import { createTdfIdentityMigrationRegistration } from './methods/tdfIdentityMigrationMethods';
 import {
   createThemeMethods,
   createUpdateActiveThemeDocument,
@@ -1096,14 +1096,15 @@ const backupRegistration = createBackupMethodRegistration({
   auditLog: AuditLog,
   requireAdminUser: authSupport.requireAdminUser,
 });
+const tdfIdentityMigration = createTdfIdentityMigrationRegistration({
+  Tdfs,
+  UserTimesLog,
+  AuditLog,
+  userIsInRoleAsync: (userId, roles) => Roles.userIsInRoleAsync(userId, roles),
+  serverConsole,
+});
 export const asyncMethods: Record<string, unknown> = {
-  ...createTdfIdentityMigrationMethods({
-    Tdfs,
-    UserTimesLog,
-    AuditLog,
-    userIsInRoleAsync: (userId, roles) => Roles.userIsInRoleAsync(userId, roles),
-    serverConsole,
-  }),
+  ...tdfIdentityMigration.methods,
   getTdfByExperimentTarget: getTdfByExperimentTargetPublic,
 
   ...publicAnalyticsMethods,
@@ -1178,6 +1179,7 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   deploymentReadiness.methodBinding,
   ...backupRegistration.methodBindings,
   ...brandProfileRegistration.methodBindings,
+  tdfIdentityMigration.methodBinding,
 ], () => MeteorAny.server?.method_handlers);
 bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);
 

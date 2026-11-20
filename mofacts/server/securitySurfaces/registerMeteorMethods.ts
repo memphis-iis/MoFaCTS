@@ -15,7 +15,8 @@ export type MeteorMethodBinding = Readonly<{
   }>;
   dataEgress: 'audit-report-list' | 'audit-report-summary' | 'audit-download-capability' | 'deployment-diagnostics'
     | 'backup-configuration' | 'backup-job-metadata' | 'backup-download-capability'
-    | 'brand-profile-draft' | 'published-brand-profile' | 'redacted-brand-profile-export';
+    | 'brand-profile-draft' | 'published-brand-profile' | 'redacted-brand-profile-export'
+    | 'filename-reference-migration-report';
 }>;
 
 let observe: (() => ReturnType<typeof observeMeteorMethodBindings>) | undefined;

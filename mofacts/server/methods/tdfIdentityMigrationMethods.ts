@@ -1,5 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
+import { FILENAME_TDF_MIGRATION_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
+import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 
 const crypto = require('crypto');
 
@@ -163,12 +165,19 @@ export async function migrateFilenameTdfReferences(
   return { ...reportBase, fingerprint };
 }
 
-export function createTdfIdentityMigrationMethods(deps: MigrationDeps) {
-  return {
-    migrateFilenameTdfReferences: async function(this: MethodContext, options: FilenameReferenceMigrationOptions = {}) {
-      const userId = normalizedString(this.userId);
+export function createTdfIdentityMigrationRegistration(deps: MigrationDeps) {
+  const policy = Object.freeze({
+    kind: 'role',
+    role: 'admin',
+    async authorize(callerId: string | null | undefined) {
+      const userId = normalizedString(callerId);
       if (!userId) throw new Meteor.Error(401, 'Must be logged in');
       if (!(await deps.userIsInRoleAsync(userId, ['admin']))) throw new Meteor.Error(403, 'Admin access required');
+    },
+  } as const);
+  const methods = {
+    migrateFilenameTdfReferences: async function(this: MethodContext, options: FilenameReferenceMigrationOptions = {}) {
+      await policy.authorize(this.userId);
       check(options, {
         dryRun: Match.Maybe(Boolean),
         confirmWrite: Match.Maybe(String),
@@ -179,4 +188,11 @@ export function createTdfIdentityMigrationMethods(deps: MigrationDeps) {
       return await migrateFilenameTdfReferences(deps, options);
     },
   };
+  const methodBinding: MeteorMethodBinding = Object.freeze({
+    handler: methods.migrateFilenameTdfReferences,
+    policy,
+    verification: FILENAME_TDF_MIGRATION_VERIFICATION,
+    dataEgress: 'filename-reference-migration-report',
+  });
+  return { methods, methodBinding };
 }

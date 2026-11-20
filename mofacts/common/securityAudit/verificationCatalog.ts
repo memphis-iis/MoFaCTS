@@ -488,6 +488,21 @@ export const BRAND_PROFILE_METHOD_VERIFICATIONS = Object.freeze({
   exportDeploymentBrandProfile: brandProfileMethodVerification('exportDeploymentBrandProfile'),
 });
 
+export const FILENAME_TDF_MIGRATION_VERIFICATION = Object.freeze({
+  ...middlewareTest,
+  suite: 'filename TDF reference migration',
+  verificationId: 'method.filename-tdf-reference-migration',
+  surfaceId: 'method:migrateFilenameTdfReferences',
+  method: 'migrateFilenameTdfReferences',
+  cases: Object.freeze([
+    'binds the installed method and preserves authorization before option validation',
+    'keeps authentication and admin authorization at the method boundary',
+    'dry-runs, fingerprints, and idempotently writes unambiguous currentTdfId values',
+    'requires reviewed fingerprints and stops on write conflicts',
+    'retains bounded log pagination and the log-only report contract',
+  ]),
+} as const);
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -499,7 +514,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download, ...Object.values(HTTP_FILE_VERIFICATIONS),
   ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat(), ...Object.values(FILES_DDP_VERIFICATIONS),
   ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS), DEPLOYMENT_READINESS_VERIFICATION, ...Object.values(BACKUP_METHOD_VERIFICATIONS),
-  ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS)]);
+  ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

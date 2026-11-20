@@ -696,7 +696,8 @@
     },
     {
       "name": "migrateFilenameTdfReferences",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "Administrator authorization precedes option validation. Writes require explicit confirmation and the fingerprint from a reviewed dry run."
     },
     {
       "name": "normalizeOptionalString",

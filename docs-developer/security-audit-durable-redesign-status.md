@@ -255,6 +255,11 @@ remains with that production window.
   Authentication and administrator checks precede bounded options validation.
   Preserve default dry run, explicit write confirmation, fingerprint checking,
   conflict handling and the bounded report.
+- [x] Bind the filename TDF reference migration method to its administrator
+  policy and bounded report. Typecheck, lint and Linux security source checks
+  passed (453 passes, seven skips).
+- [ ] Verify the migration binding, its denial precedence and its synthetic
+  dry-run and guarded-write fixtures in Meteor.
 
 Named publications, method and package bindings, composition sealing, full
 registry coverage and Phase 3 staging qualification remain open. The remaining

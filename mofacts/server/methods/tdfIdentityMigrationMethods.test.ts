@@ -1,6 +1,9 @@
 import { strict as assert } from 'node:assert';
+import { Meteor } from 'meteor/meteor';
 
-import { createTdfIdentityMigrationMethods, migrateFilenameTdfReferences } from './tdfIdentityMigrationMethods';
+import { FILENAME_TDF_MIGRATION_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
+import { createTdfIdentityMigrationRegistration, migrateFilenameTdfReferences } from './tdfIdentityMigrationMethods';
 
 function makeDeps(tdfs: any[], logs: any[]) {
   const writes: any[] = [];
@@ -41,16 +44,45 @@ function makeDeps(tdfs: any[], logs: any[]) {
 }
 
 describe('filename TDF reference migration', function() {
+  it('binds the installed method and preserves authorization before option validation', async function() {
+    const observation = registeredMeteorMethodSurfaces();
+    if (observation.state !== 'observed') throw new Error(observation.reason);
+    const entries = observation.surfaces.filter(entry => entry.name === 'migrateFilenameTdfReferences');
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0]?.verification, FILENAME_TDF_MIGRATION_VERIFICATION);
+    assert.deepEqual(entries[0]?.policy, { kind: 'role', role: 'admin' });
+    assert.equal(entries[0]?.dataEgress, 'filename-reference-migration-report');
+    const handler = (Meteor as any).server.method_handlers.migrateFilenameTdfReferences;
+    assert.equal(typeof handler, 'function');
+    for (const [userId, code, reason] of [
+      [null, 401, 'Must be logged in'],
+      ['synthetic-missing-migration-user', 403, 'Admin access required'],
+    ] as const) {
+      await assert.rejects(() => handler.call({ userId }, null),
+        (error: unknown) => error instanceof Meteor.Error && error.error === code && error.reason === reason);
+    }
+  });
+
   it('dry-runs, fingerprints, and idempotently writes unambiguous currentTdfId values', async function() {
     const fixture = makeDeps(
       [{ _id: 'tdf-one', content: { fileName: 'lesson.json' } }],
       [{ _id: 'log-one', userId: 'private', study: [{ action: 'expcondition', currentTdfName: 'lesson.json' }] }],
     );
-    const dryRun = await migrateFilenameTdfReferences(fixture.deps, { batchSize: 100 });
+    const caller = { userId: 'synthetic-migration-admin' };
+    const { methods } = createTdfIdentityMigrationRegistration({
+      ...fixture.deps,
+      async userIsInRoleAsync(userId, roles) {
+        assert.equal(userId, caller.userId);
+        assert.deepEqual(roles, ['admin']);
+        return true;
+      },
+    });
+    const dryRun = await methods.migrateFilenameTdfReferences.call(caller, { batchSize: 100 });
+    assert.equal(dryRun.dryRun, true);
     assert.equal(dryRun.changedRecords, 1);
     assert.equal(fixture.writes.length, 0);
 
-    const applied = await migrateFilenameTdfReferences(fixture.deps, {
+    const applied = await methods.migrateFilenameTdfReferences.call(caller, {
       dryRun: false,
       confirmWrite: 'backfill-filename-tdf-references',
       expectedFingerprint: dryRun.fingerprint,
@@ -120,7 +152,7 @@ describe('filename TDF reference migration', function() {
 
   it('keeps authentication and admin authorization at the method boundary', async function() {
     const fixture = makeDeps([], []);
-    const methods = createTdfIdentityMigrationMethods({ ...fixture.deps, userIsInRoleAsync: async () => false });
+    const { methods } = createTdfIdentityMigrationRegistration({ ...fixture.deps, userIsInRoleAsync: async () => false });
     await assert.rejects(() => methods.migrateFilenameTdfReferences.call({}),
       (error: any) => error?.error === 401);
     await assert.rejects(() => methods.migrateFilenameTdfReferences.call({ userId: 'non-admin' }),
