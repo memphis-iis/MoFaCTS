@@ -200,9 +200,17 @@ remains with that production window.
   explicit unavailable result for a mismatch. Client removal continues
   to be registered but disabled. The source proof tests genuine and
   mismatched ownership without executing upload handlers.
-- [ ] Verify the four generated Assets bindings on the exact candidate
-  in native Meteor, including the real client-removal refusal. This is
-  separate from the already completed staging2 package/index release.
+- [x] Verify the four generated Assets bindings in native Meteor (slot 28).
+  The real registry contains exactly the four expected handler identities
+  from the maintained package. The registered Remove method still returns
+  405. Typecheck, lint, source-security and ownership/catalog checks passed.
+- [x] Trace the next application method owner. The three V2 admin audit
+  methods use the receiver for administrator authorization before report
+  lookup or download issuance. Its existing native tests cover registered
+  denials, positive report readback and V1 record preservation.
+- [ ] Add runtime descriptors for the V2 admin audit method family.
+  Bind the existing receiver authorization and retain each method name,
+  behavior and report data or single-use capability egress.
 
 Named publications, method and package bindings, composition sealing, full
 registry coverage and Phase 3 staging qualification remain open. The remaining
@@ -1657,7 +1665,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 27 total, 26 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 28 total, 27 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 Phil authorized five additional Phase 3 invocations on the same isolated worker after slot 20.
 
@@ -1703,6 +1711,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 25 | 45b064a79318db7a37a4051ec3be832f5345ee70 | PASS 2026-11-20T00:03:08Z to 00:04:32Z. 1,065 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. All four new package validation and MongoDB concurrency/compatibility cases passed. Exact source, limits, isolation and owned cleanup verified. The existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.lbo94WPE/results/native-verification.json. SHA-256 79a6d76ab0dd3906a8424e50f097bd837154cf6223deb011cd31451a428e7cd1. |
 | 26 | 48cdcaba5a6749871324050ba6d37f06ad5f220f | PASS 2026-11-20T13:05:17Z to 13:06:47Z. 1,073 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. The four real package-method visibility cases, existing root-based access and rollback/recovery cases passed. Exact source, container isolation, resource limits and owned cleanup verified. The existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.LACeusnk/results/native-verification.json. SHA-256 dfe2f0524e5ba7d5e44db8ac12d8066dcb4241874e68c510184de180a2a95328. |
 | 27 | 26197f918218a5dae429de91bc9ab5fe73b623c4 | PASS 2026-11-20T13:31:15Z to 13:33:10Z. 1,033 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. The package visibility, competing writer and recovery cases passed on the exact staging-only source. Source, isolation, resource limits and owned cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.QG0Yp2YS/results/native-verification.json. SHA-256 9eb4c2cfd9a8fda35b4721e9b4cd4fa546d07bed572381eeb647883f664e565c. |
+| 28 | 343431a9b2ce4d74ba2fe8312c75df53ba2b1825 | PASS 2026-11-20T15:23:19Z to 15:25:18Z. 1,075 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact Assets handlers and disabled client removal verified. Source, worker limits, isolation and owned cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.jdz82r2x/results/native-verification.json. SHA-256 7373ca733be98fdf881efc40138e1bf0da47dc9817499a72b8ddaacbe1a431b3. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
