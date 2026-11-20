@@ -225,8 +225,12 @@ remains with that production window.
 - [x] Bind the deployment-readiness method to its existing administrator policy.
   Both denial messages and the diagnostics payload are preserved. Typecheck,
   lint and Linux source-security checks passed (441 passes, seven skips).
-- [ ] Verify the readiness binding in native Meteor. Require the registered
-  denial and descriptor checks plus the existing positive diagnostics fixture.
+- [x] Verify the readiness binding in native Meteor (slot 30).
+  The actual method identity, distinct authorization denials and existing
+  supported positive diagnostics fixture passed.
+- [x] Trace the eight admin backup methods as the next registration family.
+  The factory owns their shared administrator decision. It precedes argument
+  and confirmation validation, unblocking, job reads and service operations.
 
 Named publications, method and package bindings, composition sealing, full
 registry coverage and Phase 3 staging qualification remain open. The remaining
@@ -1681,7 +1685,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 33 total, 28 consumed, 0 reserved, 4 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 33 total, 29 consumed, 0 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 20 Phil approved five more Phase 3 invocations on the existing
 isolated Linux worker, starting with the V2 admin method bindings.
@@ -1732,6 +1736,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 27 | 26197f918218a5dae429de91bc9ab5fe73b623c4 | PASS 2026-11-20T13:31:15Z to 13:33:10Z. 1,033 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. The package visibility, competing writer and recovery cases passed on the exact staging-only source. Source, isolation, resource limits and owned cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.QG0Yp2YS/results/native-verification.json. SHA-256 9eb4c2cfd9a8fda35b4721e9b4cd4fa546d07bed572381eeb647883f664e565c. |
 | 28 | 343431a9b2ce4d74ba2fe8312c75df53ba2b1825 | PASS 2026-11-20T15:23:19Z to 15:25:18Z. 1,075 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact Assets handlers and disabled client removal verified. Source, worker limits, isolation and owned cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.jdz82r2x/results/native-verification.json. SHA-256 7373ca733be98fdf881efc40138e1bf0da47dc9817499a72b8ddaacbe1a431b3. |
 | 29 | 6ddcf49988ae575190f3227a54b7b0de44518828 | PASS 2026-11-20T16:14:55Z to 16:16:16Z. 1,076 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact admin audit handlers, registered denials, report readback, single-use download and V1 preservation passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.hI4iXRUt/results/native-verification.json. SHA-256 5304aa0f33b965fdb84d95cbc9a6c9da59ebfea6d633dd589887a4bcbf28ed18. |
+| 30 | bc4748ec73678b453f534f97223219465c4e9477 | PASS 2026-11-20T16:25:04Z to 16:26:56Z. 1,077 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact readiness handler identity, distinct logged-out and non-admin denials, and positive diagnostics passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.RkY6DNt1/results/native-verification.json. SHA-256 2e8a1f6c369dfb7762aa104ae905a3ef9004cf8c7b1fc01ad01a222ce29a6d0b. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
