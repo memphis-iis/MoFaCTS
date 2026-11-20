@@ -76,7 +76,7 @@ import { createSecurityAuditRuntimeV2 } from './securityAudit/securityAuditRunti
 import { SecurityAuditReportsV2 } from './securityAudit/securityAuditCollectionsV2';
 import { registerSecurityAuditHttp } from './http/securityAudits';
 import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
-import { createExperimentMethods, issueExperimentLoginToken } from './methods/experimentMethods';
+import { createExperimentMethodRegistration, issueExperimentLoginToken } from './methods/experimentMethods';
 import { createExperimentTargetFamilyResolver } from './lib/experimentTargetFamilyResolver';
 import { createPackageMethods } from './methods/packageMethods';
 import {
@@ -652,7 +652,7 @@ const prolificManagement = createProlificManagementService({ resolveExperimentTa
   testExperiment: { ...prolificTestExperiment, baseUrl: () => Meteor.absoluteUrl() },
 });
 
-const experimentMethods = createExperimentMethods({
+const experimentRegistration = createExperimentMethodRegistration({
   validateProlificBinding: async (userId, studyId, rootTdfId) => {
     const participant = await ProlificParticipations.findOneAsync({ userId, studyId, rootTdfId }, { fields: { ownerId: 1 } });
     return Boolean(participant && await ProlificStudies.findOneAsync({ studyId, rootTdfId, ownerId: participant.ownerId }, { fields: { _id: 1 } }));
@@ -673,7 +673,7 @@ const experimentMethods = createExperimentMethods({
 const {
   getTdfByExperimentTarget: getTdfByExperimentTargetRaw,
   ...publicExperimentMethods
-} = experimentMethods;
+} = experimentRegistration.methods;
 
 // Published to all clients (even without subscription calls)
 registerDefaultPublication(Meteor, 'publication:default:account-self', DEFAULT_PUBLICATION_VERIFICATIONS.account, function publishCurrentAccount() {
@@ -1188,6 +1188,7 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...analyticsRegistration.methodBindings,
   ...warningRegistration.methodBindings,
   ...simulationTelemetry.methodBindings,
+  ...experimentRegistration.methodBindings,
 ], () => MeteorAny.server?.method_handlers);
 bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);
 

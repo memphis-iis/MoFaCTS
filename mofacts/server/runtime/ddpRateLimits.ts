@@ -17,6 +17,7 @@ type DdpRateLimitDeps = {
 const DDPRateLimiterWithErrorMessage = DDPRateLimiter as DdpRateLimiterLike;
 
 let rateLimitsRegistered = false;
+export const PUBLIC_DEMO_RATE_LIMIT = Object.freeze({ requests: 10, windowMs: 3600000, scope: 'connection' } as const);
 
 export function isRateLimitedOpenRouterMethod(name: string): boolean {
   return [
@@ -111,7 +112,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     type: 'method',
     name: 'startPublicDemo',
     connectionId() { return true; }
-  }, 10, 3600000);
+  }, PUBLIC_DEMO_RATE_LIMIT.requests, PUBLIC_DEMO_RATE_LIMIT.windowMs);
 
   DDPRateLimiter.addRule({
     type: 'method',

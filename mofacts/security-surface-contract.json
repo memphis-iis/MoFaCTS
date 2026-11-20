@@ -728,7 +728,8 @@
     },
     {
       "name": "provisionExperimentUser",
-      "access": "public"
+      "access": "public",
+      "notes": "Passwordless entry and return retain the existing study and progress binding. No application DDP rate rule matches this method."
     },
     {
       "name": "publishDeploymentBrandProfile",
@@ -868,7 +869,8 @@
     },
     {
       "name": "startPublicDemo",
-      "access": "public-rate-limited"
+      "access": "public-rate-limited",
+      "notes": "The public-demo rate policy shares the existing connection limit of 10 starts per hour with the actual DDP rule."
     },
     {
       "name": "sendEmail",

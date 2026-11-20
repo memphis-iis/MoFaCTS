@@ -24,12 +24,18 @@ export type MeteorMethodBinding = Readonly<{
     kind: 'diagnostic-telemetry';
     operation: 'non-private-report' | 'lesson-package' | 'owned-attempt';
     authorize: (...args: never[]) => unknown;
+  }> | Readonly<{
+    kind: 'experiment-entry';
+    operation: 'passwordless' | 'credentialed' | 'scoped-reconnect' | 'public-demo';
+    rateLimit: Readonly<{ requests: number; windowMs: number; scope: 'connection' }> | null;
+    authorize: (...args: never[]) => unknown;
   }>;
   dataEgress: 'audit-report-list' | 'audit-report-summary' | 'audit-download-capability' | 'deployment-diagnostics'
     | 'backup-configuration' | 'backup-job-metadata' | 'backup-download-capability'
     | 'brand-profile-draft' | 'published-brand-profile' | 'redacted-brand-profile-export'
     | 'filename-reference-migration-report' | 'history-download-capability' | 'none'
-    | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page';
+    | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'
+    | 'experiment-login-token' | 'participant-session' | 'public-demo-launch';
 }>;
 
 let observe: (() => ReturnType<typeof observeMeteorMethodBindings>) | undefined;
@@ -52,6 +58,8 @@ export function observeMeteorMethodBindings(
     names.add(name);
     const policyMetadata = policy.kind === 'role'
       ? { kind: policy.kind, role: policy.role }
+      : policy.kind === 'experiment-entry'
+      ? { kind: policy.kind, operation: policy.operation, rateLimit: policy.rateLimit }
       : { kind: policy.kind, operation: policy.operation };
     surfaces.push(Object.freeze({ name, surfaceId, verification, policy: Object.freeze(policyMetadata), dataEgress }));
   }

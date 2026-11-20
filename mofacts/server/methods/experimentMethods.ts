@@ -4,6 +4,9 @@ import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import { check } from 'meteor/check';
 import { randomBytes } from 'crypto';
+import { EXPERIMENT_ENTRY_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { PUBLIC_DEMO_RATE_LIMIT } from '../runtime/ddpRateLimits';
+import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 import {
   parsePublicDemoRequest,
   PUBLIC_DEMO_DEFINITIONS,
@@ -74,7 +77,7 @@ export async function issueExperimentLoginToken(userId: string, binding?: { targ
   return stampedToken.token;
 }
 
-export function createExperimentMethods(deps: ExperimentMethodsDeps) {
+export function createExperimentMethodRegistration(deps: ExperimentMethodsDeps) {
 
   async function getTdfByExperimentTarget(experimentTarget: string) {
     const family = await deps.resolveExperimentTargetFamily(experimentTarget);
@@ -120,7 +123,7 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
     return Number.isFinite(lastUnitCompleted) && lastUnitCompleted >= (normalizedUnitCount - 1);
   }
 
-  async function provisionExperimentUser(this: MethodContext, experimentTarget: string, rawUserName: string) {
+  async function authorizePasswordlessTarget(experimentTarget: string, rawUserName: string) {
     check(experimentTarget, String);
     check(rawUserName, String);
 
@@ -142,7 +145,14 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
     if (requiresPassword === true || requiresPassword === 'true') {
       throw new Meteor.Error('experiment-password-required', 'This experiment requires instructor-provided credentials');
     }
+    return { normalizedTarget, normalizedUserName, tdf };
+  }
 
+  const passwordless = Object.freeze({
+    kind: 'experiment-entry', operation: 'passwordless', rateLimit: null, authorize: authorizePasswordlessTarget,
+  } as const);
+  async function provisionExperimentUser(this: MethodContext, experimentTarget: string, rawUserName: string) {
+    const { normalizedTarget, normalizedUserName, tdf } = await passwordless.authorize(experimentTarget, rawUserName);
     return await deps.withSignUpLock(normalizedUserName, async () => {
       const usernameExactCI = new RegExp(`^${deps.escapeRegexLiteral(normalizedUserName)}$`, 'i');
       const existingUser = await deps.usersCollection.findOneAsync({ username: usernameExactCI });
@@ -202,7 +212,7 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
     });
   }
 
-  async function enterCredentialedExperiment(this: MethodContext, target: string, username?: string, password?: { digest: string; algorithm: string }) {
+  async function authorizeCredentialedEntry(context: MethodContext, target: string, username?: string, password?: { digest: string; algorithm: string }) {
     check(target, String);
     const root = await getTdfByExperimentTarget(target);
     const spec = root?.content?.tdfs?.tutor?.setspec;
@@ -210,29 +220,38 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
       throw new Meteor.Error(403, 'Invalid experiment credentials');
     }
     const binding = { target: spec.experimentTarget, rootId: root._id };
-    if (username === undefined && password === undefined && this.userId) {
-      const account = await deps.usersCollection.findOneAsync({ _id: this.userId });
-      if (participantConnectionRoot(this) || !account || studyOnlyAccount(account) || account.profile?.createdBy === 'publicDemo') throw new Meteor.Error(403, 'Invalid experiment credentials');
-      return { loginToken: await issueExperimentLoginToken(this.userId, binding) };
+    if (username === undefined && password === undefined && context.userId) {
+      const account = await deps.usersCollection.findOneAsync({ _id: context.userId });
+      if (participantConnectionRoot(context) || !account || studyOnlyAccount(account) || account.profile?.createdBy === 'publicDemo') throw new Meteor.Error(403, 'Invalid experiment credentials');
+      return { userId: context.userId, binding };
     }
     check(username, String);
     check(password, { digest: String, algorithm: String });
     if (!username || !password || username.length > 320 || password.algorithm !== 'sha-256' || !/^[a-f0-9]{64}$/.test(password.digest)) throw new Meteor.Error(403, 'Invalid experiment credentials');
     const account = await deps.usersCollection.findOneAsync({ username: new RegExp('^' + deps.escapeRegexLiteral(username) + '$', 'i') });
     if (!account && !username.includes('@')) throw new Meteor.Error(403, 'Invalid experiment credentials');
-    if (!studyOnlyAccount(account)) return { ordinaryLoginRequired: true };
+    if (!studyOnlyAccount(account)) return { ordinaryLoginRequired: true } as const;
     if (account.profile.experimentTarget !== binding.target || account.profile.createdBy === 'startProlificParticipation'
       || !account.services?.password || (await (Accounts as any)._checkPasswordAsync(account, password)).error) {
       throw new Meteor.Error(403, 'Invalid experiment credentials');
     }
-    return { loginToken: await issueExperimentLoginToken(account._id, binding) };
+    return { userId: account._id, binding };
   }
 
-  async function reconnectExperimentParticipant(this: MethodContext, token: string) {
+  const credentialed = Object.freeze({
+    kind: 'experiment-entry', operation: 'credentialed', rateLimit: null, authorize: authorizeCredentialedEntry,
+  } as const);
+  async function enterCredentialedExperiment(this: MethodContext, target: string, username?: string, password?: { digest: string; algorithm: string }) {
+    const admission = await credentialed.authorize(this, target, username, password);
+    if ('ordinaryLoginRequired' in admission) return { ordinaryLoginRequired: true };
+    return { loginToken: await issueExperimentLoginToken(admission.userId, admission.binding) };
+  }
+
+  async function authorizeParticipantReconnect(context: MethodContext, token: string) {
     const binding = participantTokenBinding(token);
-    if (!binding || !this.connection) throw new Meteor.Error(403, 'Invalid participant session');
+    if (!binding || !context.connection) throw new Meteor.Error(403, 'Invalid participant session');
     const accounts = Accounts as any;
-    const result = await accounts._runLoginHandlers(this, { resume: token });
+    const result = await accounts._runLoginHandlers(context, { resume: token });
     if (!result?.userId || result.error || !result.stampedLoginToken) throw new Meteor.Error(403, 'Invalid participant session');
     const root = await getTdfByExperimentTarget(binding.target);
     if (!root || root._id !== binding.rootId) throw new Meteor.Error(403, 'Invalid participant session');
@@ -249,17 +268,25 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
     } else if (!credentialed) {
       throw new Meteor.Error(403, 'Invalid participant session');
     }
-    bindParticipantConnection(this.connection, result.userId, token, root._id);
+    return { connection: context.connection, rootId: root._id, result, accounts };
+  }
+
+  const reconnect = Object.freeze({
+    kind: 'experiment-entry', operation: 'scoped-reconnect', rateLimit: null, authorize: authorizeParticipantReconnect,
+  } as const);
+  async function reconnectExperimentParticipant(this: MethodContext, token: string) {
+    const { connection, rootId, result, accounts } = await reconnect.authorize(this, token);
+    bindParticipantConnection(connection, result.userId, token, rootId);
     return accounts._attemptLogin(this, 'reconnectExperimentParticipant', [], { ...result, type: 'experimentParticipant' });
   }
 
-  async function startPublicDemo(this: MethodContext, params: unknown) {
+  async function authorizePublicDemo(context: MethodContext, params: unknown) {
     check(params, Object);
     const kind = parsePublicDemoRequest(params);
     if (!kind) {
       throw new Meteor.Error('invalid-public-demo-kind', 'Public demo kind must be student, teacher, or researcher');
     }
-    if (this.userId) {
+    if (context.userId) {
       throw new Meteor.Error('public-demo-account-active', 'Sign out before starting a public demonstration');
     }
 
@@ -272,7 +299,14 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
     if (requiresPassword === true || requiresPassword === 'true') {
       throw new Meteor.Error('public-demo-password-invalid', 'Public demonstrations cannot require participant credentials');
     }
+    return { kind, definition };
+  }
 
+  const demo = Object.freeze({
+    kind: 'experiment-entry', operation: 'public-demo', rateLimit: PUBLIC_DEMO_RATE_LIMIT, authorize: authorizePublicDemo,
+  } as const);
+  async function startPublicDemo(this: MethodContext, params: unknown) {
+    const { kind, definition } = await demo.authorize(this, params);
     const createdAt = new Date();
     const expiresAt = publicDemoExpiresAt(createdAt);
     const username = generatePublicDemoUsername(kind);
@@ -304,11 +338,22 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
     };
   }
 
-  return {
+  const methods = {
     getTdfByExperimentTarget,
     enterCredentialedExperiment,
     reconnectExperimentParticipant,
     provisionExperimentUser,
     startPublicDemo,
   };
+  type RegisteredName = keyof typeof EXPERIMENT_ENTRY_VERIFICATIONS;
+  function bind(name: RegisteredName, policy: typeof passwordless | typeof credentialed | typeof reconnect | typeof demo,
+    dataEgress: MeteorMethodBinding['dataEgress']): MeteorMethodBinding {
+    return Object.freeze({ handler: methods[name], verification: EXPERIMENT_ENTRY_VERIFICATIONS[name], policy, dataEgress });
+  }
+  return { methods, methodBindings: Object.freeze([
+    bind('provisionExperimentUser', passwordless, 'experiment-login-token'),
+    bind('enterCredentialedExperiment', credentialed, 'experiment-login-token'),
+    bind('reconnectExperimentParticipant', reconnect, 'participant-session'),
+    bind('startPublicDemo', demo, 'public-demo-launch'),
+  ]) };
 }

@@ -570,6 +570,22 @@ export const SIMULATION_METHOD_VERIFICATIONS = Object.freeze({
     'preserves administrator authorization for the installed trace export'),
 });
 
+function experimentEntryVerification<N extends string>(method: N, ...cases: [string, ...string[]]) {
+  return Object.freeze({
+    ...middlewareTest, suite: 'experiment entry runtime bindings', method, surfaceId: `method:${method}` as const,
+    verificationId: `method.experiment-entry.${method}` as const, cases: Object.freeze(cases),
+  });
+}
+
+const experimentBindingCase = 'binds the four installed experiment entries to their existing admission and rate-limit rules';
+const experimentDenialCase = 'retains experiment admission errors and signed-in public demo denial';
+export const EXPERIMENT_ENTRY_VERIFICATIONS = Object.freeze({
+  provisionExperimentUser: experimentEntryVerification('provisionExperimentUser', experimentBindingCase),
+  enterCredentialedExperiment: experimentEntryVerification('enterCredentialedExperiment', experimentBindingCase, experimentDenialCase),
+  reconnectExperimentParticipant: experimentEntryVerification('reconnectExperimentParticipant', experimentBindingCase, experimentDenialCase),
+  startPublicDemo: experimentEntryVerification('startPublicDemo', experimentBindingCase, experimentDenialCase),
+});
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -583,7 +599,8 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS), DEPLOYMENT_READINESS_VERIFICATION, ...Object.values(BACKUP_METHOD_VERIFICATIONS),
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
-  ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS)]);
+  ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

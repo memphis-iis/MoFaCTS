@@ -291,7 +291,14 @@ remains with that production window.
 - [x] Trace experiment entry as the next method family. Preserve passwordless
   progress-backed return, credentialed entry, scoped reconnect and public demo
   behavior. Record observed DDP limits without adding new study restrictions.
-- [ ] Bind the experiment entry methods to their existing admission policies.
+- [x] Bind four installed experiment entry methods to their existing admission
+  policies. Passwordless progress return, scoped reconnect, the credentialed
+  handoff and public demo retain their current scope, tokens and errors. Share
+  the demo limit (10 per connection per hour) with the actual DDP rule. Record
+  the absence of a dedicated DDP rule for the other three. Typecheck, lint and
+  Linux audit source checks passed (453 passes, seven skips).
+- [ ] Verify exact experiment method bindings, their rate-rule observations,
+  and existing experiment session/return regressions in Meteor.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry
