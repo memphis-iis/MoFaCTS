@@ -14,7 +14,8 @@ test('Phase 0 manifest: reviewed brand and progressive surfaces retain explicit 
   const manifest = JSON.parse(fs.readFileSync(new URL('../../../security-surface-contract.json', import.meta.url), 'utf8'));
   for (const name of ['exportDeploymentBrandProfile', 'getDeploymentBrandProfileDraft',
     'importDeploymentBrandProfileDraft', 'publishDeploymentBrandProfile', 'saveDeploymentBrandProfileDraft']) {
-    assert.deepEqual(manifest.methods.filter((entry) => entry.name === name), [{ name, access: 'admin-only' }]);
+    assert.deepEqual(manifest.methods.filter((entry) => entry.name === name)
+      .map(({ name, access }) => ({ name, access })), [{ name, access: 'admin-only' }]);
   }
   assert.deepEqual(manifest.methods.filter((entry) => entry.name === 'getProgressiveAssignmentLaunch'), [{
     name: 'getProgressiveAssignmentLaunch',
@@ -31,16 +32,20 @@ test('Phase 0 compatibility: all brand methods authorize before reading, parsing
   const source = sourceFile('server/methods/deploymentBrandProfileMethods.ts');
   const calls = [];
   const denied = new Error('Synthetic admin denial');
-  const factory = namedFunction(source, 'createDeploymentBrandProfileMethods', {
+  const factory = namedFunction(source, 'createDeploymentBrandProfileRegistration', {
     Meteor: { Error },
+    BRAND_PROFILE_METHOD_VERIFICATIONS: {},
     readDeploymentBrandProfileDraft: async () => { calls.push('read'); return { updatedAt: 'synthetic', updatedBy: 'synthetic' }; },
     saveDeploymentBrandProfileDraft: async (value, userId) => { calls.push(['save', value, userId]); return value; },
     publishDeploymentBrandProfile: async (userId) => { calls.push(['publish', userId]); return 'published'; },
   });
-  const methods = factory({ requireAdminUser: async (id) => {
+  const registration = factory({ requireAdminUser: async (id) => {
     calls.push(['authorize', id]);
     if (id !== 'synthetic-admin') throw denied;
   } });
+  const { methods, methodBindings } = registration;
+  assert.deepEqual(Array.from(methodBindings, binding => binding.handler), Object.values(methods));
+  assert.ok(methodBindings.every(binding => binding.policy === methodBindings[0].policy));
   for (const method of Object.values(methods)) {
     for (const userId of [null, 'synthetic-learner']) {
       calls.length = 0;

@@ -268,7 +268,8 @@
     },
     {
       "name": "exportDeploymentBrandProfile",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The brand-profile policy checks administrator access before exporting a JSON draft with update metadata cleared."
     },
     {
       "name": "exportThemeFile",
@@ -625,7 +626,8 @@
     },
     {
       "name": "importDeploymentBrandProfileDraft",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The brand-profile policy checks administrator access before parsing or storing an imported draft."
     },
     {
       "name": "importPrivateRepoTdfBatch",
@@ -726,7 +728,8 @@
     },
     {
       "name": "publishDeploymentBrandProfile",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The brand-profile policy checks administrator access before publishing the saved draft."
     },
     {
       "name": "recordSessionRevocation",

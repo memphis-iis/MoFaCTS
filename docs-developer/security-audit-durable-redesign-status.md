@@ -243,6 +243,12 @@ remains with that production window.
 - [x] Trace the five administrator brand-profile methods as the next family.
   Keep authorization before reads, JSON parsing, saving and publishing,
   and retain the existing metadata redaction in exported drafts.
+- [x] Bind the five brand-profile methods to their shared administrator policy.
+  Distinguish draft, published profile and redacted export egress. Typecheck,
+  lint and Linux source checks passed (453 passes, seven skips), including
+  guard order, allowed source fixtures for each operation and export redaction.
+- [ ] Verify the brand method bindings, registered denials and authorized draft
+  read, export and import validation in Meteor.
 
 Named publications, method and package bindings, composition sealing, full
 registry coverage and Phase 3 staging qualification remain open. The remaining

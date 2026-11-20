@@ -99,7 +99,7 @@ import {
   createThemeMethods,
   createUpdateActiveThemeDocument,
 } from './methods/themeMethods';
-import { createDeploymentBrandProfileMethods } from './methods/deploymentBrandProfileMethods';
+import { createDeploymentBrandProfileRegistration } from './methods/deploymentBrandProfileMethods';
 import { getOrBuildCurrentPackageAsset } from './lib/packageExport';
 import { getClassPerformanceByTdfWorkflow } from './lib/classPerformance';
 import { createAuthSupport } from './lib/authSupport';
@@ -728,6 +728,7 @@ function normalizeCanonicalId(value: unknown): string | null {
   return null;
 }
 
+const brandProfileRegistration = createDeploymentBrandProfileRegistration({ requireAdminUser });
 export const methods: any = {
   ...createProlificMethods({ participation: prolificParticipation, management: prolificManagement, authorization: getMethodAuthorizationDeps, rateLimit: applyMethodRateLimit }),
   ...createRecoverableWarningMethods({ auditLog: AuditLog, requireAdminUser }),
@@ -885,9 +886,7 @@ export const methods: any = {
     updateActiveThemeDocument,
   }),
 
-  ...createDeploymentBrandProfileMethods({
-    requireAdminUser,
-  }),
+  ...brandProfileRegistration.methods,
 
   ...createProfileMethods({
     usersCollection: MeteorAny.users,
@@ -1178,6 +1177,7 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...securityAuditRuntime.methodBindings,
   deploymentReadiness.methodBinding,
   ...backupRegistration.methodBindings,
+  ...brandProfileRegistration.methodBindings,
 ], () => MeteorAny.server?.method_handlers);
 bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);
 
