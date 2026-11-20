@@ -294,6 +294,22 @@ two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 2
   The accepted staging2 baseline bd3520f2 and the verified main source
   differ across 372 paths. Preserve the audit-only staging2 release scope
   and qualify the exact staging candidate separately before deployment.
+- [x] Prepare the scoped staging2 package candidate on the existing
+  audit-only branch. Commit 26197f918218a5dae429de91bc9ab5fe73b623c4
+  backports the upload fixes, tests, classifications and operator index
+  script into bd3520f2. Full typecheck, lint (330 classified surfaces)
+  and source-security/catalog checks passed. The staging Git tree matched
+  the clean Linux source used for those checks.
+- [x] Run the count-only check on the healthy staging2 application database
+  using the existing pinned operator connection. The result was zero shared
+  condition IDs, zero invalid IDs and index absent. Production was outside
+  the operation. Repeat these counts at the index activation window.
+- [x] Verify exact staging2 candidate 26197f91 in native Meteor (slot 27).
+  All public/private package-order, parent visibility, failed-upload
+  ownership and restart recovery cases passed. The pure harness passed
+  26 tests separately. Slot 26 qualified main only.
+- [ ] Verify the scoped staging2 image, competing uploads and live index
+  activation. The production count-only check stays at cutover.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 
@@ -1612,7 +1628,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 26 total, 25 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 27 total, 26 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 Phil authorized five additional Phase 3 invocations on the same isolated worker after slot 20.
 
@@ -1657,6 +1673,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 24 | 748dc6eecbceccab650fd224893f71fef391ddfe | PASS 2026-11-19T22:25:06Z to 22:26:46Z. 1,061 server and 1,249 Chromium passes, no failures/hooks, 15/seven pending. The real-DDP study scope and passwordless return case passed. Exact source, limits, isolation and owned cleanup verified. Existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.YBcb2u3v/results/native-verification.json. SHA-256 3ce5844e97a82a0c8552b4e4e8a4be0c1caceb990e3d295a84ddd47782662371. |
 | 25 | 45b064a79318db7a37a4051ec3be832f5345ee70 | PASS 2026-11-20T00:03:08Z to 00:04:32Z. 1,065 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. All four new package validation and MongoDB concurrency/compatibility cases passed. Exact source, limits, isolation and owned cleanup verified. The existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.lbo94WPE/results/native-verification.json. SHA-256 79a6d76ab0dd3906a8424e50f097bd837154cf6223deb011cd31451a428e7cd1. |
 | 26 | 48cdcaba5a6749871324050ba6d37f06ad5f220f | PASS 2026-11-20T13:05:17Z to 13:06:47Z. 1,073 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. The four real package-method visibility cases, existing root-based access and rollback/recovery cases passed. Exact source, container isolation, resource limits and owned cleanup verified. The existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.LACeusnk/results/native-verification.json. SHA-256 dfe2f0524e5ba7d5e44db8ac12d8066dcb4241874e68c510184de180a2a95328. |
+| 27 | 26197f918218a5dae429de91bc9ab5fe73b623c4 | PASS 2026-11-20T13:31:15Z to 13:33:10Z. 1,033 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. The package visibility, competing writer and recovery cases passed on the exact staging-only source. Source, isolation, resource limits and owned cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.QG0Yp2YS/results/native-verification.json. SHA-256 9eb4c2cfd9a8fda35b4721e9b4cd4fa546d07bed572381eeb647883f664e565c. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
