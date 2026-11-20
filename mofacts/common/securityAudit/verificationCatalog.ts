@@ -429,6 +429,17 @@ export const AUDIT_ADMIN_METHOD_VERIFICATIONS = Object.freeze({
   'admin.securityAudits.downloadToken': auditAdminMethodVerification('downloadToken'),
 });
 
+export const DEPLOYMENT_READINESS_VERIFICATION = Object.freeze({
+  ...middlewareTest, suite: 'deploymentReadinessMethods',
+  verificationId: 'method.deployment-readiness',
+  surfaceId: 'method:deploymentReadiness',
+  method: 'deploymentReadiness',
+  cases: Object.freeze([
+    'binds the registered readiness method and preserves its distinct denials',
+    'returns passing checks for a valid session-storage self-hosted configuration',
+  ]),
+} as const);
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -439,7 +450,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...HTTP_HEALTH_VERIFICATIONS.endpoints, HTTP_HEALTH_VERIFICATIONS.fallthrough,
   HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download, ...Object.values(HTTP_FILE_VERIFICATIONS),
   ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat(), ...Object.values(FILES_DDP_VERIFICATIONS),
-  ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS)]);
+  ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS), DEPLOYMENT_READINESS_VERIFICATION]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

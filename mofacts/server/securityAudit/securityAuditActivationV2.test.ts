@@ -41,12 +41,13 @@ describe('activated V2 audit application boundaries', function() {
       'admin.securityAudits.get': 'audit-report-summary',
       'admin.securityAudits.downloadToken': 'audit-download-capability',
     } as const;
-    expect(observation.surfaces).to.have.length(3);
-    for (const entry of observation.surfaces) {
-      expect(entry.surfaceId).to.equal(`method:${entry.name}`);
-      expect(entry.verification).to.equal(AUDIT_ADMIN_METHOD_VERIFICATIONS[entry.name]);
-      expect(entry.policy).to.deep.equal({ kind: 'role', role: 'admin' });
-      expect(entry.dataEgress).to.equal(egress[entry.name]);
+    for (const name of Object.keys(egress) as (keyof typeof egress)[]) {
+      const entries = observation.surfaces.filter(entry => entry.name === name);
+      expect(entries).to.have.length(1);
+      expect(entries[0]?.surfaceId).to.equal(`method:${name}`);
+      expect(entries[0]?.verification).to.equal(AUDIT_ADMIN_METHOD_VERIFICATIONS[name]);
+      expect(entries[0]?.policy).to.deep.equal({ kind: 'role', role: 'admin' });
+      expect(entries[0]?.dataEgress).to.equal(egress[name]);
     }
   });
   for (const name of Object.keys(AUDIT_ADMIN_METHOD_VERIFICATIONS)) {

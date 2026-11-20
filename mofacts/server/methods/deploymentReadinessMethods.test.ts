@@ -3,7 +3,9 @@ import os from 'os';
 import path from 'path';
 import { Meteor } from 'meteor/meteor';
 import { expect } from 'chai';
-import { createDeploymentReadinessMethods, inspectTdfExpressions } from './deploymentReadinessMethods';
+import { DEPLOYMENT_READINESS_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
+import { createDeploymentReadinessRegistration, inspectTdfExpressions } from './deploymentReadinessMethods';
 
 const emptyTdfCursor = () => ({ fetchAsync: async () => [] });
 
@@ -57,8 +59,27 @@ describe('deploymentReadinessMethods', function() {
     (Meteor as any).settings = savedSettings;
   });
 
+  it('binds the registered readiness method and preserves its distinct denials', async function() {
+    const observation = registeredMeteorMethodSurfaces();
+    if (observation.state !== 'observed') throw new Error(observation.reason);
+    const entries = observation.surfaces.filter(entry => entry.name === 'deploymentReadiness');
+    expect(entries).to.have.length(1);
+    expect(entries[0]?.verification).to.equal(DEPLOYMENT_READINESS_VERIFICATION);
+    expect(entries[0]?.policy).to.deep.equal({ kind: 'role', role: 'admin' });
+    expect(entries[0]?.dataEgress).to.equal('deployment-diagnostics');
+    const handler = (Meteor as any).server.method_handlers.deploymentReadiness;
+    expect(handler).to.be.a('function');
+    for (const [userId, reason] of [[null, 'Must be logged in'], ['synthetic-unknown-readiness-user', 'Admin only']]) {
+      let error: unknown;
+      try { await handler.call({ userId }); }
+      catch (caught) { error = caught; }
+      expect(error).to.be.instanceOf(Meteor.Error);
+      expect(error).to.include({ error: 'not-authorized', reason });
+    }
+  });
+
   it('requires a logged-in admin', async function() {
-    const methods = createDeploymentReadinessMethods({
+    const { methods } = createDeploymentReadinessRegistration({
       Roles: { userIsInRoleAsync: async () => false },
       Tdfs: { rawDatabase: () => ({ command: async () => undefined }), find: emptyTdfCursor },
       usersCollection: { findOneAsync: async () => null },
@@ -75,7 +96,7 @@ describe('deploymentReadinessMethods', function() {
   });
 
   it('rejects logged-in non-admin users', async function() {
-    const methods = createDeploymentReadinessMethods({
+    const { methods } = createDeploymentReadinessRegistration({
       Roles: { userIsInRoleAsync: async () => false },
       Tdfs: { rawDatabase: () => ({ command: async () => undefined }), find: emptyTdfCursor },
       usersCollection: { findOneAsync: async () => null },
@@ -151,7 +172,7 @@ describe('deploymentReadinessMethods', function() {
       ...(await makeLocalStorageSettings()),
     };
 
-    const methods = createDeploymentReadinessMethods({
+    const { methods } = createDeploymentReadinessRegistration({
       Roles: { userIsInRoleAsync: async () => true },
       Tdfs: {
         find: emptyTdfCursor,

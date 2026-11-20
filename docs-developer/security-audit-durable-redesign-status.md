@@ -222,6 +222,11 @@ remains with that production window.
   Its anonymous and non-admin denials use distinct existing error messages
   and precede deployment diagnostics. Factory tests cover both denials and
   the admin result. Preserve that ordering and the readiness payload.
+- [x] Bind the deployment-readiness method to its existing administrator policy.
+  Both denial messages and the diagnostics payload are preserved. Typecheck,
+  lint and Linux source-security checks passed (441 passes, seven skips).
+- [ ] Verify the readiness binding in native Meteor. Require the registered
+  denial and descriptor checks plus the existing positive diagnostics fixture.
 
 Named publications, method and package bindings, composition sealing, full
 registry coverage and Phase 3 staging qualification remain open. The remaining

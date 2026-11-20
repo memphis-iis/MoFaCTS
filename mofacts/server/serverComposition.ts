@@ -70,7 +70,7 @@ import { createCourseMethods } from './methods/courseMethods';
 import type { CourseAssignmentHistoryContext } from '../common/courseAssignments.contracts';
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
 import { createLearnerAnalyticsMethods } from './methods/learnerAnalyticsMethods';
-import { createDeploymentReadinessMethods } from './methods/deploymentReadinessMethods';
+import { createDeploymentReadinessRegistration } from './methods/deploymentReadinessMethods';
 import { createBackupMethods, createBackupRegistry } from './methods/backupMethods';
 import { createSecurityAuditRuntimeV2 } from './securityAudit/securityAuditRuntimeV2';
 import { SecurityAuditReportsV2 } from './securityAudit/securityAuditCollectionsV2';
@@ -1083,6 +1083,12 @@ const sparcDemoAccess = createSparcDemoAccess({
 async function assertSparcDemoExpiry(userId: string): Promise<void> { await sparcDemoAccess.assertExpiry(userId); }
 async function assertPublicDemoAiQuota(userId: string, address: string): Promise<void> { await sparcDemoAccess.assertAiQuota(userId, address); }
 
+const deploymentReadiness = createDeploymentReadinessRegistration({
+  Roles,
+  Tdfs,
+  usersCollection: MeteorAny.users,
+  redisBoundary,
+});
 export const asyncMethods: Record<string, unknown> = {
   ...createTdfIdentityMigrationMethods({
     Tdfs,
@@ -1152,12 +1158,7 @@ export const asyncMethods: Record<string, unknown> = {
   ...publicDashboardCacheMethods,
   ...learnerAnalyticsMethods,
 
-  ...createDeploymentReadinessMethods({
-    Roles,
-    Tdfs,
-    usersCollection: MeteorAny.users,
-    redisBoundary
-  }),
+  ...deploymentReadiness.methods,
 
   ...createBackupMethods({
     settings: Meteor.settings || {},
@@ -1172,7 +1173,7 @@ export const asyncMethods: Record<string, unknown> = {
 }
 
 // Server-side startup logic
-registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, securityAuditRuntime.methodBindings,
+registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [...securityAuditRuntime.methodBindings, deploymentReadiness.methodBinding],
   () => MeteorAny.server?.method_handlers);
 bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);
 

@@ -220,7 +220,8 @@
     },
     {
       "name": "deploymentReadiness",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The readiness policy requires an administrator before running or returning deployment diagnostics."
     },
     {
       "name": "downloadDataByClass",

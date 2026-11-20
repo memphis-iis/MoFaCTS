@@ -1,20 +1,20 @@
 import type { Meteor } from 'meteor/meteor';
-import type { AUDIT_ADMIN_METHOD_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import type { AUDIT_ADMIN_METHOD_VERIFICATIONS, DEPLOYMENT_READINESS_VERIFICATION } from '../../common/securityAudit/verificationCatalog.ts';
 
 type MethodMap = Parameters<typeof Meteor.methods>[0];
 type ReadMethods = () => Readonly<Record<string, unknown>> | undefined;
-type AdminMethodName = keyof typeof AUDIT_ADMIN_METHOD_VERIFICATIONS;
-type AdminMethodVerification = typeof AUDIT_ADMIN_METHOD_VERIFICATIONS[AdminMethodName];
+type MethodVerification = typeof AUDIT_ADMIN_METHOD_VERIFICATIONS[keyof typeof AUDIT_ADMIN_METHOD_VERIFICATIONS]
+  | typeof DEPLOYMENT_READINESS_VERIFICATION;
 
 export type MeteorMethodBinding = Readonly<{
-  verification: AdminMethodVerification;
+  verification: MethodVerification;
   handler: MethodMap[string];
   policy: Readonly<{
     kind: 'role';
     role: 'admin';
-    authorize: (userId: string | null | undefined) => Promise<string>;
+    authorize: (userId: string | null | undefined) => Promise<string | void>;
   }>;
-  dataEgress: 'audit-report-list' | 'audit-report-summary' | 'audit-download-capability';
+  dataEgress: 'audit-report-list' | 'audit-report-summary' | 'audit-download-capability' | 'deployment-diagnostics';
 }>;
 
 let observe: (() => ReturnType<typeof observeMeteorMethodBindings>) | undefined;

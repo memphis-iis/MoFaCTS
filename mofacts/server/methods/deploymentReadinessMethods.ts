@@ -5,6 +5,8 @@ import { validateBackupConfig } from '../lib/backup/backupConfig';
 import { formatMongoConnectionValidation, validateMongoConnection } from '../lib/mongoConnectionValidation';
 import { getStrictMongoReactivityMetrics } from '../lib/strictMongoReactivity';
 import { validateTdfExpressions } from '../../common/lib/tdfExpressionValidation';
+import { DEPLOYMENT_READINESS_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
+import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -107,16 +109,23 @@ function settingsSourceMessage() {
   return source;
 }
 
-export function createDeploymentReadinessMethods(deps: ReadinessDeps) {
-  return {
-    deploymentReadiness: async function(this: { userId?: string | null }) {
-      if (!this.userId) {
+export function createDeploymentReadinessRegistration(deps: ReadinessDeps) {
+  const policy = Object.freeze({
+    kind: 'role',
+    role: 'admin',
+    async authorize(userId: string | null | undefined) {
+      if (!userId) {
         throw new Meteor.Error('not-authorized', 'Must be logged in');
       }
-      const isAdmin = await deps.Roles.userIsInRoleAsync(this.userId, ['admin']);
+      const isAdmin = await deps.Roles.userIsInRoleAsync(userId, ['admin']);
       if (!isAdmin) {
         throw new Meteor.Error('not-authorized', 'Admin only');
       }
+    },
+  } as const);
+  const methods = {
+    deploymentReadiness: async function(this: { userId?: string | null }) {
+      await policy.authorize(this.userId);
 
       const checks = [
         await check('settings.source', async () => settingsSourceMessage()),
@@ -212,4 +221,11 @@ export function createDeploymentReadinessMethods(deps: ReadinessDeps) {
       };
     },
   };
+  const methodBinding: MeteorMethodBinding = Object.freeze({
+    verification: DEPLOYMENT_READINESS_VERIFICATION,
+    handler: methods.deploymentReadiness,
+    policy,
+    dataEgress: 'deployment-diagnostics',
+  });
+  return { methods, methodBinding };
 }
