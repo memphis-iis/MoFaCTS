@@ -258,12 +258,21 @@ remains with that production window.
 - [x] Bind the filename TDF reference migration method to its administrator
   policy and bounded report. Typecheck, lint and Linux security source checks
   passed (453 passes, seven skips).
-- [ ] Verify the migration binding, its denial precedence and its synthetic
-  dry-run and guarded-write fixtures in Meteor.
+- [x] Verify the migration binding and synthetic migration fixtures (slot 33).
+  Exact handler identity and both authorization denials before validation
+  passed. The disposable fixture preserved default dry run, bounded report,
+  reviewed fingerprints, repeat safety and write-conflict rejection.
+- [x] Trace the three condition-count methods as the next owning family.
+  Replacement uses the existing study-access gate and requires owner/admin
+  on the block-allocation path. Increment retains the study-access gate and
+  the exact assigned-condition check for the later block milestone. Reset
+  requires the owner or admin. Existing tests exercise these distinctions.
+- [ ] Bind and verify the condition-count family while preserving each
+  authorization and validation step at its current position.
 
-Named publications, method and package bindings, composition sealing, full
-registry coverage and Phase 3 staging qualification remain open. The remaining
-two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 20.
+The five-run allowance covered 18 existing administrator methods across five
+owning families. Remaining method and framework bindings, full registry
+coverage, composition sealing and Phase 3 staging qualification remain open.
 
 ## Phase 3 named publications (2026-11-19)
 
@@ -1714,7 +1723,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 33 total, 31 consumed, 0 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 33 total, 32 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 20 Phil approved five more Phase 3 invocations on the existing
 isolated Linux worker, starting with the V2 admin method bindings.
@@ -1768,6 +1777,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 30 | bc4748ec73678b453f534f97223219465c4e9477 | PASS 2026-11-20T16:25:04Z to 16:26:56Z. 1,077 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact readiness handler identity, distinct logged-out and non-admin denials, and positive diagnostics passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.RkY6DNt1/results/native-verification.json. SHA-256 2e8a1f6c369dfb7762aa104ae905a3ef9004cf8c7b1fc01ad01a222ce29a6d0b. |
 | 31 | 5d664d7496a99b8cf96c077c750c285eb04318a5 | PASS 2026-11-20T16:37:47Z to 16:39:44Z. 1,079 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Eight registered backup bindings and denials, disposable archive workflow, restore confirmation and synthetic restore service passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.1vVqVaIH/results/native-verification.json. SHA-256 50c64fa2dc5345dbc28e6ac2b53821da6fb201520890f899accb887769b1ca16. |
 | 32 | 9f7e662e3dcb11052d690d2a2fdc628702f90d7c | PASS 2026-11-20T16:49:24Z to 16:51:04Z. 1,081 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Five handler identities, administrator denials, draft read, export redaction and invalid-import preservation passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.KIvMELh0/results/native-verification.json. SHA-256 2fb4dad0a170d4dac14ebcc8bdaad2ce2d56c96aa517f99a9bea05df48177485. |
+| 33 | 2e9ae5e2fef8af6226d5197fee3a79ccd37e75f2 | PASS 2026-11-20T16:57:48Z to 16:59:19Z. 1,082 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact migration handler and denial precedence, synthetic dry run, pagination, fingerprint and write-conflict checks passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.YfyAG7Va/results/native-verification.json. SHA-256 3be459370e4f6287e1ac17cfe2345b2f5c1febc748c4fcd454282fcbe415d400. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
