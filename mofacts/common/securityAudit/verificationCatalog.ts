@@ -386,6 +386,26 @@ export const HTTP_MIDDLEWARE_VERIFICATIONS = Object.freeze({
     surfaceId: 'middleware:security-headers', cases: socialPreviewCases })] as const),
 });
 
+function filesDdpVerification<N extends string>(name: N, ...cases: [string, ...string[]]) {
+  return Object.freeze({
+    ...middlewareTest, suite: 'maintained upload package ownership',
+    verificationId: `framework.ostrio-files.assets.${name}` as const,
+    surfaceId: `framework:ostrio-files:assets-${name}` as const,
+    cases: Object.freeze(['binds all generated Assets method handlers to the package instance', ...cases] as const),
+  });
+}
+
+export const FILES_DDP_VERIFICATIONS = Object.freeze({
+  _Start: filesDdpVerification('start', 'ignores forged ownership and denies anonymous start'),
+  _Write: filesDdpVerification('write',
+    'rejects cross-user, administrator and anonymous write/finish/abort without changing records or bytes',
+    'resumes from persisted ownership and prevents abort or identifier reuse after completion'),
+  _Abort: filesDdpVerification('abort',
+    'rejects cross-user, administrator and anonymous write/finish/abort without changing records or bytes',
+    'resumes from persisted ownership and prevents abort or identifier reuse after completion'),
+  _Remove: filesDdpVerification('remove', 'keeps client removal disabled on the registered Assets collection'),
+});
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -395,7 +415,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...AUTHENTICATION_SESSION_VERIFICATIONS,
   ...HTTP_HEALTH_VERIFICATIONS.endpoints, HTTP_HEALTH_VERIFICATIONS.fallthrough,
   HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download, ...Object.values(HTTP_FILE_VERIFICATIONS),
-  ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat()]);
+  ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat(), ...Object.values(FILES_DDP_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

@@ -27,6 +27,10 @@ Local changes (including behavior-preserving regex/case-block syntax cleanup for
   identifiers already present in either collection cannot be reused. Client
   FSName does not select a storage path; only the upload ID or a configured
   server namingFunction owns the filename.
+- The server-only registration observer records the names and handler references
+  after the package registers its methods. The audit compares them to Meteor's
+  installed table without wrapping or invoking the methods. Update the Assets
+  owner version in the audit binding when updating this package.
 
 The generated DDP method names and argument shapes are unchanged. The application
 still owns upload eligibility, quotas, completed-asset management and download

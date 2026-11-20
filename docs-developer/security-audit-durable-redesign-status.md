@@ -194,8 +194,15 @@ remains with that production window.
   Remove. Write handles both chunk and finish. The application config
   disables client Remove and package HTTP downloads; the DDP Remove name
   is still registered and must be represented as denied.
-- [ ] Bind the generated Assets methods and verify exact runtime ownership.
-  Existing source coverage rejects re-enabling package HTTP downloads.
+- [x] Bind the generated Assets methods to the maintained package owner.
+  The package records the original four handlers after registration. The
+  application compares exact handler identities in Meteor and returns an
+  explicit unavailable result for a mismatch. Client removal continues
+  to be registered but disabled. The source proof tests genuine and
+  mismatched ownership without executing upload handlers.
+- [ ] Verify the four generated Assets bindings on the exact candidate
+  in native Meteor, including the real client-removal refusal. This is
+  separate from the already completed staging2 package/index release.
 
 Named publications, method and package bindings, composition sealing, full
 registry coverage and Phase 3 staging qualification remain open. The remaining

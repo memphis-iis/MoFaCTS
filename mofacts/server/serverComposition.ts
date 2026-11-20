@@ -109,6 +109,7 @@ import { createTdfLookupHelpers } from './lib/tdfLookup';
 import { registerSparcRetrievalPublication } from './lib/sparcRetrievalPublication';
 import { DEFAULT_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
 import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
+import { bindAssetUploadSurfaceOwner } from './securitySurfaces/bindAssetUploadSurfaces.ts';
 import { createSparcDemoAccess } from './lib/sparcDemoAccess';
 import { createSparcLessonAuthorizer, requireSparcLessonAccess } from './lib/sparcLessonAccess';
 import {
@@ -1171,6 +1172,7 @@ export const asyncMethods: Record<string, unknown> = {
 
 // Server-side startup logic
 Meteor.methods({...methods, ...asyncMethods});
+bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);
 
 registerServerRuntime({
   DynamicAssets,

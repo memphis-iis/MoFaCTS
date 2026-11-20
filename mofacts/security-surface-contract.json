@@ -27,19 +27,23 @@
     },
     {
       "name": "_FilesCollectionAbort_Assets",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Maintained package method; persisted pending-upload ownership is required."
     },
     {
       "name": "_FilesCollectionRemove_Assets",
-      "access": "disabled"
+      "access": "disabled",
+      "notes": "Maintained package registration remains present; Assets disables client removal."
     },
     {
       "name": "_FilesCollectionStart_Assets",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Maintained package method; authenticated caller and application upload eligibility are required."
     },
     {
       "name": "_FilesCollectionWrite_Assets",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Maintained package method; chunk and completion operations require the persisted pending-upload owner."
     },
     {
       "name": "addCourse",

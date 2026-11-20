@@ -4,8 +4,9 @@ import test from 'node:test';
 import { AUTHORIZATION_VERIFICATIONS, auditVerification, AUDIT_VERIFICATIONS, AUTHENTICATION_CONTROL_CASES,
   AUTHENTICATION_PROTOCOL_MUTATIONS, AUTHORIZATION_MUTATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 
-import { HTTP_FILE_VERIFICATIONS, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
+import { FILES_DDP_VERIFICATIONS, HTTP_FILE_VERIFICATIONS, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 import { registerHttpMiddleware, registerProtocolHttpMount, registeredHttpSurfaces } from '../../../server/securitySurfaces/registerHttpRoutes.ts';
+import { observeAssetUploadSurfaces } from '../../../server/securitySurfaces/bindAssetUploadSurfaces.ts';
 
 test('file and unmounted registrations use the original callback and framework call shape', () => {
   const calls = [];
@@ -31,6 +32,33 @@ test('file and unmounted registrations use the original callback and framework c
 });
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../../../security-surface-contract.json', import.meta.url)));
+test('Assets ownership requires the exact registered package handlers and disabled client removal', () => {
+  const operations = Object.keys(FILES_DDP_VERIFICATIONS);
+  const methods = operations.map(operation => ({ operation, name: `_FilesCollection${operation.slice(1)}_Assets`,
+    handler() { throw new Error('Observation must not invoke a method'); } }));
+  const installed = Object.fromEntries(methods.map(method => [method.name, method.handler]));
+  const owner = { observeDdpUploadRegistration: () => ({ collectionName: 'Assets', allowClientCode: false, methods }) };
+  const result = observeAssetUploadSurfaces(owner, () => installed);
+  assert.equal(result.state, 'observed');
+  assert.deepEqual(new Set(result.surfaces.map(row => row.name)), new Set(manifest.methods
+    .filter(row => /^_FilesCollection.*_Assets$/.test(row.name)).map(row => row.name)));
+  const packageSource = fs.readFileSync(new URL('../../../packages/ostrio-files/package.js', import.meta.url), 'utf8');
+  const version = packageSource.match(/\bversion:\s*'([^']+)'/)?.[1];
+  assert.ok(version);
+  for (const row of result.surfaces) {
+    assert.equal(row.owner, `ostrio:files@${version}`);
+    assert.equal(row.verification, AUDIT_VERIFICATIONS.find(entry => entry.verificationId === row.verification.verificationId));
+    assert.ok(Object.isFrozen(row));
+    assert.ok(!('handler' in row));
+  }
+  assert.equal(observeAssetUploadSurfaces(owner, () => ({})).reason, 'asset-package-handler-mismatch');
+  assert.equal(observeAssetUploadSurfaces(owner, () => ({ ...installed, _FilesCollectionStart_Assets() {} })).reason,
+    'asset-package-handler-mismatch');
+  assert.equal(observeAssetUploadSurfaces({ observeDdpUploadRegistration: () => ({
+    collectionName: 'Assets', allowClientCode: true, methods,
+  }) }, () => installed).reason, 'asset-package-configuration');
+});
+
 test('Phase 2 source intent closes exactly over the 22 catalog controls without claiming executed coverage', () => {
   const catalog = JSON.parse(fs.readFileSync(new URL('../../../common/securityAudit/catalogs/control-catalog.v1.json', import.meta.url)));
   assert.deepEqual(AUTHENTICATION_CONTROL_CASES.map(row => row.controlId).sort(), catalog.controls.filter(row => row.producerId === 'authentication').map(row => row.controlId).sort());

@@ -6,6 +6,7 @@ import { FilesCollection } from 'meteor/ostrio:files';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { registeredAssetUploadSurfaces } from '../securitySurfaces/bindAssetUploadSurfaces';
 
 // Real package handlers, Mongo pending records and filesystem streams. No runtime
 // handler replacement. Wire-level/restart probes also run on isolated staging2.
@@ -45,6 +46,23 @@ if (Meteor.isServer) describe('maintained upload package ownership', function() 
   });
   after(async () => { await fs.rm(directory, { recursive: true, force: true }); });
   function id() { const value = Random.id(17); ids.push(value); return value; }
+
+  it('binds all generated Assets method handlers to the package instance', function() {
+    const result = registeredAssetUploadSurfaces();
+    expect(result.state).to.equal('observed');
+    if (result.state !== 'observed') throw new Error('Assets ownership unavailable');
+    expect(result.surfaces.map(row => row.name)).to.have.members([
+      '_FilesCollectionStart_Assets', '_FilesCollectionWrite_Assets', '_FilesCollectionAbort_Assets', '_FilesCollectionRemove_Assets',
+    ]);
+    expect(result.surfaces.every(row => row.owner === 'ostrio:files@3.0.1')).to.equal(true);
+  });
+
+  it('keeps client removal disabled on the registered Assets collection', async function() {
+    const method = (Meteor as any).server.method_handlers._FilesCollectionRemove_Assets;
+    let rejected: any;
+    try { await method.call({ userId: owner }, Random.id()); } catch (error) { rejected = error; }
+    expect(rejected?.error).to.equal(405);
+  });
 
   it('skips package HTTP registration while retaining the DDP methods', async () => {
     const address = WebApp.httpServer.address();
