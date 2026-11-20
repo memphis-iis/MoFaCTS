@@ -311,7 +311,16 @@ remains with that production window.
   the method and manifest entry together. Typecheck, lint (336 surfaces),
   Linux audit source checks (453 passes, seven skips) and all 50 synthetic
   Prolific checks passed.
-- [ ] Verify the Prolific bindings and retired method absence together in Meteor.
+- [x] Verify Prolific binding and lookup retirement together (slot 37).
+  All 16 installed handlers retained participant/researcher access boundaries.
+  The retired method was absent from the actual handler table, and the owned
+  lesson and accessor readers remained registered.
+- [ ] Resolve the lesson-sharing write boundary before migrating it. The current
+  owner-only method updates the root and user references before validating its
+  condition references, and applies child writes outside a transaction. A late
+  error can leave changes in place. Recommend validating and committing all
+  applicable lesson and user updates together while preserving who may change
+  access. This is a source finding; no live lesson was modified.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry
@@ -1766,7 +1775,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 38 total, 35 consumed, 0 reserved, 2 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 38 total, 36 consumed, 0 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 20 Phil authorized five more Phase 3 Meteor invocations, with fewer
 full runs where related source-checked changes can share one exact-source run.
@@ -1827,6 +1836,7 @@ within this allowance. Do not import historical invocations into this counter.
 | 34 | 715eb02c186edf3490271d239a263c11ce53be95 | PASS 2026-11-20T18:10:58Z to 18:12:34Z. 1,086 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Seven exact handlers, assigned-condition controls and download session/scope regressions passed. Source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.riku5IGJ/results/native-verification.json. SHA-256 e9854f46a0457ffeb792657bc60fe04191f0d943d338ab68b8896deaa0c58691. |
 | 35 | c04cd8e802c17331dc589940c65abc22542e8911 | PASS 2026-11-20T18:22:38Z to 18:24:30Z. 1,091 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Seven registered handlers, private warning suppression, simulation attempt ownership, and admin-only trace export passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.IegOflsU/results/native-verification.json. SHA-256 4ced551f2b85f1372a9213f4ac5714563300ed128692a8e4130f78d3df68bf8d. |
 | 36 | 6d8a42596320b6f4e854c156b27339e8ecb747ae | PASS 2026-11-20T18:33:53Z to 18:35:54Z. 1,093 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Four installed entries, observed DDP rules, passwordless progress return and cross-study denial passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.R2fGsxYi/results/native-verification.json. SHA-256 3ce69678ce90180d010a8650df46c171fa36738662c6ed6fcb09855816311092. |
+| 37 | 82f48c57e1ed8f124b553b61a56bbf7063034755 | PASS 2026-11-20T18:46:00Z to 18:48:01Z. 1,095 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. All 16 Prolific bindings and access checks passed. The approved obsolete lookup was absent from the native registry. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.U0zglv7j/results/native-verification.json. SHA-256 2b698432a7ae99d86f071d056656ac664cc8bfde88a8f76e39872da71c89e625. |
 
 Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
 P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
