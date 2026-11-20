@@ -318,8 +318,12 @@ remains with that production window.
 - [x] Apply the approved all-or-nothing lesson-sharing design. The owner check,
   family validation, authorized lesson changes and user references share one
   MongoDB transaction. Children belonging to other owners remain excluded.
-- [ ] Verify installed sharing-method identity, owner authorization, rollback
+- [x] Verify installed sharing-method identity, owner authorization, rollback
   after a late child write failure, grants and revocations on the Linux worker.
+  Slot 38 passed the named case, including exclusion of a different owner's child.
+- [ ] Decide whether the owner-facing accessor lookup should return only the
+  user ID and display username. It currently forwards all stored accessor fields;
+  the tracked grant and revoke interfaces use only those two fields.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry
@@ -1774,7 +1778,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 38 total, 36 consumed, 0 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 38 total, 37 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 38 consumed on 92e3a04d. Native Linux integration passed at 20:04:19 to 20:06:40 UTC on 2026-11-20 (1,096 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 2e72ebe6915a5c5a4f46f09ee282a88619ab21feb6a3a6fff019b058ac339ca4.
 
 On November 20 Phil authorized five more Phase 3 Meteor invocations, with fewer
 full runs where related source-checked changes can share one exact-source run.
