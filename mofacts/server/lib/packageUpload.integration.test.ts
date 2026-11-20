@@ -2,8 +2,11 @@ import { strict as assert } from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { Mongo } from 'meteor/mongo';
+import { Random } from 'meteor/random';
 
 import { createContentAssetMaintenanceMethods } from '../methods/contentAssetMaintenanceMethods';
+import { createPackageMethods } from '../methods/packageMethods';
 import { processPackageUploadWorkflow } from './packageUpload';
 import type { ProcessPackageUploadDeps } from './packageUploadShared';
 
@@ -110,6 +113,7 @@ function createWorkflowDeps(state: IntegrationState): ProcessPackageUploadDeps {
         stimuli: [],
         tdfFileName: record.fileName,
         tdfRevision: 1,
+        packageWriteJobId: record.mutationJobId,
         tdfAvailability: 'available',
       };
       return { res: 'upserted', stimuliSetId: 17, tdfId: record.tdfId };
@@ -148,7 +152,9 @@ function createWorkflowDeps(state: IntegrationState): ProcessPackageUploadDeps {
         };
       },
       async findOneAsync(selector) {
-        return selector._id === 'known-tdf-id' ? state.storedTdf : null;
+        if (selector._id !== 'known-tdf-id') return null;
+        if (selector.packageWriteJobId !== undefined && selector.packageWriteJobId !== state.storedTdf.packageWriteJobId) return null;
+        return state.storedTdf;
       },
       async upsertAsync() {},
       async updateAsync(selector, modifier) {
@@ -181,6 +187,51 @@ describe('package upload identity confirmation integration', function() {
     if (zipPath && fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
     zipPath = '';
   });
+
+  for (const rootVisibility of ['true', 'false']) {
+    for (const childFirst of [false, true]) {
+      it(`keeps a ${rootVisibility === 'true' ? 'public' : 'private'} root and guards its condition write with the ${childFirst ? 'child' : 'root'} first`, async function() {
+        this.timeout(15000);
+        const zip = new JSZip();
+        const root = { tutor: { setspec: { lessonname: 'Study', stimulusfile: 'stimuli.json',
+          userselect: rootVisibility, condition: ['child.json'] } } };
+        const child = { tutor: { setspec: { lessonname: 'Condition', stimulusfile: 'stimuli.json', userselect: 'true' }, unit: [{}] } };
+        for (const name of childFirst ? ['child.json', 'root.json'] : ['root.json', 'child.json']) {
+          zip.file(name, JSON.stringify(name === 'root.json' ? root : child));
+        }
+        zip.file('stimuli.json', JSON.stringify({ setspec: { clusters: [] } }));
+        zipPath = await writePackage(zip);
+        const state: IntegrationState = { contentWrites: 0, removedAssetIds: [], storedTdf: null };
+        const deps = createWorkflowDeps(state);
+        const tdfs = new Mongo.Collection<any>(`packageVisibility${Random.id()}`);
+        let nextStimuliSet = 101;
+        const methods = createPackageMethods({ ...deps, Tdfs: tdfs,
+          usersCollection: { async findOneAsync() { return { profile: { displayName: 'Synthetic teacher' } }; } },
+          allocateNextStimuliSetId: () => nextStimuliSet++,
+        } as unknown as Parameters<typeof createPackageMethods>[0]);
+        const asset = { _id: 'asset-visibility', path: zipPath, userId: 'owner-1', ext: 'zip',
+          name: 'condition-package.zip', size: fs.statSync(zipPath).size };
+        const conditionIds = 'content.tdfs.tutor.setspec.conditionTdfIds';
+        await tdfs.rawCollection().createIndex({ [conditionIds]: 1 }, {
+          unique: true, partialFilterExpression: { [`${conditionIds}.0`]: { $exists: true } },
+        });
+        try {
+          const result = await methods.processPackageUpload.call({ userId: 'owner-1' }, asset, 'owner-1', '', false);
+          assert.equal(result?.status, 'complete');
+          const storedRoot = await tdfs.findOneAsync({ tdfFileName: 'root.json' });
+          const storedChild = await tdfs.findOneAsync({ tdfFileName: 'child.json' });
+          assert.equal(storedRoot?.content.tdfs.tutor.setspec.userselect, rootVisibility);
+          assert.equal(storedChild?.content.tdfs.tutor.setspec.userselect, 'false');
+          assert.deepEqual(storedRoot?.content.tdfs.tutor.setspec.conditionTdfIds, [storedChild?._id]);
+          assert.equal(storedRoot?.packageWriteJobId, state.mutationJob._id);
+          assert.equal(storedChild?.packageWriteJobId, state.mutationJob._id);
+          assert.equal(storedChild?.tdfRevision, 1);
+        } finally {
+          await tdfs.rawCollection().drop();
+        }
+      });
+    }
+  }
 
   it('rejects two roots claiming one condition before starting an upload mutation', async function() {
     const zip = new JSZip();
@@ -361,5 +412,28 @@ describe('package upload identity confirmation integration', function() {
     assert.equal(state.storedTdf.content.fileName, 'previous-name.json');
     assert.equal(state.storedTdf.tdfAvailability, 'repair-required');
     assert.equal(state.storedTdf.tdfRevision, 0);
+  });
+
+  it('leaves a newer writer untouched when a package fails during post-processing', async function() {
+    zipPath = await writeIdentityPackage('known-tdf-id');
+    const state: IntegrationState = { contentWrites: 0, removedAssetIds: [], storedTdf: null };
+    const deps = createWorkflowDeps(state);
+    let winner: any;
+    deps.processAudioFilesForTDF = async () => {
+      winner = { ...structuredClone(state.storedTdf), packageWriteJobId: 'winning-job', tdfFileName: 'winner.json' };
+      state.storedTdf = structuredClone(winner);
+      throw new Error('forced synthetic package failure');
+    };
+    const asset = { _id: 'asset-failed-contender', path: zipPath, userId: 'owner-1', ext: 'zip',
+      name: 'identity-package.zip', size: fs.statSync(zipPath).size };
+    const review = await processPackageUploadWorkflow({ userId: 'owner-1' }, asset, 'owner-1', false, deps) as any;
+    await assert.rejects(() => processPackageUploadWorkflow({ userId: 'owner-1' }, asset, 'owner-1', false, deps, undefined, {
+      confirmedIdentityFingerprint: state.mutationJob.identityFingerprint,
+      expectedArchiveSha256: state.mutationJob.archiveSha256,
+      mutationJobId: review.uploadPlanId,
+    }), /forced synthetic package failure/);
+    assert.equal(state.mutationJob.status, 'rolled-back');
+    assert.equal(winner.tdfRevision, 1);
+    assert.deepEqual(state.storedTdf, winner);
   });
 });

@@ -325,6 +325,7 @@ export async function preflightPackageTdfIdentities(args: {
         stimuli: existingById.get(tdfId).stimuli,
         packageFile: existingById.get(tdfId).packageFile,
         packageAssetId: existingById.get(tdfId).packageAssetId,
+        packageWriteJobId: existingById.get(tdfId).packageWriteJobId,
         conditionCounts: existingById.get(tdfId).conditionCounts,
         tdfAvailability: existingById.get(tdfId).tdfAvailability,
         tdfIdentityState: existingById.get(tdfId).tdfIdentityState,

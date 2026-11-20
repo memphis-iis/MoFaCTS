@@ -264,13 +264,31 @@ two Phase 3 Meteor runs authorized for this sequence were used in slots 19 and 2
   affected source-security and exact-source Meteor checks passed.
   Deployment database inventory, end-to-end competing upload recovery,
   and activation of the database constraint remain open.
-- [ ] Decide the rollout for a database constraint across experiment roots.
-  A partial unique index on existing condition IDs can enforce this across
-  concurrent writers. It requires a count-only preflight on the deployment
-  data and a defined response if there are duplicate references. Leave
-  existing condition assignments and learner progress untouched. Confirm
-  failed package recovery can only restore writes owned by that package
-  before activating a constraint on a shared database.
+- [x] Approve job-owned rollback followed by staging2 qualification of
+  MongoDB condition-root uniqueness, then a count-only production
+  preflight at cutover. Preserve existing assignments and progress.
+- [x] Verify the focused rollback ownership cases locally. A competing
+  job that reached the same revision is preserved. An owned write is
+  restored only with a matching job ID and revision. Mismatched revisions
+  and legacy interrupted jobs without ownership proof are retained for review.
+- [x] Move the approved condition visibility enforcement into the child
+  TDF write that records the writer job. Preserve both reference checks
+  and the root-based learner access policy. Use the same ownership-aware
+  TDF restore for upload failure and startup recovery. Keep interrupted
+  legacy jobs without write ownership evidence for review.
+- [ ] Verify full package rollback and visibility in Meteor. Four synthetic
+  database-backed package cases cover public and private roots and both
+  archive orders. The supported suite also checks parent-based visibility
+  and the existing failure and startup recovery paths.
+- [x] Verify the operator script in disposable MongoDB. Its read-only run
+  counted a synthetic shared ID, and apply refused without changing the two
+  existing rows. On clean data it installed the index. Two competing
+  inserts produced one success, and standalone lessons remained accepted.
+- [ ] Qualify the count-only check and named partial unique index on staging2
+  after the rollback integration passes. The operator script requires an
+  explicit database name and an explicit apply flag. It refuses to install
+  over shared condition IDs or invalid IDs, without editing the records.
+  Production inventory and any index installation remain at cutover.
 
 ## Staging2 reset-expiry qualification resumed (2026-11-18)
 
@@ -1589,7 +1607,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 25 total, 24 consumed, 0 reserved, 0 available for continued Phase 3 work, and 1 for the earlier `/health` batch only.**
+**Current allowance: 26 total, 24 consumed, 0 reserved, 1 available for the approved package rollback and visibility batch, and 1 for the earlier `/health` batch only.**
 
 Phil authorized five additional Phase 3 invocations on the same isolated worker after slot 20.
 

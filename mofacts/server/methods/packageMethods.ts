@@ -7,6 +7,7 @@ import { check, Match } from 'meteor/check';
 import { parsePackageZip, disposeParsedPackage, type UploadedPackageFile } from '../lib/packageParser';
 import { processPackageUploadWorkflow } from '../lib/packageUpload';
 import { assertPackageConditionOwnership } from '../lib/packageTdfIdentity';
+import { PACKAGE_WRITE_OWNERSHIP } from '../lib/tdfMutationRecovery';
 import { uploadPackageMedia } from '../lib/mediaUploader';
 import type { PackageUploadIntegrity, ProcessPackageUploadDeps } from '../lib/packageUploadShared';
 import type { createStorageBoundary } from '../lib/storageBoundary';
@@ -87,6 +88,7 @@ type PackagePayload = {
   tdfs: TdfPayload['tdfs'];
   conditionTdfIds?: Array<string | null>;
   expectedRevision: number;
+  mutationJobId: string;
 };
 
 type PrivateRepoTdfRecord = {
@@ -335,7 +337,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     await requireContentCreatorDisplayName(deps.usersCollection, actingUserId);
     const claimed = await deps.TdfMutationJobs.updateAsync(
       { _id: uploadPlanId, actorUserId: actingUserId, status: 'awaiting-confirmation' },
-      { $set: { status: 'committing', updatedAt: new Date() }, $unset: { cleanupAt: '', confirmationExpiresAt: '' } },
+      { $set: { status: 'committing', contentWriteOwnership: PACKAGE_WRITE_OWNERSHIP, updatedAt: new Date() }, $unset: { cleanupAt: '', confirmationExpiresAt: '' } },
     );
     if (claimed !== 1) {
       throw new Meteor.Error('upload-plan-conflict', 'This upload plan is already being processed.');
@@ -775,20 +777,6 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     return stimuliSetId
   }
 
-  async function enforceConditionChildUserSelect(conditionTdfIds: Array<string | null>) {
-    const validIds = [...new Set(conditionTdfIds.filter((id): id is string => typeof id === 'string' && id.length > 0))];
-    if (validIds.length > 0) {
-      await deps.Tdfs.updateAsync(
-        { _id: { $in: validIds } },
-        {
-          $set: { 'content.tdfs.tutor.setspec.userselect': 'false' },
-          $inc: { tdfRevision: 1 },
-        },
-        { multi: true },
-      );
-    }
-  }
-
   function normalizeOptionalString(value: unknown): string | null {
     if (typeof value !== 'string') {
       return null;
@@ -810,6 +798,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (!packageAssetId) {
       throw new Meteor.Error(500, 'Package asset id missing during package upsert');
     }
+    if (!packageJSON.mutationJobId) throw new Error('Package content write requires a mutation job');
     const Tdf = packageJSON.tdfs;
     assertValidTdfExpressions(Tdf, `${packageJSON.fileName}.tdfs.tutor`);
     const lessonName = deps.legacyTrim(Tdf.tutor.setspec.lessonname);
@@ -902,6 +891,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       ownerId: persistedOwnerId,
       packageFile: packageFile,
       packageAssetId: packageAssetId,
+      packageWriteJobId: packageJSON.mutationJobId,
       rawStimuliFile: stimJSON,
       stimuli: formattedStims,
       stimuliSetId: stimuliSetId,
@@ -926,8 +916,6 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         tdfRevision: 1,
       });
     }
-    await enforceConditionChildUserSelect(Tdf.tutor.setspec.conditionTdfIds ?? []);
-
     return { res: 'upserted', stimuliSetId: stimuliSetId, tdfId }
   }
 
