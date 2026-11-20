@@ -59,7 +59,8 @@
     },
     {
       "name": "admin.backups.config",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The backup method policy checks administrator access before returning configuration status."
     },
     {
       "name": "admin.backups.create",
@@ -71,7 +72,8 @@
     },
     {
       "name": "admin.backups.downloadToken",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The backup method policy checks administrator access before issuing a one-use archive download capability."
     },
     {
       "name": "admin.backups.get",
@@ -83,7 +85,8 @@
     },
     {
       "name": "admin.backups.restore",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The backup method policy checks administrator access before validating restore confirmation or starting restore work."
     },
     {
       "name": "admin.backups.verify",

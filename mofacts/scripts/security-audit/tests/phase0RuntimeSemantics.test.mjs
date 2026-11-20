@@ -123,9 +123,10 @@ test('Phase 0 compatibility: backup authorization, validation, unblock and actor
   class SyntheticMeteorError extends Error {
     constructor(code, reason) { super(reason); this.error = code; }
   }
-  const factory = namedFunction(source, 'createBackupMethods', {
+  const verification = Object.freeze({ method: 'admin.backups.verify', surfaceId: 'method:admin.backups.verify' });
+  const factory = namedFunction(source, 'createBackupMethodRegistration', {
     Meteor: { Error: SyntheticMeteorError },
-    requireAdmin: namedFunction(source, 'requireAdmin'),
+    BACKUP_METHOD_VERIFICATIONS: { 'admin.backups.verify': verification },
     actorFromContext: namedFunction(source, 'actorFromContext'),
     runExclusiveBackupOperation: (work) => work(),
     verifyBackupJob: async (_deps, actor, id) => { calls.push(['verify', actor.userId, actor.connection.clientAddress, id]); return 'synthetic-result'; },
@@ -134,7 +135,11 @@ test('Phase 0 compatibility: backup authorization, validation, unblock and actor
     calls.push(['authorize', id]);
     if (id !== 'synthetic-admin') throw new SyntheticMeteorError('not-authorized', 'Synthetic denial');
   } };
-  const method = factory(deps)['admin.backups.verify'];
+  const registration = factory(deps);
+  const method = registration.methods['admin.backups.verify'];
+  const binding = registration.methodBindings.find(entry => entry.verification === verification);
+  assert.equal(binding.handler, method);
+  assert.equal(binding.policy.role, 'admin');
   const context = { userId: 'synthetic-admin', connection: { clientAddress: '192.0.2.1' }, unblock() { calls.push(['unblock']); } };
   assert.equal(await method.call(context, ' synthetic-job '), 'synthetic-result');
   assert.deepEqual(calls, [['authorize', 'synthetic-admin'], ['unblock'], ['verify', 'synthetic-admin', '192.0.2.1', 'synthetic-job']]);

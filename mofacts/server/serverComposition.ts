@@ -71,7 +71,7 @@ import type { CourseAssignmentHistoryContext } from '../common/courseAssignments
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
 import { createLearnerAnalyticsMethods } from './methods/learnerAnalyticsMethods';
 import { createDeploymentReadinessRegistration } from './methods/deploymentReadinessMethods';
-import { createBackupMethods, createBackupRegistry } from './methods/backupMethods';
+import { createBackupMethodRegistration, createBackupRegistry } from './methods/backupMethods';
 import { createSecurityAuditRuntimeV2 } from './securityAudit/securityAuditRuntimeV2';
 import { SecurityAuditReportsV2 } from './securityAudit/securityAuditCollectionsV2';
 import { registerSecurityAuditHttp } from './http/securityAudits';
@@ -1089,6 +1089,14 @@ const deploymentReadiness = createDeploymentReadinessRegistration({
   usersCollection: MeteorAny.users,
   redisBoundary,
 });
+const backupRegistration = createBackupMethodRegistration({
+  settings: Meteor.settings || {},
+  backupJobs: createBackupRegistry(BackupJobs),
+  rawDatabase: () => Tdfs.rawDatabase(),
+  usersCollection: MeteorAny.users,
+  auditLog: AuditLog,
+  requireAdminUser: authSupport.requireAdminUser,
+});
 export const asyncMethods: Record<string, unknown> = {
   ...createTdfIdentityMigrationMethods({
     Tdfs,
@@ -1160,21 +1168,17 @@ export const asyncMethods: Record<string, unknown> = {
 
   ...deploymentReadiness.methods,
 
-  ...createBackupMethods({
-    settings: Meteor.settings || {},
-    backupJobs: createBackupRegistry(BackupJobs),
-    rawDatabase: () => Tdfs.rawDatabase(),
-    usersCollection: MeteorAny.users,
-    auditLog: AuditLog,
-    requireAdminUser: authSupport.requireAdminUser,
-  }),
+  ...backupRegistration.methods,
 
   ...securityAuditRuntime.methods,
 }
 
 // Server-side startup logic
-registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [...securityAuditRuntime.methodBindings, deploymentReadiness.methodBinding],
-  () => MeteorAny.server?.method_handlers);
+registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
+  ...securityAuditRuntime.methodBindings,
+  deploymentReadiness.methodBinding,
+  ...backupRegistration.methodBindings,
+], () => MeteorAny.server?.method_handlers);
 bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);
 
 registerServerRuntime({

@@ -231,6 +231,11 @@ remains with that production window.
 - [x] Trace the eight admin backup methods as the next registration family.
   The factory owns their shared administrator decision. It precedes argument
   and confirmation validation, unblocking, job reads and service operations.
+- [x] Bind all eight admin backup methods to the shared factory policy.
+  Preserve validation and unblocking order, actor context, and configuration,
+  job-metadata and one-use download egress. Typecheck, lint and Linux source
+  checks passed (453 passes, seven skips), including Phase 0 ordering parity.
+- [ ] Verify the backup bindings and the disposable archive fixture in Meteor.
 
 Named publications, method and package bindings, composition sealing, full
 registry coverage and Phase 3 staging qualification remain open. The remaining

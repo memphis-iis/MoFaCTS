@@ -440,6 +440,33 @@ export const DEPLOYMENT_READINESS_VERIFICATION = Object.freeze({
   ]),
 } as const);
 
+function backupMethodVerification<N extends string>(operation: N) {
+  const method = `admin.backups.${operation}` as const;
+  return Object.freeze({
+    ...middlewareTest, suite: 'backupMethods',
+    verificationId: `method.admin-backups.${operation}` as const,
+    surfaceId: `method:${method}` as const,
+    method,
+    cases: Object.freeze([
+      'binds all backup methods and authorizes before validation or unblocking',
+      operation === 'restore'
+        ? 'requires explicit restore confirmation before guarded restore work starts'
+        : 'preserves authorized operations on a disposable backup archive',
+    ]),
+  });
+}
+
+export const BACKUP_METHOD_VERIFICATIONS = Object.freeze({
+  'admin.backups.config': backupMethodVerification('config'),
+  'admin.backups.list': backupMethodVerification('list'),
+  'admin.backups.get': backupMethodVerification('get'),
+  'admin.backups.create': backupMethodVerification('create'),
+  'admin.backups.verify': backupMethodVerification('verify'),
+  'admin.backups.downloadToken': backupMethodVerification('downloadToken'),
+  'admin.backups.delete': backupMethodVerification('delete'),
+  'admin.backups.restore': backupMethodVerification('restore'),
+});
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -450,7 +477,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...HTTP_HEALTH_VERIFICATIONS.endpoints, HTTP_HEALTH_VERIFICATIONS.fallthrough,
   HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download, ...Object.values(HTTP_FILE_VERIFICATIONS),
   ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat(), ...Object.values(FILES_DDP_VERIFICATIONS),
-  ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS), DEPLOYMENT_READINESS_VERIFICATION]);
+  ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS), DEPLOYMENT_READINESS_VERIFICATION, ...Object.values(BACKUP_METHOD_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }
