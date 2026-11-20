@@ -1,5 +1,5 @@
 import { publishContentUploadMetadata } from './lib/contentUploadMetadataPublication';
-import { createSimulationTelemetryMethods } from './methods/simulationTelemetryMethods';
+import { createSimulationTelemetryRegistration } from './methods/simulationTelemetryMethods';
 import { ensureSimulationTelemetryIndexes, removeSimulationResearchUserRecords } from './lib/simulationTelemetry';
 import { createSparcVideoCatalogMethods } from './methods/sparcVideoCatalogMethods';
 import { createSparcLibraryCurationMethods } from './methods/sparcLibraryCurationMethods';
@@ -93,7 +93,7 @@ import { createSparcFigureClusterLabeler } from './lib/sparcFigureClusterLabels'
 import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods } from './methods/systemMethods';
-import { createRecoverableWarningMethods } from './methods/recoverableWarningMethods';
+import { createRecoverableWarningRegistration } from './methods/recoverableWarningMethods';
 import { createTdfIdentityMigrationRegistration } from './methods/tdfIdentityMigrationMethods';
 import {
   createThemeMethods,
@@ -729,9 +729,10 @@ function normalizeCanonicalId(value: unknown): string | null {
 }
 
 const brandProfileRegistration = createDeploymentBrandProfileRegistration({ requireAdminUser });
+const warningRegistration = createRecoverableWarningRegistration({ auditLog: AuditLog, requireAdminUser });
 export const methods: any = {
   ...createProlificMethods({ participation: prolificParticipation, management: prolificManagement, authorization: getMethodAuthorizationDeps, rateLimit: applyMethodRateLimit }),
-  ...createRecoverableWarningMethods({ auditLog: AuditLog, requireAdminUser }),
+  ...warningRegistration.methods,
   ...createSystemMethods({
     validateProlificLockout: prolificParticipation.validateLockout,
     serverConsole,
@@ -1103,6 +1104,11 @@ const tdfIdentityMigration = createTdfIdentityMigrationRegistration({
   userIsInRoleAsync: (userId, roles) => Roles.userIsInRoleAsync(userId, roles),
   serverConsole,
 });
+const simulationTelemetry = createSimulationTelemetryRegistration({
+  getMethodAuthorizationDeps,
+  writeHistory: (userId, record) => analyticsRegistration.methods.insertHistory.call({ userId }, record),
+  loadLesson: id => Tdfs.findOneAsync({ _id: id }, { fields: { 'rawStimuliFile.setspec.sparcPages': 1 } }),
+});
 export const asyncMethods: Record<string, unknown> = {
   ...tdfIdentityMigration.methods,
   getTdfByExperimentTarget: getTdfByExperimentTargetPublic,
@@ -1128,8 +1134,7 @@ export const asyncMethods: Record<string, unknown> = {
   getTdfById: getTdfByIdPublic,
 
   ...speechMethods,
-  ...createSimulationTelemetryMethods({ getMethodAuthorizationDeps, writeHistory: (userId, record) => analyticsRegistration.methods.insertHistory.call({ userId }, record),
-    loadLesson: id => Tdfs.findOneAsync({ _id: id }, { fields: { 'rawStimuliFile.setspec.sparcPages': 1 } }) }),
+  ...simulationTelemetry.methods,
 
   ...createSparcLibraryCurationMethods({ getMethodAuthorizationDeps,
     remove: id => withSparcFigureLibraryLock(() => sparcLibraryCuration.remove(id)), removed: readSparcAdministrativeRemovals }),
@@ -1181,6 +1186,8 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...brandProfileRegistration.methodBindings,
   tdfIdentityMigration.methodBinding,
   ...analyticsRegistration.methodBindings,
+  ...warningRegistration.methodBindings,
+  ...simulationTelemetry.methodBindings,
 ], () => MeteorAny.server?.method_handlers);
 bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);
 

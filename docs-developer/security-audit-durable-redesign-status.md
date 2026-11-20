@@ -279,6 +279,13 @@ remains with that production window.
   All seven installed handlers matched their policies. Assigned-condition
   acceptance and denial, disabled class export, ownership, ordinary/participant
   session boundaries, and existing download regression cases passed.
+- [x] Bind the two recoverable-warning methods and five simulation telemetry
+  methods to their existing policies. Preserve study-only diagnostic
+  suppression, projected admin warning reads, exact lesson and package
+  checks, attempt-owner enforcement inside services and admin trace exports.
+  Typecheck, lint, Linux audit source checks (453 passes, seven skips) and
+  all 16 existing simulation source tests passed.
+- [ ] Verify the warning and simulation telemetry families together in Meteor.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry

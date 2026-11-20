@@ -23,7 +23,8 @@
     },
     {
       "name": "exportSimulationResearchTrace",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The registered policy checks administrator access before exporting a bounded trace page."
     },
     {
       "name": "_FilesCollectionAbort_Assets",
@@ -228,7 +229,7 @@
     },
     {
       "name": "downloadDataByClass",
-      "access": "authenticated-self",
+      "access": "disabled",
       "notes": "The registered method preserves its login error and denies signed-in callers. This flow issues no export."
     },
     {
@@ -453,7 +454,8 @@
     },
     {
       "name": "getRecoverableWarnings",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "The registered policy checks administrator access before validating cursors or reading projected warnings."
     },
     {
       "name": "getPasswordHashRuntimeInfo",

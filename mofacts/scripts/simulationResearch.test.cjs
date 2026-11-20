@@ -49,10 +49,10 @@ Module._load = function(name, parent, main) {
   return load.call(this, name, parent, main);
 };
 const storage = require('../server/lib/simulationTelemetry.ts');
-const { createSimulationTelemetryMethods } = require('../server/methods/simulationTelemetryMethods.ts');
+const { createSimulationTelemetryRegistration } = require('../server/methods/simulationTelemetryMethods.ts');
 const { SimulationResearchHost } = require('../client/views/experiment/svelte/services/simulationResearchHost.ts');
 Module._load = load;
-const methods = createSimulationTelemetryMethods({ writeHistory, loadLesson:async()=>({rawStimuliFile:{setspec:{sparcPages:[{pageId:'page',display:{nodes:[{id:'simulation',atomType:'simulation',simulation:{buildId,asset,bindings:[{name:'mass',address:{path:'screens.0.model.mass'},projection:'value'}]}}]}}]}}}), getMethodAuthorizationDeps: () => ({
+const { methods } = createSimulationTelemetryRegistration({ writeHistory, loadLesson:async()=>({rawStimuliFile:{setspec:{sparcPages:[{pageId:'page',display:{nodes:[{id:'simulation',atomType:'simulation',simulation:{buildId,asset,bindings:[{name:'mass',address:{path:'screens.0.model.mass'},projection:'value'}]}}]}}]}}}), getMethodAuthorizationDeps: () => ({
   requireSparcLessonAccess: async (user, tdf) => { if (tdf !== 'lesson') throw Error('no lesson access'); },
   userIsInRoleAsync: async user => user === 'admin',
 }) });

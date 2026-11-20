@@ -539,6 +539,37 @@ export const HISTORY_DOWNLOAD_METHOD_VERIFICATIONS = Object.freeze({
     'returns a single-lesson streaming capability while keeping ownership enforcement'),
 });
 
+function telemetryMethodVerification<N extends string>(method: N, suite: string, ...cases: [string, ...string[]]) {
+  return Object.freeze({
+    ...middlewareTest, suite, method, surfaceId: `method:${method}` as const,
+    verificationId: `method.diagnostic-telemetry.${method}` as const, cases: Object.freeze(cases),
+  });
+}
+
+export const WARNING_METHOD_VERIFICATIONS = Object.freeze({
+  reportRecoverableWarning: telemetryMethodVerification('reportRecoverableWarning', 'recoverable warning log methods',
+    'binds both installed warning methods to their existing authorization',
+    'accepts bounded authenticated reports and derives identity and time on the server',
+    'skips stored diagnostics for private participants before validating the report',
+    'rejects anonymous, unknown, oversized and text-bearing reports'),
+  getRecoverableWarnings: telemetryMethodVerification('getRecoverableWarnings', 'recoverable warning log methods',
+    'binds both installed warning methods to their existing authorization',
+    'denies non-admin reads before querying and uses bounded chronological cursor pages'),
+});
+
+const simulationSuite = 'simulation telemetry runtime bindings';
+const simulationBindingCase = 'binds the five installed methods and denies unsigned telemetry operations';
+export const SIMULATION_METHOD_VERIFICATIONS = Object.freeze({
+  startSimulationResearchAttempt: telemetryMethodVerification('startSimulationResearchAttempt', simulationSuite, simulationBindingCase),
+  interruptSimulationResearchActivity: telemetryMethodVerification('interruptSimulationResearchActivity', simulationSuite, simulationBindingCase),
+  ingestSimulationResearchBatch: telemetryMethodVerification('ingestSimulationResearchBatch', simulationSuite, simulationBindingCase,
+    'preserves owner checks in the installed attempt operations'),
+  endSimulationResearchAttempt: telemetryMethodVerification('endSimulationResearchAttempt', simulationSuite, simulationBindingCase,
+    'preserves owner checks in the installed attempt operations'),
+  exportSimulationResearchTrace: telemetryMethodVerification('exportSimulationResearchTrace', simulationSuite, simulationBindingCase,
+    'preserves administrator authorization for the installed trace export'),
+});
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -551,7 +582,8 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat(), ...Object.values(FILES_DDP_VERIFICATIONS),
   ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS), DEPLOYMENT_READINESS_VERIFICATION, ...Object.values(BACKUP_METHOD_VERIFICATIONS),
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
-  ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS)]);
+  ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
+  ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }
