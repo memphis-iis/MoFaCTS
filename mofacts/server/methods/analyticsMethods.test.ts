@@ -3,7 +3,10 @@ import { expect } from 'chai';
 import { progressiveRevisionId } from '../lib/progressiveAssignmentRevision';
 import { HistoryCommitConflictError } from '../lib/historyCommitStorage';
 import { SparcContentAlreadyUsedError } from '../lib/sparcContentUse';
-import { createAnalyticsMethods } from './analyticsMethods';
+import { createAnalyticsMethodRegistration } from './analyticsMethods';
+
+const createAnalyticsMethods = (deps: Parameters<typeof createAnalyticsMethodRegistration>[0]) =>
+  createAnalyticsMethodRegistration(deps).methods;
 
 function createMeteorErrorClass() {
   return class MeteorError extends Error {

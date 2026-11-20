@@ -12,11 +12,19 @@ export type MeteorMethodBinding = Readonly<{
     kind: 'role';
     role: 'admin';
     authorize: (userId: string | null | undefined) => Promise<string | void>;
+  }> | Readonly<{
+    kind: 'study-condition-count';
+    operation: 'replace' | 'increment' | 'reset';
+    authorize: (...args: never[]) => Promise<void>;
+  }> | Readonly<{
+    kind: 'history-download';
+    operation: 'owned-lessons' | 'own-history' | 'disabled-class' | 'owned-lesson';
+    authorize: (...args: never[]) => unknown;
   }>;
   dataEgress: 'audit-report-list' | 'audit-report-summary' | 'audit-download-capability' | 'deployment-diagnostics'
     | 'backup-configuration' | 'backup-job-metadata' | 'backup-download-capability'
     | 'brand-profile-draft' | 'published-brand-profile' | 'redacted-brand-profile-export'
-    | 'filename-reference-migration-report';
+    | 'filename-reference-migration-report' | 'history-download-capability' | 'none';
 }>;
 
 let observe: (() => ReturnType<typeof observeMeteorMethodBindings>) | undefined;
@@ -37,8 +45,10 @@ export function observeMeteorMethodBindings(
       return { state: 'unavailable', reason: 'application-method-handler-mismatch' } as const;
     }
     names.add(name);
-    surfaces.push(Object.freeze({ name, surfaceId, verification,
-      policy: Object.freeze({ kind: policy.kind, role: policy.role }), dataEgress }));
+    const policyMetadata = policy.kind === 'role'
+      ? { kind: policy.kind, role: policy.role }
+      : { kind: policy.kind, operation: policy.operation };
+    surfaces.push(Object.freeze({ name, surfaceId, verification, policy: Object.freeze(policyMetadata), dataEgress }));
   }
   return Object.freeze({ state: 'observed', surfaces: Object.freeze(surfaces) } as const);
 }

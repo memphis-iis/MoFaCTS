@@ -19,8 +19,8 @@ import {
   recordStimulusCrowdOutcome,
   type StimulusCrowdStatsCollection,
 } from '../lib/stimulusCrowdStats';
-import { createAnalyticsConditionCountMethods } from './analyticsConditionCountMethods';
-import { createAnalyticsDownloadMethods } from './analyticsDownloadMethods';
+import { createAnalyticsConditionCountRegistration } from './analyticsConditionCountMethods';
+import { createAnalyticsDownloadRegistration } from './analyticsDownloadMethods';
 import type { LearningHistoryReadOptions } from '../../../learning-components/units/UnitEngineServerMethods';
 import { curSemester } from '../../common/Definitions';
 import { collectLessonFamilyRefs, createLessonFamilyResolver } from '../lib/tdfLessonFamilyResolver';
@@ -136,7 +136,7 @@ function buildLearningHistoryScopeMatch(
   };
 }
 
-export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
+export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
   const lessonFamilies = createLessonFamilyResolver({ tdfs: deps.Tdfs });
 
   async function validateCourseEnrollmentForUser(userId: string, courseId: string) {
@@ -1687,10 +1687,10 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     return lessonId;
   }
 
-  const downloadMethods = createAnalyticsDownloadMethods(deps);
-  const conditionCountMethods = createAnalyticsConditionCountMethods(deps, { validateExperimentStateMutation });
+  const downloads = createAnalyticsDownloadRegistration(deps);
+  const conditionCounts = createAnalyticsConditionCountRegistration(deps, { validateExperimentStateMutation });
 
-  return {
+  const methods = {
     createExperimentState: async function(
       this: MethodContext,
       curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string },
@@ -1964,7 +1964,8 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       return await createExperimentState(curExperimentState, this);
     },
 
-    ...downloadMethods,
-    ...conditionCountMethods,
+    ...downloads.methods,
+    ...conditionCounts.methods,
   };
+  return { methods, methodBindings: Object.freeze([...conditionCounts.methodBindings, ...downloads.methodBindings]) };
 }

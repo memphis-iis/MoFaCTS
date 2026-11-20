@@ -1,4 +1,6 @@
 import { Meteor } from 'meteor/meteor';
+import { CONDITION_COUNT_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 import {
   requireUserMatchesOrHasRole,
   type MethodAuthorizationDeps,
@@ -31,11 +33,65 @@ type AnalyticsConditionCountCallbacks = {
   ) => Promise<void>;
 };
 
-export function createAnalyticsConditionCountMethods(
+export function createAnalyticsConditionCountRegistration(
   deps: AnalyticsConditionCountDeps,
   callbacks: AnalyticsConditionCountCallbacks
 ) {
-  return {
+  const replace = Object.freeze({
+    kind: 'study-condition-count',
+    operation: 'replace',
+    async authorize(userId: MethodContext['userId'], rootId: string, ownerId: MethodContext['userId'], blockAllocation: boolean, counts: number[]) {
+      if (blockAllocation) {
+        await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
+          actingUserId: userId, subjectUserId: ownerId, roles: ['admin'],
+          forbiddenMessage: 'Only owner or admin can replace block-allocation counts',
+        });
+        if (counts.some(count => !Number.isSafeInteger(count))) throw new Meteor.Error(400, 'Invalid condition counts');
+      }
+      await callbacks.validateExperimentStateMutation(
+        userId, rootId, { currentTdfId: rootId }, 'methods.updateTdfConditionCounts'
+      );
+    },
+  } as const);
+  const increment = Object.freeze({
+    kind: 'study-condition-count',
+    operation: 'increment',
+    async authorize(userId: MethodContext['userId'], rootId: string, index: number, spec: {
+      loadbalancing?: unknown; countcompletion?: unknown; conditionTdfIds?: string[];
+    } | undefined) {
+      await callbacks.validateExperimentStateMutation(
+        userId, rootId, { currentTdfId: rootId }, 'methods.incrementTdfConditionCount'
+      );
+      if (spec?.loadbalancing === 'not-max') {
+        if (spec.countcompletion === 'beginning') {
+          throw new Meteor.Error(400, 'Beginning counts are committed atomically with condition assignment');
+        }
+        const assignment = await deps.GlobalExperimentStates.findOneAsync(
+          { userId, TDFId: rootId }, { fields: { 'experimentState.conditionTdfId': 1 } },
+        );
+        if (!assignment?.experimentState?.conditionTdfId
+          || assignment.experimentState.conditionTdfId !== spec.conditionTdfIds?.[index]) {
+          throw new Meteor.Error(403, 'Can only count the participant’s assigned condition');
+        }
+      }
+    },
+  } as const);
+  const reset = Object.freeze({
+    kind: 'study-condition-count',
+    operation: 'reset',
+    async authorize(userId: MethodContext['userId'], ownerId: MethodContext['userId']) {
+      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
+        actingUserId: userId,
+        subjectUserId: ownerId,
+        roles: ['admin'],
+        notLoggedInMessage: 'Must be logged in',
+        notLoggedInCode: 401,
+        forbiddenMessage: 'Only owner or admin can reset condition counts',
+        forbiddenCode: 403,
+      });
+    },
+  } as const);
+  const methods = {
     updateTdfConditionCounts: async function(this: MethodContext, TDFId: string, conditionCounts: number[]) {
       deps.serverConsole('updateTdfConditionCounts', TDFId, conditionCounts);
       const normalizedTdfId = deps.normalizeCanonicalId(TDFId);
@@ -55,19 +111,8 @@ export function createAnalyticsConditionCountMethods(
       if (conditions.length !== conditionCounts.length) {
         throw new Meteor.Error(400, 'Condition counts length does not match root TDF conditions');
       }
-      if (tdf?.content?.tdfs?.tutor?.setspec?.loadbalancing === 'not-max') {
-        await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-          actingUserId: this.userId, subjectUserId: tdf.ownerId, roles: ['admin'],
-          forbiddenMessage: 'Only owner or admin can replace block-allocation counts',
-        });
-        if (conditionCounts.some(count => !Number.isSafeInteger(count))) throw new Meteor.Error(400, 'Invalid condition counts');
-      }
-      await callbacks.validateExperimentStateMutation(
-        this.userId,
-        normalizedTdfId,
-        { currentTdfId: normalizedTdfId },
-        'methods.updateTdfConditionCounts'
-      );
+      await replace.authorize(this.userId, normalizedTdfId, tdf?.ownerId,
+        tdf?.content?.tdfs?.tutor?.setspec?.loadbalancing === 'not-max', conditionCounts);
       await deps.Tdfs.updateAsync({ _id: normalizedTdfId }, { $set: { conditionCounts }, $unset: { conditionAllocation: '' }, $inc: { tdfRevision: 1 } });
     },
 
@@ -97,25 +142,7 @@ export function createAnalyticsConditionCountMethods(
       if (!Number.isFinite(Number(currentCount)) || Number(currentCount) < 0) {
         throw new Meteor.Error(400, 'Invalid condition count');
       }
-      await callbacks.validateExperimentStateMutation(
-        this.userId,
-        normalizedTdfId,
-        { currentTdfId: normalizedTdfId },
-        'methods.incrementTdfConditionCount'
-      );
-      const spec = tdf?.content?.tdfs?.tutor?.setspec;
-      if (spec?.loadbalancing === 'not-max') {
-        if (spec.countcompletion === 'beginning') {
-          throw new Meteor.Error(400, 'Beginning counts are committed atomically with condition assignment');
-        }
-        const assignment = await deps.GlobalExperimentStates.findOneAsync(
-          { userId: this.userId, TDFId: normalizedTdfId }, { fields: { 'experimentState.conditionTdfId': 1 } },
-        );
-        if (!assignment?.experimentState?.conditionTdfId
-          || assignment.experimentState.conditionTdfId !== spec.conditionTdfIds?.[conditionIndex]) {
-          throw new Meteor.Error(403, 'Can only count the participant’s assigned condition');
-        }
-      }
+      await increment.authorize(this.userId, normalizedTdfId, conditionIndex, tdf?.content?.tdfs?.tutor?.setspec);
       await deps.Tdfs.updateAsync(
         { _id: normalizedTdfId },
         { $inc: { [`conditionCounts.${conditionIndex}`]: 1, tdfRevision: 1 } }
@@ -132,19 +159,19 @@ export function createAnalyticsConditionCountMethods(
       if (!tdf) {
         throw new Meteor.Error(404, 'TDF not found');
       }
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
-        subjectUserId: tdf.ownerId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Only owner or admin can reset condition counts',
-        forbiddenCode: 403,
-      });
+      await reset.authorize(this.userId, tdf.ownerId);
       const setspec = tdf?.content?.tdfs?.tutor?.setspec;
       const conditions = Array.isArray(setspec?.condition) ? setspec.condition : [];
       const conditionCounts = new Array(conditions.length).fill(0);
       await deps.Tdfs.updateAsync({ _id: normalizedTdfId }, { $set: { conditionCounts }, $unset: { conditionAllocation: '' }, $inc: { tdfRevision: 1 } });
     },
   };
+  function bind(name: keyof typeof methods, policy: typeof replace | typeof increment | typeof reset): MeteorMethodBinding {
+    return Object.freeze({ handler: methods[name], verification: CONDITION_COUNT_VERIFICATIONS[name], policy, dataEgress: 'none' });
+  }
+  return { methods, methodBindings: Object.freeze([
+    bind('updateTdfConditionCounts', replace),
+    bind('incrementTdfConditionCount', increment),
+    bind('resetTdfConditionCounts', reset),
+  ]) };
 }

@@ -57,7 +57,7 @@ import { createStimulusLookupHelpers } from './lib/stimulusLookup';
 import { createAccessMethods } from './methods/accessMethods';
 import { transferTdfOwnership } from './lib/tdfOwnershipTransferMongo';
 import { createAdminMethods } from './methods/adminMethods';
-import { createAnalyticsMethods } from './methods/analyticsMethods';
+import { createAnalyticsMethodRegistration } from './methods/analyticsMethods';
 import { insertSparcHistoryBatch } from './lib/sparcHistoryBatchStorage';
 import { Random } from 'meteor/random';
 import { HistoryCommitState, historyCommitStorage } from './lib/historyCommitMongo';
@@ -584,7 +584,7 @@ const learnerAnalyticsMethods = createLearnerAnalyticsMethods({
   now: () => Date.now(),
 });
 
-const analyticsMethods = createAnalyticsMethods({
+const analyticsRegistration = createAnalyticsMethodRegistration({
   writeConditionState,
   serverConsole,
   Histories,
@@ -624,7 +624,7 @@ const {
   getStimSetFromLearningSessionByClusterList: _getStimSetFromLearningSessionByClusterList,
   getUserLastFeedbackTypeFromHistory: _getUserLastFeedbackTypeFromHistory,
   ...publicAnalyticsMethods
-} = analyticsMethods as Record<string, unknown>;
+} = analyticsRegistration.methods as Record<string, unknown>;
 const getHistoryByTDFID = getHistoryByTDFIDMethod as (TDFId: string) => Promise<any[]>;
 
 const speechMethods = createSpeechMethods({
@@ -1128,7 +1128,7 @@ export const asyncMethods: Record<string, unknown> = {
   getTdfById: getTdfByIdPublic,
 
   ...speechMethods,
-  ...createSimulationTelemetryMethods({ getMethodAuthorizationDeps, writeHistory: (userId, record) => analyticsMethods.insertHistory.call({ userId }, record),
+  ...createSimulationTelemetryMethods({ getMethodAuthorizationDeps, writeHistory: (userId, record) => analyticsRegistration.methods.insertHistory.call({ userId }, record),
     loadLesson: id => Tdfs.findOneAsync({ _id: id }, { fields: { 'rawStimuliFile.setspec.sparcPages': 1 } }) }),
 
   ...createSparcLibraryCurationMethods({ getMethodAuthorizationDeps,
@@ -1180,6 +1180,7 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...backupRegistration.methodBindings,
   ...brandProfileRegistration.methodBindings,
   tdfIdentityMigration.methodBinding,
+  ...analyticsRegistration.methodBindings,
 ], () => MeteorAny.server?.method_handlers);
 bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);
 

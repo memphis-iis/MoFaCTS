@@ -503,6 +503,42 @@ export const FILENAME_TDF_MIGRATION_VERIFICATION = Object.freeze({
   ]),
 } as const);
 
+function conditionCountVerification<N extends string>(method: N, deniedCase: string) {
+  return Object.freeze({
+    ...middlewareTest,
+    suite: 'condition count method authorization',
+    method,
+    surfaceId: `method:${method}` as const,
+    verificationId: `method.study-condition-count.${method}` as const,
+    cases: Object.freeze(['binds all count methods to their installed study policies', deniedCase]),
+  });
+}
+
+export const CONDITION_COUNT_VERIFICATIONS = Object.freeze({
+  updateTdfConditionCounts: conditionCountVerification('updateTdfConditionCounts', 'denies unauthenticated condition count updates'),
+  incrementTdfConditionCount: conditionCountVerification('incrementTdfConditionCount', 'requires the exact assigned condition for a later block milestone'),
+  resetTdfConditionCounts: conditionCountVerification('resetTdfConditionCounts', 'denies condition count resets by unrelated users'),
+});
+
+function historyDownloadMethodVerification<N extends string>(method: N, suite: string, ...cases: [string, ...string[]]) {
+  return Object.freeze({
+    ...middlewareTest, suite, method, surfaceId: `method:${method}` as const,
+    verificationId: `method.history-download.${method}` as const, cases: Object.freeze(cases),
+  });
+}
+
+export const HISTORY_DOWNLOAD_METHOD_VERIFICATIONS = Object.freeze({
+  downloadDataByTeacher: historyDownloadMethodVerification('downloadDataByTeacher', 'instructor export method capabilities',
+    'returns an all-owned streaming capability using only projected lesson IDs',
+    'rejects unsigned and cross-user all-owned requests before reading lesson IDs'),
+  downloadOwnHistoryAcrossTdfs: historyDownloadMethodVerification('downloadOwnHistoryAcrossTdfs', 'history export runtime bindings',
+    'binds the four history export methods and preserves missing-session denials'),
+  downloadDataByClass: historyDownloadMethodVerification('downloadDataByClass', 'history export runtime bindings',
+    'keeps class-based export disabled for signed-in callers'),
+  downloadDataById: historyDownloadMethodVerification('downloadDataById', 'instructor export method capabilities',
+    'returns a single-lesson streaming capability while keeping ownership enforcement'),
+});
+
 export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 // One catalog owner, with the accepted selected subset kept stable for its
 // existing runner. Protocol qualifications are not retrofitted into its vector.
@@ -514,7 +550,8 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download, ...Object.values(HTTP_FILE_VERIFICATIONS),
   ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat(), ...Object.values(FILES_DDP_VERIFICATIONS),
   ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS), DEPLOYMENT_READINESS_VERIFICATION, ...Object.values(BACKUP_METHOD_VERIFICATIONS),
-  ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION]);
+  ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
+  ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

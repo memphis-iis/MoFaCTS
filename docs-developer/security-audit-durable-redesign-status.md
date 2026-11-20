@@ -267,8 +267,15 @@ remains with that production window.
   on the block-allocation path. Increment retains the study-access gate and
   the exact assigned-condition check for the later block milestone. Reset
   requires the owner or admin. Existing tests exercise these distinctions.
-- [ ] Bind and verify the condition-count family while preserving each
-  authorization and validation step at its current position.
+- [x] Bind all three condition-count methods to their existing policies.
+  Preserve validation order, study access, owner/admin gates and exact
+  saved-condition enforcement.
+- [x] Bind the four adjacent history-download methods to their current
+  session, ownership and exact study-scope policies. Class export stays
+  disabled and the other methods issue the existing download capabilities.
+  The combined source batch passed typecheck, lint and Linux checks
+  (453 passes, seven skips, zero failures).
+- [ ] Verify both analytics families together in one exact-source Meteor run.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry
@@ -1723,7 +1730,10 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 33 total, 32 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 38 total, 32 consumed, 0 reserved, 5 generally available, and 1 for the earlier `/health` batch only.**
+
+On November 20 Phil authorized five more Phase 3 Meteor invocations, with fewer
+full runs where related source-checked changes can share one exact-source run.
 
 On November 20 Phil approved five more Phase 3 invocations on the existing
 isolated Linux worker, starting with the V2 admin method bindings.

@@ -228,7 +228,8 @@
     },
     {
       "name": "downloadDataByClass",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "The registered method preserves its login error and denies signed-in callers. This flow issues no export."
     },
     {
       "name": "downloadDataById",
@@ -640,7 +641,7 @@
     {
       "name": "incrementTdfConditionCount",
       "access": "role-checked",
-      "notes": "Existing root access required. not-max milestone increments must match the caller's saved condition; beginning increments belong exclusively to the allocation transaction."
+      "notes": "The registered increment policy checks root access and, for not-max milestones, the caller's exact saved condition. Beginning increments belong to the allocation transaction."
     },
     {
       "name": "initializeCustomTheme",
@@ -811,7 +812,7 @@
     {
       "name": "resetTdfConditionCounts",
       "access": "role-checked",
-      "notes": "Existing owner/admin check retained. Reset clears the allocation block together with counts; saved participant assignments remain intact."
+      "notes": "The registered reset policy requires the owner or an administrator. Reset clears the allocation block together with counts and retains saved participant assignments."
     },
     {
       "name": "resolveAssignedRootTdfIdsForUser",
@@ -974,7 +975,7 @@
     {
       "name": "updateTdfConditionCounts",
       "access": "role-checked",
-      "notes": "not-max count replacement additionally requires root ownership or admin role and clears the server-owned block. Other modes retain existing authorization."
+      "notes": "The registered replacement policy checks study access. For not-max it first checks root ownership or admin role and validates integer counts before authorizing the study mutation."
     },
     {
       "name": "upsertStimFile",

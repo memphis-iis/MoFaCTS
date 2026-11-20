@@ -13,6 +13,8 @@ import { Accounts } from 'meteor/accounts-base';
 import { createHash, randomBytes } from 'node:crypto';
 import { unusedExpiredResetPrecondition, resetAttemptOutcome } from '../common/securityAudit/resetProtocol';
 import { sessionLifetimeStatus } from '../common/securityAudit/sessionLifetime';
+import { CONDITION_COUNT_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
+import { registeredMeteorMethodSurfaces } from './securitySurfaces/registerMeteorMethods';
 
 const MeteorAny = Meteor as any;
 const MeteorUsersAny = Meteor.users as any;
@@ -2005,6 +2007,39 @@ describe('not-max condition allocation transactions', function() {
 describe('condition count method authorization', function() {
   beforeEach(async function() {
     await clearServerCompositionCollections();
+  });
+
+  it('binds all count methods to their installed study policies', function() {
+    const observation = registeredMeteorMethodSurfaces();
+    if (observation.state !== 'observed') throw new Error(observation.reason);
+    const operations = {
+      updateTdfConditionCounts: 'replace', incrementTdfConditionCount: 'increment', resetTdfConditionCounts: 'reset',
+    } as const;
+    for (const verification of Object.values(CONDITION_COUNT_VERIFICATIONS)) {
+      const entries = observation.surfaces.filter(entry => entry.name === verification.method);
+      expect(entries).to.have.length(1);
+      expect(entries[0]?.verification).to.equal(verification);
+      expect(entries[0]?.policy).to.deep.equal({ kind: 'study-condition-count', operation: operations[verification.method] });
+      expect(entries[0]?.dataEgress).to.equal('none');
+    }
+  });
+
+  it('requires the exact assigned condition for a later block milestone', async function() {
+    const userId = 'audit-condition-participant';
+    const root = 'audit-condition-root';
+    await TdfsAny.insertAsync({ _id: root, ownerId: 'audit-condition-owner', conditionCounts: [0, 0],
+      content: { tdfs: { tutor: { setspec: { lessonname: 'Synthetic study', userselect: 'true', loadbalancing: 'not-max',
+        countcompletion: 'end', condition: ['left.json', 'right.json'], conditionTdfIds: ['left', 'right'] } } } } });
+    await GlobalExperimentStatesAny.insertAsync({ userId, TDFId: root, experimentState: { conditionTdfId: 'left' } });
+    const increment = MeteorAny.server.method_handlers.incrementTdfConditionCount;
+    let failure: any;
+    try { await increment.call({ userId }, root, 1); }
+    catch (error) { failure = error; }
+    expect(failure?.error).to.equal(403);
+    expect(failure?.reason).to.equal('Can only count the participant’s assigned condition');
+    expect((await TdfsAny.findOneAsync(root)).conditionCounts).to.deep.equal([0, 0]);
+    await increment.call({ userId }, root, 0);
+    expect((await TdfsAny.findOneAsync(root)).conditionCounts).to.deep.equal([1, 0]);
   });
 
   it('denies unauthenticated condition count updates', async function() {

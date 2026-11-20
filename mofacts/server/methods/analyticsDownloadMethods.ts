@@ -11,6 +11,8 @@ import {
 import { createOwnHistoryDownloadToken } from '../lib/ownHistoryDownloadTokens';
 import { resolveOwnedHistoryDownloadScope } from '../lib/ownedHistoryDownloadScope';
 import { createOwnedHistoryDownloadToken } from '../lib/ownedHistoryDownloadTokens';
+import { HISTORY_DOWNLOAD_METHOD_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -41,21 +43,55 @@ function sanitizeFileNameSegment(value: unknown, defaultValue: string) {
   return rawValue.replace(/[/\\?%*:|"<>\s]/g, '_');
 }
 
-export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
-  return {
-    downloadDataByTeacher: async function(this: MethodContext, targetUserId: string) {
-      check(targetUserId, String);
-      requireAccountProgressSession(this);
-
+export function createAnalyticsDownloadRegistration(deps: AnalyticsDownloadDeps) {
+  const ownedLessons = Object.freeze({
+    kind: 'history-download', operation: 'owned-lessons',
+    async authorize(context: MethodContext, targetUserId: string) {
+      requireAccountProgressSession(context);
       await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
+        actingUserId: context.userId,
         subjectUserId: targetUserId,
         notLoggedInMessage: 'Must be logged in',
         notLoggedInCode: 401,
         forbiddenMessage: 'Permission denied',
         forbiddenCode: 403,
       });
-
+    },
+  } as const);
+  const ownHistory = Object.freeze({
+    kind: 'history-download', operation: 'own-history',
+    authorize(context: MethodContext) {
+      const userId = requireAuthenticatedUser(context.userId, 'Must be logged in', 401);
+      requireAccountProgressSession(context);
+      return userId;
+    },
+  } as const);
+  const disabledClass = Object.freeze({
+    kind: 'history-download', operation: 'disabled-class',
+    authorize(context: MethodContext): never {
+      if (!context.userId) throw new Meteor.Error(401, 'Must be logged in');
+      throw new Meteor.Error(403, 'Class-based data download is not allowed in this flow');
+    },
+  } as const);
+  const ownedLesson = Object.freeze({
+    kind: 'history-download', operation: 'owned-lesson',
+    async authorize(context: MethodContext, request: { kind: 'lesson'; tdfId: string; includeConditions: boolean }) {
+      if (!context.userId) throw new Meteor.Error(401, 'Must be logged in');
+      const studyLessonIds = await participantProgressLessonIds(context, deps.Tdfs);
+      if (studyLessonIds && !studyLessonIds.includes(request.tdfId)) {
+        throw new Meteor.Error(403, 'Progress is unavailable outside the current study');
+      }
+      const { tdfIds, lessonName } = await resolveOwnedHistoryDownloadScope(deps, context.userId, request);
+      if (studyLessonIds && tdfIds.some(id => !studyLessonIds.includes(id))) {
+        throw new Meteor.Error(403, 'Progress is unavailable outside the current study');
+      }
+      return { tdfIds, lessonName, userId: context.userId };
+    },
+  } as const);
+  const methods = {
+    downloadDataByTeacher: async function(this: MethodContext, targetUserId: string) {
+      check(targetUserId, String);
+      await ownedLessons.authorize(this, targetUserId);
       const request = { kind: 'owned-lessons' } as const;
       const { tdfIds } = await resolveOwnedHistoryDownloadScope(deps, targetUserId, request);
 
@@ -71,8 +107,7 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
     },
 
     downloadOwnHistoryAcrossTdfs: async function(this: MethodContext) {
-      const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
-      requireAccountProgressSession(this);
+      const actingUserId = ownHistory.authorize(this);
 
       const history = await deps.Histories.findOneAsync({ userId: actingUserId, ...operationalHistorySelector() }, { fields: { _id: 1 } });
       if (!history) {
@@ -99,31 +134,27 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
     downloadDataByClass: async function(this: MethodContext, classId: string) {
       check(classId, String);
 
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-      throw new Meteor.Error(403, 'Class-based data download is not allowed in this flow');
+      return disabledClass.authorize(this);
     },
 
     downloadDataById: async function(this: MethodContext, tdfId: string, includeConditions: boolean = false) {
       check(tdfId, String);
       check(includeConditions, Boolean);
 
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-
       const request = { kind: 'lesson', tdfId, includeConditions } as const;
-      const studyLessonIds = await participantProgressLessonIds(this, deps.Tdfs);
-      if (studyLessonIds && !studyLessonIds.includes(tdfId)) {
-        throw new Meteor.Error(403, 'Progress is unavailable outside the current study');
-      }
-      const { tdfIds, lessonName } = await resolveOwnedHistoryDownloadScope(deps, this.userId, request);
-      if (studyLessonIds && tdfIds.some(id => !studyLessonIds.includes(id))) {
-        throw new Meteor.Error(403, 'Progress is unavailable outside the current study');
-      }
+      const { tdfIds, lessonName, userId } = await ownedLesson.authorize(this, request);
       const fileName = `${sanitizeFileNameSegment(lessonName, `tdf-${tdfId}`)}-data.tsv`;
-      return { fileName, contentType: 'text/tab-separated-values', downloadUrl: createOwnedHistoryDownloadToken(this.userId, request, tdfIds, fileName).url };
+      return { fileName, contentType: 'text/tab-separated-values', downloadUrl: createOwnedHistoryDownloadToken(userId, request, tdfIds, fileName).url };
     },
   };
+  function bind(name: keyof typeof methods, policy: typeof ownedLessons | typeof ownHistory | typeof disabledClass | typeof ownedLesson): MeteorMethodBinding {
+    return Object.freeze({ handler: methods[name], verification: HISTORY_DOWNLOAD_METHOD_VERIFICATIONS[name], policy,
+      dataEgress: policy.operation === 'disabled-class' ? 'none' : 'history-download-capability' });
+  }
+  return { methods, methodBindings: Object.freeze([
+    bind('downloadDataByTeacher', ownedLessons),
+    bind('downloadOwnHistoryAcrossTdfs', ownHistory),
+    bind('downloadDataByClass', disabledClass),
+    bind('downloadDataById', ownedLesson),
+  ]) };
 }
