@@ -98,7 +98,7 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Restrict both preference methods to the signed-in user and practiceTableStatisticsExpanded. Only boolean writes are accepted; the setter no longer logs the value.
 - [x] Verify both installed methods, true/false round trips, user isolation and invalid input/stored values.
 - [x] Implement validation of all nine supported personal audio fields and one atomic update for each supplied patch. The audio screen submits only the edited control fields.
-- [ ] Verify first-save initialization, concurrent partial saves and invalid mixed patches in native Meteor.
+- [x] Verify first-save initialization, concurrent partial saves and invalid mixed patches in native Meteor.
 - [ ] Decide whether to remove the entire preferences object from the userAudioSettings publication. The dashboard reads its one allowed setting via the separate preference method. Session ID and timestamp fields have an active client consumer.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
@@ -1807,9 +1807,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 46 total, 44 consumed, 0 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 46 total, 45 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
+
+Slot 46 consumed on a4df7935. The installed audio save regression passed. Native integration passed 22:22:05 to 22:23:47 UTC on 2026-11-21 (1,102 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: fac9a89c3b4525ca9bca0d27e5eebc3e6149f07496d4aa6cce00aa8b071b744b.
 
 Slot 45 consumed on 25875f14. The installed preference case passed. Native integration passed 22:08:14 to 22:10:15 UTC on 2026-11-21 (1,101 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 54f9232ebaad5e18b142a729f7d5406abc8dddcc19e1defc59386e14ea52912d.
 
