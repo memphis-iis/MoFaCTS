@@ -2587,7 +2587,10 @@ describe('content helper authorization', function() {
     }
   });
 
-  it('does not expose retired raw content save or fingerprint confirmation methods', function() {
+  it('does not expose retired mail or content methods', function() {
+    for (const name of ['sendEmail', 'sendErrorReportSummaries']) {
+      expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);
+    }
     expect(asyncMethods).not.to.have.property('saveContentFile');
     expect(asyncMethods).not.to.have.property('tdfUpdateConfirmed');
   });

@@ -6,16 +6,11 @@ import {
   SERVER_VERBOSITY_SETTING,
   parseLoggingVerbosityLevel,
 } from '../../common/loggingSettings';
-import {
-  requireAuthenticatedUser,
-  requireUserWithRoles,
-  type MethodAuthorizationDeps,
-} from '../lib/methodAuthorization';
+import { requireAuthenticatedUser } from '../lib/methodAuthorization';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
   userId?: string | null;
-  unblock?: () => void;
   connection?: { id?: string; clientAddress?: string | null } | null;
 };
 
@@ -32,15 +27,12 @@ type SystemMethodsDeps = {
   DynamicSettings: {
     upsertAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
   };
-  getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
   requireAdminUser: (
     userId: string | null | undefined,
     errMsg?: string,
     errorCode?: string | number
   ) => Promise<void>;
   buildDiskUsageStatus: (path?: string) => unknown;
-  sendErrorReportSummaries: () => Promise<unknown>;
-  sendEmail: (to: string, from: string, subject: string, text: string) => void;
   getCurrentUser: () => Promise<any>;
   setVerbosityLevel: (level: number) => void;
 };
@@ -172,31 +164,6 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
     getServerStatus: async function(this: MethodContext) {
       await deps.requireAdminUser(this.userId, 'Admin access required');
       return deps.buildDiskUsageStatus('/');
-    },
-
-    sendErrorReportSummaries: async function(this: MethodContext) {
-      await requireUserWithRoles(deps.getMethodAuthorizationDeps(), {
-        userId: this.userId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Admin access required',
-        forbiddenCode: 403,
-      });
-      return await deps.sendErrorReportSummaries();
-    },
-
-    sendEmail: async function(this: MethodContext, to: string, from: string, subject: string, text: string) {
-      await requireUserWithRoles(deps.getMethodAuthorizationDeps(), {
-        userId: this.userId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Admin access required',
-        forbiddenCode: 403,
-      });
-      this.unblock?.();
-      deps.sendEmail(to, from, subject, text);
     },
 
     sendUserErrorReport: async function(

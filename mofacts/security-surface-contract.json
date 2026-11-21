@@ -873,14 +873,6 @@
       "notes": "The public-demo rate policy shares the existing connection limit of 10 starts per hour with the actual DDP rule."
     },
     {
-      "name": "sendEmail",
-      "access": "role-checked"
-    },
-    {
-      "name": "sendErrorReportSummaries",
-      "access": "admin-only"
-    },
-    {
       "name": "sendUserErrorReport",
       "access": "role-checked"
     },
