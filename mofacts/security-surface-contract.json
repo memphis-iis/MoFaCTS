@@ -1208,7 +1208,8 @@
     },
     {
       "name": "userAudioSettings",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Projects the signed-in user ID, personal audio settings, lastSessionId and lastSessionIdTimestamp."
     },
     {
       "name": "userExperimentState",

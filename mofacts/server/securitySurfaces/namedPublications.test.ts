@@ -30,7 +30,8 @@ describe('named application publications', function() {
   }
 
   before(async function() {
-    await users.insertAsync({ _id: owner, username: owner, audioPromptMode: 'silent', services: { synthetic: true } });
+    await users.insertAsync({ _id: owner, username: owner, audioPromptMode: 'silent', preferences: { practiceTableStatisticsExpanded: true, other: 'synthetic' },
+      lastSessionId: 'synthetic-session', lastSessionIdTimestamp: 123, services: { synthetic: true } });
     await users.insertAsync({ _id: admin, username: admin });
     await Roles.createRoleAsync('admin', { unlessExists: true });
     await Roles.addUsersToRolesAsync(admin, 'admin');
@@ -93,7 +94,10 @@ describe('named application publications', function() {
     const audio = await (await invoke('userAudioSettings', owner).result).fetchAsync();
     expect(audio.map((entry: { _id: string }) => entry._id)).to.deep.equal([owner]);
     expect(audio[0].audioSettings.audioPromptMode).to.equal('silent');
-    expect(audio[0]).not.to.have.property('services');
+    expect(audio[0]).to.have.all.keys('_id', 'audioSettings', 'lastSessionId', 'lastSessionIdTimestamp');
+    expect(audio[0]).to.include({ lastSessionId: 'synthetic-session', lastSessionIdTimestamp: 123 });
+    const getPreference = (Meteor as any).server.method_handlers.getUserPreference;
+    expect(await getPreference.call({ userId: owner }, 'practiceTableStatisticsExpanded')).to.equal(true);
     expect((await users.findOneAsync(admin)).audioSettings).to.equal(undefined);
     expect((await users.findOneAsync(owner)).audioSettings).to.deep.equal(audio[0].audioSettings);
   });

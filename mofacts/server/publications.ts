@@ -762,15 +762,12 @@ registerNamedPublication(Meteor, 'userAudioSettings', {
         );
     }
 
-    // IMPORTANT: Include roles and preferences fields to prevent flash/issues
-    // When this subscription merges with client minimongo, it needs to preserve
-    // essential fields like roles and preferences, otherwise helpers will temporarily fail
+    // Session helpers read both session fields from the signed-in user.
     return Meteor.users.find(
         { _id: this.userId! },
         {
             fields: {
                 audioSettings: 1,
-                preferences: 1,
                 lastSessionId: 1,
                 lastSessionIdTimestamp: 1
             }
