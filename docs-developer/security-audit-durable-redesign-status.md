@@ -93,7 +93,9 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Verify both enrollment paths in native Meteor, including passwordless reconnect, a condition-specific wait, same-unit resume and denial outside that scope.
 - [x] Delete both remote mail methods, their injected dependencies and contract entries. Internal delivery and scheduled summaries retain their server-owned functions.
 - [x] Confirm both retired names are absent from the installed Meteor registry.
-- [ ] Review remote free-text logging: serverLog has no tracked caller; debugLog has two production callers sending the same sign-in success message. Its privacy test is also a caller. The local SAML logger is separate.
+- [x] Delete remote serverLog and debugLog, both browser sign-in calls, the obsolete log-length constant and the obsolete privacy harness invocation. Server-side SAML logging remains active.
+- [ ] Confirm both logging names are absent from the installed Meteor registry.
+- [ ] Decide whether to restrict the self-service preference methods to the one tracked dashboard preference, a boolean controlling expansion of practice statistics. The current methods accept arbitrary names and values and the setter logs the supplied value at verbosity 2.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.

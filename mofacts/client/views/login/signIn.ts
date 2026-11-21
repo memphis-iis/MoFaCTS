@@ -702,7 +702,6 @@ Template.signIn.events({
 
       if (Session.get('debugging')) {
         clientConsole(2, '[GOOGLE-LOGIN] Sign-in succeeded; current route is', getCurrentRouteName());
-        MeteorAny.callAsync('debugLog', 'Sign in was successful');
       }
 
       clientConsole(2, '[GOOGLE-LOGIN] Calling logUserAgentAndLoginTime...');
@@ -868,7 +867,6 @@ async function signInNotify(
 ) {
   if (Session.get('debugging')) {
     clientConsole(2, 'Sign-in succeeded; current route is', getCurrentRouteName());
-    MeteorAny.callAsync('debugLog', 'Sign in was successful');
     MeteorAny.callAsync('logUserAgentAndLoginTime', Meteor.userId(), navigator.userAgent);
   }
   try {

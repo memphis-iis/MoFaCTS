@@ -41,7 +41,6 @@ const MAX_ERROR_REPORT_TEXT_LENGTH = 20000;
 const MAX_ERROR_REPORT_JSON_LENGTH = 250000;
 const MAX_ERROR_REPORT_LOG_ROWS = 200;
 const MAX_ERROR_REPORT_LOG_ROW_LENGTH = 2000;
-const MAX_DEBUG_LOG_LENGTH = 2000;
 
 function truncateText(value: unknown, maxLength: number) {
   const text = typeof value === 'string' ? value : String(value ?? '');
@@ -207,30 +206,6 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
       if (await privateParticipantActivity(this)) return;
       const loginTime = new Date();
       return await deps.usersCollection.updateAsync({ _id: userID }, { $set: { status: { lastLogin: loginTime, userAgent } } });
-    },
-
-    serverLog: async function(this: MethodContext, data: unknown) {
-      requireAuthenticatedUser(this.userId, 'Must be logged in to write server logs', 401);
-      if (await privateParticipantActivity(this)) return;
-      const currentUser = await deps.getCurrentUser();
-      if (currentUser) {
-        const logData = 'User:' + currentUser._id + ', log:' + truncateText(data, MAX_DEBUG_LOG_LENGTH);
-        deps.serverConsole(logData);
-      }
-    },
-
-    debugLog: async function(this: MethodContext, logtxt: unknown) {
-      requireAuthenticatedUser(this.userId, 'Must be logged in to write debug logs', 401);
-      if (await privateParticipantActivity(this)) return;
-      let usr = await deps.getCurrentUser();
-      if (!usr) {
-        usr = '[No Current User]';
-      } else {
-        usr = usr.username ? usr.username : usr._id;
-        usr = '[USER:' + usr + ']';
-      }
-
-      deps.serverConsole(usr + ' ' + truncateText(logtxt, MAX_DEBUG_LOG_LENGTH));
     },
 
     setVerbosity: async function(this: MethodContext, level: number | string) {

@@ -61,7 +61,6 @@ async function main() {
       await Meteor.callAsync('logUserAgentAndLoginTime', uid, 'synthetic-agent');
       await Meteor.callAsync('sendUserErrorReport', uid, 'synthetic', '/synthetic', {}, 'synthetic', [], {});
       await Meteor.callAsync('reportRecoverableWarning', { code: 'autotutor.citationMismatch', tdfId: null, mismatchCount: 1 });
-      await Meteor.callAsync('debugLog', 'synthetic-participant-debug');
       let denied = false;
       try { await Meteor.callAsync('updateOwnProfile', { name: 'synthetic-private-write' }); }
       catch (error) { denied = error.error === 'experiment-account-restricted'; }

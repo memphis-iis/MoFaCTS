@@ -1887,14 +1887,7 @@ describe('system method authorization', function() {
     }
   });
 
-  it('requires auth for debug logging and self-only error reports', async function() {
-    try {
-      await methods.debugLog.call({}, 'anonymous log');
-      expect.fail('Expected anonymous debug logging to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(401);
-    }
-
+  it('requires self-only error reports', async function() {
     try {
       await methods.sendUserErrorReport.call(
         { userId: 'current-user' },
@@ -2587,8 +2580,8 @@ describe('content helper authorization', function() {
     }
   });
 
-  it('does not expose retired mail or content methods', function() {
-    for (const name of ['sendEmail', 'sendErrorReportSummaries']) {
+  it('does not expose retired mail, logging or content methods', function() {
+    for (const name of ['sendEmail', 'sendErrorReportSummaries', 'serverLog', 'debugLog']) {
       expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);
     }
     expect(asyncMethods).not.to.have.property('saveContentFile');

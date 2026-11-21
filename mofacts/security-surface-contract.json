@@ -186,10 +186,6 @@
       "access": "role-checked"
     },
     {
-      "name": "debugLog",
-      "access": "role-checked"
-    },
-    {
       "name": "deleteAdminApiKeyAlternative",
       "access": "admin-only"
     },
@@ -874,10 +870,6 @@
     },
     {
       "name": "sendUserErrorReport",
-      "access": "role-checked"
-    },
-    {
-      "name": "serverLog",
       "access": "role-checked"
     },
     {
