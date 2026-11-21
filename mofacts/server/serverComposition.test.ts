@@ -2623,6 +2623,12 @@ describe('Prolific composed account and completion methods', function() {
     } catch (error: any) { expect(error.error).to.equal(403); }
     await ProlificParticipations.updateAsync({ _id: p._id }, { $set: { userId: p.userId } });
     await GlobalExperimentStatesAny.insertAsync({ userId: p.userId, TDFId: 'prolific-root', experimentState: { currentUnitNumber: 0, lastUnitCompleted: -1 } });
+    const observation = registeredMeteorMethodSurfaces();
+    expect(observation.state).to.equal('observed');
+    if (observation.state !== 'observed') throw new Error('Waiting period binding is unavailable');
+    const binding = observation.surfaces.find(row => row.name === 'setLockoutTimeStamp');
+    expect(binding?.policy).to.deep.equal({ kind: 'study-wait', operation: 'start-or-resume' });
+    expect(binding?.dataEgress).to.equal('saved-wait');
     const lockouts = await Promise.all(Array.from({ length: 4 }, () => methods.setLockoutTimeStamp.call({ userId: p.userId }, 0, 999, 0, 'prolific-root')));
     expect(new Set(lockouts.map((lockout: any) => lockout.lockoutTimeStamp)).size).to.equal(1);
     expect(lockouts[0].lockoutMinutes).to.equal(5);

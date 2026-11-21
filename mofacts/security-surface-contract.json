@@ -911,7 +911,8 @@
     },
     {
       "name": "setLockoutTimeStamp",
-      "access": "role-checked"
+      "access": "authenticated-self",
+      "notes": "Study sessions use persisted study progress, authored timing and a server timestamp. Ordinary practice retains its existing self-only timer."
     },
     {
       "name": "setTdfUserSelect",

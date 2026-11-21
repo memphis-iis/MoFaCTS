@@ -1,9 +1,8 @@
 import { normalizeSavedUnitNumber, savedLessonCompleted } from '../../common/experimentCompletion';
-import { pickTimingRuntimeSettings } from '../../common/deliveryTimingSettings';
+import { readStudyProgress } from './studyWaitingPeriod';
 import { createHash, randomBytes } from 'crypto';
 import { Meteor } from 'meteor/meteor';
 import { prolificId, prolificCompletionUrl } from '../../common/prolific';
-import { restoreAdaptiveUnitSequence } from '../../common/adaptiveUnitSequence';
 import { ProlificParticipations, ProlificStudies, ProlificReminders } from './prolificCollections';
 
 export type ProlificParticipantDeps = {
@@ -37,20 +36,7 @@ export function createProlificParticipationService(deps: ProlificParticipantDeps
   async function progress(p: any) {
     const { root, binding, completionUrl } = await configuration(p.studyId);
     if (p.rootTdfId !== root._id || p.ownerId !== binding.ownerId) throw new Error('prolific.identityConflict');
-    const doc = await deps.states.findOneAsync({ userId: p.userId, TDFId: root._id });
-    if (!doc) return { p, state: {} as Record<string, unknown>, units: [], tdfId: root._id, completionUrl, binding };
-    const state = doc.experimentState || {};
-    const conditionId = state.conditionTdfId || root._id;
-    if (conditionId !== root._id && !root.content?.tdfs?.tutor?.setspec?.conditionTdfIds?.includes(conditionId)) {
-      throw new Error('prolific.identityConflict');
-    }
-    const tdf = conditionId === root._id ? root : await deps.Tdfs.findOneAsync({ _id: conditionId });
-    if (!tdf) throw new Error('prolific.invalidConfiguration');
-    const content = structuredClone(tdf.content);
-    restoreAdaptiveUnitSequence(content, state, conditionId);
-    const units = content?.tdfs?.tutor?.unit;
-    if (!Array.isArray(units)) throw new Error('prolific.invalidConfiguration');
-    return { p, state, units, tdfId: conditionId, completionUrl, binding };
+    return { ...await readStudyProgress(deps, p.userId, root), p, completionUrl, binding };
   }
 
   async function start(input: any) {
@@ -161,18 +147,11 @@ export function createProlificParticipationService(deps: ProlificParticipantDeps
     return { prolific: true, completed, completionUrl: !p.firstSessionCompletedAt || retryInitialReturn ? completionUrl : null };
   }
 
-  async function validateLockout(userId: string, tdfId: string, unit: number) {
+  async function enrolledStudyProgress(userId: string, boundRoot?: string | null) {
     const p = await stores.participations.findOneAsync({ userId });
     if (!p) return null;
-    const current = await progress(p);
-    if (current.tdfId !== tdfId || Number(current.state.currentUnitNumber ?? 0) !== unit) throw new Meteor.Error(403, 'prolific.identityConflict');
-    const currentUnit = current.units[unit];
-    if (!Number.isInteger(unit) || !currentUnit) throw new Error('prolific.invalidConfiguration');
-    const tutor = (await deps.Tdfs.findOneAsync({ _id: tdfId }))?.content?.tdfs?.tutor;
-    const timing = { ...pickTimingRuntimeSettings(tutor?.deliverySettings, current.state.experimentXCond), ...pickTimingRuntimeSettings(currentUnit?.deliverySettings, current.state.experimentXCond) };
-    const minutes = Number(timing.lockoutminutes ?? 0);
-    if (!Number.isFinite(minutes) || minutes < 0) throw new Error('prolific.invalidConfiguration');
-    return minutes;
+    if (boundRoot && p.rootTdfId !== boundRoot) throw new Meteor.Error(403, 'prolific.identityConflict');
+    return progress(p);
   }
-  return { start, resume, checkpoint, validateLockout, progress };
+  return { start, resume, checkpoint, enrolledStudyProgress, progress };
 }

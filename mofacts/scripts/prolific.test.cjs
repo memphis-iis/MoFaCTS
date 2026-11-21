@@ -10,6 +10,7 @@ Module._load = function(name, ...args) {
   if (name === 'meteor/meteor') return { Meteor: { Error: class extends Error { constructor(code, message) { super(message); this.error = code; } } } };
   return originalLoad.call(this, name, ...args);
 };
+const { configuredStudyWait } = require('../server/lib/studyWaitingPeriod.ts');
 const { createProlificParticipationService } = require('../server/lib/prolificParticipation.ts');
 const { createProlificManagementService } = require('../server/lib/prolificManagement.ts');
 const { createProlificMethodRegistration } = require('../server/methods/prolificMethods.ts');
@@ -175,11 +176,12 @@ describe('participation persistence and session boundaries', () => {
     await progress(f, p, { currentUnitNumber: 1, lastUnitCompleted: 0 });
     assert.equal((await f.participation.checkpoint(p.userId)).completionUrl, undefined);
     f.users.rows[0].lockouts = { root: { currentLockoutUnit: 1, lockoutMinutes: 5, lockoutTimeStamp: Date.now() } };
-    assert.equal(await f.participation.validateLockout(p.userId, 'root', 1), 5);
+    assert.equal(configuredStudyWait(await f.participation.enrolledStudyProgress(p.userId), 'root', 1), 5);
     f.Tdfs.rows[0].content.tdfs.tutor.unit[1].deliverySettings = [{ lockoutminutes: 5 }, { lockoutminutes: 15 }];
     f.states.rows[0].experimentState.experimentXCond = 1;
-    assert.equal(await f.participation.validateLockout(p.userId, 'root', 1), 15);
-    await assert.rejects(f.participation.validateLockout(p.userId, 'root', 2));
+    assert.equal(configuredStudyWait(await f.participation.enrolledStudyProgress(p.userId), 'root', 1), 15);
+    const current = await f.participation.enrolledStudyProgress(p.userId);
+    assert.throws(() => configuredStudyWait(current, 'root', 2));
     assert.equal((await f.participation.checkpoint(p.userId)).completionUrl, completionUrl);
     assert.equal((await f.participation.checkpoint(p.userId)).completionUrl, null);
     assert.equal((await f.participation.checkpoint(p.userId, true)).completionUrl, completionUrl);
@@ -201,9 +203,9 @@ describe('participation persistence and session boundaries', () => {
     tutor.deliverySettings = [{ lockoutminutes: 5 }, { lockoutminutes: 15 }];
     tutor.unit[1].deliverySettings = { optimalThreshold: 0.8 };
     f.states.rows[0].experimentState.experimentXCond = 1;
-    assert.equal(await f.participation.validateLockout(p.userId, 'root', 1), 15);
+    assert.equal(configuredStudyWait(await f.participation.enrolledStudyProgress(p.userId), 'root', 1), 15);
     tutor.unit[1].deliverySettings.lockoutminutes = 0;
-    assert.equal(await f.participation.validateLockout(p.userId, 'root', 1), 0);
+    assert.equal(configuredStudyWait(await f.participation.enrolledStudyProgress(p.userId), 'root', 1), 0);
   });
   it('does not count initial pre-work lockouts or mid-unit progress', async () => {
     const f = fixture(), p = await started(f);

@@ -54,8 +54,10 @@ import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
 import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
-import { ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
+import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
+import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
 import { transferOwnerPolicy } from './lib/tdfOwnershipTransfer';
 import { transferTdfOwnership } from './lib/tdfOwnershipTransferMongo';
 import { createAdminMethods } from './methods/adminMethods';
@@ -736,11 +738,27 @@ const prolificRegistration = createProlificMethodRegistration({
   participation: prolificParticipation, management: prolificManagement,
   authorization: getMethodAuthorizationDeps, rateLimit: applyMethodRateLimit,
 });
+const waitingPeriodPolicy = Object.freeze({
+  kind: 'study-wait', operation: 'start-or-resume',
+  async authorize(context: Parameters<typeof participantConnectionRoot>[0], userId: string, tdfId: string, unit: number) {
+    const rootId = participantConnectionRoot(context);
+    const current = await prolificParticipation.enrolledStudyProgress(userId, rootId);
+    if (current) return configuredStudyWait(current, tdfId, unit);
+    if (!rootId) {
+      if (await privateParticipantActivity(context)) throw new Meteor.Error(403, 'A study session is required');
+      return null;
+    }
+    const root = await Tdfs.findOneAsync({ _id: rootId });
+    if (!root) throw new Meteor.Error(403, 'Current study is unavailable');
+    return configuredStudyWait(await readStudyProgress({ Tdfs, states: GlobalExperimentStates }, userId, root), tdfId, unit);
+  },
+} as const);
+
 export const methods: any = {
   ...prolificRegistration.methods,
   ...warningRegistration.methods,
   ...createSystemMethods({
-    validateProlificLockout: prolificParticipation.validateLockout,
+    studyWaitMinutes: waitingPeriodPolicy.authorize,
     serverConsole,
     usersCollection: MeteorAny.users,
     ErrorReports,
@@ -1194,6 +1212,7 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...warningRegistration.methodBindings,
   ...simulationTelemetry.methodBindings,
   ...experimentRegistration.methodBindings,
+  { verification: STUDY_WAIT_VERIFICATION, handler: methods.setLockoutTimeStamp, policy: waitingPeriodPolicy, dataEgress: 'saved-wait' },
   { verification: LESSON_ACCESS_VERIFICATIONS.list, handler: methods.getAccessableTDFSForUser, policy: ownLessonListPolicy, dataEgress: 'owned-lesson-list' },
   { verification: LESSON_ACCESS_VERIFICATIONS.transfer, handler: methods.transferDataOwnership, policy: transferOwnerPolicy, dataEgress: 'transfer-status' },
   { verification: RECIPIENT_LOOKUP_VERIFICATION, handler: methods.resolveUsersForTdf, policy: accessorReadPolicy, dataEgress: 'recipient-lookup-result' },

@@ -113,7 +113,7 @@ describe('approved progress-privacy selection on the registered Meteor publicati
         content: { fileName: `${id}.tdf`, tdfs: { tutor } } });
     }
     try {
-      await insertLesson(ids.condition, { unit: [{}] });
+      await insertLesson(ids.condition, { deliverySettings: [{ lockoutminutes: 3 }, { lockoutminutes: 7 }], unit: [{}] });
       await insertLesson(ids.shared, { unit: [{}] });
       await insertLesson(ids.root, { setspec: { experimentTarget: target,
         condition: [`${ids.condition}.tdf`, `${ids.shared}.tdf`], conditionTdfIds: [ids.condition, ids.shared] } });
@@ -121,7 +121,7 @@ describe('approved progress-privacy selection on the registered Meteor publicati
       await Meteor.users.insertAsync({ _id: userId, username, createdAt: new Date(), profile: {} });
       for (const [index, [TDFId, _id]] of rows.entries()) {
         await GlobalExperimentStates.insertAsync({ _id, userId, TDFId,
-          experimentState: { lastUnitCompleted: -1, lastActionTimeStamp: 100 + index } });
+          experimentState: { ...(TDFId === ids.root ? { conditionTdfId: ids.condition, currentUnitNumber: 0, experimentXCond: 1 } : {}), lastUnitCompleted: -1, lastActionTimeStamp: 100 + index } });
         await Histories.insertAsync({ _id, userId, TDFId, time: 100 + index });
       }
       await GlobalExperimentStates.insertAsync({ _id: otherActorRowId, userId: otherUserId, TDFId: ids.root });
@@ -157,6 +157,15 @@ describe('approved progress-privacy selection on the registered Meteor publicati
       expect(login.error).to.equal(undefined);
       expect(login.result.id).to.equal(userId);
       expect(removedIds.sort()).to.deep.equal([otherRowId, sharedRowId].sort());
+
+      const wait = await method(ws, 'setLockoutTimeStamp', 1, 999, 0, ids.condition);
+      expect(wait.error).to.equal(undefined);
+      expect(wait.result.lockoutMinutes).to.equal(7);
+      expect(wait.result.lockoutTimeStamp).to.be.greaterThan(1);
+      const resumedWait = await method(ws, 'setLockoutTimeStamp', 0, 0, 0, ids.condition);
+      expect(resumedWait.result).to.deep.equal(wait.result);
+      expect((await method(ws, 'setLockoutTimeStamp', 0, 0, 1, ids.condition)).error.error).to.equal(403);
+      expect((await method(ws, 'setLockoutTimeStamp', 0, 0, 0, ids.other)).error.error).to.equal(403);
 
       for (const [lessonId, rowId] of [[ids.root, rootRowId], [ids.condition, conditionRowId]]) {
         expect((await method(ws, 'getExperimentState', userId, lessonId)).result.id).to.equal(rowId);
