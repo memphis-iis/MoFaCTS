@@ -136,7 +136,7 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
         throw new Meteor.Error(404, 'TDF not found');
       }
 
-      if (!deps.isTdfOwner(this.userId, tdf)) {
+      if (!accessorReadPolicy.authorize(this.userId, tdf)) {
         throw new Meteor.Error(403, 'Only current owner can manage access');
       }
 
@@ -176,37 +176,21 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
         { fields: { _id: 1, username: 1, email_canonical: 1, emails: 1, profile: 1 } }
       ).fetchAsync();
 
-      const userByLookupId = new Map<string, any>();
+      const requestedIds = new Set(normalized.map(id => id.toLowerCase()));
+      const userByLookupId = new Map<string, { _id: string; username: string; displayIdentifier: string }>();
       for (const user of matchedUsers) {
         const displayIdentifier = deps.getUserDisplayIdentifier(user);
-        const username = typeof user?.username === 'string' ? user.username.trim() : '';
-        const canonicalEmail = typeof user?.email_canonical === 'string' ? user.email_canonical.trim().toLowerCase() : '';
-        const emails = Array.isArray(user?.emails)
-          ? user.emails
-              .map((entry: { address?: string }) => typeof entry?.address === 'string' ? entry.address.trim().toLowerCase() : '')
-              .filter(Boolean)
-          : [];
-
-        if (username) {
-          userByLookupId.set(username.toLowerCase(), {
-            _id: user._id,
-            username: displayIdentifier || username,
-            displayIdentifier: displayIdentifier || username,
-          });
-        }
-        if (canonicalEmail) {
-          userByLookupId.set(canonicalEmail, {
-            _id: user._id,
-            username: displayIdentifier || canonicalEmail,
-            displayIdentifier: displayIdentifier || canonicalEmail,
-          });
-        }
-        for (const email of emails) {
-          userByLookupId.set(email, {
-            _id: user._id,
-            username: displayIdentifier || email,
-            displayIdentifier: displayIdentifier || email,
-          });
+        const aliases = [user.username, user.email_canonical, ...(Array.isArray(user.emails) ? user.emails : []).map((entry: { address?: string }) => entry?.address)];
+        for (const alias of aliases) {
+          if (typeof alias !== 'string') continue;
+          const key = alias.trim().toLowerCase();
+          if (!requestedIds.has(key)) continue;
+          const previous = userByLookupId.get(key);
+          if (previous && previous._id !== user._id) {
+            throw new Meteor.Error('ambiguous-recipient', 'Enter a username or email that identifies exactly one account.');
+          }
+          const label = displayIdentifier || alias.trim();
+          userByLookupId.set(key, { _id: user._id, username: label, displayIdentifier: label });
         }
       }
 

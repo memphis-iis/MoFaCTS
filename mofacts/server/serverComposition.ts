@@ -54,7 +54,7 @@ import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
 import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
-import { ACCESSOR_READ_VERIFICATIONS, LESSON_SHARING_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { ACCESSOR_READ_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy } from './methods/accessMethods';
 import { transferTdfOwnership } from './lib/tdfOwnershipTransferMongo';
 import { createAdminMethods } from './methods/adminMethods';
@@ -1194,6 +1194,7 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...warningRegistration.methodBindings,
   ...simulationTelemetry.methodBindings,
   ...experimentRegistration.methodBindings,
+  { verification: RECIPIENT_LOOKUP_VERIFICATION, handler: methods.resolveUsersForTdf, policy: accessorReadPolicy, dataEgress: 'recipient-lookup-result' },
   ...ACCESSOR_READ_VERIFICATIONS.map(verification => ({ verification, handler: methods[verification.method], policy: accessorReadPolicy, dataEgress: 'accessor-identities' as const })),
   { verification: LESSON_SHARING_VERIFICATION, handler: methods.assignAccessors, policy: lessonSharingPolicy, dataEgress: 'none' },
   ...prolificRegistration.methodBindings,

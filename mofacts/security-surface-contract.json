@@ -820,7 +820,8 @@
     },
     {
       "name": "resolveUsersForTdf",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Lesson owners resolve exact recipient identifiers before sharing or ownership transfer. An identifier matching distinct accounts rejects the whole lookup."
     },
     {
       "name": "saveAdminApiKeyAlternative",

@@ -46,6 +46,40 @@ describe('accessor identity query authorization', () => {
     }
   });
 
+  it('rejects ambiguous recipient lists and resolves repeated aliases of one account', async () => {
+    const lesson = randomUUID();
+    const owner = randomUUID();
+    const first = randomUUID();
+    const second = randomUUID();
+    const alias = randomUUID() + '@example.invalid';
+    const lessons = Tdfs.rawCollection() as unknown as import('mongodb').Collection<{ _id: string; ownerId: string }>;
+    const users = Meteor.users.rawCollection();
+    const observation = registeredMeteorMethodSurfaces();
+    assert.equal(observation.state, 'observed');
+    const binding = observation.surfaces.find(row => row.name === 'resolveUsersForTdf');
+    assert.deepEqual(binding?.policy, { kind: 'lesson-sharing', operation: 'owner-read' });
+    assert.equal(binding?.dataEgress, 'recipient-lookup-result');
+    const lookup = (Meteor as any).server.method_handlers.resolveUsersForTdf;
+    const resolve = lookup.bind({ userId: owner });
+    try {
+      await lessons.insertOne({ _id: lesson, ownerId: owner });
+      await users.insertOne({ _id: first, username: alias, email_canonical: alias } as Meteor.User);
+      await assert.rejects(lookup.call({ userId: first }, lesson, [alias]), { error: 403 });
+      const resolved = await resolve(lesson, [alias.toUpperCase()]);
+      assert.deepEqual(resolved, { users: [{ _id: first, username: alias, displayIdentifier: alias }], missing: [] });
+      await users.insertOne({ _id: second, username: second, emails: [{ address: alias.toUpperCase(), verified: false }] });
+      for (const inputs of [[alias], [second, alias], [alias, second]]) {
+        await assert.rejects(resolve(lesson, inputs), { error: 'ambiguous-recipient' });
+      }
+      assert.deepEqual(await resolve(lesson, [second]), {
+        users: [{ _id: second, username: alias.toUpperCase(), displayIdentifier: alias.toUpperCase() }], missing: [],
+      });
+    } finally {
+      await lessons.deleteOne({ _id: lesson });
+      await users.deleteMany({ _id: { $in: [first, second] } });
+    }
+  });
+
   function fixture(tdf: { ownerId: string } | null = { ownerId: 'synthetic-owner' }) {
     const calls: Array<{ selector: Record<string, unknown>; options?: Record<string, unknown> }> = [];
     let lessonReads = 0;

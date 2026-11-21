@@ -50,7 +50,7 @@ export type MeteorMethodBinding = Readonly<{
     | 'filename-reference-migration-report' | 'history-download-capability' | 'none'
     | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'
     | 'experiment-login-token' | 'participant-session' | 'public-demo-launch'
-    | 'accessor-identities' | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
+    | 'accessor-identities' | 'recipient-lookup-result' | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
 }>;
 
 let observe: (() => ReturnType<typeof observeMeteorMethodBindings>) | undefined;
