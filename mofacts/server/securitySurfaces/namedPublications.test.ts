@@ -52,6 +52,19 @@ describe('named application publications', function() {
     if (createdClientSetting) await DynamicSettings.removeAsync(CLIENT_VERBOSITY_SETTING.id);
   });
 
+  it('omits retired lesson listings and preserves signed-out readiness for active listings', async function() {
+    const handlers = (Meteor as any).server.publish_handlers;
+    for (const retired of ['ownedTdfs', 'pagedTdfsListing']) expect(handlers).not.to.have.own.property(retired);
+    for (const active of ['allTdfsListing', 'dashboardTdfsListing']) {
+      const observation = invoke(active, null);
+      await observation.result;
+      expect(observation.readyCalls).to.equal(1);
+      expect(observation.emitted).to.deep.equal([]);
+      const cursor = await invoke(active, owner).result;
+      expect(cursor.fetchAsync).to.be.a('function');
+    }
+  });
+
   it('binds each characterized publication to one reviewed descriptor', function() {
     const cases = Object.entries(NAMED_PUBLICATION_VERIFICATIONS);
     expect(registeredNamedPublications()).to.have.length(cases.length);

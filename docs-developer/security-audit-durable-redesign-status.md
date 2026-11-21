@@ -101,7 +101,8 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Verify first-save initialization, concurrent partial saves and invalid mixed patches in native Meteor.
 - [x] Remove preferences from the audio publication and retain both fields used for session tracking.
 - [x] Verify the exact installed audio projection and dashboard preference read for the same synthetic user.
-- [ ] Decide whether to retire ownedTdfs and pagedTdfsListing. No tracked application subscriber found. The developer wiki lists ownedTdfs, and the Change Streams plan requires checking for external consumers before removing pagedTdfsListing.
+- [x] Delete ownedTdfs and pagedTdfsListing and the pagination-only field stripping helper. The admin user list still requires normalizePageRequest.
+- [ ] Verify both retired names are absent and the two active listing handlers retain their authenticated cursors and signed-out readiness.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
@@ -1809,7 +1810,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 47 total, 46 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 48 total, 46 consumed, 0 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
 

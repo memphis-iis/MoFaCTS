@@ -37,11 +37,6 @@ const adminPublication = Object.freeze({ kind: 'role', role: 'admin' } as const)
 // undefined in the webpack bundle due to module loading order.
 const getRoleAssignment = () => (Meteor as any).roleAssignment;
 
-function fieldsWithoutId(document: Record<string, any>) {
-    const { _id, ...fields } = document;
-    return fields;
-}
-
 function normalizePageRequest(page: unknown, limit: unknown, maximumLimit = 200) {
     const normalizedPage = Number(page);
     const normalizedLimit = Number(limit);
@@ -596,44 +591,6 @@ Meteor.publish('contentUploadOwners', async function(ownerIds: any[] = []) {
             }
         }
     );
-});
-
-Meteor.publish('ownedTdfs', async function(ownerId: any) {
-    // Security: Only allow users to query their own TDFs or if they're admin
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    // Users can only query their own TDFs unless they're admin
-    // METEOR 3 FIX: await the async Roles.userIsInRoleAsync() call
-    if (ownerId !== this.userId && !(await Roles.userIsInRoleAsync(this.userId, ['admin']))) {
-        return this.ready(); // Return empty result
-    }
-
-    return Tdfs.find({ ownerId }, { fields: TDF_LISTING_FIELDS });
-});
-
-Meteor.publish('pagedTdfsListing', async function(page: any = 0, limit: any = 50) {
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const pageRequest = normalizePageRequest(page, limit);
-    if (!pageRequest) return this.ready();
-
-    const options = {
-        fields: TDF_LISTING_FIELDS,
-        sort: { 'content.tdfs.tutor.setspec.lessonname': 1, 'content.fileName': 1, _id: 1 },
-        skip: pageRequest.page * pageRequest.limit,
-        limit: pageRequest.limit
-    };
-
-    const selector = await tdfPublicationAccess.resolveListingSelector(this.userId);
-    const tdfs = await (Tdfs.find(selector, options) as any).fetchAsync();
-    for (const tdf of tdfs) {
-        this.added('tdfs', tdf._id, fieldsWithoutId(tdf));
-    }
-    this.ready();
 });
 
 Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any) {

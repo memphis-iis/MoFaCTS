@@ -1162,14 +1162,6 @@
       "access": "admin-only"
     },
     {
-      "name": "ownedTdfs",
-      "access": "role-checked"
-    },
-    {
-      "name": "pagedTdfsListing",
-      "access": "role-checked"
-    },
-    {
       "name": "settings",
       "access": "admin-only"
     },
