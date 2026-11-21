@@ -81,6 +81,19 @@ four-section report, unattended scheduling and the coordinated production
 cutover remain separate gates. The Phase 1 production recording gate (P1-04)
 remains with that production window.
 
+## Phase 3 remaining work (reconciled 2026-11-21)
+
+Use the evidence entries below for individual completed bindings. These are the remaining groups from the Phase 3 deliverables and exit gates.
+
+- [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
+- [x] Reconcile the sharing transaction, both accessor reads and recipient resolution with the named passing Meteor cases in slots 38-40.
+- [ ] Resolve sharing when a proposed new account disappears between the owner lookup and the grant. The grant currently accepts unmatched IDs. Decide whether to reject the whole new grant while preserving existing stored entries and permitting their revocation. Source review only.
+- [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
+- [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
+- [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
+- [ ] Verify static bypass detection across active source roots and retire the old manifest and inference checker after parity.
+- [ ] Qualify the complete matched image and scanner on staging2, including login, ordinary learner behavior and enabled providers. The earlier condition-index cutover covered that specific change only.
+
 ## Phase 3 HTTP characterization started (2026-11-18)
 
 - [x] Confirm the written migration order starts with HTTP. The existing
@@ -418,8 +431,8 @@ coverage, composition sealing and Phase 3 staging qualification remain open.
   counted a synthetic shared ID, and apply refused without changing the two
   existing rows. On clean data it installed the index. Two competing
   inserts produced one success, and standalone lessons remained accepted.
-- [ ] Qualify the count-only check and named partial unique index on staging2
-  after the rollback integration passes. The operator script requires an
+- [x] Qualify the count-only check and named partial unique index on staging2
+  after rollback integration. See the accepted 26197f91 cutover and protected evidence below. The operator script requires an
   explicit database name and an explicit apply flag. It refuses to install
   over shared condition IDs or invalid IDs, without editing the records.
   Production inventory and any index installation remain at cutover.
@@ -1782,7 +1795,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 40 total, 39 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 45 total, 39 consumed, 0 reserved, 5 generally available, and 1 for the earlier `/health` batch only.**
+
+On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
 
 Slot 40 consumed on 16349e26. Native Linux integration passed 11:45:59 to 11:47:09 UTC on 2026-11-21 (1,098 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 7b1e0631dc3f8a3430c1bf9103e53c0958f6dd3ace2edc22182b354ad05937c3.
 
