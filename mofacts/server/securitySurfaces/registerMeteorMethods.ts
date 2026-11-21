@@ -25,7 +25,7 @@ export type MeteorMethodBinding = Readonly<{
     operation: 'start-or-resume';
     authorize: (...args: never[]) => Promise<number | null>;
   }> | Readonly<{
-    kind: 'lesson-list' | 'dashboard-preference';
+    kind: 'lesson-list' | 'dashboard-preference' | 'personal-audio';
     operation: 'self';
     authorize: (...args: never[]) => Promise<string> | string;
   }> | Readonly<{

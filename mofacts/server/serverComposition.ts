@@ -54,7 +54,8 @@ import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
 import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
-import { PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
+import { AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -96,7 +97,7 @@ import { consolidateSparcInstructionalLibrary, SparcInstructionalLibrary } from 
 import { createSparcFigureClusterLabeler } from './lib/sparcFigureClusterLabels';
 import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
-import { createSystemMethods, preferencePolicy } from './methods/systemMethods';
+import { createSystemMethods, preferencePolicy, audioSavePolicy } from './methods/systemMethods';
 import { createRecoverableWarningRegistration } from './methods/recoverableWarningMethods';
 import { createTdfIdentityMigrationRegistration } from './methods/tdfIdentityMigrationMethods';
 import {
@@ -759,6 +760,16 @@ export const methods: any = {
   ...warningRegistration.methods,
   ...createSystemMethods({
     studyWaitMinutes: waitingPeriodPolicy.authorize,
+    async savePersonalAudio(userId, patch) {
+      const result = await MeteorAny.users.rawCollection().updateOne({ _id: userId }, [{
+        $set: { audioSettings: { $mergeObjects: [
+          { $ifNull: ['$audioSettings', { ...DEFAULT_AUDIO_SETTINGS, audioPromptMode: { $ifNull: ['$audioPromptMode', DEFAULT_AUDIO_SETTINGS.audioPromptMode] },
+            audioInputMode: { $ifNull: ['$audioInputMode', DEFAULT_AUDIO_SETTINGS.audioInputMode] } }] },
+          { $literal: patch },
+        ] } },
+      }]);
+      if (result.matchedCount !== 1) throw new Meteor.Error('account-unavailable', 'Audio settings account unavailable');
+    },
     serverConsole,
     usersCollection: MeteorAny.users,
     ErrorReports,
@@ -1209,6 +1220,7 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...warningRegistration.methodBindings,
   ...simulationTelemetry.methodBindings,
   ...experimentRegistration.methodBindings,
+  { verification: AUDIO_SAVE_VERIFICATION, handler: methods.saveAudioSettings, policy: audioSavePolicy, dataEgress: 'save-status' },
   ...PREFERENCE_VERIFICATIONS.map(verification => ({
     verification, handler: methods[verification.method], policy: preferencePolicy,
     dataEgress: verification.method === 'getUserPreference' ? 'statistics-expanded' as const : 'save-status' as const,

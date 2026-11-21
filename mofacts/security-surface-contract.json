@@ -832,7 +832,8 @@
     },
     {
       "name": "saveAudioSettings",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Only validated personal audio fields are updated together on the signed-in account."
     },
     {
       "name": "saveCourseAssignments",

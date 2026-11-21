@@ -2684,3 +2684,34 @@ describe('dashboard preference', () => {
     }
   });
 });
+
+describe('personal audio settings', () => {
+  it('validates the whole patch and preserves omitted personal audio choices', async () => {
+    const id = Random.id();
+    const handler = MeteorAny.server.method_handlers.saveAudioSettings;
+    const save = (patch: unknown) => handler.call({ userId: id }, patch);
+    const read = async () => (await MeteorUsersAny.findOneAsync(id)).audioSettings;
+    const { rejects } = await import('node:assert/strict');
+    const observation = registeredMeteorMethodSurfaces();
+    if (observation.state !== 'observed') throw new Error('Audio method registry unavailable');
+    expect(observation.surfaces.find(row => row.name === 'saveAudioSettings')?.policy).to.deep.equal({ kind: 'personal-audio', operation: 'self' });
+    try {
+      await MeteorUsersAny.insertAsync({ _id: id, audioPromptMode: 'feedback', audioInputMode: true });
+      await rejects(handler.call({}, { audioInputSensitivity: 70 }), { error: 401 });
+      await rejects(save({ audioInputSensitivity: 70, unknown: true }), { error: 'invalid-audio-settings' });
+      expect(await read()).to.equal(undefined);
+      await Promise.all([save({ audioInputSensitivity: 70 }), save({ audioPromptVoice: 'en-US-Standard-J' })]);
+      const baseline = await read();
+      expect(baseline).to.include({ audioInputMode: true, audioPromptMode: 'feedback', audioInputSensitivity: 70, audioPromptVoice: 'en-US-Standard-J' });
+      for (const invalid of [{ audioPromptMode: 'custom' }, { audioInputMode: 1 }, { audioPromptVoice: 'unknown' },
+        { audioPromptFeedbackVoice: '' }, { audioPromptQuestionVolume: -7 }, { audioPromptFeedbackVolume: 0.1 },
+        { audioPromptQuestionSpeakingRate: 0 }, { audioPromptFeedbackSpeakingRate: 1.1 }, { audioInputSensitivity: '70' }]) {
+        await rejects(save({ audioInputSensitivity: 30, ...invalid }), { error: 'invalid-audio-settings' });
+      }
+      expect(await read()).to.deep.equal(baseline);
+      await save({ audioPromptQuestionVolume: -6, audioPromptFeedbackVolume: 6, audioPromptQuestionSpeakingRate: 0.25, audioPromptFeedbackSpeakingRate: 2,
+        audioPromptFeedbackVoice: 'en-US-Standard-B', audioPromptMode: 'all', audioInputMode: false });
+      expect(await read()).to.include({ audioPromptQuestionVolume: -6, audioPromptFeedbackVolume: 6, audioInputSensitivity: 70, audioPromptVoice: 'en-US-Standard-J' });
+    } finally { await MeteorUsersAny.removeAsync(id); }
+  });
+});

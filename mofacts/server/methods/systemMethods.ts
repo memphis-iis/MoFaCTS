@@ -1,3 +1,4 @@
+import { validPersonalAudioSetting } from '../../common/personalAudioSettings';
 import { privateParticipantActivity } from '../lib/participantSession';
 import { Meteor } from 'meteor/meteor';
 import { PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY } from '../../common/practiceStatisticsPreference';
@@ -7,6 +8,11 @@ import {
   parseLoggingVerbosityLevel,
 } from '../../common/loggingSettings';
 import { requireAuthenticatedUser } from '../lib/methodAuthorization';
+
+export const audioSavePolicy = Object.freeze({
+  kind: 'personal-audio', operation: 'self',
+  authorize: (userId: string | null | undefined) => requireAuthenticatedUser(userId, 'Must be logged in to save audio settings', 401),
+} as const);
 
 const statisticsField = 'preferences.' + PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY;
 export const preferencePolicy = Object.freeze({
@@ -25,6 +31,7 @@ type MethodContext = {
 };
 
 type SystemMethodsDeps = {
+  savePersonalAudio: (userId: string, patch: UnknownRecord) => Promise<void>;
   studyWaitMinutes: (context: MethodContext, userId: string, tdfId: string, unit: number) => Promise<number | null>;
   serverConsole: (...args: unknown[]) => void;
   usersCollection: {
@@ -90,29 +97,16 @@ function sanitizeLogRows(logs: unknown) {
 export function createSystemMethods(deps: SystemMethodsDeps) {
   return {
     saveAudioSettings: async function(this: MethodContext, audioSettings: UnknownRecord) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in to save audio settings');
+      const userId = audioSavePolicy.authorize(this.userId);
+
+      if (!audioSettings || typeof audioSettings !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(audioSettings))) {
+        throw new Meteor.Error('invalid-audio-settings', 'Expected audio settings');
       }
-
-      const DEFAULT_AUDIO_SETTINGS = {
-        audioPromptMode: 'silent',
-        audioPromptQuestionVolume: 0,
-        audioPromptQuestionSpeakingRate: 1,
-        audioPromptVoice: 'en-US-Standard-A',
-        audioPromptFeedbackVolume: 0,
-        audioPromptFeedbackSpeakingRate: 1,
-        audioPromptFeedbackVoice: 'en-US-Standard-A',
-        audioInputMode: false,
-        audioInputSensitivity: 60,
-      };
-
-      const settingsToSave = { ...DEFAULT_AUDIO_SETTINGS, ...audioSettings };
-
-      await deps.usersCollection.updateAsync(
-        { _id: this.userId },
-        { $set: { audioSettings: settingsToSave } }
-      );
-
+      const entries = Object.entries(audioSettings);
+      if (!entries.length || !entries.every(([key, value]) => validPersonalAudioSetting(key, value))) {
+        throw new Meteor.Error('invalid-audio-settings', 'Invalid audio settings');
+      }
+      await deps.savePersonalAudio(userId, audioSettings);
       return { success: true };
     },
 

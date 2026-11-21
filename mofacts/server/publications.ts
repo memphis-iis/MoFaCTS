@@ -1,3 +1,4 @@
+import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
 import { Roles } from 'meteor/alanning:roles';
 import { Meteor } from 'meteor/meteor';
 import {
@@ -748,18 +749,6 @@ registerNamedPublication(Meteor, 'userAudioSettings', {
     const user = await (Meteor.users as any).findOneAsync({ _id: this.userId }, { fields: { audioSettings: 1, audioPromptMode: 1, audioInputMode: 1 } });
 
     if (!user.audioSettings) {
-        const DEFAULT_AUDIO_SETTINGS = {
-            audioPromptMode: 'silent',
-            audioPromptQuestionVolume: 0,
-            audioPromptQuestionSpeakingRate: 1,
-            audioPromptVoice: 'en-US-Standard-A',
-            audioPromptFeedbackVolume: 0,
-            audioPromptFeedbackSpeakingRate: 1,
-            audioPromptFeedbackVoice: 'en-US-Standard-A',
-            audioInputMode: false,
-            audioInputSensitivity: 60,
-        };
-
         const initialSettings = {
             ...DEFAULT_AUDIO_SETTINGS,
             audioPromptMode: user.audioPromptMode || DEFAULT_AUDIO_SETTINGS.audioPromptMode,
@@ -768,7 +757,7 @@ registerNamedPublication(Meteor, 'userAudioSettings', {
 
         // Save initialized settings
         await (Meteor.users as any).updateAsync(
-            { _id: this.userId },
+            { _id: this.userId, audioSettings: null },
             { $set: { audioSettings: initialSettings } }
         );
     }

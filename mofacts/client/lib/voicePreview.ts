@@ -1,4 +1,4 @@
-const PREVIEW_VOICES = new Set('ABCDEFGHIJ'.split('').map(letter => `en-US-Standard-${letter}`));
+import { personalAudioVoices } from '../../common/personalAudioSettings';
 
 type PreviewAudio = Pick<HTMLAudioElement, 'play' | 'pause' | 'currentTime' | 'onerror'>;
 
@@ -22,7 +22,7 @@ export function createVoicePreview(
     play(voice: string) {
       if (destroyed) return;
       stop();
-      if (!PREVIEW_VOICES.has(voice)) {
+      if (!personalAudioVoices.has(voice)) {
         onFailure(new Error('Unsupported preview voice.'));
         return;
       }
