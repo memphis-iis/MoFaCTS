@@ -327,7 +327,7 @@ remains with that production window.
   Slot 39 passed the named case for both methods.
 - [x] Reject the whole recipient lookup for sharing or transfer when a requested
   identifier matches distinct accounts. Repeated aliases of one account still resolve.
-- [ ] Verify the installed owner-only resolver and ambiguous single- and multi-recipient requests.
+- [x] Verify the installed owner-only resolver and ambiguous single- and multi-recipient requests. Slot 40 passed the named case including both input orders.
 
 The five-run allowance covered 18 existing administrator methods across five
 owning families. Remaining method and framework bindings, full registry
@@ -1782,7 +1782,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 40 total, 38 consumed, 0 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 40 total, 39 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 40 consumed on 16349e26. Native Linux integration passed 11:45:59 to 11:47:09 UTC on 2026-11-21 (1,098 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 7b1e0631dc3f8a3430c1bf9103e53c0958f6dd3ace2edc22182b354ad05937c3.
 
 Slot 39 consumed on 0a8722fc. Native Linux integration passed 21:27:04 to 21:28:20 UTC on 2026-11-20 (1,097 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 31d976888e285e0cb5a317e5f6560ef38f13c3144925a968f009c9aba04f0667.
 
