@@ -94,7 +94,7 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Delete both remote mail methods, their injected dependencies and contract entries. Internal delivery and scheduled summaries retain their server-owned functions.
 - [x] Confirm both retired names are absent from the installed Meteor registry.
 - [x] Delete remote serverLog and debugLog, both browser sign-in calls, the obsolete log-length constant and the obsolete privacy harness invocation. Server-side SAML logging remains active.
-- [ ] Confirm both logging names are absent from the installed Meteor registry.
+- [x] Confirm both logging names are absent from the installed Meteor registry.
 - [ ] Decide whether to restrict the self-service preference methods to the one tracked dashboard preference, a boolean controlling expansion of practice statistics. The current methods accept arbitrary names and values and the setter logs the supplied value at verbosity 2.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
@@ -1803,9 +1803,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 45 total, 42 consumed, 0 reserved, 2 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 45 total, 43 consumed, 0 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
+
+Slot 44 consumed on 9c05b6ee. Both retired logging commands were absent from the installed Meteor registry. Native integration passed 21:53:43 to 21:55:20 UTC on 2026-11-21 (1,100 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: af8f7f62913ed3439d49032b464a2e698ee478deebc32fcb60ce07c1269087c1.
 
 Slot 43 consumed on b319e0d4. Both retired names were absent from the installed Meteor registry. Native integration passed 15:32:40 to 15:34:30 UTC on 2026-11-21 (1,100 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 8d1fcf60a9df972f443b06e427fa1863c2cd3c0317b184f1f86ea6f3ded6f922.
 
