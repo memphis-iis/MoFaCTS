@@ -90,7 +90,7 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Apply the approved new-recipient rule at the transactional user update. Existing grants can still be retained or revoked.
 - [x] Verify missing-account rollback, stale-entry retention/revocation and the final two lesson-access method bindings in a combined Meteor run.
 - [x] Apply the approved server-authoritative study wait to Prolific and other study sessions. Resolve the saved unit and assigned lesson, use authored condition timing and the server clock, and preserve existing timers and ordinary practice.
-- [ ] Verify both enrollment paths in native Meteor, including passwordless reconnect, a condition-specific wait, same-unit resume and denial outside that scope.
+- [x] Verify both enrollment paths in native Meteor, including passwordless reconnect, a condition-specific wait, same-unit resume and denial outside that scope.
 - [ ] Decide whether to retire the two admin-callable mail methods (sendEmail and sendErrorReportSummaries). No tracked client caller was found. Internal server delivery and the scheduled summary call the underlying functions directly.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
@@ -1799,9 +1799,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 45 total, 40 consumed, 0 reserved, 4 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 45 total, 41 consumed, 0 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
+
+Slot 42 consumed on aecd9d95. Native Linux integration passed 15:05:43 to 15:07:36 UTC on 2026-11-21 (1,100 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Both extended study cases passed. Exact native receipt SHA-256: 8e5bdb55ab3424781b9bc38e889a594d03e5eca021afa5db182a653395db28e3.
 
 Slot 41 consumed on 9d15f8ce. Native Linux integration passed 13:16:38 to 13:18:00 UTC on 2026-11-21 (1,100 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Both named cases passed. Run evidence SHA-256: d83594cdeff15afff3df463b8b9fdd1ec885dd5ae7944119d9bf8e19b0aa2271.
 
