@@ -114,7 +114,8 @@
     },
     {
       "name": "assignAccessors",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Only the owner may edit sharing. Each new recipient must match an account inside the transaction. Stale existing entries can be retained or revoked."
     },
     {
       "name": "auditPublicAssetsWithoutSharedTdf",
@@ -293,7 +294,8 @@
     },
     {
       "name": "getAccessableTDFSForUser",
-      "access": "role-checked"
+      "access": "authenticated-self",
+      "notes": "Self-only owned lesson metadata for the data-download picker."
     },
     {
       "name": "getAccessors",

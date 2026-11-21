@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto';
 import { Tdfs } from '../../common/Collections';
 import { Meteor } from 'meteor/meteor';
 import { createAccessMethods } from './accessMethods';
-import { isTdfOwner } from '../lib/contentAccessPolicy';
 
 describe('accessor identity query authorization', () => {
   it('omits the retired assignable-lesson method from the live Meteor registry', () => {
@@ -101,7 +100,7 @@ describe('accessor identity query authorization', () => {
         }, updateAsync: unexpectedWrite,
       },
       serverConsole: () => undefined, getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => false }),
-      isTdfOwner, getUserDisplayIdentifier: user => user?.username || '',
+      getUserDisplayIdentifier: user => user?.username || '',
       exactCaseInsensitiveRegex: value => new RegExp(value, 'i'), isValidEmailAddress: () => false,
       normalizeCanonicalId: value => typeof value === 'string' ? value : null,
       transferTdfOwnership: async () => { throw new Error('Accessor listing must not transfer ownership'); },
@@ -146,6 +145,35 @@ describe('accessor identity query authorization', () => {
 });
 
 describe('atomic lesson sharing', () => {
+  it('rejects missing new recipients atomically and allows retaining or revoking stale entries', async () => {
+    const lesson = randomUUID();
+    const owner = randomUUID();
+    const learner = randomUUID();
+    const stale = { userId: randomUUID(), username: 'Former account' };
+    const active = { userId: learner, username: 'Current account' };
+    const missing = { userId: randomUUID(), username: 'Removed account' };
+    const lessons = Tdfs.rawCollection() as unknown as import('mongodb').Collection<{ _id: string; ownerId: string; accessors: typeof active[]; content: unknown; tdfRevision: number }>;
+    const users = Meteor.users.rawCollection() as unknown as import('mongodb').Collection<{ _id: string; accessedTDFs: string[] }>;
+    const assign = (Meteor as any).server.method_handlers.assignAccessors.bind({ userId: owner });
+    try {
+      await lessons.insertOne({ _id: lesson, ownerId: owner, accessors: [stale], tdfRevision: 4, content: { tdfs: { tutor: { unit: [{}] } } } });
+      await users.insertOne({ _id: learner, accessedTDFs: [] });
+      await assert.rejects(assign(lesson, [active, missing], [stale.userId]), { error: 'sharing-recipient-missing' });
+      const original = await lessons.findOne({ _id: lesson });
+      assert.equal(original?.tdfRevision, 4);
+      assert.deepEqual(original?.accessors, [stale]);
+      assert.deepEqual((await users.findOne({ _id: learner }))?.accessedTDFs, []);
+      await assign(lesson, [stale, active], []);
+      assert.deepEqual((await lessons.findOne({ _id: lesson }))?.accessors, [stale, active]);
+      assert.deepEqual((await users.findOne({ _id: learner }))?.accessedTDFs, [lesson]);
+      await assign(lesson, [], [stale.userId]);
+      assert.deepEqual((await lessons.findOne({ _id: lesson }))?.accessors, [active]);
+    } finally {
+      await lessons.deleteOne({ _id: lesson });
+      await users.deleteOne({ _id: learner });
+    }
+  });
+
   it('rolls back a late child failure and commits owner grants and revocations together', async () => {
     const observation = registeredMeteorMethodSurfaces();
     assert.equal(observation.state, 'observed');
@@ -190,6 +218,40 @@ describe('atomic lesson sharing', () => {
     } finally {
       await lessons.deleteMany({ _id: { $in: [root, child, foreign] } });
       await users.deleteOne({ _id: learner });
+    }
+  });
+});
+
+describe('lesson access bindings', () => {
+  it('lists only owned lessons and transfers ownership only for the owner', async () => {
+    const lesson = randomUUID();
+    const owner = randomUUID();
+    const recipient = randomUUID();
+    const lessons = Tdfs.rawCollection() as unknown as import('mongodb').Collection<{ _id: string; ownerId: string; content: unknown; tdfRevision: number }>;
+    const handlers = (Meteor as any).server.method_handlers;
+    const observation = registeredMeteorMethodSurfaces();
+    assert.equal(observation.state, 'observed');
+    const list = 'getAccessableTDFSForUser';
+    const transfer = 'transferDataOwnership';
+    assert.deepEqual(observation.surfaces.find(row => row.name === list)?.policy, { kind: 'lesson-list', operation: 'self' });
+    assert.deepEqual(observation.surfaces.find(row => row.name === transfer)?.policy, { kind: 'lesson-sharing', operation: 'family-owner-transfer' });
+    try {
+      await lessons.insertOne({ _id: lesson, ownerId: owner, content: { fileName: 'test.json', tdfs: { tutor: { unit: [{}] } } }, tdfRevision: 1 });
+      await Meteor.users.rawCollection().insertOne({ _id: recipient });
+      await assert.rejects(handlers[list].call({}, owner), { error: 401 });
+      await assert.rejects(handlers[list].call({ userId: recipient }, owner), { error: 403 });
+      assert.deepEqual(await handlers[list].call({ userId: recipient }, recipient), []);
+      const rows = await handlers[list].call({ userId: owner }, owner);
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0]._id, lesson);
+      assert.equal(rows[0].ownerId, undefined);
+      assert.equal(rows[0].content.tdfs?.tutor?.unit, undefined);
+      await assert.rejects(handlers[transfer].call({ userId: recipient }, lesson, recipient), { error: 403 });
+      assert.equal(await handlers[transfer].call({ userId: owner }, lesson, recipient), 'success');
+      assert.equal((await lessons.findOne({ _id: lesson }))?.ownerId, recipient);
+    } finally {
+      await lessons.deleteOne({ _id: lesson });
+      await Meteor.users.rawCollection().deleteOne({ _id: recipient });
     }
   });
 });

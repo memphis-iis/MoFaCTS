@@ -2,6 +2,11 @@ import { Meteor } from 'meteor/meteor';
 import { assertConditionFilenameIdAlignment, validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
 import { createLessonFamilyResolver, LESSON_FAMILY_ROOT_FIELDS, type LessonFamilyTdfCollection } from './tdfLessonFamilyResolver';
 
+export const transferOwnerPolicy = Object.freeze({
+  kind: 'lesson-sharing', operation: 'family-owner-transfer',
+  authorize: (ownerId: unknown, actingUserId: string) => ownerId === actingUserId,
+} as const);
+
 type RecordData = Record<string, any>;
 type TransferStorage = {
   tdfs: LessonFamilyTdfCollection;
@@ -19,7 +24,7 @@ export function createTdfOwnershipTransfer(deps: TransferDeps) {
   return async (tdfId: string, actingUserId: string, newOwnerId: string) => deps.transaction(async storage => {
     const target = await storage.tdfs.findOneAsync({ _id: tdfId }, { fields: { ownerId: 1 } });
     if (!target) throw new Meteor.Error(404, 'TDF not found');
-    if (target.ownerId !== actingUserId) {
+    if (!transferOwnerPolicy.authorize(target.ownerId, actingUserId)) {
       throw new Meteor.Error(403, 'Only current owner can transfer ownership');
     }
     const resolver = createLessonFamilyResolver({ tdfs: storage.tdfs });
@@ -36,7 +41,7 @@ export function createTdfOwnershipTransfer(deps: TransferDeps) {
       throw new Meteor.Error('tdf-identity-repair-required', 'A condition belongs to more than one experiment root.');
     }
     for (const member of members.values()) {
-      if (member.ownerId !== actingUserId) {
+      if (!transferOwnerPolicy.authorize(member.ownerId, actingUserId)) {
         throw new Meteor.Error('tdf-identity-repair-required', 'Every lesson-family member must have the same current owner.');
       }
       if (member.tdfAvailability === 'repair-required') {

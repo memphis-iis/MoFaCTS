@@ -103,6 +103,7 @@ function contentText(key: Parameters<typeof translatePlatformString>[1], values?
 }
 
 function uploadErrorText(error: any): string {
+  if (error?.error === 'sharing-recipient-missing') return contentText('content.sharingRecipientMissing');
   if (error?.error === 'ambiguous-recipient') return contentText('content.ambiguousRecipient');
   return String(error?.reason || error?.message || error || '');
 }

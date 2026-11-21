@@ -87,7 +87,9 @@ Use the evidence entries below for individual completed bindings. These are the 
 
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
 - [x] Reconcile the sharing transaction, both accessor reads and recipient resolution with the named passing Meteor cases in slots 38-40.
-- [ ] Resolve sharing when a proposed new account disappears between the owner lookup and the grant. The grant currently accepts unmatched IDs. Decide whether to reject the whole new grant while preserving existing stored entries and permitting their revocation. Source review only.
+- [x] Apply the approved new-recipient rule at the transactional user update. Existing grants can still be retained or revoked.
+- [ ] Verify missing-account rollback, stale-entry retention/revocation and the final two lesson-access method bindings in a combined Meteor run.
+- [ ] Decide the authority for new waiting periods in non-Prolific studies. The instructions screen supplies the lesson, unit, duration and start time; Prolific checks study progress and configured timing on the server. Existing saved waiting periods and passwordless return are durable contracts.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.

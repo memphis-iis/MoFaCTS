@@ -616,8 +616,16 @@ export const PROLIFIC_METHOD_VERIFICATIONS = Object.freeze({
 export const LESSON_SHARING_VERIFICATION = Object.freeze({
   ...middlewareTest, suite: 'atomic lesson sharing', method: 'assignAccessors', surfaceId: 'method:assignAccessors',
   verificationId: 'method.lesson-sharing.assignAccessors',
-  cases: Object.freeze(['rolls back a late child failure and commits owner grants and revocations together']),
+  cases: Object.freeze(['rolls back a late child failure and commits owner grants and revocations together',
+    'rejects missing new recipients atomically and allows retaining or revoking stale entries']),
 } as const);
+
+export const LESSON_ACCESS_VERIFICATIONS = Object.freeze({
+  list: Object.freeze({ ...middlewareTest, suite: 'lesson access bindings', method: 'getAccessableTDFSForUser', surfaceId: 'method:getAccessableTDFSForUser',
+    verificationId: 'method.lesson-access.own-list', cases: Object.freeze(['lists only owned lessons and transfers ownership only for the owner']) } as const),
+  transfer: Object.freeze({ ...middlewareTest, suite: 'lesson access bindings', method: 'transferDataOwnership', surfaceId: 'method:transferDataOwnership',
+    verificationId: 'method.lesson-access.transfer', cases: Object.freeze(['lists only owned lessons and transfers ownership only for the owner']) } as const),
+});
 
 export const RECIPIENT_LOOKUP_VERIFICATION = Object.freeze({
   ...middlewareTest, suite: 'accessor identity query authorization', method: 'resolveUsersForTdf', surfaceId: 'method:resolveUsersForTdf',
@@ -645,7 +653,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

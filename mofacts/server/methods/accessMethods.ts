@@ -11,6 +11,8 @@ export const lessonSharingPolicy = Object.freeze({ kind: 'lesson-sharing', opera
 
 export const accessorReadPolicy = Object.freeze({ kind: 'lesson-sharing', operation: 'owner-read', authorize: isTdfOwner } as const);
 
+export const ownLessonListPolicy = Object.freeze({ kind: 'lesson-list', operation: 'self', authorize: requireUserMatchesOrHasRole } as const);
+
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
   userId?: string | null;
@@ -30,7 +32,6 @@ type AccessMethodsDeps = {
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
   };
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
-  isTdfOwner: (userId: string, tdf: any) => boolean;
   getUserDisplayIdentifier: (user: any) => string;
   exactCaseInsensitiveRegex: (value: string) => RegExp;
   isValidEmailAddress: (value: string) => boolean;
@@ -95,7 +96,7 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
     },
 
     getAccessableTDFSForUser: async function(this: MethodContext, userId: string) {
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
+      await ownLessonListPolicy.authorize(deps.getMethodAuthorizationDeps(), {
         actingUserId: this.userId,
         subjectUserId: userId,
         notLoggedInMessage: 'Must be logged in',
@@ -288,8 +289,16 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
         }
         await storage.setAccessors(TDFId, normalizedAccessors);
         const userIds = normalizedAccessors.map((x: { userId: string }) => x.userId);
-        if (userIds.length > 0) {
-          await storage.grant(TDFId, userIds);
+        const newIds = userIds.filter(id => !currentById.has(id));
+        const retainedIds = userIds.filter(id => currentById.has(id));
+        if (newIds.length > 0) {
+          const result = await storage.grant(TDFId, newIds);
+          if (result.matchedCount !== newIds.length) {
+            throw new Meteor.Error('sharing-recipient-missing', 'A selected account no longer exists. Select the recipients again.');
+          }
+        }
+        if (retainedIds.length > 0) {
+          await storage.grant(TDFId, retainedIds);
         }
         if (actuallyRemovedIds.length > 0) {
           await storage.revoke(TDFId, actuallyRemovedIds);
