@@ -620,6 +620,12 @@ export const LESSON_SHARING_VERIFICATION = Object.freeze({
     'rejects missing new recipients atomically and allows retaining or revoking stale entries']),
 } as const);
 
+export const PREFERENCE_VERIFICATIONS = Object.freeze((['getUserPreference', 'setUserPreference'] as const).map(method => Object.freeze({
+  ...middlewareTest, suite: 'dashboard preference', method, surfaceId: `method:${method}` as const,
+  verificationId: `method.dashboard-preference.${method}` as const,
+  cases: Object.freeze(['persists only the signed-in user practice statistics boolean']),
+})));
+
 export const STUDY_WAIT_VERIFICATION = Object.freeze({
   ...middlewareTest, suite: 'Prolific composed account and completion methods', method: 'setLockoutTimeStamp', surfaceId: 'method:setLockoutTimeStamp',
   verificationId: 'method.study-wait.start-or-resume',
@@ -659,7 +665,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

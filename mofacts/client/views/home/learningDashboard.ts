@@ -1,3 +1,4 @@
+import { PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY } from '../../../common/practiceStatisticsPreference';
 import { createBrowserSnapshotStore } from '../../lib/browserSnapshotStore';
 import { initializeLearnerSettingsHost, destroyLearnerSettingsHost, learnerSettingsEvents, flushLearnerSettings, type LearnerConfigState } from '../shared/learnerTdfSettings';
 import { getLearnerTdfConfig, learnerConfigHasSetSpecAudioOverride } from '../../lib/learnerSettings';
@@ -55,7 +56,6 @@ declare const $: any;
 
 const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 4;
 const PRACTICE_DASHBOARD_SEARCH_VERSION = 1;
-const PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY = 'practiceTableStatisticsExpanded';
 const LESSON_COMMAND_FEEDBACK_SESSION_KEY = 'learningDashboardLessonCommandFeedback';
 
 type LessonCommandFeedback = Readonly<{

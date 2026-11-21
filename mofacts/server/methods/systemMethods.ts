@@ -1,12 +1,22 @@
 import { privateParticipantActivity } from '../lib/participantSession';
 import { Meteor } from 'meteor/meteor';
-import { check, Match } from 'meteor/check';
+import { PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY } from '../../common/practiceStatisticsPreference';
 import {
   CLIENT_VERBOSITY_SETTING,
   SERVER_VERBOSITY_SETTING,
   parseLoggingVerbosityLevel,
 } from '../../common/loggingSettings';
 import { requireAuthenticatedUser } from '../lib/methodAuthorization';
+
+const statisticsField = 'preferences.' + PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY;
+export const preferencePolicy = Object.freeze({
+  kind: 'dashboard-preference', operation: 'self',
+  authorize(userId: string | null | undefined, key: string, action: 'get' | 'set') {
+    if (!userId) throw new Meteor.Error('not-authorized', `Must be logged in to ${action} preferences`);
+    if (key !== PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY) throw new Meteor.Error('invalid-preference', 'Unknown dashboard preference');
+    return userId;
+  },
+} as const);
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -245,35 +255,17 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
     },
 
     async getUserPreference(this: MethodContext, key: string) {
-      if (!this.userId) {
-        throw new Meteor.Error('not-authorized', 'Must be logged in to get preferences');
-      }
-
-      check(key, String);
-
-      const user = await deps.usersCollection.findOneAsync(
-        { _id: this.userId },
-        { fields: { preferences: 1 } }
-      );
-
-      return user?.preferences?.[key];
+      const userId = preferencePolicy.authorize(this.userId, key, 'get');
+      const user = await deps.usersCollection.findOneAsync({ _id: userId }, { fields: { [statisticsField]: 1 } });
+      const saved = user?.preferences?.[PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY];
+      if (saved !== undefined && typeof saved !== 'boolean') throw new Meteor.Error('invalid-preference', 'Invalid saved dashboard preference');
+      return saved;
     },
 
     async setUserPreference(this: MethodContext, key: string, value: unknown) {
-      if (!this.userId) {
-        throw new Meteor.Error('not-authorized', 'Must be logged in to set preferences');
-      }
-
-      check(key, String);
-      check(value, Match.Any);
-
-      const updateField = `preferences.${key}`;
-      await deps.usersCollection.updateAsync(
-        { _id: this.userId },
-        { $set: { [updateField]: value } }
-      );
-
-      deps.serverConsole(2, `User ${this.userId} set preference ${key} to ${value}`);
+      const userId = preferencePolicy.authorize(this.userId, key, 'set');
+      if (typeof value !== 'boolean') throw new Meteor.Error('invalid-preference', 'Expected a boolean dashboard preference');
+      await deps.usersCollection.updateAsync({ _id: userId }, { $set: { [statisticsField]: value } });
       return true;
     },
   };

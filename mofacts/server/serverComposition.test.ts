@@ -2648,3 +2648,39 @@ describe('Prolific composed account and completion methods', function() {
     } catch (error: any) { expect(error.error).to.equal('experiment-password-required'); }
   });
 });
+
+describe('dashboard preference', () => {
+  it('persists only the signed-in user practice statistics boolean', async () => {
+    const id = Random.id(), other = Random.id();
+    const key = 'practiceTableStatisticsExpanded';
+    const handlers = MeteorAny.server.method_handlers;
+    const read = (userId: string, name = key) => handlers.getUserPreference.call({ userId }, name);
+    const write = (userId: string, name: string, value: unknown) => handlers.setUserPreference.call({ userId }, name, value);
+    const { rejects } = await import('node:assert/strict');
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Preference registry unavailable');
+    for (const method of ['getUserPreference', 'setUserPreference']) {
+      expect(observed.surfaces.find(row => row.name === method)?.policy).to.deep.equal({ kind: 'dashboard-preference', operation: 'self' });
+    }
+    try {
+      await MeteorUsersAny.insertAsync({ _id: id, preferences: { existing: 17 } });
+      await MeteorUsersAny.insertAsync({ _id: other, preferences: { [key]: true } });
+      expect(await read(id)).to.equal(undefined);
+      await rejects(read(''), { error: 'not-authorized' });
+      await rejects(write('', key, true), { error: 'not-authorized' });
+      await rejects(read(id, 'existing'), { error: 'invalid-preference' });
+      await rejects(write(id, 'existing', false), { error: 'invalid-preference' });
+      for (const value of [true, false]) {
+        expect(await write(id, key, value)).to.equal(true);
+        expect(await read(id)).to.equal(value);
+      }
+      await rejects(write(id, key, 'true'), { error: 'invalid-preference' });
+      expect(await read(other)).to.equal(true);
+      expect((await MeteorUsersAny.findOneAsync(id)).preferences).to.deep.equal({ existing: 17, [key]: false });
+      await MeteorUsersAny.updateAsync(id, { $set: { ['preferences.' + key]: { invalid: true } } });
+      await rejects(read(id), { error: 'invalid-preference' });
+    } finally {
+      await MeteorUsersAny.removeAsync({ _id: { $in: [id, other] } });
+    }
+  });
+});

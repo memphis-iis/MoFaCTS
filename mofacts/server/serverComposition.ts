@@ -54,7 +54,7 @@ import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
 import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
-import { STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -96,7 +96,7 @@ import { consolidateSparcInstructionalLibrary, SparcInstructionalLibrary } from 
 import { createSparcFigureClusterLabeler } from './lib/sparcFigureClusterLabels';
 import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
-import { createSystemMethods } from './methods/systemMethods';
+import { createSystemMethods, preferencePolicy } from './methods/systemMethods';
 import { createRecoverableWarningRegistration } from './methods/recoverableWarningMethods';
 import { createTdfIdentityMigrationRegistration } from './methods/tdfIdentityMigrationMethods';
 import {
@@ -1209,6 +1209,10 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...warningRegistration.methodBindings,
   ...simulationTelemetry.methodBindings,
   ...experimentRegistration.methodBindings,
+  ...PREFERENCE_VERIFICATIONS.map(verification => ({
+    verification, handler: methods[verification.method], policy: preferencePolicy,
+    dataEgress: verification.method === 'getUserPreference' ? 'statistics-expanded' as const : 'save-status' as const,
+  })),
   { verification: STUDY_WAIT_VERIFICATION, handler: methods.setLockoutTimeStamp, policy: waitingPeriodPolicy, dataEgress: 'saved-wait' },
   { verification: LESSON_ACCESS_VERIFICATIONS.list, handler: methods.getAccessableTDFSForUser, policy: ownLessonListPolicy, dataEgress: 'owned-lesson-list' },
   { verification: LESSON_ACCESS_VERIFICATIONS.transfer, handler: methods.transferDataOwnership, policy: transferOwnerPolicy, dataEgress: 'transfer-status' },

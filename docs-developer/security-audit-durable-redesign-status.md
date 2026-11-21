@@ -95,7 +95,9 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Confirm both retired names are absent from the installed Meteor registry.
 - [x] Delete remote serverLog and debugLog, both browser sign-in calls, the obsolete log-length constant and the obsolete privacy harness invocation. Server-side SAML logging remains active.
 - [x] Confirm both logging names are absent from the installed Meteor registry.
-- [ ] Decide whether to restrict the self-service preference methods to the one tracked dashboard preference, a boolean controlling expansion of practice statistics. The current methods accept arbitrary names and values and the setter logs the supplied value at verbosity 2.
+- [x] Restrict both preference methods to the signed-in user and practiceTableStatisticsExpanded. Only boolean writes are accepted; the setter no longer logs the value.
+- [ ] Verify both installed methods, true/false round trips, user isolation and invalid input/stored values.
+- [ ] Decide the personal audio save contract. The current screen sends nine fields; the server accepts additional fields and fills omissions with defaults, which can reset previous choices. Review partial saves and preservation of existing settings before changing the contract.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.

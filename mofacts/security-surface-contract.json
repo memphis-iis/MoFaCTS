@@ -602,7 +602,8 @@
     },
     {
       "name": "getUserPreference",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Only the signed-in user and the boolean practiceTableStatisticsExpanded field."
     },
     {
       "name": "getUserRecentTDFs",
@@ -908,7 +909,8 @@
     },
     {
       "name": "setUserPreference",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Only the signed-in user and the boolean practiceTableStatisticsExpanded field."
     },
     {
       "name": "setUserSessionId",
