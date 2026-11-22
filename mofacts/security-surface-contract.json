@@ -1114,10 +1114,6 @@
       "access": "role-checked"
     },
     {
-      "name": "allTdfsListing",
-      "access": "role-checked"
-    },
-    {
       "name": "assets",
       "access": "role-checked"
     },

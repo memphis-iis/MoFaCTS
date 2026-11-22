@@ -12,19 +12,6 @@ export type ReportingAssignment = {
 
 export type ReportingAssignmentsByCourseId = Record<string, ReportingAssignment[]>;
 
-export type ReportingTdfSummary = {
-  _id: string;
-  content?: {
-    tdfs?: {
-      tutor?: {
-        setspec?: {
-          duedate?: unknown;
-        };
-      };
-    };
-  };
-};
-
 export type ReportingPerformanceRow = {
   userId: string;
   username: string;
@@ -85,17 +72,6 @@ export function findAssignmentForTdf(
 ): ReportingAssignment | null {
   return getCourseAssignments(assignmentsByCourseId, courseId)
     .find((assignment) => String(assignment?.TDFId || '') === String(tdfId || '')) || null;
-}
-
-export function findTdfSummary(allTdfs: ReportingTdfSummary[], tdfId: string): ReportingTdfSummary | null {
-  return allTdfs.find((tdf) => String(tdf?._id || '') === String(tdfId || '')) || null;
-}
-
-export function resolveSelectedDueDate(
-  assignment: ReportingAssignment | null,
-  tdf: ReportingTdfSummary | null,
-): unknown {
-  return assignment?.dueAt || tdf?.content?.tdfs?.tutor?.setspec?.duedate || null;
 }
 
 export function toDateInputValue(value: unknown): string {

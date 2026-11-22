@@ -93,14 +93,6 @@ function experimentTargetFromUser(user: any) {
         : '';
 }
 
-function baseVisibilityTerms(userId: string): PublicationSelector[] {
-    return [
-        { ownerId: userId },
-        { 'accessors.userId': userId },
-        { 'content.tdfs.tutor.setspec.userselect': 'true' }
-    ];
-}
-
 function teacherListingSelector(userId: string) {
     return {
         $or: [
@@ -175,28 +167,6 @@ export function createTdfPublicationAccessResolver(
         });
 
         return promise;
-    }
-
-    async function resolveListingSelectorUncached(userId: string) {
-        if (await deps.roles.userIsInRoleAsync(userId, ['admin'])) {
-            return {};
-        }
-        if (await deps.roles.userIsInRoleAsync(userId, ['teacher'])) {
-            return teacherListingSelector(userId);
-        }
-
-        const user = await deps.users.findOneAsync(
-            { _id: userId },
-            { fields: { accessedTDFs: 1 } }
-        );
-        const accessedTdfIds = normalizeIdList(user?.accessedTDFs || []);
-        const visibilityTerms: PublicationSelector[] = baseVisibilityTerms(userId);
-        if (accessedTdfIds.length > 0) {
-            visibilityTerms.push({ _id: { $in: accessedTdfIds } });
-        } else {
-            visibilityTerms.push({ _id: { $in: [] } });
-        }
-        return { $or: visibilityTerms };
     }
 
     async function resolveAssetStimuliSetIdsUncached(userId: string) {
@@ -279,9 +249,6 @@ export function createTdfPublicationAccessResolver(
     }
 
     return {
-        resolveListingSelector(userId: string) {
-            return cached(`listing:${userId}`, () => resolveListingSelectorUncached(userId));
-        },
         resolveAssetStimuliSetIds(userId: string) {
             return cached(`assets:${userId}`, () => resolveAssetStimuliSetIdsUncached(userId));
         },

@@ -2,7 +2,8 @@ import { expect } from 'chai';
 import { Roles } from 'meteor/alanning:roles';
 import { Meteor } from 'meteor/meteor';
 import { Random } from 'meteor/random';
-import { DynamicSettings, UserDashboardCache } from '../../common/Collections';
+import { curSemester } from '../../common/Definitions';
+import { Tdfs, DynamicSettings, UserDashboardCache } from '../../common/Collections';
 import { DEPLOYMENT_BRAND_PROFILE_KEY } from '../../common/deploymentBrandProfile';
 import { CLIENT_VERBOSITY_SETTING } from '../../common/loggingSettings';
 import { NAMED_PUBLICATION_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
@@ -52,16 +53,59 @@ describe('named application publications', function() {
     if (createdClientSetting) await DynamicSettings.removeAsync(CLIENT_VERBOSITY_SETTING.id);
   });
 
-  it('omits all six retired lesson publications and preserves the instructor listing', async function() {
+  it('omits all seven retired lesson publications', function() {
     const handlers = (Meteor as any).server.publish_handlers;
-    const retired = ['ownedTdfs', 'pagedTdfsListing', 'tdfByIds', 'tdfForEditMetadata', 'dashboardTdfsListing', 'contentUploadOwners'];
+    const retired = ['ownedTdfs', 'pagedTdfsListing', 'tdfByIds', 'tdfForEditMetadata', 'dashboardTdfsListing', 'contentUploadOwners', 'allTdfsListing'];
     for (const name of retired) expect(handlers).not.to.have.own.property(name);
-    const observation = invoke('allTdfsListing', null);
-    await observation.result;
-    expect(observation.readyCalls).to.equal(1);
-    expect(observation.emitted).to.deep.equal([]);
-    const cursor = await invoke('allTdfsListing', owner).result;
-    expect(cursor.fetchAsync).to.be.a('function');
+  });
+
+  it('publishes only a single accessible runtime lesson', async function() {
+    const id = Random.id();
+    try {
+      await Tdfs.insertAsync({ _id: id, ownerId: owner });
+      const docs = await (await invoke('currentTdf', owner, id).result).fetchAsync();
+      expect(docs.map((doc: { _id: string }) => doc._id)).to.deep.equal([id]);
+      for (const [actor, argument] of [[owner, [id]], [owner, { id }], [null, id], [admin, id]] as const) {
+        const observation = invoke('currentTdf', actor, argument);
+        expect(await observation.result).to.equal(undefined);
+        expect(observation.readyCalls).to.equal(1);
+        expect(observation.emitted).to.deep.equal([]);
+      }
+    } finally {
+      await Tdfs.removeAsync(id);
+    }
+  });
+
+  it('reports effective due dates only for the requested instructor courses', async function() {
+    const course = Random.id(), otherCourse = Random.id();
+    const lessons = [Random.id(), Random.id(), Random.id()];
+    try {
+      await Courses.insertAsync({ _id: course, teacherUserId: admin, semester: curSemester });
+      await Courses.insertAsync({ _id: otherCourse, teacherUserId: owner, semester: curSemester });
+      for (const [i, id] of lessons.entries()) {
+        const setspec = { lessonname: id, ...(i < 2 ? { duedate: '2026-03-04' } : {}) };
+        await Tdfs.insertAsync({ _id: id, ownerId: admin, content: { tdfs: { tutor: { setspec } } } });
+      }
+      const [first, second, third] = lessons;
+      await Assignments.insertAsync({ courseId: course, TDFId: first, dueAt: '2026-02-03' });
+      await Assignments.insertAsync({ courseId: course, assignmentType: 'progressive', memberTdfIds: [second, third] });
+      await Assignments.insertAsync({ courseId: otherCourse, TDFId: first });
+      const report = (Meteor as any).server.method_handlers.getTdfAssignmentsByCourseIdMap;
+      const result = await report.call({ userId: admin }, admin);
+      expect(result).to.have.keys(course);
+      const rows = result[course];
+      expect(rows).to.have.length(3);
+      for (const [i, id] of lessons.entries()) {
+        const row = rows.find((item: { TDFId: string }) => item.TDFId === id);
+        expect(row).to.have.keys('assignmentId', 'TDFId', 'displayName', 'dueAt');
+        expect(row.displayName).to.equal(id);
+        expect(row.dueAt).to.equal(['2026-02-03', '2026-03-04', null][i]);
+      }
+    } finally {
+      await Assignments.removeAsync({ courseId: { $in: [course, otherCourse] } });
+      await Courses.removeAsync({ _id: { $in: [course, otherCourse] } });
+      await Tdfs.removeAsync({ _id: { $in: lessons } });
+    }
   });
 
   it('binds each characterized publication to one reviewed descriptor', function() {

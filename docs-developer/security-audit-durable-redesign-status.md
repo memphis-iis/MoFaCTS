@@ -106,8 +106,9 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Confirm no independent client uses the four remaining obsolete lesson subscriptions. Retire tdfByIds, tdfForEditMetadata, dashboardTdfsListing and contentUploadOwners, their contract entries and dashboard-only resolver code.
 - [x] Verify all six retired subscriptions are absent and the instructor listing still works in native Meteor.
 - [x] Trace the remaining allTdfsListing subscription. Its only tracked client is instructor reporting. It uses the selected lesson for the authored due date when the assignment has none. The existing instructor-scoped assignment query already joins that lesson.
-- [ ] Decide whether to retire allTdfsListing by returning the effective due date in the instructor assignment response and preserving assignment-date precedence. This would remove the independent authenticated listing, including its broad lesson metadata fields.
-- [ ] Reconcile currentTdf with its exact-ID inventory description. The retained runtime handler also accepts arrays; the two tracked subscription sites pass a current lesson ID.
+- [x] Retire allTdfsListing and use the course-scoped assignment result for the effective due date. Assignment date takes precedence over the authored date.
+- [x] Restrict currentTdf to a single normalized lesson ID while retaining course-context, repair and visibility guards.
+- [ ] Verify the seven publication retirements, single-lesson runtime behavior and scoped assignment dates in native Meteor.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
@@ -1815,9 +1816,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 49 total, 48 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 50 total, 48 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
+
+Slot 50 reserved for the combined reporting due-date and single-lesson batch.
 
 Slot 49 consumed on 14cdef82. Native Meteor passed 01:40:36 to 01:41:42 UTC on 2026-11-22: 1,100 server and 1,249 Chromium passes, zero failures, 15 and seven pending. The six-name absence and instructor-listing regression passed. Three tests solely for deleted dashboard selector helpers were removed. Source snapshot SHA-256: 35e748467d394675888a321114b48713c544181075ded358f5bb482276137714. Full typecheck and lint passed; 326 security surfaces remain. Source-security suite: 453 passed, seven skipped. Wiki reference updated on 3d43626.
 

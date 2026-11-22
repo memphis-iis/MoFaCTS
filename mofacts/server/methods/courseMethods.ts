@@ -987,7 +987,8 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
         $project: {
           _id: 0,
           assignmentId: '$_id',
-          content: '$TDF.content',
+          displayName: '$TDF.content.tdfs.tutor.setspec.lessonname',
+          lessonDueDate: '$TDF.content.tdfs.tutor.setspec.duedate',
           TDFId: '$effectiveTdfIds',
           courseId: 1,
           dueAt: 1,
@@ -1005,8 +1006,8 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       assignmentsByCourseId[courseId]!.push({
         assignmentId: assignment._id || assignment.assignmentId,
         TDFId: assignment.TDFId,
-        displayName: assignment.content.tdfs.tutor.setspec.lessonname,
-        dueAt: assignment.dueAt || null,
+        displayName: assignment.displayName,
+        dueAt: assignment.dueAt || assignment.lessonDueDate || null,
       });
     }
     return assignmentsByCourseId;

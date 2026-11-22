@@ -101,9 +101,9 @@ describe('tdfPublicationAccess', function() {
       }
     }, { maxCacheEntries: 1 });
 
-    await resolver.resolveListingSelector('user-1');
-    await resolver.resolveListingSelector('user-2');
-    await resolver.resolveListingSelector('user-1');
+    await resolver.resolveAssetStimuliSetIds('user-1');
+    await resolver.resolveAssetStimuliSetIds('user-2');
+    await resolver.resolveAssetStimuliSetIds('user-1');
 
     expect(userCalls).to.deep.equal(['user-1', 'user-2', 'user-1']);
   });

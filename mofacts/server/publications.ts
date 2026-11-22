@@ -292,68 +292,23 @@ registerNamedPublication(Meteor, 'userExperimentState', {
     });
 });
 
-async function publishRuntimeTdfsByIds(publication: any, tdfIdOrIds: any) {
-    if (!publication.userId) {
-        return publication.ready();
+Meteor.publish('currentTdf', async function(tdfId: unknown) {
+    const id = normalizeOptionalStringId(tdfId);
+    if (!this.userId || !id) return this.ready();
+
+    const tdf = await Tdfs.findOneAsync(
+        { _id: id },
+        { fields: { _id: 1, ownerId: 1, accessors: 1, tdfAvailability: 1, 'content.tdfs.tutor.setspec.userselect': 1 } }
+    );
+    if (!tdf || tdf.tdfAvailability === 'repair-required' || !await canViewDashboardTdf(this.userId, tdf)) {
+        return this.ready();
     }
 
-    const assignedRootIds = new Set<string>(await resolveAssignedRootTdfIdsForUser(publication.userId as string));
-    const assignedConditionIdsPromise = lessonFamilyResolver
-        .resolveConditionChildIdsForRootIds(Array.from(assignedRootIds))
-        .then((ids: string[]) => new Set(ids));
-    const requestedTdfRequiresCourseContext = async (requestedId: string) => {
-        if (assignedRootIds.has(requestedId)) {
-            return true;
-        }
-        const assignedConditionIds = await assignedConditionIdsPromise;
-        return assignedConditionIds.has(requestedId);
-    };
-    const canAccessRequestedTdf = async (requestedId: string) => {
-        const tdf = await Tdfs.findOneAsync(
-            { _id: requestedId },
-            { fields: { _id: 1, ownerId: 1, accessors: 1, tdfAvailability: 1, 'content.tdfs.tutor.setspec.userselect': 1 } }
-        );
-        if (!tdf) {
-            return false;
-        }
-        if (tdf.tdfAvailability === 'repair-required') {
-            return false;
-        }
-        if (await requestedTdfRequiresCourseContext(requestedId)) {
-            return false;
-        }
-        return canViewDashboardTdf(publication.userId, tdf);
-    };
-
-    if (tdfIdOrIds && typeof tdfIdOrIds === 'object') {
-        const normalizedIds = normalizeIdList(tdfIdOrIds);
-        if (!normalizedIds.length) {
-            return publication.ready();
-        }
-        const allowedIds: string[] = [];
-        for (const requestedId of normalizedIds) {
-            if (await canAccessRequestedTdf(requestedId)) {
-                allowedIds.push(requestedId);
-            }
-        }
-        if (!allowedIds.length) {
-            return publication.ready();
-        }
-        return Tdfs.find({ _id: { $in: allowedIds } }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
-    }
-
-    const normalizedTdfId = normalizeOptionalStringId(tdfIdOrIds);
-    if (!normalizedTdfId) {
-        return publication.ready();
-    }
-    if (!await canAccessRequestedTdf(normalizedTdfId)) {
-        return publication.ready();
-    }
-    return Tdfs.find({ _id: normalizedTdfId }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
-}
-
-Meteor.publish('currentTdf', async function(tdfId: any) {
-    return publishRuntimeTdfsByIds(this, tdfId);
+    const assignedRoots = await resolveAssignedRootTdfIdsForUser(this.userId);
+    if (assignedRoots.includes(id)) return this.ready();
+    const assignedConditions = await lessonFamilyResolver.resolveConditionChildIdsForRootIds(assignedRoots);
+    if (assignedConditions.includes(id)) return this.ready();
+    return Tdfs.find({ _id: id }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
 });
 
 // Publication for content/TDF editor - returns TDF with full content for editing
@@ -382,45 +337,6 @@ Meteor.publish('tdfForEdit', async function(tdfId: any) {
 
     return Tdfs.find({ _id: tdfId }, { fields: editFields });
 });
-
-// ===== LIGHTWEIGHT TDF LISTING PUBLICATION =====
-// For dashboard/listing pages - excludes large 'unit' arrays (50-70% bandwidth savings)
-// Use this for pages that only need TDF metadata, not full content
-const TDF_LISTING_FIELDS = {
-    _id: 1,
-    tdfAvailability: 1,
-    stimuliSetId: 1,
-    ownerId: 1,
-    accessors: 1,
-    conditionCounts: 1,
-    'content.fileName': 1,
-    'content.isMultiTdf': 1,
-    'content.tdfs.tutor.setspec.lessonname': 1,
-    'content.tdfs.tutor.setspec.duedate': 1,
-    'content.tdfs.tutor.setspec.tags': 1,
-    'content.tdfs.tutor.setspec.contentLanguage': 1,
-    'content.tdfs.tutor.setspec.recommendedUiLocales': 1,
-    'content.tdfs.tutor.setspec.translationStatus': 1,
-    'content.tdfs.tutor.setspec.condition': 1,
-    'content.tdfs.tutor.setspec.conditionTdfIds': 1,
-    'content.tdfs.tutor.setspec.userselect': 1,
-    'content.tdfs.tutor.setspec.experimentTarget': 1,
-    'content.tdfs.tutor.setspec.showPageNumbers': 1,
-    'content.tdfs.tutor.setspec.speechIgnoreOutOfGrammarResponses': 1,
-    'content.tdfs.tutor.setspec.srfilterclose': 1,
-    'content.tdfs.tutor.setspec.speechOutOfGrammarFeedback': 1,
-    'content.tdfs.tutor.setspec.audioPromptMode': 1,
-    'content.tdfs.tutor.setspec.audioInputEnabled': 1,
-    'content.tdfs.tutor.setspec.audioInputSensitivity': 1,
-    'content.tdfs.tutor.setspec.audioPromptFeedbackSpeakingRate': 1,
-    'content.tdfs.tutor.setspec.audioPromptQuestionSpeakingRate': 1,
-    'content.tdfs.tutor.setspec.audioPromptVoice': 1,
-    'content.tdfs.tutor.setspec.audioPromptQuestionVolume': 1,
-    'content.tdfs.tutor.setspec.audioPromptFeedbackVolume': 1,
-    'content.tdfs.tutor.setspec.audioPromptFeedbackVoice': 1,
-    'content.tdfs.tutor.unit.learningsession': 1,
-    // Includes only runtime markers from units; still excludes full unit content.
-};
 
 const TDF_CONTENT_UPLOAD_DETAIL_FIELDS = {
     _id: 1,
@@ -480,16 +396,6 @@ const tdfPublicationAccess = createTdfPublicationAccessResolver({
 });
 const lessonFamilyResolver = createLessonFamilyResolver({ tdfs: Tdfs as any });
 const resolveExperimentTargetFamily = createExperimentTargetFamilyResolver({ Tdfs: Tdfs as any });
-
-Meteor.publish('allTdfsListing', async function() {
-    // Security: Filter TDFs based on user role and access permissions
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const selector = await tdfPublicationAccess.resolveListingSelector(this.userId);
-    return Tdfs.find(selector, { fields: TDF_LISTING_FIELDS });
-});
 
 Meteor.publish('tdfForContentUploadDetails', async function(tdfId: any) {
     if (!this.userId || !tdfId || typeof tdfId !== 'string') {
