@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { Meteor } from 'meteor/meteor';
-import { createCourseMethods } from './courseMethods';
+import { createCourseService } from './courseMethods';
 import { COURSE_SNAPSHOT_VERSION } from '../lib/courseLearnerSnapshotCache';
 
 function cursor(rows: any[] = []) {
@@ -220,7 +220,7 @@ function createCachedProgressiveLaunch(userId = 'student-user') {
   }]);
   const tdfs = createMemoryCollection([progressiveMember('lesson-1', 'set-1'), progressiveMember('lesson-2', 'set-2')]);
   let memberReads = 0;
-  const methods = createCourseMethods(createDeps({
+  const { methods } = createCourseService(createDeps({
     Courses: courses,
     Sections: sections,
     SectionUserMap: enrollments,
@@ -251,7 +251,7 @@ describe('course method operational errors', function() {
       { _id: 'former-teacher', username: 'Former teacher', email_canonical: 'former@example.test', emails: [], roles: ['teacher'] },
     ];
     const queries: Array<{ role: string; options: unknown }> = [];
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Roles: {
         async getUsersInRoleAsync(role: string, options: { queryOptions: { fields: Record<string, 1> } }) {
           queries.push({ role, options });
@@ -288,7 +288,7 @@ describe('course method operational errors', function() {
 
   it('rejects teacher discovery before reading role assignments for a signed-out caller', async function() {
     let queries = 0;
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Roles: { async getUsersInRoleAsync() { queries++; return cursor(); } },
     }));
     try {
@@ -309,7 +309,7 @@ describe('course method operational errors', function() {
       { TDFId: 'lesson', courseId: 'course', date },
       { assignmentId: 'target', courseId: 'course', TDFId: 'lesson', date },
     ] }]);
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       usersCollection: users,
       Courses: createMemoryCollection([{ _id: 'course', teacherUserId: 'teacher' }]),
       Assignments: createMemoryCollection([{ _id: 'target', courseId: 'course', assignmentType: 'lesson', TDFId: 'lesson' }]),
@@ -322,7 +322,7 @@ describe('course method operational errors', function() {
     expect(await methods.checkForUserException.call({ userId: 'student' }, 'student', 'target')).to.equal(false);
   });
   it('returns an empty array for a valid empty broad course listing', async function() {
-    const methods = createCourseMethods(createDeps());
+    const { methods } = createCourseService(createDeps());
 
     const result = await methods.getAllCourses.call({ userId: 'admin-user' });
 
@@ -330,7 +330,7 @@ describe('course method operational errors', function() {
   });
 
   it('throws Meteor.Error instead of returning null for listing failures', async function() {
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Courses: {
         ...createDeps().Courses,
         find: () => ({
@@ -362,7 +362,7 @@ describe('course assignment metadata methods', function() {
       CourseLearnerSnapshotCache: createMemoryCollection(),
       UserDashboardCache: createMemoryCollection(),
     });
-    const methods = createCourseMethods(deps);
+    const { methods } = createCourseService(deps);
 
     await methods.addCourse.call({ userId: 'teacher-user' }, {
       courseName: 'Intro Course',
@@ -383,7 +383,7 @@ describe('course assignment metadata methods', function() {
 
   it('creates a default section for new courses when no section names are supplied', async function() {
     const sections = createMemoryCollection();
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Courses: createMemoryCollection(),
       Sections: sections,
       SectionUserMap: createMemoryCollection(),
@@ -408,7 +408,7 @@ describe('course assignment metadata methods', function() {
   });
 
   it('rejects duplicate course names for the same instructor and semester', async function() {
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Courses: createMemoryCollection([{ _id: 'course-1', courseName: 'Intro Course', teacherUserId: 'teacher-user', semester: 'current' }]),
       Sections: createMemoryCollection(),
       SectionUserMap: createMemoryCollection(),
@@ -441,7 +441,7 @@ describe('course assignment metadata methods', function() {
         return this.rows[0] || null;
       },
     };
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Courses: courses,
       Sections: sections,
       SectionUserMap: sectionUserMap,
@@ -480,7 +480,7 @@ describe('course assignment metadata methods', function() {
     ]);
     const assignments = createMemoryCollection([{ _id: 'assignment-1', courseId: 'course-1', assignmentType: 'lesson', TDFId: 'tdf-1' }]);
     const histories = { async findOneAsync() { throw new Error('Course editing must not read or alter learner history'); } };
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Courses: courses, Sections: sections, SectionUserMap: enrollments, Assignments: assignments,
       CourseLearnerSnapshotCache: snapshots, UserDashboardCache: createMemoryCollection(), Histories: histories,
     }));
@@ -498,7 +498,7 @@ describe('course assignment metadata methods', function() {
   });
 
   it('rejects invalid course visibility values', async function() {
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Courses: createMemoryCollection(),
       Sections: createMemoryCollection(),
       SectionUserMap: createMemoryCollection(),
@@ -527,7 +527,7 @@ describe('course assignment metadata methods', function() {
     const users = createMemoryCollection([
       { _id: 'student-user', username: 'Student One', emails: [{ address: 'student@example.test' }], loginParams: {} },
     ]);
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Courses: createMemoryCollection([{ _id: 'course-1', courseName: 'Course One', teacherUserId: 'teacher-1', semester: 'current', timezone: 'America/Chicago' }]),
       Sections: createMemoryCollection([{ _id: 'section-1', courseId: 'course-1', sectionName: 'Section A' }]),
       SectionUserMap: sectionUserMap,
@@ -555,7 +555,7 @@ describe('course assignment metadata methods', function() {
   it('shows public courses as joinable but unavailable until section membership exists', async function() {
     const sectionUserMap = createMemoryCollection();
     const courseSnapshotCache = createMemoryCollection();
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Courses: createMemoryCollection([
         { _id: 'course-public', courseName: 'Public Course', teacherUserId: 'teacher-1', semester: 'current', visibility: 'public', timezone: 'America/Chicago' },
       ]),
@@ -607,7 +607,7 @@ describe('course assignment metadata methods', function() {
   });
 
   it('lets a teacher see and launch their private course from the learner course snapshot', async function() {
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Courses: createMemoryCollection([
         { _id: 'course-private', courseName: 'Private Course', teacherUserId: 'teacher-user', semester: 'current', visibility: 'private', timezone: 'America/Chicago' },
       ]),
@@ -644,7 +644,7 @@ describe('course assignment metadata methods', function() {
 
   it('saves and launches the current ordered progressive prefix without creating aggregate progress', async function() {
     const assignments = createMemoryCollection();
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Courses: createMemoryCollection([{
         _id: 'course-progressive',
         courseName: 'Progressive Course',
@@ -761,7 +761,7 @@ describe('course assignment metadata methods', function() {
 
 describe('course assignment package visibility', function() {
   it('groups by package identity and blocks a partially accessible package without exposing private member IDs', async function() {
-    const methods = createCourseMethods(createDeps({
+    const { methods } = createCourseService(createDeps({
       Courses: createMemoryCollection([{ _id: 'course-1', teacherUserId: 'teacher-1', timezone: 'America/Chicago' }]),
       DynamicAssets: createMemoryCollection([{ _id: 'zip-1', name: 'stats.zip' }]),
       Tdfs: createMemoryCollection([

@@ -148,10 +148,6 @@
       "access": "role-checked"
     },
     {
-      "name": "checkForTDFData",
-      "access": "role-checked"
-    },
-    {
       "name": "checkForUserException",
       "access": "role-checked"
     },
@@ -472,10 +468,6 @@
       "access": "admin-only"
     },
     {
-      "name": "getSourceSentences",
-      "access": "role-checked"
-    },
-    {
       "name": "getSparcHistoryForUnit",
       "access": "role-checked",
       "notes": "Self and course authorization retained. Worksheet reads require page/checkpoint scope, use the worksheet_scoped_history index prefix, and reject more than 10000 records."
@@ -556,16 +548,8 @@
       "access": "role-checked"
     },
     {
-      "name": "getTdfIdsByOwnerId",
-      "access": "authenticated-self"
-    },
-    {
       "name": "getTdfOwnersMap",
       "access": "authenticated-self"
-    },
-    {
-      "name": "getTdfsAssignedToStudent",
-      "access": "role-checked"
     },
     {
       "name": "getTdfsByOwnerId",
@@ -636,18 +620,6 @@
     },
     {
       "name": "insertNewUsers",
-      "access": "role-checked"
-    },
-    {
-      "name": "invalidateCourseSnapshotForUser",
-      "access": "role-checked"
-    },
-    {
-      "name": "invalidateCourseSnapshotsForAssignment",
-      "access": "role-checked"
-    },
-    {
-      "name": "invalidateCourseSnapshotsForCourse",
       "access": "role-checked"
     },
     {
@@ -792,10 +764,6 @@
       "name": "resetTdfConditionCounts",
       "access": "role-checked",
       "notes": "The registered reset policy requires the owner or an administrator. Reset clears the allocation block together with counts and retains saved participant assignments."
-    },
-    {
-      "name": "resolveAssignedRootTdfIdsForUser",
-      "access": "role-checked"
     },
     {
       "name": "resolveUsersForTdf",

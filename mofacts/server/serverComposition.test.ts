@@ -1,5 +1,7 @@
+import { bindParticipantConnection } from './lib/participantSession';
+import { COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './lib/prolificCollections';
-import "../common/Collections";
+import { CourseLearnerSnapshotCache } from '../common/Collections';
 import { Meteor } from 'meteor/meteor';
 import { Roles } from 'meteor/alanning:roles';
 import { asyncMethods, methods } from './serverComposition';
@@ -2559,6 +2561,67 @@ describe('course method authorization', function() {
     await Roles.createRoleAsync('teacher', { unlessExists: true });
   });
 
+  function boundCourseRead(name: keyof typeof COURSE_READ_VERIFICATIONS, operation: string) {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed Meteor method bindings');
+    const entries = observed.surfaces.filter(row => row.name === name);
+    expect(entries).to.have.length(1);
+    expect(entries[0]?.verification).to.equal(COURSE_READ_VERIFICATIONS[name]);
+    expect(entries[0]?.policy).to.deep.equal({ kind: 'course-read', operation });
+    return MeteorAny.server.method_handlers[name];
+  }
+
+  async function expectCourseDenial(call: () => Promise<unknown>, code: number) {
+    let denied: unknown;
+    try { await call(); } catch (error) { denied = error; }
+    expect(denied).to.be.instanceOf(Meteor.Error);
+    expect(denied).to.include({ error: code });
+  }
+
+  it('binds the learner course snapshot to the current account session', async function() {
+    const read = boundCourseRead('getLearnerCoursesSnapshot', 'own-account-session');
+    const userId = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await expectCourseDenial(() => read.call({}), 401);
+    let close = () => {};
+    const connection = { id: Random.id(), onClose(fn: () => void) { close = fn; } };
+    bindParticipantConnection(connection, userId, Random.id(), Random.id());
+    try { await expectCourseDenial(() => read.call({ userId, connection }), 403); }
+    finally { close(); }
+    try {
+      const snapshot = await read.call({ userId });
+      expect(snapshot.assignedCourses).to.be.an('array');
+      expect(snapshot.publicCourses).to.be.an('array');
+    } finally {
+      await CourseLearnerSnapshotCache.removeAsync({ userId });
+    }
+  });
+
+  it('binds instructor course reads to the instructor or an administrator', async function() {
+    const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const admin = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    const courseId = Random.id(), otherCourseId = Random.id(), lessonId = Random.id();
+    const fileName = 'synthetic-course-lesson.json';
+    for (const [id, instructor] of [[courseId, teacher], [otherCourseId, admin]]) {
+      await CoursesAny.insertAsync({ _id: id, semester: 'SU_2022', teacherUserId: instructor, courseName: id });
+      await AssignmentsAny.insertAsync({ courseId: id, assignmentType: 'lesson', TDFId: lessonId });
+    }
+    await TdfsAny.insertAsync({ _id: lessonId, content: { fileName } });
+    for (const name of ['getAllCoursesForInstructor', 'getAllCourseAssignmentsForInstructor', 'getTdfNamesAssignedByInstructor', 'getTdfAssignmentsByCourseIdMap'] as const) {
+      const read = boundCourseRead(name, 'instructor-or-admin');
+      await expectCourseDenial(() => read.call({}, teacher), 401);
+      await expectCourseDenial(() => read.call({ userId: Random.id() }, teacher), 403);
+      await expectCourseDenial(() => read.call({ userId: teacher }, admin), 403);
+      const own = await read.call({ userId: teacher }, teacher);
+      if (name === 'getAllCoursesForInstructor') expect(own.map((row: any) => row._id)).to.deep.equal([courseId]);
+      if (name === 'getAllCourseAssignmentsForInstructor') expect(own.map((row: any) => row.courseId)).to.deep.equal([courseId]);
+      if (name === 'getTdfAssignmentsByCourseIdMap') expect(Object.keys(own)).to.deep.equal([courseId]);
+      if (name === 'getTdfNamesAssignedByInstructor') expect(own).to.deep.equal([fileName]);
+      expect(await read.call({ userId: admin }, teacher)).to.deep.equal(own);
+    }
+  });
+
   it('denies course creation by non-teachers', async function() {
     try {
       await (asyncMethods.addCourse as any).call({ userId: 'student-user' }, {
@@ -2643,6 +2706,18 @@ describe('content helper authorization', function() {
     } catch (error: any) {
       expect(error.error).to.equal(403);
     }
+  });
+
+  it('keeps the retired course lookup and internal course helpers out of Meteor', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of [
+      'getTdfsAssignedToStudent', 'resolveAssignedRootTdfIdsForUser', 'invalidateCourseSnapshotForUser',
+      'invalidateCourseSnapshotsForCourse', 'invalidateCourseSnapshotsForAssignment',
+      'getTdfIdsByOwnerId', 'getSourceSentences', 'checkForTDFData',
+    ]) {
+      expect(handlers).not.to.have.own.property(name);
+    }
+    expect(handlers.getLearnerCoursesSnapshot).to.be.a('function');
   });
 
   it('retires the five unused status methods and preserves the active help and speech methods', function() {

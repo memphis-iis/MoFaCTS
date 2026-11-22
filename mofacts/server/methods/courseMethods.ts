@@ -1,3 +1,5 @@
+import { COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 import { enrolledCourseLessonIds } from '../lib/enrolledCourseLessons';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
 import { Meteor } from 'meteor/meteor';
@@ -324,7 +326,7 @@ function throwLoggedCourseOperationError(
   throw new Meteor.Error('course-operation-failed', `${operation} failed`);
 }
 
-export function createCourseMethods(deps: CourseMethodsDeps) {
+export function createCourseService(deps: CourseMethodsDeps) {
   async function requireTeacherOrAdmin(thisArg: MethodContext) {
     const actingUserId = requireAuthenticatedUser(thisArg.userId, 'Must be logged in', 401);
     const roleFlags = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), actingUserId, ['admin', 'teacher'] as const);
@@ -373,6 +375,18 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     }
     return normalizedInstructorId;
   }
+
+  const instructorReadPolicy = Object.freeze({
+    kind: 'course-read', operation: 'instructor-or-admin', authorize: resolveInstructorForCaller,
+  } as const);
+  const snapshotPolicy = Object.freeze({
+    kind: 'course-read', operation: 'own-account-session',
+    authorize(context: MethodContext) {
+      const userId = requireAuthenticatedUser(context.userId, 'Must be logged in', 401);
+      requireAccountProgressSession(context);
+      return userId;
+    },
+  } as const);
 
   function requireCourseSnapshotDeps() {
     if (!deps.CourseLearnerSnapshotCache || !deps.UserDashboardCache) {
@@ -548,7 +562,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   }
 
   async function getAllCoursesForInstructor(this: MethodContext, instructorId: string) {
-    instructorId = await resolveInstructorForCaller(this, instructorId);
+    instructorId = await instructorReadPolicy.authorize(this, instructorId);
     deps.serverConsole('getAllCoursesForInstructor:', instructorId);
     const courses = await deps.Courses.find(
       { teacherUserId: instructorId, semester: curSemester },
@@ -559,7 +573,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
 
   async function getAllCourseAssignmentsForInstructor(this: MethodContext, instructorId: string) {
     try {
-      instructorId = await resolveInstructorForCaller(this, instructorId);
+      instructorId = await instructorReadPolicy.authorize(this, instructorId);
       deps.serverConsole('getAllCourseAssignmentsForInstructor:' + instructorId);
       return await deps.Assignments.rawCollection().aggregate([
         {
@@ -939,7 +953,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   }
 
   async function getTdfAssignmentsByCourseIdMap(this: MethodContext, instructorId: string) {
-    instructorId = await resolveInstructorForCaller(this, instructorId);
+    instructorId = await instructorReadPolicy.authorize(this, instructorId);
     deps.serverConsole('getTdfAssignmentsByCourseIdMap', instructorId);
     const assignmentTdfs = await deps.Assignments.rawCollection().aggregate([
       {
@@ -1019,8 +1033,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   }
 
   async function getLearnerCoursesSnapshot(this: MethodContext): Promise<LearnerCoursesSnapshot> {
-    const userId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
-    requireAccountProgressSession(this);
+    const userId = snapshotPolicy.authorize(this);
     return await getCourseSnapshotCache().ensureLearnerCoursesSnapshot(userId);
   }
 
@@ -1140,112 +1153,9 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     };
   }
 
-  async function getTdfsAssignedToStudent(this: MethodContext, userId: string, curSectionId: string) {
-    deps.serverConsole('getTdfsAssignedToStudent', userId, curSectionId);
-    const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
-    if (!userId || !curSectionId) {
-      throw new Meteor.Error(400, 'User and section are required');
-    }
-
-    const roleFlags = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), actingUserId, ['admin', 'teacher'] as const);
-    const callerIsAdmin = roleFlags.admin;
-    const callerIsTeacher = roleFlags.teacher;
-    const isSelfRequest = actingUserId === userId;
-    if (!isSelfRequest && !callerIsAdmin && !callerIsTeacher) {
-      throw new Meteor.Error(403, 'Permission denied');
-    }
-
-    const pipeline = [
-      { $match: { _id: curSectionId } },
-      {
-        $lookup: {
-          from: 'course',
-          let: { courseId: '$courseId' },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$_id', '$$courseId'] },
-                    { $eq: ['$semester', curSemester] },
-                  ],
-                },
-              },
-            },
-          ],
-          as: 'course',
-        },
-      },
-      { $unwind: { path: '$course', preserveNullAndEmptyArrays: false } },
-      {
-        $lookup: {
-          from: 'section_user_map',
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$sectionId', curSectionId] },
-                    { $eq: ['$userId', userId] },
-                  ],
-                },
-              },
-            },
-            { $limit: 1 },
-          ],
-          as: 'enrollment',
-        },
-      },
-      {
-        $lookup: {
-          from: 'assessments',
-          localField: 'course._id',
-          foreignField: 'courseId',
-          as: 'assignments',
-        },
-      },
-      {
-        $project: {
-          'course.teacherUserId': 1,
-          enrollment: 1,
-          'assignments.assignmentType': 1,
-          'assignments.TDFId': 1,
-          'assignments.memberTdfIds': 1,
-        },
-      },
-    ];
-
-    const results = await deps.Sections.rawCollection().aggregate(pipeline).toArray();
-    const result = results[0];
-    if (!result) {
-      const sectionExists = await deps.Sections.findOneAsync({ _id: curSectionId }, { fields: { _id: 1 } });
-      if (!sectionExists) {
-        throw new Meteor.Error(404, 'Section not found');
-      }
-      return [];
-    }
-
-    const enrolled = Array.isArray(result.enrollment) && result.enrollment.length > 0;
-    const teacherOwnsCourse = callerIsTeacher &&
-      String(result.course?.teacherUserId || '') === this.userId;
-    if (!enrolled && !callerIsAdmin && !teacherOwnsCourse) {
-      throw new Meteor.Error(403, 'User is not enrolled in this section');
-    }
-
-    const assignments = Array.isArray(result.assignments) ? result.assignments : [];
-    const assignedIdSet = new Set<string>();
-    for (const row of assignments) {
-      for (const rawId of assignmentMemberTdfIds(row)) {
-        const id = deps.normalizeCanonicalId(rawId);
-        if (id) assignedIdSet.add(id);
-      }
-    }
-    return Array.from(assignedIdSet);
-  }
-
   async function getTdfNamesAssignedByInstructor(this: MethodContext, instructorID: string) {
     try {
-      instructorID = await resolveInstructorForCaller(this, instructorID);
+      instructorID = await instructorReadPolicy.authorize(this, instructorID);
       let assignmentTdfFileNames = await deps.Courses.rawCollection().aggregate([
         {
           $lookup: {
@@ -1575,8 +1485,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     await deps.usersCollection.updateAsync({ _id: userId }, user);
   }
 
-  return {
-    getSourceSentences,
+  const methods = {
     getAllCourses,
     getAllCourseSections,
     getAllCoursesForInstructor,
@@ -1585,23 +1494,36 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     saveCourseAssignments,
     editCourseAssignments,
     getTdfAssignmentsByCourseIdMap,
-    resolveAssignedRootTdfIdsForUser,
     getLearnerCoursesSnapshot,
     getProgressiveAssignmentLaunch,
-    invalidateCourseSnapshotForUser,
-    invalidateCourseSnapshotsForCourse,
-    invalidateCourseSnapshotsForAssignment,
-    getTdfsAssignedToStudent,
     getTdfNamesAssignedByInstructor,
-    getTdfIdsByOwnerId,
     getAllTeachers,
     addCourse,
     editCourse,
     deleteCourse,
     addUserToTeachersClass,
     addUserDueDateException,
-    checkForTDFData,
     checkForUserException,
     removeUserDueDateException,
+  };
+  function bind(name: keyof typeof COURSE_READ_VERIFICATIONS, dataEgress: MeteorMethodBinding['dataEgress']): MeteorMethodBinding {
+    return Object.freeze({ handler: methods[name], verification: COURSE_READ_VERIFICATIONS[name], dataEgress,
+      policy: name === 'getLearnerCoursesSnapshot' ? snapshotPolicy : instructorReadPolicy });
+  }
+  return {
+    methods,
+    methodBindings: Object.freeze([
+      bind('getLearnerCoursesSnapshot', 'learner-course-snapshot'),
+      bind('getTdfAssignmentsByCourseIdMap', 'assignments-by-course'),
+      bind('getAllCoursesForInstructor', 'instructor-course-list'),
+      bind('getAllCourseAssignmentsForInstructor', 'instructor-assignment-list'),
+      bind('getTdfNamesAssignedByInstructor', 'assigned-lesson-names'),
+    ]),
+    resolveAssignedRootTdfIdsForUser,
+    invalidateCourseSnapshotsForCourse,
+    invalidateCourseSnapshotsForAssignment,
+    getTdfIdsByOwnerId,
+    getSourceSentences,
+    checkForTDFData,
   };
 }

@@ -103,6 +103,8 @@ In the existing synthetic experiment/condition fixture, each subscription perfor
 
 Source review of the course module accounts for seven of the 177. Its factory returns 27 properties. In serverComposition.ts, seven are removed before the other 20 are passed to Meteor. The seven are resolveAssignedRootTdfIdsForUser, invalidateCourseSnapshotForUser, invalidateCourseSnapshotsForCourse, invalidateCourseSnapshotsForAssignment, getTdfIdsByOwnerId, getSourceSentences and checkForTDFData. This leaves at most 170 further candidate names, including the 20 course methods. A name without a matching declaration can already have behavior tests. Keep the five exit groups open until their own acceptance criteria pass.
 
+After the course retirement and the explicit course method map, the source contract lists 236 methods. Of these, 68 match application test declarations and four match package declarations. That leaves 164 names for reconciliation. Five of the 68 have new course bindings awaiting the native result below. All 21 publications still match declarations.
+
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
 - [x] Reconcile the sharing transaction, both accessor reads and recipient resolution with the named passing Meteor cases in slots 38-40.
 - [x] Apply the approved new-recipient rule at the transactional user update. Existing grants can still be retained or revoked.
@@ -139,6 +141,10 @@ Source review of the course module accounts for seven of the 177. Its factory re
 - [x] Verify key-free exported ZIPs, refusal to reuse older archives, and actual MongoDB family transfers in native Meteor (slot 54).
 - [x] Operator decision: leave existing ZIP links as they are. Historical archive remediation is out of scope. The verified key-removal rules for new exports and changes of ownership still apply.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
+  - [x] Remove getTdfsAssignedToStudent from the course implementation and source contract, and remove its developer wiki listing. The course screens use server-owned assignment reads.
+  - [x] Separate the 19 public course handlers from the course service helpers at their definition. Seven former inventory rows represented internal functions. None of those seven is a newly retired public command.
+  - [x] Bind the learner course snapshot and four instructor reads to their existing authorization functions. Preserve the account-session requirement, instructor scope, administrator access, error ordering, and returned fields.
+  - [ ] Verify the retired command and helper exclusions in the installed Meteor registry, the learner's account-session restriction, and all four instructor reads on real synthetic assignments in one native run.
   - [x] Trace the Content Upload stimulus filename lookup through both editor routes. The subscription publishes matching Stims IDs and filenames by filename alone. The content editor loads and saves the selected lesson by TDF ID. The SPARC header displays the filename. The condition selector does change the TDF ID. Six content-upload cache and projection regressions passed. No live data inspected.
   - [x] Remove the stimulus-file selector and filename-based publication lookup with operator approval. Remove the editor query labels, keep the expanded lesson's stimulus details, and advance the browser snapshot format. Six cache/projection tests passed. A focused invocation of the actual click handler verified the root, ordinary condition and SPARC condition routes.
   - [x] Bind contentUploadMetadata to the named publication registry with the existing asynchronous not-authorized denial, owner/shared lesson scope, and condition/asset metadata. Full typecheck and lint passed (324 surfaces).
@@ -1861,7 +1867,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 60 total, 59 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 61 total, 59 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 61 is reserved under the November 22 single-use authorization for the combined course-command retirement, helper exclusions, and five course-read bindings.
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
 

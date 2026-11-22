@@ -71,7 +71,7 @@ import { archiveDashboardHistory } from './lib/dashboardHistoryArchive';
 import { writeConditionState } from './lib/conditionAllocationMongo';
 import { createAuthMethods, ssoProfilePolicy } from './methods/authMethods';
 import { createContentMethods } from './methods/contentMethods';
-import { createCourseMethods } from './methods/courseMethods';
+import { createCourseService } from './methods/courseMethods';
 import type { CourseAssignmentHistoryContext } from '../common/courseAssignments.contracts';
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
 import { createLearnerAnalyticsMethods } from './methods/learnerAnalyticsMethods';
@@ -402,7 +402,8 @@ const updateActiveThemeDocument = createUpdateActiveThemeDocument({
   usersCollection: MeteorAny.users,
 });
 
-const courseMethods = createCourseMethods({
+const { methods: publicCourseMethods, methodBindings: courseReadBindings, resolveAssignedRootTdfIdsForUser,
+  invalidateCourseSnapshotsForCourse, invalidateCourseSnapshotsForAssignment } = createCourseService({
   Roles,
   DynamicAssets,
   serverConsole,
@@ -424,20 +425,6 @@ const courseMethods = createCourseMethods({
   normalizeCanonicalId,
   removeRuntimeTdfSecrets,
 });
-
-const {
-  resolveAssignedRootTdfIdsForUser: resolveAssignedRootTdfIdsForUserMethod,
-  invalidateCourseSnapshotForUser: _invalidateCourseSnapshotForUser,
-  invalidateCourseSnapshotsForCourse: _invalidateCourseSnapshotsForCourse,
-  invalidateCourseSnapshotsForAssignment: _invalidateCourseSnapshotsForAssignment,
-  getTdfIdsByOwnerId: _getTdfIdsByOwnerId,
-  getSourceSentences: _getSourceSentences,
-  checkForTDFData: _checkForTDFData,
-  ...publicCourseMethods
-} = courseMethods as Record<string, unknown>;
-const resolveAssignedRootTdfIdsForUser = resolveAssignedRootTdfIdsForUserMethod as (userId: string) => Promise<string[]>;
-const invalidateCourseSnapshotsForCourse = _invalidateCourseSnapshotsForCourse as (courseId: string, reason: string) => Promise<unknown>;
-const invalidateCourseSnapshotsForAssignment = _invalidateCourseSnapshotsForAssignment as (assignmentId: string, reason: string) => Promise<unknown>;
 
 const {
   deleteTdfRuntimeData,
@@ -1205,6 +1192,7 @@ export const asyncMethods: Record<string, unknown> = {
 // Server-side startup logic
 registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...securityAuditRuntime.methodBindings,
+  ...courseReadBindings,
   deploymentReadiness.methodBinding,
   ...backupRegistration.methodBindings,
   ...brandProfileRegistration.methodBindings,
