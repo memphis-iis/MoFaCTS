@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
+import { directMeteorRegistrationReferences } from './checkApplicationMeteorRegistration.mjs';
 import { uploadMethodNames } from '../../packages/ostrio-files/upload-policy.js';
 
 const toolAppRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1')), '..', '..');
@@ -14,7 +15,7 @@ async function filesUnder(directory) {
   for (const entry of entries) {
     const full = path.join(directory, entry.name);
     if (entry.isDirectory()) files.push(...await filesUnder(full));
-    else if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) files.push(full);
+    else if (entry.isFile() && /\.(?:[cm]?[jt]s)$/.test(entry.name) && !/\.test\.[cm]?[jt]s$/.test(entry.name)) files.push(full);
   }
   return files;
 }
@@ -75,7 +76,13 @@ export async function discoverSecuritySurfaces() {
   const httpMiddleware = [];
   for (const file of serverFiles) {
     const text = await fs.readFile(file, 'utf8');
-    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+    const bypasses = directMeteorRegistrationReferences(source);
+    if (bypasses.length) {
+      throw new Error(bypasses.map(({ member, line }) =>
+        path.relative(sourceRepoRoot, file) + ':' + line + ' references Meteor.' + member + ' outside the application adapter.'
+      ).join('\n'));
+    }
     methods.push(...discoverMethods(source));
     httpMiddleware.push(...regexMatches(text, /registerHttpMiddleware\(\s*\w+,\s*'(?:handlers|connectHandlers)',\s*\{\s*surfaceId:\s*'(middleware:[^']+)'/g, (match) => match[1]));
     publications.push(...regexMatches(text, /Meteor\.publish\(\s*(?:'([^']+)'|null)/g,
@@ -166,6 +173,29 @@ if (process.argv.includes('--discover')) {
     if (invalidPolicies.length > 20) process.stderr.write(`${invalidPolicies.length - 20} additional invalid classifications omitted.\n`);
     process.exitCode = 1;
   } else {
-    process.stdout.write(`Security surface contract covers ${Object.values(actual).flat().length} surfaces.\n`);
+    if (process.argv.includes('--coverage')) {
+      const { AUDIT_VERIFICATIONS, FILES_DDP_VERIFICATIONS } = await import('../../common/securityAudit/verificationCatalog.ts');
+      const { collectionMongoName } = await import('../../common/collectionOwnership.ts');
+      const tests = AUDIT_VERIFICATIONS.filter(entry => entry.kind === 'integrationTest');
+      const applicationMethods = new Set(tests.filter(entry =>
+        entry.method && entry.surfaceId === 'method:' + entry.method).map(entry => entry.method));
+      const generated = uploadMethodNames(collectionMongoName('DynamicAssets'));
+      const packageMethods = new Set(Object.entries(generated)
+        .filter(([operation]) => tests.includes(FILES_DDP_VERIFICATIONS[operation]))
+        .map(([, name]) => name));
+      const publications = new Set(tests.map(entry => entry.surfaceId));
+      const methodsForReview = actual.methods.filter(name => !applicationMethods.has(name) && !packageMethods.has(name));
+      process.stdout.write(JSON.stringify({
+        methodNamesInSourceContract: actual.methods.length,
+        matchedApplicationMethods: actual.methods.filter(name => applicationMethods.has(name)).length,
+        matchedPackageMethods: actual.methods.filter(name => packageMethods.has(name)).length,
+        methodNamesForReconciliation: methodsForReview,
+        publicationNamesInSourceContract: actual.publications.length,
+        matchedPublications: actual.publications.filter(name => publications.has(
+          name.startsWith('publication:default:') ? name : 'publication:' + name)).length,
+      }, null, 2) + '\n');
+    } else {
+      process.stdout.write(`Security surface contract covers ${Object.values(actual).flat().length} surfaces.\n`);
+    }
   }
 }

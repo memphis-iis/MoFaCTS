@@ -85,6 +85,24 @@ remains with that production window.
 
 Use the evidence entries below for individual completed bindings. These are the remaining groups from the Phase 3 deliverables and exit gates.
 
+### Coverage count on November 22, after Meteor slot 60
+
+The reconciled checklist has 35 completed top-level items and five open groups. The first open group has 15 completed subitems. The other four groups cover sealing the running inventory, linking test evidence to the released image, validating bypass detection and retiring the old checker, and qualifying the matched image and scanner on staging2. Checklist rows have different sizes.
+
+From the repository root, run `node mofacts/scripts/security-audit/check-security-surfaces.mjs --coverage` for the current source counts and names requiring reconciliation. This report first checks agreement with the existing manifest. It compares integration-test declarations by exact method name and includes the maintained package’s four generated upload names through its existing name mapping. It does not run Meteor or qualify a deployment.
+
+| Source inventory at 7b001cfe | Count |
+| --- | ---: |
+| Method names in the old manifest | 244 |
+| Matched application integration-test declarations | 63 |
+| Matched package-owned upload methods | 4 |
+| Names to reconcile | 177 |
+| Named and default publications with matching integration-test declarations | 21 of 21 |
+
+In the existing synthetic experiment/condition fixture, each subscription performs one user lookup, one exact lesson lookup and three lesson collection queries for independent file visibility. A second subscription inside five seconds previously reused the first result; it now repeats those five collection calls and the two role checks. This measures calls for that fixture, not production latency or database load.
+
+Source review of the course module accounts for seven of the 177. Its factory returns 27 properties. In serverComposition.ts, seven are removed before the other 20 are passed to Meteor. The seven are resolveAssignedRootTdfIdsForUser, invalidateCourseSnapshotForUser, invalidateCourseSnapshotsForCourse, invalidateCourseSnapshotsForAssignment, getTdfIdsByOwnerId, getSourceSentences and checkForTDFData. This leaves at most 170 further candidate names, including the 20 course methods. A name without a matching declaration can already have behavior tests. Keep the five exit groups open until their own acceptance criteria pass.
+
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
 - [x] Reconcile the sharing transaction, both accessor reads and recipient resolution with the named passing Meteor cases in slots 38-40.
 - [x] Apply the approved new-recipient rule at the transactional user update. Existing grants can still be retained or revoked.
@@ -139,6 +157,7 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
 - [ ] Verify static bypass detection across active source roots and retire the old manifest and inference checker after parity.
+  - [x] Check direct references to Meteor.methods and Meteor.publish in application server JavaScript and TypeScript, including renamed imports, aliases, literal property access and destructuring. Shadowed unrelated names are covered by a source regression. Other roots, dynamically computed dispatch, HTTP and package ownership still need their own checks.
 - [ ] Qualify the complete matched image and scanner on staging2, including login, ordinary learner behavior and enabled providers. The earlier condition-index cutover covered that specific change only.
 
 ## Phase 3 HTTP characterization started (2026-11-18)

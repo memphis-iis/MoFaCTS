@@ -1,3 +1,4 @@
+import './tests/applicationMeteorRegistration.test.mjs';
 import './tests/uploadBoundary.test.mjs';
 import './tests/catalogRegistry.test.mjs';
 import './tests/assemblyV2.test.mjs';
