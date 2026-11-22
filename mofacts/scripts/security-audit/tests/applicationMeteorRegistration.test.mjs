@@ -18,3 +18,9 @@ test('keeps application adapter calls, injected dispatch, and unrelated properti
   assert.deepEqual(members("const app = Meteor as any; const target = app; target['methods']({});", 'alias.ts'), ['methods']);
   assert.deepEqual(members("registerMeteorMethods(Meteor, handlers, bindings, read); server.methods(handlers); Meteor.callAsync('publish');", 'server.js'), []);
 });
+
+test('reports computed Meteor references that require explicit resolution', () => {
+  assert.deepEqual(members("import { Meteor as app } from 'meteor/meteor'; app[operation](handlers);", 'shared.js'), ['[unresolved property]']);
+  assert.deepEqual(members("const { ['publish']: register, [key]: unknown } = Meteor;", 'client.ts'), ['publish', '[unresolved property]']);
+  assert.deepEqual(members("const opts = {}; opts[operation](); Meteor['callAsync']('read');", 'client.js'), []);
+});

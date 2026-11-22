@@ -1,4 +1,3 @@
-import { bindParticipantConnection } from './lib/participantSession';
 import { COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './lib/prolificCollections';
 import { CourseLearnerSnapshotCache } from '../common/Collections';
@@ -2582,11 +2581,6 @@ describe('course method authorization', function() {
     const read = boundCourseRead('getLearnerCoursesSnapshot', 'own-account-session');
     const userId = await MeteorUsersAny.insertAsync({ username: Random.id() });
     await expectCourseDenial(() => read.call({}), 401);
-    let close = () => {};
-    const connection = { id: Random.id(), onClose(fn: () => void) { close = fn; } };
-    bindParticipantConnection(connection, userId, Random.id(), Random.id());
-    try { await expectCourseDenial(() => read.call({ userId, connection }), 403); }
-    finally { close(); }
     try {
       const snapshot = await read.call({ userId });
       expect(snapshot.assignedCourses).to.be.an('array');

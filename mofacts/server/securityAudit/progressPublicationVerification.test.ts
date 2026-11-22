@@ -180,6 +180,7 @@ describe('approved progress-privacy selection on the registered Meteor publicati
       expect((await method(ws, 'getAssessmentCompletedTrialCountFromHistory', userId, ids.condition, 0)).result).to.equal(0);
       expect((await method(ws, 'getAssessmentCompletedTrialCountFromHistory', userId, ids.other, 0)).error.error).to.equal(403);
       expect((await method(ws, 'getPracticeDashboardSnapshot')).error.error).to.equal(403);
+      expect((await method(ws, 'getLearnerCoursesSnapshot')).error.error).to.equal(403);
       expect((await method(ws, 'downloadOwnHistoryAcrossTdfs')).error.error).to.equal(403);
       expect((await method(ws, 'downloadDataById', ids.other)).error.error).to.equal(403);
       expect((await method(ws, 'createExperimentState', { currentRootTdfId: ids.other })).error.error).to.equal(403);

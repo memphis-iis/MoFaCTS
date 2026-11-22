@@ -50,14 +50,20 @@ export function directMeteorRegistrationReferences(source) {
   const findings = [];
   function visit(node) {
     const member = property(node);
+    if (ts.isElementAccessExpression(node) && member === undefined && isMeteor(node.expression)) {
+      findings.push({ member: '[unresolved property]', line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 });
+    }
     if ((member === 'methods' || member === 'publish') && isMeteor(node.expression)) {
       findings.push({ member, line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 });
     }
     if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && isMeteor(node.initializer)) {
       for (const element of node.name.elements) {
         const name = element.propertyName ?? element.name;
-        if (name.text === 'methods' || name.text === 'publish') {
-          findings.push({ member: name.text, line: source.getLineAndCharacterOfPosition(element.getStart(source)).line + 1 });
+        const member = ts.isComputedPropertyName(name)
+          ? (ts.isStringLiteralLike(name.expression) ? name.expression.text : '[unresolved property]')
+          : name.text;
+        if (member === 'methods' || member === 'publish' || member === '[unresolved property]') {
+          findings.push({ member, line: source.getLineAndCharacterOfPosition(element.getStart(source)).line + 1 });
         }
       }
     }

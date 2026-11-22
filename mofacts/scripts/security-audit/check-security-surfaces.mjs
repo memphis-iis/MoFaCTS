@@ -68,21 +68,30 @@ function regexMatches(text, pattern, mapper) {
   return [...text.matchAll(pattern)].map(mapper);
 }
 
+async function checkedApplicationSource(file) {
+  const text = await fs.readFile(file, 'utf8');
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const bypasses = directMeteorRegistrationReferences(source);
+  if (bypasses.length) {
+    throw new Error(bypasses.map(({ member, line }) =>
+      path.relative(sourceRepoRoot, file) + ':' + line + ' references Meteor.' + member + ' outside the application adapter.'
+    ).join('\n'));
+  }
+  return source;
+}
+
 export async function discoverSecuritySurfaces() {
+  for (const root of [path.join(appRoot, 'common'), path.join(appRoot, 'client'), path.join(sourceRepoRoot, 'learning-components')]) {
+    for (const file of await filesUnder(root)) await checkedApplicationSource(file);
+  }
   const serverFiles = await filesUnder(path.join(appRoot, 'server'));
   const methods = [];
   const publications = [];
   const httpRoutes = [];
   const httpMiddleware = [];
   for (const file of serverFiles) {
-    const text = await fs.readFile(file, 'utf8');
-    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
-    const bypasses = directMeteorRegistrationReferences(source);
-    if (bypasses.length) {
-      throw new Error(bypasses.map(({ member, line }) =>
-        path.relative(sourceRepoRoot, file) + ':' + line + ' references Meteor.' + member + ' outside the application adapter.'
-      ).join('\n'));
-    }
+    const source = await checkedApplicationSource(file);
+    const text = source.text;
     methods.push(...discoverMethods(source));
     httpMiddleware.push(...regexMatches(text, /registerHttpMiddleware\(\s*\w+,\s*'(?:handlers|connectHandlers)',\s*\{\s*surfaceId:\s*'(middleware:[^']+)'/g, (match) => match[1]));
     publications.push(...regexMatches(text, /Meteor\.publish\(\s*(?:'([^']+)'|null)/g,

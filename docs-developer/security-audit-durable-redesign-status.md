@@ -103,7 +103,7 @@ In the existing synthetic experiment/condition fixture, each subscription perfor
 
 Source review of the course module accounts for seven of the 177. Its factory returns 27 properties. In serverComposition.ts, seven are removed before the other 20 are passed to Meteor. The seven are resolveAssignedRootTdfIdsForUser, invalidateCourseSnapshotForUser, invalidateCourseSnapshotsForCourse, invalidateCourseSnapshotsForAssignment, getTdfIdsByOwnerId, getSourceSentences and checkForTDFData. This leaves at most 170 further candidate names, including the 20 course methods. A name without a matching declaration can already have behavior tests. Keep the five exit groups open until their own acceptance criteria pass.
 
-After the course retirement and the explicit course method map, the source contract lists 236 methods. Of these, 68 match application test declarations and four match package declarations. That leaves 164 names for reconciliation. Five of the 68 have new course bindings awaiting the native result below. All 21 publications still match declarations.
+After the course retirement and the explicit course method map, the source contract lists 236 methods. Of these, 68 match application test declarations and four match package declarations. That leaves 164 names for reconciliation. Four of the five new course bindings passed native verification. The corrected learner snapshot test awaits a combined retest. All 21 publications still match declarations.
 
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
 - [x] Reconcile the sharing transaction, both accessor reads and recipient resolution with the named passing Meteor cases in slots 38-40.
@@ -144,7 +144,8 @@ After the course retirement and the explicit course method map, the source contr
   - [x] Remove getTdfsAssignedToStudent from the course implementation and source contract, and remove its developer wiki listing. The course screens use server-owned assignment reads.
   - [x] Separate the 19 public course handlers from the course service helpers at their definition. Seven former inventory rows represented internal functions. None of those seven is a newly retired public command.
   - [x] Bind the learner course snapshot and four instructor reads to their existing authorization functions. Preserve the account-session requirement, instructor scope, administrator access, error ordering, and returned fields.
-  - [ ] Verify the retired command and helper exclusions in the installed Meteor registry, the learner's account-session restriction, and all four instructor reads on real synthetic assignments in one native run.
+  - [x] Verify installed command and helper exclusions, and four instructor reads with synthetic assignments and teacher/admin authorization (slot 61).
+  - [ ] Verify the learner course snapshot on the corrected ordinary-account and real passwordless study-session cases. The synthetic connection setup in slot 61 was insufficient.
   - [x] Trace the Content Upload stimulus filename lookup through both editor routes. The subscription publishes matching Stims IDs and filenames by filename alone. The content editor loads and saves the selected lesson by TDF ID. The SPARC header displays the filename. The condition selector does change the TDF ID. Six content-upload cache and projection regressions passed. No live data inspected.
   - [x] Remove the stimulus-file selector and filename-based publication lookup with operator approval. Remove the editor query labels, keep the expanded lesson's stimulus details, and advance the browser snapshot format. Six cache/projection tests passed. A focused invocation of the actual click handler verified the root, ordinary condition and SPARC condition routes.
   - [x] Bind contentUploadMetadata to the named publication registry with the existing asynchronous not-authorized denial, owner/shared lesson scope, and condition/asset metadata. Full typecheck and lint passed (324 surfaces).
@@ -164,6 +165,7 @@ After the course retirement and the explicit course method map, the source contr
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
 - [ ] Verify static bypass detection across active source roots and retire the old manifest and inference checker after parity.
   - [x] Check direct references to Meteor.methods and Meteor.publish in application server JavaScript and TypeScript, including renamed imports, aliases, literal property access and destructuring. Shadowed unrelated names are covered by a source regression. Other roots, dynamically computed dispatch, HTTP and package ownership still need their own checks.
+  - [x] Extend direct Meteor registration checks to JavaScript and TypeScript in client, common and learning-components. Computed Meteor access that cannot be resolved is now reported. Checked 218 server, 380 client, 107 common and 163 learning-component files. Svelte components, package owners and the other registration APIs are separate open coverage.
 - [ ] Qualify the complete matched image and scanner on staging2, including login, ordinary learner behavior and enabled providers. The earlier condition-index cutover covered that specific change only.
 
 ## Phase 3 HTTP characterization started (2026-11-18)
@@ -1867,9 +1869,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 61 total, 59 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 61 total, 60 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
-Slot 61 is reserved under the November 22 single-use authorization for the combined course-command retirement, helper exclusions, and five course-read bindings.
+Slot 61 ran on 1b793608 on November 22. Native Meteor recorded 1,119 server passes, one server failure, 1,249 Chromium passes, 15/seven pending and zero hook failures. The course command and helper absence case and all four instructor reads passed. The new learner snapshot test manually bound a connection without an Accounts login token, so it was not recognized as a study session. The correction moves the denial assertion to the existing authenticated passwordless DDP session. Native verification of the correction is pending. The worker reused its image and cleaned up. Retained failure receipt /var/tmp/mofacts-integration.aAuLRzsn/results/meteor-run.json SHA-256 a91639347dd73b0a4659265f39b781f95d1ea7f78c27d5a8719654026c9b2583.
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
 
