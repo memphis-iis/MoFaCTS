@@ -1110,12 +1110,9 @@
       "access": "authenticated-self"
     },
     {
-      "name": "Assignments",
-      "access": "role-checked"
-    },
-    {
       "name": "assets",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Requires ownership or shared access to a lesson using the requested stimulus set."
     },
     {
       "name": "clientRuntimeSettings",
@@ -1138,7 +1135,8 @@
     },
     {
       "name": "files.assets.all",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Lists own uploads and assets in accessible stimulus sets with the existing asset metadata projection."
     },
     {
       "name": "filteredUsers",
@@ -1155,15 +1153,18 @@
     },
     {
       "name": "tdfByExperimentTarget",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Returns the resolved experiment family under the existing admin, teacher, profile-target or prior-access rules."
     },
     {
       "name": "tdfForContentUploadDetails",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Owners and shared accessors receive the upload detail projection, including the lesson settings block."
     },
     {
       "name": "tdfForEdit",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Only the owner receives the editor fields, including full lesson content and stimuli."
     },
     {
       "name": "theme",

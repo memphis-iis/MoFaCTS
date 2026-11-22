@@ -202,13 +202,12 @@ registerNamedPublication(Meteor, 'dashboardCache', {
     );
 });
 
-Meteor.publish('files.assets.all', async function () {
-    // Security: Filter assets based on user role and ownership
-    if (!this.userId) {
-        return this.ready(); // No data for unauthenticated users
-    }
+registerNamedPublication(Meteor, 'files.assets.all', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'accessible-asset-metadata',
+    verification: NAMED_PUBLICATION_VERIFICATIONS['files.assets.all'],
+}, async function() {
 
-    const accessibleStimSetIds = await tdfPublicationAccess.resolveAssetStimuliSetIds(this.userId);
+    const accessibleStimSetIds = await tdfPublicationAccess.resolveAssetStimuliSetIds(this.userId as string);
     const assetQuery = accessibleStimSetIds.length > 0
         ? {
             $or: [
@@ -221,11 +220,10 @@ Meteor.publish('files.assets.all', async function () {
     return DynamicAssets.collection.find(assetQuery, { fields: DYNAMIC_ASSET_PUBLICATION_FIELDS });
 });
 
-Meteor.publish('assets', async function(ownerId: any, stimSetId: any) {
-    // Security: Require authentication to access stimulus assets
-    if (!this.userId) {
-        return this.ready();
-    }
+registerNamedPublication(Meteor, 'assets', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'stimulus-set-asset-metadata',
+    verification: NAMED_PUBLICATION_VERIFICATIONS.assets,
+}, async function(ownerId: any, stimSetId: any) {
     if (!stimSetId) {
         return this.ready();
     }
@@ -292,9 +290,12 @@ registerNamedPublication(Meteor, 'userExperimentState', {
     });
 });
 
-Meteor.publish('currentTdf', async function(tdfId: unknown) {
+registerNamedPublication(Meteor, 'currentTdf', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'runtime-lesson',
+    verification: NAMED_PUBLICATION_VERIFICATIONS.currentTdf,
+}, async function(tdfId: unknown) {
     const id = normalizeOptionalStringId(tdfId);
-    if (!this.userId || !id) return this.ready();
+    if (!id) return this.ready();
 
     const tdf = await Tdfs.findOneAsync(
         { _id: id },
@@ -304,7 +305,7 @@ Meteor.publish('currentTdf', async function(tdfId: unknown) {
         return this.ready();
     }
 
-    const assignedRoots = await resolveAssignedRootTdfIdsForUser(this.userId);
+    const assignedRoots = await resolveAssignedRootTdfIdsForUser(this.userId as string);
     if (assignedRoots.includes(id)) return this.ready();
     const assignedConditions = await lessonFamilyResolver.resolveConditionChildIdsForRootIds(assignedRoots);
     if (assignedConditions.includes(id)) return this.ready();
@@ -312,8 +313,10 @@ Meteor.publish('currentTdf', async function(tdfId: unknown) {
 });
 
 // Publication for content/TDF editor - returns TDF with full content for editing
-Meteor.publish('tdfForEdit', async function(tdfId: any) {
-    if (!this.userId) return this.ready();
+registerNamedPublication(Meteor, 'tdfForEdit', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'owner-editor-content',
+    verification: NAMED_PUBLICATION_VERIFICATIONS.tdfForEdit,
+}, async function(tdfId: any) {
     if (!tdfId) return this.ready();
 
     // Fields needed for both content editor (stimuli) and TDF editor (full content)
@@ -397,8 +400,11 @@ const tdfPublicationAccess = createTdfPublicationAccessResolver({
 const lessonFamilyResolver = createLessonFamilyResolver({ tdfs: Tdfs as any });
 const resolveExperimentTargetFamily = createExperimentTargetFamilyResolver({ Tdfs: Tdfs as any });
 
-Meteor.publish('tdfForContentUploadDetails', async function(tdfId: any) {
-    if (!this.userId || !tdfId || typeof tdfId !== 'string') {
+registerNamedPublication(Meteor, 'tdfForContentUploadDetails', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'owner-or-shared-upload-details',
+    verification: NAMED_PUBLICATION_VERIFICATIONS.tdfForContentUploadDetails,
+}, async function(tdfId: any) {
+    if (!tdfId || typeof tdfId !== 'string') {
         return this.ready();
     }
     const tdf = await Tdfs.findOneAsync(
@@ -411,11 +417,10 @@ Meteor.publish('tdfForContentUploadDetails', async function(tdfId: any) {
     return Tdfs.find({ _id: tdfId }, { fields: TDF_CONTENT_UPLOAD_DETAIL_FIELDS });
 });
 
-Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any) {
-    // Security: Require authentication
-    if (!this.userId) {
-        return this.ready();
-    }
+registerNamedPublication(Meteor, 'tdfByExperimentTarget', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'experiment-lesson-family',
+    verification: NAMED_PUBLICATION_VERIFICATIONS.tdfByExperimentTarget,
+}, async function(experimentTarget: any) {
 
     const normalizedTarget = normalizeExperimentTarget(experimentTarget);
     if (!normalizedTarget) {
@@ -454,50 +459,6 @@ Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any) {
         { _id: { $in: family.tdfIds } },
         { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS },
     );
-});
-
-Meteor.publish('Assignments', async function(courseId: any) {
-    // Security: Require authentication to access course assignments
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    if (typeof courseId !== 'string' || !courseId.trim()) {
-        return this.ready();
-    }
-
-    // Verify user has access to this course
-    const course = await Courses.findOneAsync({ _id: courseId });
-    if (!course) {
-        return this.ready();
-    }
-
-    // Check if user is teacher of this course, enrolled student, or admin
-    const isTeacherForCourse = String((course as any).teacherUserId || '') === this.userId;
-    const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-    let isEnrolledStudent = false;
-    if (!isAdmin && !isTeacherForCourse) {
-        const sectionIds = (await Sections.find(
-            { courseId },
-            { fields: { _id: 1 } }
-        ).fetchAsync()).map((section: any) => section._id);
-        if (sectionIds.length > 0) {
-            const enrollment = await SectionUserMap.findOneAsync({
-                sectionId: { $in: sectionIds },
-                userId: this.userId
-            });
-            isEnrolledStudent = !!enrollment;
-        }
-    }
-
-    if (!isTeacherForCourse && !isEnrolledStudent && !isAdmin) {
-        return this.ready();
-    }
-
-    return Assignments.find({courseId: courseId}, { fields: {
-        courseId: 1, assignmentType: 1, TDFId: 1, title: 1, memberTdfIds: 1,
-        order: 1, releaseAt: 1, dueAt: 1, required: 1, createdAt: 1, updatedAt: 1,
-    } });
 });
 
 registerNamedPublication(Meteor, 'settings', {

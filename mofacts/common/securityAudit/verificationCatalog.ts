@@ -355,6 +355,12 @@ function namedPublicationVerification<N extends string>(
   });
 }
 export const NAMED_PUBLICATION_VERIFICATIONS = Object.freeze({
+  'files.assets.all': namedPublicationVerification('files.assets.all', 'limits asset metadata to the eligible files and stimulus sets'),
+  assets: namedPublicationVerification('assets', 'limits asset metadata to the eligible files and stimulus sets'),
+  currentTdf: namedPublicationVerification('currentTdf', 'publishes only a single accessible runtime lesson'),
+  tdfForEdit: namedPublicationVerification('tdfForEdit', 'distinguishes owner editing from shared upload details'),
+  tdfForContentUploadDetails: namedPublicationVerification('tdfForContentUploadDetails', 'distinguishes owner editing from shared upload details'),
+  tdfByExperimentTarget: namedPublicationVerification('tdfByExperimentTarget', 'limits experiment lessons to a permitted target and omits runtime secrets'),
   theme: namedPublicationVerification('theme', brandingPublications),
   themeLibrary: namedPublicationVerification('themeLibrary', brandingPublications),
   deploymentBrandProfile: namedPublicationVerification('deploymentBrandProfile', brandingPublications),

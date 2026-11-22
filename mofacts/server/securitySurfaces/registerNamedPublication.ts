@@ -13,6 +13,8 @@ type Policy =
 type Egress =
   | 'theme-settings' | 'deployment-brand-profile' | 'own-dashboard-cache' | 'client-log-setting'
   | 'own-audio-settings' | 'own-experiment-progress' | 'system-settings'
+  | 'accessible-asset-metadata' | 'stimulus-set-asset-metadata' | 'runtime-lesson' | 'owner-editor-content'
+  | 'owner-or-shared-upload-details' | 'experiment-lesson-family'
   | 'admin-user-page' | 'admin-user-count' | 'admin-dashboard-usage';
 type Descriptor = Readonly<{ policy: Policy; dataEgress: Egress; verification: Verification }>;
 type Registration = Descriptor & Readonly<{ name: Name; surfaceId: `publication:${Name}` }>;

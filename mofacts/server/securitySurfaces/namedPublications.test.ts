@@ -108,6 +108,92 @@ describe('named application publications', function() {
     }
   });
 
+  it('retires the course assignment subscription and finishes all six active subscriptions when signed out', async function() {
+    expect((Meteor as any).server.publish_handlers).not.to.have.own.property('Assignments');
+    for (const name of ['files.assets.all', 'assets', 'currentTdf', 'tdfForEdit', 'tdfForContentUploadDetails', 'tdfByExperimentTarget']) {
+      const observation = invoke(name, null);
+      expect(observation.result).to.be.instanceOf(Promise);
+      expect(await observation.result).to.equal(undefined);
+      expect(observation.readyCalls).to.equal(1);
+      expect(observation.emitted).to.deep.equal([]);
+    }
+  });
+
+  async function expectPublicationError(result: Promise<unknown>, code: string) {
+    let caught: unknown;
+    try { await result; } catch (error) { caught = error; }
+    expect(caught).to.have.property('error', code);
+  }
+
+  it('distinguishes owner editing from shared upload details', async function() {
+    const id = Random.id(), stranger = Random.id();
+    try {
+      await Tdfs.insertAsync({ _id: id, ownerId: owner, accessors: [{ userId: admin }],
+        content: { fileName: 'fixture.json', tdfs: { tutor: { setspec: {}, unit: [{}] } } }, syntheticPrivate: true });
+      const edited = await (await invoke('tdfForEdit', owner, id).result).fetchAsync();
+      expect(edited[0]).to.have.keys('_id', 'ownerId', 'accessors', 'content');
+      await expectPublicationError(invoke('tdfForEdit', admin, id).result, 'not-authorized');
+      await expectPublicationError(invoke('tdfForEdit', owner, Random.id()).result, 'not-found');
+      for (const actor of [owner, admin]) {
+        const details = await (await invoke('tdfForContentUploadDetails', actor, id).result).fetchAsync();
+        expect(details[0]._id).to.equal(id);
+        expect(details[0]).not.to.have.property('syntheticPrivate');
+        expect(details[0].content.tdfs.tutor).not.to.have.property('unit');
+      }
+      const denied = invoke('tdfForContentUploadDetails', stranger, id);
+      await denied.result;
+      expect(denied.readyCalls).to.equal(1);
+    } finally { await Tdfs.removeAsync(id); }
+  });
+
+  it('limits asset metadata to the eligible files and stimulus sets', async function() {
+    const lesson = Random.id(), set = Random.id(), otherSet = Random.id();
+    const own = Random.id(), shared = Random.id(), foreign = Random.id();
+    const files = DynamicAssets.collection.rawCollection();
+    try {
+      await Tdfs.insertAsync({ _id: lesson, stimuliSetId: set, ownerId: admin, accessors: [{ userId: owner }] });
+      await files.insertMany([
+        { _id: own, userId: owner, meta: { stimuliSetId: otherSet }, syntheticPrivate: true },
+        { _id: shared, userId: admin, meta: { stimuliSetId: set }, syntheticPrivate: true },
+        { _id: foreign, userId: admin, meta: { stimuliSetId: otherSet } },
+      ]);
+      const visible = await (await invoke('files.assets.all', owner).result).fetchAsync();
+      expect(visible.map((row: { _id: string }) => row._id)).to.have.members([own, shared]);
+      for (const row of visible) expect(row).not.to.have.property('syntheticPrivate');
+      for (const actor of [owner, admin]) {
+        const selected = await (await invoke('assets', actor, actor, set).result).fetchAsync();
+        expect(selected.map((row: { _id: string }) => row._id)).to.deep.equal([shared]);
+        expect(selected[0]).not.to.have.property('syntheticPrivate');
+      }
+      await expectPublicationError(invoke('assets', Random.id(), owner, set).result, 'not-authorized');
+      await expectPublicationError(invoke('assets', owner, owner, otherSet).result, 'not-found');
+    } finally {
+      await files.deleteMany({ _id: { $in: [own, shared, foreign] } });
+      await Tdfs.removeAsync(lesson);
+    }
+  });
+
+  it('limits experiment lessons to a permitted target and omits runtime secrets', async function() {
+    const id = Random.id(), target = Random.id().toLowerCase();
+    try {
+      await Tdfs.insertAsync({ _id: id, ownerId: admin, tdfAvailability: 'available', conditionAllocation: {},
+        content: { tdfs: { tutor: { unit: [{}], setspec: { experimentTarget: target, speechAPIKey: 'synthetic' } } } } });
+      const denied = invoke('tdfByExperimentTarget', owner, target);
+      await denied.result;
+      expect(denied.readyCalls).to.equal(1);
+      await users.updateAsync(owner, { $set: { 'profile.experimentTarget': target } });
+      for (const actor of [admin, owner]) {
+        const rows = await (await invoke('tdfByExperimentTarget', actor, target).result).fetchAsync();
+        expect(rows.map((row: { _id: string }) => row._id)).to.deep.equal([id]);
+        expect(rows[0]).not.to.have.property('conditionAllocation');
+        expect(rows[0].content.tdfs.tutor.setspec).not.to.have.property('speechAPIKey');
+      }
+    } finally {
+      await users.updateAsync(owner, { $unset: { 'profile.experimentTarget': 1 } });
+      await Tdfs.removeAsync(id);
+    }
+  });
+
   it('binds each characterized publication to one reviewed descriptor', function() {
     const cases = Object.entries(NAMED_PUBLICATION_VERIFICATIONS);
     expect(registeredNamedPublications()).to.have.length(cases.length);
