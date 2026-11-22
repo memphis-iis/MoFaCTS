@@ -505,26 +505,5 @@ export function createThemeMethods(deps: ThemeMethodDeps) {
 
       return { success: true };
     },
-
-    getCustomHelpPageStatus: async function() {
-      deps.serverConsole('getCustomHelpPageStatus');
-
-      const activeTheme = await themeRegistry.ensureActiveTheme();
-      const help = activeTheme?.help;
-
-      if (!help || help.enabled === false || (!help.markdown && !help.url)) {
-        return {
-          enabled: false,
-          uploadedAt: null,
-          uploadedBy: null,
-        };
-      }
-
-      return {
-        enabled: true,
-        uploadedAt: help.uploadedAt || null,
-        uploadedBy: help.uploadedBy || null,
-      };
-    },
   };
 }

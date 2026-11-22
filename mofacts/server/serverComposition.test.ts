@@ -2580,6 +2580,19 @@ describe('content helper authorization', function() {
     }
   });
 
+  it('retires the five unused status methods and preserves the active help and speech methods', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of [
+      'getCustomHelpPageStatus', 'getPasswordHashRuntimeInfo', 'getUserSpeechAPIKey',
+      'getTdfSpeechAPIKey', 'getTdfTTSAPIKey',
+    ]) {
+      expect(handlers).not.to.have.own.property(name);
+    }
+    for (const name of ['getCustomHelpPage', 'hasUserPersonalKeys', 'isUserSpeechAPIKeySetup']) {
+      expect(handlers[name]).to.be.a('function');
+    }
+  });
+
   it('does not expose retired mail, logging or content methods', function() {
     for (const name of ['sendEmail', 'sendErrorReportSummaries', 'serverLog', 'debugLog']) {
       expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);

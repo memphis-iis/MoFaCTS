@@ -130,8 +130,6 @@ import {
 } from './lib/contentAccessPolicy';
 import {
   ADMIN_API_KEY_SETTINGS_KEY,
-  getAccessibleTdfApiKey,
-  getUserPersonalApiKey,
   type ApiKeyResolutionDeps,
 } from './lib/apiKeyResolution';
 import {
@@ -876,10 +874,7 @@ export const methods: any = {
     normalizeCanonicalId,
     syncUsernameCaches,
     encryptData,
-    getUserPersonalApiKey,
-    getAccessibleTdfApiKey,
     getApiKeyResolutionDeps: getAudioApiKeyResolutionDeps,
-    getPasswordHashRuntimeInfo,
   }),
 
   ...createContentMethods({

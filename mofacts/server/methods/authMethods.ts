@@ -101,17 +101,7 @@ type AuthMethodsDeps = {
   normalizeCanonicalId: (value: unknown) => string | null;
   syncUsernameCaches: (userId: string, nextUsername: string, previousUsername?: string) => void;
   encryptData: (value: string) => string;
-  getUserPersonalApiKey: (
-    deps: ApiKeyResolutionDeps,
-    userId: string | null | undefined,
-    kind: 'speech' | 'tts'
-  ) => Promise<unknown>;
-  getAccessibleTdfApiKey: (
-    deps: ApiKeyResolutionDeps,
-    params: { userId: string | null | undefined; tdfId: string; kind: 'speech' | 'tts' }
-  ) => Promise<unknown>;
   getApiKeyResolutionDeps: () => ApiKeyResolutionDeps;
-  getPasswordHashRuntimeInfo: () => unknown;
 };
 
 function requireCurrentUserId(userId: string | null | undefined, message = 'Must be logged in') {
@@ -448,11 +438,6 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       });
     },
 
-    getUserSpeechAPIKey: async function(this: MethodContext) {
-      requireCurrentUserId(this.userId, 'Must be logged in to read speech API key status');
-      return '';
-    },
-
     isUserSpeechAPIKeySetup: async function(this: MethodContext) {
       const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
       if (!userId) {
@@ -495,24 +480,6 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       await deps.usersCollection.upsertAsync({ _id: userId }, { $set: { speechAPIKey: deps.encryptData(key) } });
     },
 
-    getTdfTTSAPIKey: async function(this: MethodContext, tdfId: string) {
-      const key = await deps.getAccessibleTdfApiKey(deps.getApiKeyResolutionDeps(), {
-        userId: this.userId,
-        tdfId,
-        kind: 'tts',
-      });
-      return { configured: Boolean(key) };
-    },
-
-    getTdfSpeechAPIKey: async function(this: MethodContext, tdfId: string) {
-      const key = await deps.getAccessibleTdfApiKey(deps.getApiKeyResolutionDeps(), {
-        userId: this.userId,
-        tdfId,
-        kind: 'speech',
-      });
-      return { configured: Boolean(key) };
-    },
-
     setUserSessionId: async function(this: MethodContext, sessionId: string, sessionIdTimestamp: number) {
       if (await privateParticipantActivity(this)) return;
       deps.serverConsole('setUserSessionId request received');
@@ -533,11 +500,6 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
         reason: reason.trim() || 'unspecified',
       });
       return { success: true };
-    },
-
-    getPasswordHashRuntimeInfo: async function(this: MethodContext) {
-      await deps.requireAdminUser(this.userId, 'Admin access required');
-      return deps.getPasswordHashRuntimeInfo();
     },
 
     deleteUserSpeechAPIKey: async function(this: MethodContext) {

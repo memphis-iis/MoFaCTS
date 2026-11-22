@@ -376,10 +376,6 @@
       "access": "public-rate-limited"
     },
     {
-      "name": "getCustomHelpPageStatus",
-      "access": "public-rate-limited"
-    },
-    {
       "name": "getDeploymentBrandProfileDraft",
       "access": "admin-only"
     },
@@ -452,10 +448,6 @@
       "name": "getRecoverableWarnings",
       "access": "admin-only",
       "notes": "The registered policy checks administrator access before validating cursors or reading projected warnings."
-    },
-    {
-      "name": "getPasswordHashRuntimeInfo",
-      "access": "public-rate-limited"
     },
     {
       "name": "getLearnerTdfConfig",
@@ -572,16 +564,6 @@
       "access": "authenticated-self"
     },
     {
-      "name": "getTdfSpeechAPIKey",
-      "access": "role-checked",
-      "notes": "Authenticated caller with canonical lesson execution access; returns configured status only, never the speech credential."
-    },
-    {
-      "name": "getTdfTTSAPIKey",
-      "access": "role-checked",
-      "notes": "Authenticated caller with canonical lesson execution access; returns configured status only, never the TTS credential."
-    },
-    {
       "name": "getTdfsAssignedToStudent",
       "access": "role-checked"
     },
@@ -609,10 +591,6 @@
     {
       "name": "getUserRecentTDFs",
       "access": "authenticated-self"
-    },
-    {
-      "name": "getUserSpeechAPIKey",
-      "access": "role-checked"
     },
     {
       "name": "getVideoCompletedCheckpointQuestionCountFromHistory",
