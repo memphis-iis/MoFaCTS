@@ -1192,7 +1192,7 @@
     {
       "name": "contentUploadMetadata",
       "access": "role-checked",
-      "notes": "Authenticated owner/shared metadata and referenced dependencies only; projected fields, credential presence flags, bounded dependency queries and asset-count aggregation. No full lessons, media or credentials. Client owns summaries and persistent cache."
+      "notes": "Registered asynchronous sign-in policy rejects anonymous subscribers. Owned/shared lesson metadata, referenced conditions and asset counts only; projected fields, credential presence flags, bounded dependency queries and asset-count aggregation. No full lessons, media or credentials. Client owns summaries and persistent cache."
     },
     {
       "name": "sparcRetrievalEmbeddings",

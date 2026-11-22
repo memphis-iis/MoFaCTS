@@ -7,7 +7,6 @@ import {
 type Doc = Record<string, any>;
 type Handle = { stop: () => unknown };
 type Publication = {
-  userId?: string | null;
   added: (collection: string, id: string, fields: Doc) => void;
   changed: (collection: string, id: string, fields: Doc) => void;
   removed: (collection: string, id: string) => void;
@@ -15,12 +14,10 @@ type Publication = {
   onStop: (callback: () => void) => void;
   error: (error: Error) => void;
 };
-type Deps = { Tdfs: any; Stims: any; DynamicAssets: any; serverConsole: (...args: any[]) => void };
+type Deps = { Tdfs: any; DynamicAssets: any; serverConsole: (...args: any[]) => void };
 
 /** One subscription owns access, dependency observers, and count queries. No row computation. */
-export async function publishContentUploadMetadata(publication: Publication, deps: Deps): Promise<void> {
-  const userId = publication.userId;
-  if (!userId) throw new Meteor.Error('not-authorized', 'Must be logged in');
+export async function publishContentUploadMetadata(publication: Publication, userId: string, deps: Deps): Promise<void> {
   let stopped = false;
   let rootsReady = false;
   let running = false;
@@ -34,7 +31,7 @@ export async function publishContentUploadMetadata(publication: Publication, dep
   const dirtySets = new Map<string, string | number>();
   let referencedSets = new Map<string, string | number>();
 
-  function send(kind: 'tdf' | 'stim' | 'count', id: string, data: Doc, root = false) {
+  function send(kind: 'tdf' | 'count', id: string, data: Doc, root = false) {
     if (stopped) return;
     const key = `${kind}:${id}`;
     const fields = { userId, kind, data, root };
@@ -98,12 +95,10 @@ export async function publishContentUploadMetadata(publication: Publication, dep
 
   async function synchronizeDependencies() {
     const conditionIds = new Set<string>();
-    const filenames = new Set<string>();
     const nextSets = new Map<string, string | number>();
     for (const root of roots.values()) {
       const refs = uploadMetadataReferences(root);
       refs.conditions.forEach(id => conditionIds.add(id));
-      refs.files.forEach(name => filenames.add(name));
       refs.sets.forEach(id => nextSets.set(stimuliSetCountKey(id), id));
     }
     for (const key of referencedSets.keys()) if (!nextSets.has(key)) remove('count', key);
@@ -111,7 +106,7 @@ export async function publishContentUploadMetadata(publication: Publication, dep
     referencedSets = nextSets;
     const required = new Map<string, { kind: string; values: Array<string | number> }>();
     for (const [kind, values] of [
-      ['condition', [...conditionIds].sort()], ['stim', [...filenames].sort()],
+      ['condition', [...conditionIds].sort()],
       ['asset', [...nextSets.values()].sort((a, b) => stimuliSetCountKey(a).localeCompare(stimuliSetCountKey(b)))],
     ] as Array<[string, Array<string | number>]>) {
       for (let offset = 0; offset < values.length; offset += CONTENT_UPLOAD_BATCH_SIZE) {
@@ -131,9 +126,6 @@ export async function publishContentUploadMetadata(publication: Publication, dep
           'rawStimuliFile.setspec.sparcPages.pageId': 1,
           'rawStimuliFile.setspec.sparcPages.display.unitType': 1,
         }, (id, doc) => { children.set(id, doc); sendTdf(id); }, id => { children.delete(id); sendTdf(id); });
-      } else if (kind === 'stim') {
-        group = await observe(deps.Stims, { 'meta.fileName': { $in: values } }, { 'meta.fileName': 1 },
-          (id, doc) => send('stim', id, doc), id => remove('stim', id));
       } else {
         const dirty = (_id: string, doc: Doc) => {
           const value = doc.meta?.stimuliSetId;

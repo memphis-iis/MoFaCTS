@@ -12,7 +12,7 @@ Module._load = function(request, parent, main) {
 };
 const { createBrowserSnapshotStore } = require('../client/lib/browserSnapshotStore.ts');
 const { createContentUploadProjection } = require('../client/views/experimentSetup/contentUploadProjection.ts');
-const { publicUploadMetadata, stimuliSetCandidates, stimuliSetCountKey } = require('../common/lib/contentUploadMetadata.ts');
+const { CONTENT_UPLOAD_CACHE_VERSION, publicUploadMetadata, stimuliSetCandidates, stimuliSetCountKey } = require('../common/lib/contentUploadMetadata.ts');
 const { publishContentUploadMetadata } = require('../server/lib/contentUploadMetadataPublication.ts');
 
 const root = (id, extra = {}) => ({ _id: id, ownerId: 'owner', stimuliSetId: '42', content: { fileName: `${id}.json`,
@@ -49,19 +49,17 @@ test('client projections handle all cached rows and recompute only affected root
   assert.equal(project(changed.slice(1)).ids.includes('lesson-000'), false);
 });
 
-test('client computes condition eligibility, missing stimulus state and typed asset counts', () => {
+test('client computes condition eligibility and typed asset counts', () => {
   const project = createContentUploadProjection();
   const parent = root('parent', { condition: ['child.json'], conditionTdfIds: ['child'], stimulusfile: 'stim.json' });
   parent.conditionCounts = [3];
   const child = { _id: 'child', content: { tdfs: { tutor: { unit: [{ sparcsession: { pageId: 'p' } }] } } },
     rawStimuliFile: { setspec: { sparcPages: [{ pageId: 'p', display: { unitType: 'sparc-autotutor-dialogue' } }] } } };
   const count = value => ({ _id: `count:${stimuliSetCountKey(value)}`, userId: 'owner', kind: 'count', data: { stimuliSetId: value, count: 2 } });
-  let rows = [record(parent), record(child, 'tdf', false), count('42'), count(42)];
+  const rows = [record(parent), record(child, 'tdf', false), count('42'), count(42)];
   const first = project(rows).summaries.parent;
   assert.equal(first.assetCount, 4); assert.equal(first.conditions[0].supportsSparcVideoCatalog, true);
-  assert.equal(first.stimFiles[0].exists, false);
-  rows = [...rows, record({ _id: 'stim', meta: { fileName: 'stim.json' } }, 'stim', false)];
-  assert.equal(project(rows).summaries.parent.stimFiles[0].exists, true);
+  assert.equal('stimFiles' in first, false);
   assert.deepEqual(stimuliSetCandidates('42'), ['42', 42]);
 });
 
@@ -113,11 +111,11 @@ function fakeCollection(initial = []) {
 
 test('publication synchronizes writes/deletion/revocation and stops every observer', async () => {
   const Tdfs = fakeCollection([root('a'), { ...root('hidden'), ownerId: 'other' }]);
-  const Stims = fakeCollection(); const assets = fakeCollection([{ _id: 'asset', meta: { stimuliSetId: 42 } }]);
+  const assets = fakeCollection([{ _id: 'asset', meta: { stimuliSetId: 42 } }]);
   const wire = new Map(); let ready = false, stop;
   const publication = { userId: 'owner', added(_c, id, value) { wire.set(id, value); }, changed(_c, id, value) { wire.set(id, value); },
     removed(_c, id) { wire.delete(id); }, ready() { ready = true; }, onStop(fn) { stop = fn; }, error(err) { throw err; } };
-  await publishContentUploadMetadata(publication, { Tdfs, Stims, DynamicAssets: { collection: assets }, serverConsole() {} });
+  await publishContentUploadMetadata(publication, publication.userId, { Tdfs, DynamicAssets: { collection: assets }, serverConsole() {} });
   assert.ok(ready); assert.ok(wire.has('tdf:a')); assert.equal(wire.has('tdf:hidden'), false);
   assert.equal(wire.get('count:number:42').data.count, 1);
   assets.update('asset2', { _id: 'asset2', meta: { stimuliSetId: 42 } });
@@ -128,8 +126,7 @@ test('publication synchronizes writes/deletion/revocation and stops every observ
   assert.ok(wire.has('tdf:b')); assert.equal(wire.has('tdf:a'), false);
   Tdfs.update('b', null); await new Promise(resolve => setTimeout(resolve, 65));
   assert.equal(wire.size, 0);
-  stop(); assert.equal(Tdfs.watchers.size + Stims.watchers.size + assets.watchers.size, 0);
-  await assert.rejects(() => publishContentUploadMetadata({ ...publication, userId: null }, {}), /logged in/);
+  stop(); assert.equal(Tdfs.watchers.size + assets.watchers.size, 0);
 });
 
 test('browser runtime paints saved data before readiness, reconciles live membership and cancels late work', async () => {
@@ -137,7 +134,7 @@ test('browser runtime paints saved data before readiness, reconciles live member
   const dom = new JSDOM('', { url: 'http://localhost:3200' });
   global.window = dom.window;
   const { contentUploadSnapshotStore } = require('../client/lib/contentUploadSnapshotStore.ts');
-  const saved = { version: 1, userId: 'owner', generatedAt: 1, records: [record(root('saved'))] };
+  const saved = { version: CONTENT_UPLOAD_CACHE_VERSION, userId: 'owner', generatedAt: 1, records: [record(root('saved'))] };
   contentUploadSnapshotStore.write('owner', saved);
   let userId = 'owner', ready = false, stopped = false, records = [], currentComputation;
   const tracker = { autorun(fn) {

@@ -4,7 +4,6 @@
 
   export let tdfId = '';
   export let initialTdf = null;
-  export let selectedStimFile = '';
   export let sparcTargets = [];
   export let activeTargetKey = '';
   export let showAdvancedEditors = false;
@@ -22,9 +21,6 @@
   <div>
     <h1>{sparcText('sparc.title')}</h1>
     <div class="sparc-editor-subtitle">{initialTdf?.content?.tdfs?.tutor?.setspec?.lessonname || tdfId}</div>
-    {#if selectedStimFile}
-      <div class="sparc-editor-subtitle">{selectedStimFile}</div>
-    {/if}
   </div>
   <div class="sparc-editor-actions">
     <label class="sparc-advanced-toggle">

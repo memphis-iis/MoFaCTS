@@ -112,7 +112,8 @@ import { createMediaReferenceHelpers } from './lib/mediaReferences';
 import { getMemphisSamlClientConfig } from './lib/memphisSaml';
 import { createTdfLookupHelpers } from './lib/tdfLookup';
 import { registerSparcRetrievalPublication } from './lib/sparcRetrievalPublication';
-import { DEFAULT_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
+import { registerNamedPublication } from './securitySurfaces/registerNamedPublication.ts';
+import { DEFAULT_PUBLICATION_VERIFICATIONS, NAMED_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
 import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
 import { bindAssetUploadSurfaceOwner } from './securitySurfaces/bindAssetUploadSurfaces.ts';
 import { registerMeteorMethods } from './securitySurfaces/registerMeteorMethods.ts';
@@ -884,7 +885,6 @@ export const methods: any = {
   ...createContentMethods({
     ManualContentDrafts,
     Tdfs,
-    Stims,
     DynamicAssets,
     usersCollection: MeteorAny.users,
     UserUploadQuota,
@@ -1370,6 +1370,10 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 }
 
 // DDP-only metadata; clients own summary construction and persistent snapshots.
-Meteor.publish('contentUploadMetadata', async function() {
-  await publishContentUploadMetadata(this, { Tdfs, Stims, DynamicAssets, serverConsole });
+registerNamedPublication(Meteor, 'contentUploadMetadata', {
+  policy: { kind: 'authenticated', delivery: 'async', denial: 'not-authorized' },
+  dataEgress: 'owned-or-shared-upload-metadata',
+  verification: NAMED_PUBLICATION_VERIFICATIONS.contentUploadMetadata,
+}, async function() {
+  await publishContentUploadMetadata(this, this.userId!, { Tdfs, DynamicAssets, serverConsole });
 });

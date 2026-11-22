@@ -1214,22 +1214,9 @@ Template.contentUpload.events({
       }
     }
 
-    // Check for stim file selector in the same table row
-    const stimSelector = row.find('.stim-file-selector');
-    let stimFileParam = '';
-
-    if (stimSelector.length > 0) {
-      const selectedStimId = stimSelector.val();
-      const selectedFilename = stimSelector.find('option:selected').data('filename');
-      if (selectedStimId && selectedFilename) {
-        // Pass stim file info as query params
-        stimFileParam = `?stimFile=${encodeURIComponent(selectedFilename)}&stimId=${selectedStimId}`;
-      }
-    }
-
     const routeToEditor = (selectedTdf: any) => {
       const editorRoute = tdfHasSparcPages(selectedTdf) ? '/sparcEdit/' : '/contentEdit/';
-      FlowRouter.go(editorRoute + tdfId + stimFileParam);
+      FlowRouter.go(editorRoute + tdfId);
     };
 
     const selectedTdf = TdfsCollection.findOne({ _id: tdfId });
@@ -1301,18 +1288,6 @@ Template.contentUpload.events({
 
     // Optional: Store selection in Session for persistence
     Session.set(`selectedConditionFor_${rootTdfId}`, selectedTdfId);
-  },
-
-  // Stim file selector change handler
-  'change .stim-file-selector': function(event: any, _template: any) {
-    const selectedStimId = $(event.currentTarget).val();
-    const selectedFilename = $(event.currentTarget).find('option:selected').data('filename');
-    const tdfId = $(event.currentTarget).data('tdf-id');
-
-    clientConsole(2, `[STIM SELECT] TDF: ${tdfId}, Selected: ${selectedFilename} (${selectedStimId})`);
-
-    // Optional: Store selection in Session for persistence
-    Session.set(`selectedStimFor_${tdfId}`, { stimId: selectedStimId, filename: selectedFilename });
   },
 
   // Copy TDF to create a private copy

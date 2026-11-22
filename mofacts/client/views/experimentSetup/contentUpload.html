@@ -486,25 +486,6 @@
                                             </div>
                                             {{/if}}
 
-                                            {{#if stimFiles}}
-                                            <div class="condition-selector-wrapper">
-                                                <label for="stim-selector-{{_id}}" class="form-label small admin-form-row-xs">
-                                                    {{t 'content.selectStimFileToEdit'}}
-                                                </label>
-                                                <select id="stim-selector-{{_id}}"
-                                                        class="form-select form-select-sm stim-file-selector"
-                                                        data-tdf-id="{{_id}}">
-                                                    {{#each stimFiles}}
-                                                        <option value="{{this.stimId}}"
-                                                                data-filename="{{this.filename}}"
-                                                                {{disabledAttr this.exists}}>
-                                                            {{this.filename}}
-                                                            {{#unless this.exists}} ({{t 'content.notFoundMarker'}}){{/unless}}
-                                                        </option>
-                                                    {{/each}}
-                                                </select>
-                                            </div>
-                                            {{/if}}
                                         </div>
                                         {{/if}}
                                     </div>

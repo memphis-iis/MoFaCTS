@@ -1,5 +1,5 @@
 import { Roles } from 'meteor/alanning:roles';
-import type { Meteor } from 'meteor/meteor';
+import { Meteor } from 'meteor/meteor';
 import type { NAMED_PUBLICATION_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
 
 type Name = keyof typeof NAMED_PUBLICATION_VERIFICATIONS;
@@ -9,9 +9,10 @@ type Handler = Parameters<Publish>[1];
 type Policy =
   | Readonly<{ kind: 'public'; applicationRateLimit: 'none' }>
   | Readonly<{ kind: 'authenticated' | 'authenticated-self'; delivery: 'sync' | 'async' }>
+  | Readonly<{ kind: 'authenticated'; delivery: 'async'; denial: 'not-authorized' }>
   | Readonly<{ kind: 'role'; role: 'admin' }>;
 type Egress =
-  | 'theme-settings' | 'deployment-brand-profile' | 'own-dashboard-cache' | 'client-log-setting'
+  | 'owned-or-shared-upload-metadata' | 'theme-settings' | 'deployment-brand-profile' | 'own-dashboard-cache' | 'client-log-setting'
   | 'own-audio-settings' | 'own-experiment-progress' | 'system-settings'
   | 'accessible-asset-metadata' | 'stimulus-set-asset-metadata' | 'runtime-lesson' | 'owner-editor-content'
   | 'owner-or-shared-upload-details' | 'experiment-lesson-family'
@@ -31,7 +32,10 @@ function applyPolicy(policy: Policy, handler: Handler): Handler {
   // Authentication is synchronous even when the authorized cursor needs async
   // setup. Keep the original result and error timing for both kinds of handler.
   const guarded: Handler = function(...args) {
-    if (!this.userId) return this.ready();
+    if (!this.userId) {
+      if ('denial' in policy) throw new Meteor.Error(policy.denial, 'Must be logged in');
+      return this.ready();
+    }
     return handler.apply(this, args);
   };
   if (policy.delivery === 'sync') return guarded;

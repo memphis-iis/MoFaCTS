@@ -8,7 +8,7 @@ export const contentUploadSnapshotStore = createBrowserSnapshotStore<ContentUplo
     return snapshot?.version === CONTENT_UPLOAD_CACHE_VERSION && snapshot.userId === userId
       && Number.isFinite(snapshot.generatedAt) && Array.isArray(snapshot.records)
       && snapshot.records.every(record => record?.userId === userId && typeof record._id === 'string'
-        && ['tdf', 'stim', 'count'].includes(record.kind) && record.data && typeof record.data === 'object');
+        && ['tdf', 'count'].includes(record.kind) && record.data && typeof record.data === 'object');
   },
 );
 

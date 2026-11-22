@@ -11,7 +11,7 @@ to receive live TDF/dependency changes through Meteor Change Streams. The two li
 have been removed. Client code constructs summaries, orders rows and handles 50-row display
 increments; Show more does not read the server. Expanded lesson/media details remain lazy.
 
-The publication observes only owned/shared TDFs and their referenced dependencies. It projects
+The publication observes owned/shared lessons, their referenced conditions and asset counts. The stimulus editor opens the selected lesson or condition by TDF ID. The metadata subscription does not look up stimulus files by filename. It projects
 fields, replaces protected keys with presence flags, observes and reads dependencies in batches
 of at most 200, and uses database aggregation for affected asset counts. There is no persisted
 server summary collection. The earlier decision against a separate server read model still

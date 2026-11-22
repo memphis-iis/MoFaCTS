@@ -57,9 +57,6 @@ type ContentMethodsDeps = {
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
-  Stims: {
-    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
-  };
   DynamicAssets: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]>; countAsync: () => Promise<number> };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;

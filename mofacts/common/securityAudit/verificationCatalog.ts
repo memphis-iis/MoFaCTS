@@ -366,6 +366,7 @@ export const NAMED_PUBLICATION_VERIFICATIONS = Object.freeze({
   deploymentBrandProfile: namedPublicationVerification('deploymentBrandProfile', brandingPublications),
   dashboardCache: namedPublicationVerification('dashboardCache', selfPublications),
   clientRuntimeSettings: namedPublicationVerification('clientRuntimeSettings', selfPublications),
+  contentUploadMetadata: namedPublicationVerification('contentUploadMetadata', 'rejects anonymous upload metadata and publishes only authorized roots'),
   userAudioSettings: namedPublicationVerification('userAudioSettings', selfPublications),
   userExperimentState: namedPublicationVerification('userExperimentState',
     'finishes logged-out subscriptions without a progress cursor',

@@ -71,14 +71,6 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
       updateAsync: async () => undefined,
       removeAsync: async () => undefined
     },
-    Stims: {
-      find: () => ({
-        fetchAsync: async () => [
-          { _id: 'stim-a', meta: { fileName: 'stim-a.json' } },
-          { _id: 'stim-extra', meta: { fileName: 'stim-extra.json' } }
-        ]
-      })
-    },
     DynamicAssets: {
       find: () => ({ fetchAsync: async () => [], countAsync: async () => 0 }),
       findOneAsync: async () => null,

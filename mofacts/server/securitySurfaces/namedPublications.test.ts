@@ -213,6 +213,27 @@ describe('named application publications', function() {
     }
   });
 
+  it('rejects anonymous upload metadata and publishes only authorized roots', async function() {
+    const anonymous = invoke('contentUploadMetadata', null);
+    await import('node:assert/strict').then(({ rejects }) =>
+      rejects(anonymous.result, { error: 'not-authorized', reason: 'Must be logged in' }));
+    expect(anonymous.readyCalls).to.equal(0);
+    const ids = [Random.id(), Random.id(), Random.id()];
+    let observation: ReturnType<typeof invoke> | undefined;
+    try {
+      await Tdfs.insertAsync({ _id: ids[0], ownerId: owner });
+      await Tdfs.insertAsync({ _id: ids[1], ownerId: admin, accessors: [{ userId: owner }] });
+      await Tdfs.insertAsync({ _id: ids[2], ownerId: admin });
+      observation = invoke('contentUploadMetadata', owner);
+      await observation.result;
+      expect(observation.readyCalls).to.equal(1);
+      expect(observation.emitted.map(row => row.id)).to.have.members(ids.slice(0, 2).map(id => 'tdf:' + id));
+    } finally {
+      observation?.stop();
+      await Tdfs.removeAsync({ _id: { $in: ids } });
+    }
+  });
+
   it('binds each characterized publication to one reviewed descriptor', function() {
     const cases = Object.entries(NAMED_PUBLICATION_VERIFICATIONS);
     expect(registeredNamedPublications()).to.have.length(cases.length);

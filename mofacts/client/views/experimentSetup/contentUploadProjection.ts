@@ -13,18 +13,15 @@ export function createContentUploadProjection() {
     const rootIds = new Set(roots.map(root => root.data._id as string));
     for (const id of summaries.keys()) if (!rootIds.has(id)) summaries.delete(id);
     const tdfs = records.filter(record => record.kind === 'tdf').map(record => record.data);
-    const stims = records.filter(record => record.kind === 'stim').map(record => record.data as { _id: string });
     const counts = records.filter(record => record.kind === 'count')
       .map(record => record.data as { stimuliSetId: string | number; count: number });
     for (const root of roots) {
       const refs = uploadMetadataReferences(root.data);
       const affected = !summaries.has(root.data._id) || changed.has(root._id)
         || refs.conditions.some(id => changed.has(`tdf:${id}`))
-        || refs.sets.some(id => changed.has(`count:${stimuliSetCountKey(id)}`))
-        || [...changed].some(key => [previous.get(key), current.get(key)]
-          .some(record => record?.kind === 'stim' && refs.files.includes(record.data.meta?.fileName)));
+        || refs.sets.some(id => changed.has(`count:${stimuliSetCountKey(id)}`));
       if (affected) {
-        const [summary] = buildContentUploadSummaries([root.data], tdfs, stims, counts);
+        const [summary] = buildContentUploadSummaries([root.data], tdfs, counts);
         summaries.set(root.data._id, summary);
       }
     }

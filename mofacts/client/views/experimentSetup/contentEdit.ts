@@ -218,9 +218,6 @@ Template.contentEdit.helpers({
         });
     },
 
-    stimFileSummary(stimFileInfo: any) {
-        return contentEditorText('contentEditor.stimFileInfo', { filename: stimFileInfo?.filename ?? '' });
-    },
 
     conditionInfo() {
         const tdfId = (Template.instance() as any).tdfId;
@@ -243,18 +240,6 @@ Template.contentEdit.helpers({
             index: index + 1,  // 1-based for display
             total: conditions.length
         };
-    },
-
-    stimFileInfo() {
-        // Check if specific stim file was selected via query params
-        const params = FlowRouter.current().queryParams;
-        if (params.stimFile) {
-            return {
-                filename: params.stimFile,
-                stimId: params.stimId
-            };
-        }
-        return null;
     },
 
     hasChanges() {
