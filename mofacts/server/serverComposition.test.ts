@@ -502,7 +502,7 @@ describe('public TDF and stimulus method authorization', function() {
       stimuliSetId: 109,
       content: {
         fileName: 'AssignedContext.json',
-        tdfs: { tutor: { setspec: { lessonname: 'Assigned Context', userselect: 'false' } } },
+        tdfs: { tutor: { setspec: { lessonname: 'Assigned Context', userselect: 'false', experimentTarget: 'course-access-test' } } },
       },
     });
 
@@ -521,6 +521,46 @@ describe('public TDF and stimulus method authorization', function() {
     );
 
     expect(tdf._id).to.equal('assigned-context-tdf');
+    const actor = { userId: 'assigned-student' };
+    const id = tdf._id;
+    await MeteorUsersAny.insertAsync({ _id: actor.userId, accessedTDFs: [id] });
+    await GlobalExperimentStatesAny.insertAsync({ userId: actor.userId, TDFId: id, experimentState: { currentUnitNumber: 2 } });
+    await methods.setUserLoginData.call(actor, 'section-invite', 'password', null, null, ['unused-id']);
+    const user = await MeteorUsersAny.findOneAsync(actor.userId);
+    expect(user.loginParams).not.to.have.property('assignedTdfs');
+    expect(user.accessedTDFs).to.deep.equal([id]);
+
+    const context = { courseAssignment: { assignmentId: 'assignment-launch-context', courseId: 'course-launch-context',
+      TDFId: id, launchSource: 'courses', launchMode: 'individual' } };
+    const lookup = (options = {}) => (asyncMethods.getTdfById as any).call(actor, id, options);
+    await AssignmentsAny.removeAsync(context.courseAssignment.assignmentId);
+    async function expectDenied(options: Record<string, unknown>, code: number) {
+      let denied: unknown;
+      try { await lookup(options); } catch (error) { denied = error; }
+      expect(denied).to.be.instanceOf(Meteor.Error);
+      expect(denied).to.include({ error: code });
+    }
+    async function dashboardIds() {
+      const snapshot = await MeteorAny.server.method_handlers.getPracticeDashboardSnapshot.call(actor);
+      return snapshot.lessons.map((lesson: { TDFId: string }) => lesson.TDFId);
+    }
+    expect(await dashboardIds()).not.to.include(id);
+    await expectDenied(context, 400);
+    await expectDenied({}, 403);
+    await AssignmentsAny.insertAsync({ _id: context.courseAssignment.assignmentId, courseId: context.courseAssignment.courseId, assignmentType: 'lesson', TDFId: id });
+    expect((await lookup(context))._id).to.equal(id);
+    await AssignmentsAny.removeAsync(context.courseAssignment.assignmentId);
+    await TdfsAny.updateAsync(id, { $set: { accessors: [{ userId: actor.userId }] } });
+    expect((await lookup())._id).to.equal(id);
+    expect(await dashboardIds()).to.include(id);
+    await TdfsAny.updateAsync(id, { $unset: { accessors: 1 } });
+    await CoursesAny.insertAsync({ _id: 'other-course', semester: 'SU_2022', teacherUserId: 'teacher-user' });
+    await SectionsAny.insertAsync({ _id: 'other-section', courseId: 'other-course' });
+    await SectionUserMapAny.insertAsync({ userId: actor.userId, sectionId: 'other-section' });
+    Object.assign(context.courseAssignment, { courseId: 'other-course', assignmentId: 'other-assignment' });
+    await AssignmentsAny.insertAsync({ _id: 'other-assignment', courseId: 'other-course', assignmentType: 'lesson', TDFId: id });
+    expect((await lookup(context))._id).to.equal(id);
+    expect((await GlobalExperimentStatesAny.findOneAsync({ userId: actor.userId, TDFId: id })).experimentState.currentUnitNumber).to.equal(2);
   });
 
   it('blocks direct condition-child lookup for a student with an active root course assignment', async function() {

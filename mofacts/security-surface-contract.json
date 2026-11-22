@@ -886,7 +886,8 @@
     },
     {
       "name": "setUserLoginData",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Saves navigation state only. Browser-supplied lesson IDs cannot grant course access."
     },
     {
       "name": "setUserPreference",
@@ -1116,7 +1117,7 @@
     {
       "name": "files.assets.all",
       "access": "role-checked",
-      "notes": "Lists own uploads and assets in accessible stimulus sets with the existing asset metadata projection."
+      "notes": "Lists own uploads and independently accessible stimulus sets. Course-only metadata is a snapshot of currently released assignments for enrolled users."
     },
     {
       "name": "filteredUsers",
@@ -1134,7 +1135,7 @@
     {
       "name": "tdfByExperimentTarget",
       "access": "role-checked",
-      "notes": "Returns the resolved experiment family under the existing admin, teacher, profile-target or prior-access rules."
+      "notes": "Returns the resolved experiment family under the existing admin, teacher, profile-target, lesson owner or explicit lesson-sharing rules."
     },
     {
       "name": "tdfForContentUploadDetails",

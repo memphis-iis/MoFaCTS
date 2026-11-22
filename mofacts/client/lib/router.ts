@@ -254,14 +254,12 @@ async function acceptClassInvite(teacherId: string, sectionId: string): Promise<
     : null;
 
   await meteorCallAsync('addUserToTeachersClass', teacherId, sectionId);
-  const assignedTdfIds = await meteorCallAsync('getTdfsAssignedToStudent', userId, sectionId);
   await meteorCallAsync(
     'setUserLoginData',
     'section-invite',
     Session.get('loginMode') || 'password',
     teacher || { _id: teacherId },
     curClass || { sectionId, teacherUserId: teacherId },
-    assignedTdfIds
   );
   Session.set('curTeacher', teacher || { _id: teacherId });
   Session.set('curClass', curClass || { sectionId, teacherUserId: teacherId });

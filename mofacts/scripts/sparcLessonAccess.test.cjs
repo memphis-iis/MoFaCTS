@@ -15,6 +15,7 @@ const observer=async()=>({stop(){stoppedObservers++;}});
 const originalLoad=Module._load;
 Module._load=function(request,parent,main){
  if(request==='meteor/meteor')return {Meteor:{Error:MeteorError,publish:(_name,handler)=>{publication=handler;}}};
+ if(request==='meteor/alanning:roles')return {Roles:{userIsInRoleAsync:async()=>false}};
  if(request==='meteor/check')return {check:()=>{},Match:{ObjectIncluding:x=>x}};
  if(request.endsWith('sparcInstructionalLibraryStorage'))return {SparcInstructionalLibrary:{
   rawCollection:()=>({

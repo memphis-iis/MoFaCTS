@@ -1000,13 +1000,12 @@ async function persistLoginDataAfterLogin(
   entryPoint: string,
   loginMode: string,
   curTeacher?: unknown,
-  curClass?: unknown,
-  assignedTdfs?: unknown
+  curClass?: unknown
 ) {
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 8; attempt += 1) {
     try {
-      await meteorCallAsync('setUserLoginData', entryPoint, loginMode, curTeacher, curClass, assignedTdfs);
+      await meteorCallAsync('setUserLoginData', entryPoint, loginMode, curTeacher, curClass);
       return;
     } catch (error: unknown) {
       lastError = error;

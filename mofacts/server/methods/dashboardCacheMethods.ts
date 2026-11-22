@@ -433,6 +433,7 @@ export function createDashboardCacheMethods({
   }
 
   const practiceSnapshotMethods = createDashboardPracticeSnapshotMethods({
+    Courses,
     Meteor,
     Tdfs,
     Assignments,

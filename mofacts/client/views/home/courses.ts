@@ -595,7 +595,6 @@ Template.courses.events({
     Session.set(JOINING_COURSE_SESSION_KEY, course.courseId);
     await instance.commandRegistry.run(scope, async () => {
       await meteorCallAsync('addUserToTeachersClass', course.teacherUserId, sectionId);
-      const assignedTdfIds = await meteorCallAsync('getTdfsAssignedToStudent', Meteor.userId(), sectionId);
       const teacher = {
         _id: course.teacherUserId,
         displayIdentifier: course.teacherDisplayName,
@@ -615,7 +614,6 @@ Template.courses.events({
         Session.get('loginMode') || 'password',
         teacher,
         curClass,
-        assignedTdfIds,
       );
       Session.set('curTeacher', teacher);
       Session.set('curClass', curClass);

@@ -256,18 +256,12 @@ Template.classSelection.events({
     instance.message.set(null);
     await instance.commandController.run(async () => {
       await Meteor.callAsync('addUserToTeachersClass', teacherId, sectionId);
-      const assignedTdfIds = await Meteor.callAsync(
-        'getTdfsAssignedToStudent',
-        Meteor.userId(),
-        sectionId,
-      );
       await Meteor.callAsync(
         'setUserLoginData',
         'main-menu-class-select',
         Session.get('loginMode') || 'password',
         teacher,
         section,
-        assignedTdfIds,
       );
       return { teacher, section };
     }, {

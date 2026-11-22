@@ -10,6 +10,7 @@ import {
 import {
     createTdfPublicationAccessResolver,
     normalizeIdList,
+    normalizeStimSetIds,
     normalizeOptionalStringId,
 } from './lib/tdfPublicationAccess';
 import { createLessonFamilyResolver } from './lib/tdfLessonFamilyResolver';
@@ -17,12 +18,13 @@ import {
     createExperimentTargetFamilyResolver,
     normalizeExperimentTarget,
 } from './lib/experimentTargetFamilyResolver';
+import { collectionMongoName } from '../common/collectionOwnership';
+import { enrolledCourseLessonIds } from './lib/enrolledCourseLessons';
 import { DynamicSettings } from '../common/Collections';
 import { CLIENT_VERBOSITY_SETTING } from '../common/loggingSettings';
 import { themeRegistry } from './lib/themeRegistry';
 import { ensurePublishedDeploymentBrandProfile } from './lib/deploymentBrandProfileRegistry';
 import { DEPLOYMENT_BRAND_PROFILE_KEY } from '../common/deploymentBrandProfile';
-import { assignmentMemberTdfIds } from '../common/progressiveAssignments';
 import { publishAdminUserPage } from './lib/adminUserPagePublication';
 import { DEFAULT_PUBLICATION_VERIFICATIONS, NAMED_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
 import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
@@ -209,6 +211,27 @@ registerNamedPublication(Meteor, 'files.assets.all', {
 }, async function() {
 
     const accessibleStimSetIds = await tdfPublicationAccess.resolveAssetStimuliSetIds(this.userId as string);
+    // Course-only metadata is delivered once per subscription. A later file
+    // change must not be streamed under a grant that may already have ended.
+    const assigned = await resolveAssignedRootTdfIdsForUser(this.userId as string);
+    const snapshotIds: string[] = [];
+    if (assigned.length) {
+        const fields = { stimuliSetId: 1, 'content.tdfs.tutor.setspec.condition': 1, 'content.tdfs.tutor.setspec.conditionTdfIds': 1 };
+        const roots = await Tdfs.find({ _id: { $in: assigned } }, { fields }).fetchAsync();
+        const children = await lessonFamilyResolver.findConditionChildrenForRoots(roots, { stimuliSetId: 1 });
+        const independent = new Set(accessibleStimSetIds);
+        const courseSets = normalizeStimSetIds([...roots, ...children].map(tdf => tdf.stimuliSetId)).filter(id => !independent.has(id));
+        if (courseSets.length) {
+            const files = await DynamicAssets.collection.find(
+                { userId: { $ne: this.userId }, 'meta.stimuliSetId': { $in: courseSets } },
+                { fields: DYNAMIC_ASSET_PUBLICATION_FIELDS }
+            ).fetchAsync();
+            for (const { _id, ...metadata } of files) {
+                this.added(collectionMongoName('DynamicAssets'), _id, metadata);
+                snapshotIds.push(_id);
+            }
+        }
+    }
     const assetQuery = accessibleStimSetIds.length > 0
         ? {
             $or: [
@@ -218,7 +241,8 @@ registerNamedPublication(Meteor, 'files.assets.all', {
         }
         : { userId: this.userId };
 
-    return DynamicAssets.collection.find(assetQuery, { fields: DYNAMIC_ASSET_PUBLICATION_FIELDS });
+    const liveQuery = snapshotIds.length ? { ...assetQuery, _id: { $nin: snapshotIds } } : assetQuery;
+    return DynamicAssets.collection.find(liveQuery, { fields: DYNAMIC_ASSET_PUBLICATION_FIELDS });
 });
 
 registerNamedPublication(Meteor, 'assets', {
@@ -356,41 +380,8 @@ const TDF_CONTENT_UPLOAD_DETAIL_FIELDS = {
     'content.tdfs.tutor.setspec': 1
 };
 
-async function resolveAssignedRootTdfIdsForUser(userId: string) {
-    const enrollmentRows = await SectionUserMap.find(
-        { userId },
-        { fields: { sectionId: 1 } }
-    ).fetchAsync();
-    const sectionIds = enrollmentRows
-        .map((row: any) => normalizeOptionalStringId(row?.sectionId))
-        .filter((id: string | null): id is string => !!id);
-    if (sectionIds.length === 0) {
-        return [];
-    }
-
-    const sections = await Sections.find(
-        { _id: { $in: sectionIds } },
-        { fields: { courseId: 1 } }
-    ).fetchAsync();
-    const courseIds = sections
-        .map((section: any) => normalizeOptionalStringId(section?.courseId))
-        .filter((id: string | null): id is string => !!id);
-    if (courseIds.length === 0) {
-        return [];
-    }
-
-    const assignmentRows = await Assignments.find(
-        { courseId: { $in: [...new Set(courseIds)] } },
-        { fields: { assignmentType: 1, TDFId: 1, memberTdfIds: 1, releaseAt: 1 } }
-    ).fetchAsync();
-    return assignmentRows
-        .flatMap((row: any) => {
-            const releaseAt = row.assignmentType === 'progressive' && row.releaseAt ? new Date(row.releaseAt) : null;
-            if (releaseAt && Number.isFinite(releaseAt.getTime()) && releaseAt.getTime() > Date.now()) return [];
-            return assignmentMemberTdfIds(row);
-        })
-        .map((id: string) => normalizeOptionalStringId(id))
-        .filter((id: string | null): id is string => !!id);
+function resolveAssignedRootTdfIdsForUser(userId: string) {
+    return enrolledCourseLessonIds({ SectionUserMap, Sections, Courses, Assignments }, userId, true);
 }
 
 const tdfPublicationAccess = createTdfPublicationAccessResolver({
@@ -442,16 +433,12 @@ registerNamedPublication(Meteor, 'tdfByExperimentTarget', {
     } else if (!isAdmin) {
         const user = await (Meteor.users as any).findOneAsync(
             this.userId,
-            { fields: { accessedTDFs: 1, profile: 1 } },
+            { fields: { 'profile.experimentTarget': 1 } },
         );
-        const accessedTDFs = normalizeIdList(user?.accessedTDFs || []);
         const profileTarget = normalizeExperimentTarget(user?.profile?.experimentTarget);
-        if (profileTarget !== normalizedTarget && accessedTDFs.length === 0) {
-            return this.ready();
+        if (profileTarget !== normalizedTarget) {
+            rootAccessSelector = { $or: [{ ownerId: this.userId }, { 'accessors.userId': this.userId }] };
         }
-        rootAccessSelector = profileTarget === normalizedTarget
-            ? {}
-            : { _id: { $in: accessedTDFs } };
     }
 
     const family = await resolveExperimentTargetFamily(normalizedTarget, rootAccessSelector);

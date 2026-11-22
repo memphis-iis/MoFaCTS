@@ -43,6 +43,7 @@ Implementation should stay inside the active MoFaCTS app tree under `mofacts/`.
 - Preserve existing teacher/admin access checks for course management.
 - Preserve existing practice launch behavior and runtime route guards.
 - Public course browsing must not create section membership or enrollment records.
+- Removing an ordinary private lesson assignment ends access granted by that course, including for students who started it. Reassignment restores access to the saved progress. Another active assignment or direct lesson share can independently grant access. Experiment participants retain progress-backed passwordless return.
 - Progressive launch authorizes against the current course and section enrollment before returning member lesson content; a cached course snapshot cannot retain access after enrollment is removed. Current course owners and administrators retain their existing access.
 - Removing a course section also removes its enrollment references and invalidates snapshots that already reference the course, including learners no longer discoverable through its surviving sections.
 - Existing assignment rows containing only `courseId` and `TDFId` must remain readable during migration.

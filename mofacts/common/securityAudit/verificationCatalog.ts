@@ -365,7 +365,7 @@ function namedPublicationVerification<N extends string>(
   });
 }
 export const NAMED_PUBLICATION_VERIFICATIONS = Object.freeze({
-  'files.assets.all': namedPublicationVerification('files.assets.all', 'limits asset metadata to the eligible files and stimulus sets'),
+  'files.assets.all': namedPublicationVerification('files.assets.all', 'limits asset metadata to the eligible files and stimulus sets', 'named application publications', 'delivers course-only asset metadata from a current assignment and ignores old account IDs'),
   assets: namedPublicationVerification('assets', 'limits asset metadata to the eligible files and stimulus sets'),
   currentTdf: namedPublicationVerification('currentTdf', 'publishes only a single accessible runtime lesson'),
   tdfForEdit: namedPublicationVerification('tdfForEdit', 'distinguishes owner editing from shared upload details'),

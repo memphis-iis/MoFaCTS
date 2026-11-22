@@ -1,3 +1,4 @@
+import { enrolledCourseLessonIds } from '../lib/enrolledCourseLessons';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
 import { Meteor } from 'meteor/meteor';
 import { progressiveRevisionId, progressiveRevisionPrefix } from '../lib/progressiveAssignmentRevision';
@@ -1013,53 +1014,8 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return assignmentsByCourseId;
   }
 
-  async function resolveAssignedRootTdfIdsForUser(userId: string) {
-    const enrollmentRows = await deps.SectionUserMap.find(
-      { userId },
-      { fields: { sectionId: 1 } }
-    ).fetchAsync();
-    const sectionIds: string[] = enrollmentRows
-      .map((row: any) => deps.normalizeCanonicalId(row?.sectionId))
-      .filter((id: string | null): id is string => typeof id === 'string');
-    if (sectionIds.length === 0) {
-      return [];
-    }
-
-    const uniqueSectionIds = [...new Set(sectionIds)];
-    const sections = await deps.Sections.find(
-      { _id: { $in: uniqueSectionIds } },
-      { fields: { _id: 1, courseId: 1 } }
-    ).fetchAsync();
-    const courseIds = [...new Set(
-      sections
-        .map((section: any) => deps.normalizeCanonicalId(section?.courseId))
-        .filter((courseId: string | null): courseId is string => typeof courseId === 'string')
-    )];
-    if (courseIds.length === 0) {
-      return [];
-    }
-
-    const activeCourses = await deps.Courses.find(
-      { _id: { $in: courseIds }, semester: curSemester },
-      { fields: { _id: 1 } }
-    ).fetchAsync();
-    const activeCourseIds = activeCourses.map((course: any) => String(course?._id || '').trim()).filter(Boolean);
-    if (activeCourseIds.length === 0) {
-      return [];
-    }
-
-    const assignmentRows = await deps.Assignments.find(
-      { courseId: { $in: activeCourseIds } },
-      { fields: { assignmentType: 1, TDFId: 1, memberTdfIds: 1 } }
-    ).fetchAsync();
-    const assignedIdSet = new Set<string>();
-    for (const row of assignmentRows) {
-      for (const rawId of assignmentMemberTdfIds(row)) {
-        const normalizedId = deps.normalizeCanonicalId(rawId);
-        if (normalizedId) assignedIdSet.add(normalizedId);
-      }
-    }
-    return Array.from(assignedIdSet);
+  function resolveAssignedRootTdfIdsForUser(userId: string) {
+    return enrolledCourseLessonIds(deps, userId, false);
   }
 
   async function getLearnerCoursesSnapshot(this: MethodContext): Promise<LearnerCoursesSnapshot> {

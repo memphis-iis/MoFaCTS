@@ -175,7 +175,7 @@ export function createTdfPublicationAccessResolver(
             deps.roles.userIsInRoleAsync(userId, ['teacher']),
             deps.users.findOneAsync(
                 { _id: userId },
-                { fields: { accessedTDFs: 1, profile: 1, loginParams: 1 } }
+                { fields: { 'profile.experimentTarget': 1 } }
             )
         ]);
 
@@ -185,11 +185,9 @@ export function createTdfPublicationAccessResolver(
         } else if (isTeacher) {
             tdfQuery = teacherListingSelector(userId);
         } else {
-            const accessedTdfIds = normalizeIdList(user?.accessedTDFs || []);
             const visibilityTerms: PublicationSelector[] = [
                 { ownerId: userId },
                 { 'accessors.userId': userId },
-                { _id: { $in: accessedTdfIds } },
                 { 'content.tdfs.tutor.setspec.userselect': 'true' }
             ];
             const experimentTarget = experimentTargetFromUser(user);

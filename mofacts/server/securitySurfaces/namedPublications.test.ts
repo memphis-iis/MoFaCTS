@@ -166,6 +166,38 @@ describe('named application publications', function() {
     } finally { await Tdfs.removeAsync(id); }
   });
 
+  it('delivers course-only asset metadata from a current assignment and ignores old account IDs', async function() {
+    const course = Random.id(), section = Random.id(), assignment = Random.id();
+    const lesson = Random.id(), set = Random.id(), asset = Random.id(), enrollment = Random.id();
+    const files = DynamicAssets.collection.rawCollection();
+    try {
+      await Courses.insertAsync({ _id: course, semester: curSemester });
+      await Sections.insertAsync({ _id: section, courseId: course });
+      await SectionUserMap.insertAsync({ _id: enrollment, userId: owner, sectionId: section });
+      await Assignments.insertAsync({ _id: assignment, courseId: course, assignmentType: 'lesson', TDFId: lesson });
+      await Tdfs.insertAsync({ _id: lesson, stimuliSetId: set, ownerId: admin });
+      await files.insertOne({ _id: asset, userId: admin, meta: { stimuliSetId: set } });
+      await users.updateAsync(owner, { $addToSet: { accessedTDFs: lesson } });
+      const active = invoke('files.assets.all', owner);
+      const stream = await active.result;
+      expect(active.emitted.map(row => row.id)).to.include(asset);
+      expect((await stream.fetchAsync()).map((row: any) => row._id)).not.to.include(asset);
+      await Assignments.removeAsync(assignment);
+      const revoked = invoke('files.assets.all', owner);
+      const remaining = await revoked.result;
+      expect(revoked.emitted.map(row => row.id)).not.to.include(asset);
+      expect((await remaining.fetchAsync()).map((row: any) => row._id)).not.to.include(asset);
+    } finally {
+      await users.updateAsync(owner, { $pull: { accessedTDFs: lesson } });
+      await files.deleteOne({ _id: asset });
+      await Tdfs.removeAsync(lesson);
+      await Assignments.removeAsync(assignment);
+      await SectionUserMap.removeAsync(enrollment);
+      await Sections.removeAsync(section);
+      await Courses.removeAsync(course);
+    }
+  });
+
   it('limits asset metadata to the eligible files and stimulus sets', async function() {
     const lesson = Random.id(), set = Random.id(), otherSet = Random.id();
     const own = Random.id(), shared = Random.id(), foreign = Random.id();

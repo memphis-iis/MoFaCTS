@@ -98,7 +98,6 @@ type AuthMethodsDeps = {
   isNormalAccountUser: (user: any) => boolean;
   isUserEmailVerified: (user: any) => boolean;
   buildSessionAuthState: (loginMode: string, primaryFactor: string) => unknown;
-  normalizeCanonicalId: (value: unknown) => string | null;
   syncUsernameCaches: (userId: string, nextUsername: string, previousUsername?: string) => void;
   encryptData: (value: string) => string;
   getApiKeyResolutionDeps: () => ApiKeyResolutionDeps;
@@ -170,8 +169,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       entryPoint: string,
       loginMode: string,
       curTeacher: unknown = undefined,
-      curClass: unknown = undefined,
-      assignedTdfs: unknown = undefined
+      curClass: unknown = undefined
     ) {
       const studyRoot = participantConnectionRoot(this);
 
@@ -188,23 +186,12 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       loginParams.curTeacher = curTeacher;
       loginParams.curClass = curClass;
       loginParams.loginMode = loginMode;
-      loginParams.assignedTdfs = assignedTdfs;
+      delete loginParams.assignedTdfs;
       if (!studyRoot) loginParams.authSessionState = deps.buildSessionAuthState(
         loginMode,
         loginMode === 'google' || loginMode === 'microsoft' || loginMode === 'memphisSaml' ? 'federated' : 'password'
       );
-      const normalizedAssignedTdfIds = Array.isArray(assignedTdfs)
-        ? assignedTdfs
-          .map((id: unknown) => deps.normalizeCanonicalId(id))
-          .filter((id: string | null): id is string => typeof id === 'string')
-        : [];
-
-
-      const userUpdate: UnknownRecord = { $set: { loginParams } };
-      if (normalizedAssignedTdfIds.length > 0) {
-        userUpdate.$addToSet = { accessedTDFs: { $each: normalizedAssignedTdfIds } };
-      }
-      const result = await deps.usersCollection.updateAsync({ _id: userId }, userUpdate);
+      const result = await deps.usersCollection.updateAsync({ _id: userId }, { $set: { loginParams } });
       deps.serverConsole('setUserLoginData update result:', result);
 
       return result;

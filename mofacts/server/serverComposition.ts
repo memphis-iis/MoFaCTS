@@ -871,7 +871,6 @@ export const methods: any = {
     isNormalAccountUser,
     isUserEmailVerified,
     buildSessionAuthState,
-    normalizeCanonicalId,
     syncUsernameCaches,
     encryptData,
     getApiKeyResolutionDeps: getAudioApiKeyResolutionDeps,
