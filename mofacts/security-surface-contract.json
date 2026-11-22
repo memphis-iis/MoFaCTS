@@ -328,7 +328,7 @@
     {
       "name": "getAllTeachers",
       "access": "role-checked",
-      "notes": "Requires a signed-in caller; teacher discovery uses the canonical Roles assignment query and projects only existing teacher identity/display fields. Obsolete users.roles values do not grant listing membership."
+      "notes": "Signed-in learners receive only current teachers with a public or enrolled section in the current semester. Staff retain the teacher directory. Every result contains only _id and displayIdentifier."
     },
     {
       "name": "getAssessmentCompletedTrialCountFromHistory",

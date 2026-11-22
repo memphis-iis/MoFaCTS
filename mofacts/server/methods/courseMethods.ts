@@ -481,29 +481,49 @@ export function createCourseService(deps: CourseMethodsDeps) {
     return sourceSentencesRet.sourceSentences;
   }
 
+  const directoryPolicy = Object.freeze({
+    kind: 'course-read', operation: 'section-directory',
+    authorize(context: MethodContext) {
+      return requireAuthenticatedUser(context.userId, 'Must be logged in', 401);
+    },
+  } as const);
+
+  async function learnerSectionFilter(userId: string) {
+    const roles = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), userId, ['admin', 'teacher'] as const);
+    if (roles.admin || roles.teacher) return null;
+    const enrollments = await deps.SectionUserMap.find({ userId }, { fields: { sectionId: 1 } }).fetchAsync();
+    return { $match: { $or: [{ visibility: 'public' }, { 'section._id': { $in: enrollments.map(row => row.sectionId).filter(Boolean) } }] } };
+  }
+
+  function currentCourseSections() {
+    return [
+      {
+        $match: { semester: curSemester },
+      },
+      {
+        $lookup: {
+          from: 'section',
+          localField: '_id',
+          foreignField: 'courseId',
+          as: 'section',
+        },
+      },
+      {
+        $unwind: {
+          path: '$section',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    ];
+  }
+
   async function getAllCourseSections(this: MethodContext) {
-    const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+    const actingUserId = directoryPolicy.authorize(this);
     try {
-      deps.serverConsole('getAllCourseSections');
-      const roleFlags = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), actingUserId, ['admin', 'teacher'] as const);
-      const allSections = await deps.Courses.rawCollection().aggregate([
-        {
-          $match: { semester: curSemester },
-        },
-        {
-          $lookup: {
-            from: 'section',
-            localField: '_id',
-            foreignField: 'courseId',
-            as: 'section',
-          },
-        },
-        {
-          $unwind: {
-            path: '$section',
-            preserveNullAndEmptyArrays: true,
-          },
-        },
+      const filter = await learnerSectionFilter(actingUserId);
+      return await deps.Courses.rawCollection().aggregate([
+        ...currentCourseSections(),
+        ...(filter ? [filter] : []),
         {
           $project: {
             _id: 0,
@@ -520,18 +540,6 @@ export function createCourseService(deps: CourseMethodsDeps) {
           },
         },
       ]).toArray();
-      if (roleFlags.admin || roleFlags.teacher) {
-        return allSections;
-      }
-      const enrollmentRows = await deps.SectionUserMap.find(
-        { userId: actingUserId },
-        { fields: { sectionId: 1 } }
-      ).fetchAsync();
-      const enrolledSectionIds = new Set(enrollmentRows.map((row: any) => String(row?.sectionId || '')).filter(Boolean));
-      return allSections.filter((section: any) =>
-        section.visibility === 'public' ||
-        enrolledSectionIds.has(String(section.sectionId || ''))
-      );
     } catch (e: unknown) {
       throwLoggedCourseOperationError(deps, 'getAllCourseSections', e);
     }
@@ -1059,9 +1067,17 @@ export function createCourseService(deps: CourseMethodsDeps) {
   }
 
   async function getAllTeachers(this: MethodContext) {
-    deps.serverConsole('getAllTeachers');
-    if (!this.userId) {
-      throw new Meteor.Error(401, 'Must be logged in');
+    const userId = directoryPolicy.authorize(this);
+    const filter = await learnerSectionFilter(userId);
+    let visibleTeachers: Set<string> | undefined;
+    if (filter) {
+      const owners = await deps.Courses.rawCollection().aggregate([
+        ...currentCourseSections(), filter,
+        { $match: { 'section._id': { $exists: true } } },
+        { $group: { _id: '$teacherUserId' } },
+      ]).toArray();
+      visibleTeachers = new Set(owners.map((owner: { _id: string }) => owner._id));
+      if (!visibleTeachers.size) return [];
     }
     const teacherCursor = await deps.Roles.getUsersInRoleAsync('teacher', {
       queryOptions: {
@@ -1075,9 +1091,8 @@ export function createCourseService(deps: CourseMethodsDeps) {
     });
     const allTeachers = await teacherCursor.fetchAsync();
 
-    return allTeachers.map((teacher: any) => ({
-      ...teacher,
-      username: deps.getUserDisplayIdentifier(teacher),
+    return allTeachers.filter((teacher: any) => !visibleTeachers || visibleTeachers.has(teacher._id)).map((teacher: any) => ({
+      _id: teacher._id,
       displayIdentifier: deps.getUserDisplayIdentifier(teacher),
     }));
   }
@@ -1323,16 +1338,17 @@ export function createCourseService(deps: CourseMethodsDeps) {
     addUserDueDateException,
     removeUserDueDateException,
   };
-  function bind(name: keyof typeof COURSE_READ_VERIFICATIONS, dataEgress: MeteorMethodBinding['dataEgress']): MeteorMethodBinding {
-    return Object.freeze({ handler: methods[name], verification: COURSE_READ_VERIFICATIONS[name], dataEgress,
-      policy: name === 'getLearnerCoursesSnapshot' ? snapshotPolicy : instructorReadPolicy });
+  function bind(name: keyof typeof COURSE_READ_VERIFICATIONS, policy: MeteorMethodBinding['policy'], dataEgress: MeteorMethodBinding['dataEgress']): MeteorMethodBinding {
+    return Object.freeze({ handler: methods[name], verification: COURSE_READ_VERIFICATIONS[name], policy, dataEgress });
   }
   return {
     methods,
     methodBindings: Object.freeze([
-      bind('getLearnerCoursesSnapshot', 'learner-course-snapshot'),
-      bind('getTdfAssignmentsByCourseIdMap', 'assignments-by-course'),
-      bind('getAllCoursesForInstructor', 'instructor-course-list'),
+      bind('getAllTeachers', directoryPolicy, 'teacher-display-list'),
+      bind('getAllCourseSections', directoryPolicy, 'course-section-list'),
+      bind('getLearnerCoursesSnapshot', snapshotPolicy, 'learner-course-snapshot'),
+      bind('getTdfAssignmentsByCourseIdMap', instructorReadPolicy, 'assignments-by-course'),
+      bind('getAllCoursesForInstructor', instructorReadPolicy, 'instructor-course-list'),
     ]),
     resolveAssignedRootTdfIdsForUser,
     invalidateCourseSnapshotsForCourse,

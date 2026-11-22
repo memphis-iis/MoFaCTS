@@ -2577,6 +2577,35 @@ describe('course method authorization', function() {
     expect(denied).to.include({ error: code });
   }
 
+  it('limits learner teacher discovery to public or enrolled sections', async function() {
+    const directory = boundCourseRead('getAllTeachers', 'section-directory');
+    const sections = boundCourseRead('getAllCourseSections', 'section-directory');
+    await expectCourseDenial(() => directory.call({}), 401);
+    await expectCourseDenial(() => sections.call({}), 401);
+    const learner = { userId: await MeteorUsersAny.insertAsync({ username: Random.id() }) };
+    const fixtures: Array<{ teacher: string; label: string; section: string | null }> = [];
+    for (const kind of ['public', 'private', 'other', 'empty', 'past', 'former']) {
+      const label = Random.id() + '@example.test';
+      const teacher = await MeteorUsersAny.insertAsync({ username: Random.id(), email_canonical: label });
+      if (kind !== 'former') await Roles.addUsersToRolesAsync(teacher, 'teacher');
+      const course = await CoursesAny.insertAsync({ teacherUserId: teacher, courseName: kind,
+        semester: kind === 'past' ? 'past' : 'SU_2022', visibility: ['private', 'other'].includes(kind) ? 'private' : 'public' });
+      const section = kind === 'empty' ? null : await SectionsAny.insertAsync({ courseId: course, sectionName: kind });
+      fixtures.push({ teacher, label, section });
+    }
+    const [visible, invited, other] = fixtures;
+    await SectionUserMapAny.insertAsync({ userId: Random.id(), sectionId: other!.section });
+    const option = (row: typeof fixtures[number]) => ({ _id: row.teacher, displayIdentifier: row.label });
+    expect(await directory.call(learner)).to.deep.equal([option(visible!)]);
+    expect((await sections.call(learner)).some((s: any) => s.sectionId === invited!.section)).to.equal(false);
+    await SectionUserMapAny.insertAsync({ userId: learner.userId, sectionId: invited!.section });
+    expect(await directory.call(learner)).to.have.deep.members([option(visible!), option(invited!)]);
+    expect((await sections.call(learner)).some((s: any) => s.sectionId === invited!.section)).to.equal(true);
+    const staff = await directory.call({ userId: visible!.teacher });
+    expect(staff).to.deep.include(option(other!));
+    for (const row of staff) expect(Object.keys(row).sort()).to.deep.equal(['_id', 'displayIdentifier']);
+  });
+
   it('binds the learner course snapshot to the current account session', async function() {
     const read = boundCourseRead('getLearnerCoursesSnapshot', 'own-account-session');
     const userId = await MeteorUsersAny.insertAsync({ username: Random.id() });

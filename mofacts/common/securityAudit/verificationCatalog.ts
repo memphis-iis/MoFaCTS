@@ -644,6 +644,8 @@ function courseReadVerification<N extends string>(method: N, observedCase: strin
     cases: Object.freeze([observedCase]) });
 }
 export const COURSE_READ_VERIFICATIONS = Object.freeze({
+  getAllCourseSections: courseReadVerification('getAllCourseSections', 'limits learner teacher discovery to public or enrolled sections'),
+  getAllTeachers: courseReadVerification('getAllTeachers', 'limits learner teacher discovery to public or enrolled sections'),
   getLearnerCoursesSnapshot: courseReadVerification('getLearnerCoursesSnapshot', 'binds the learner course snapshot to the current account session'),
   getTdfAssignmentsByCourseIdMap: courseReadVerification('getTdfAssignmentsByCourseIdMap', 'binds instructor course reads to the instructor or an administrator'),
   getAllCoursesForInstructor: courseReadVerification('getAllCoursesForInstructor', 'binds instructor course reads to the instructor or an administrator'),

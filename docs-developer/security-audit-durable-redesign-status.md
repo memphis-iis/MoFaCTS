@@ -1871,7 +1871,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 62 total, 61 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 63 total, 61 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 63 reserved for section-scoped teacher discovery and direct invitations.
 
 Slot 62 passed on e0ff19e6 on November 22. The installed registry excluded all five additional retired commands. The corrected ordinary-account and resumed passwordless study-session cases both passed. Native Meteor recorded 1,115 server and 1,249 Chromium passes, zero failures or hook failures, and 15/seven pending. The existing worker image was reused, the worker exited 0 and cleanup completed. The outer PowerShell-to-Bash launcher reported a trailing carriage return after worker completion; the retained worker status and native verification receipt confirm the result. Receipt: /var/tmp/mofacts-integration.n19jUhUq/results/native-verification.json SHA-256 580e9708e908dfd0243e3e47eeda4e0002df87d5efea30100b94c2dacc2779dd.
 

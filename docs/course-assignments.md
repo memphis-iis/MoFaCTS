@@ -640,6 +640,10 @@ Performance rules:
 - Preserve existing teacher/admin ownership behavior.
 - Update only recognized course fields.
 
+### Enrollment teacher directory
+
+Signed-in learners see current teachers with at least one public section or a section they are enrolled in for the current semester. Staff retain their teacher directory. Each entry contains only the teacher ID and existing display label, which can be an email address. A direct invitation enrolls the learner in the specified section before loading the directory.
+
 ### `getAllCourseSections`
 
 - Include `visibility`, `beginDate`, `endDate`, and `timezone` in the projected course fields so Class Management can render existing values without an extra method call.

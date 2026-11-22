@@ -274,8 +274,7 @@ describe('course method operational errors', function() {
     expect(await methods.getAllTeachers.call({ userId: 'learner' })).to.deep.equal([]);
     assignments.add('current-teacher');
     expect(await methods.getAllTeachers.call({ userId: 'learner' })).to.deep.equal([{
-      _id: 'current-teacher', username: 'teacher@example.test', displayIdentifier: 'teacher@example.test',
-      email_canonical: 'teacher@example.test', emails: [{ address: 'teacher@example.test' }],
+      _id: 'current-teacher', displayIdentifier: 'teacher@example.test',
     }]);
     assignments.delete('current-teacher');
     expect(await methods.getAllTeachers.call({ userId: 'learner' })).to.deep.equal([]);
