@@ -20,25 +20,28 @@
   let submitting = false;
   $: options = node.children;
   $: nextTarget = options.find(child => child.optionId === 'next-target');
-  $: locked = options.some(child => child.selected && child.optionId !== 'next-target');
+  $: acceptedOption = options.find(child => child.selected && child.optionId !== 'next-target');
 
-  function availableMove(id) {
+  function availableMove(options, id) {
     return options.some(child => child.optionId?.startsWith(`${id}.`) && !child.readOnly);
   }
-  function availableFormat(id) {
+  function availableFormat(options, move, id) {
     return options.some(child => child.optionId === `${move}.${id}` && !child.readOnly)
       || (!move && options.some(child => child.optionId?.endsWith(`.${id}`) && !child.readOnly));
   }
-  async function choose(factor, value) {
-    if (submitting) return;
+  function choose(factor, value) {
     if (factor === 'kc') nextKC = value;
     if (factor === 'move') move = value;
     if (factor === 'format') format = value;
     if (!move || !format) return;
     const option = options.find(child => child.optionId === `${move}.${format}` && !child.readOnly);
     if (!option || (nextKC && !nextTarget)) throw new Error('Selected SPARC move is not offered by the active menu');
+    return submit(option, nextKC ? nextTarget : null);
+  }
+  async function submit(option, next) {
+    if (submitting) return;
     submitting = true;
-    try { await onActivate(option, nextKC ? nextTarget : null); }
+    try { await onActivate(option, next); }
     finally { submitting = false; }
   }
 
@@ -64,10 +67,14 @@
   }
 </script>
 
-{#if options.length}
+{#if !history && acceptedOption && !submitting && !node.readOnly}
+  <button type="button" class="btn btn-primary" data-node-id={node.id} on:click={() => submit(acceptedOption, nextTarget?.selected ? nextTarget : null)}>
+    {translatePlatformString(getActiveUiLocale(), 'common.tryAgain')}
+  </button>
+{:else if options.length && (history || (!acceptedOption && !submitting && !node.readOnly))}
   <div class="sparc-student-move-menu" class:sparc-student-move-history={history} data-node-id={node.id} use:fitMenu>
     <div class="sparc-student-menu-size">
-      <div class="sparc-student-menu-grid" aria-busy={submitting}>
+      <div class="sparc-student-menu-grid">
         {#if history}
           <div class="sparc-student-menu-column" role="group" aria-label={text('kcGroup')}>
             <button type="button" aria-pressed="true" disabled>{text(nextKC ? 'nextKC' : 'sameKC')}</button>
@@ -82,17 +89,17 @@
           {/if}
         {:else}
         <div class="sparc-student-menu-column" role="group" aria-label={text('kcGroup')} class:has-selection={true}>
-          <button type="button" aria-pressed={!nextKC} disabled={submitting || locked} on:click={() => choose('kc', false)}>{text('sameKC')}</button>
-          <button type="button" aria-pressed={nextKC} disabled={submitting || locked || nextTarget?.readOnly || !nextTarget} on:click={() => choose('kc', true)}>{text('nextKC')}</button>
+          <button type="button" aria-pressed={!nextKC} on:click={() => choose('kc', false)}>{text('sameKC')}</button>
+          <button type="button" aria-pressed={nextKC} disabled={nextTarget?.readOnly || !nextTarget} on:click={() => choose('kc', true)}>{text('nextKC')}</button>
         </div>
         <div class="sparc-student-menu-column" role="group" aria-label={text('moveGroup')} class:has-selection={Boolean(move)}>
           {#each moves as id, index}
-            <button type="button" aria-pressed={move === id} disabled={submitting || !availableMove(id)} on:click={() => choose('move', id)}>{text(moveKeys[index])}</button>
+            <button type="button" aria-pressed={move === id} disabled={!availableMove(options, id)} on:click={() => choose('move', id)}>{text(moveKeys[index])}</button>
           {/each}
         </div>
         <div class="sparc-student-menu-column" role="group" aria-label={text('formatGroup')} class:has-selection={Boolean(format)}>
           {#each SPARC_QUESTION_RESPONSE_FORMATS as id, index}
-            <button type="button" aria-pressed={format === id} disabled={submitting || !availableFormat(id)} on:click={() => choose('format', id)}>{text(formatKeys[index])}</button>
+            <button type="button" aria-pressed={format === id} disabled={!availableFormat(options, move, id)} on:click={() => choose('format', id)}>{text(formatKeys[index])}</button>
           {/each}
         </div>
         {/if}

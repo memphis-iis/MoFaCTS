@@ -19,7 +19,7 @@ async function buildFixture({ captureSubmissions = false, realStartup = false } 
   stub('sparcAutoTutorRuleCommit', `export const isSparcAutoTutorDisplay = () => true;
     export const commitSparcAutoTutorDocumentLoad = async () => ({ sparcNodeValues: {} });
     export const commitSparcAutoTutorSubmit = async params => {
-      ${captureSubmissions ? 'window.fixture.submissions.push(params.sparcResult); window.fixture.submissionPresentations.push(params.submissionPresentation); return { sparcNodeValues: {} };' : "throw Error('Unexpected submission');"}
+      ${captureSubmissions ? 'window.fixture.submissions.push(params.sparcResult); window.fixture.submissionPresentations.push(params.submissionPresentation); await window.fixture.submissionGate; return { sparcNodeValues: {} };' : "throw Error('Unexpected submission');"}
     };`);
   stub('sparcControllerDialogueOpenRouter', 'export const createSparcDialogueOpenRouterProvider = () => ({ prepareAssessment: async () => {} });');
   stub('sparcOpenRouterSession', "export const createSparcOpenRouterSession = () => ({ sessionIdForScope: () => 'synthetic' });");
