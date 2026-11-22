@@ -1,4 +1,4 @@
-import { COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { COURSE_EXCEPTION_VERIFICATIONS, COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
 import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 import { enrolledCourseLessonIds } from '../lib/enrolledCourseLessons';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
@@ -1261,8 +1261,9 @@ export function createCourseService(deps: CourseMethodsDeps) {
     return true;
   }
 
-  async function resolveAssignmentForDueDateException(this: MethodContext, classId: string, tdfId: string, assignmentId: string) {
-    await assertCanManageCourse(this, classId);
+  async function authorizeDueDateException(context: MethodContext, studentId: string, classId: string, tdfId: string, assignmentId: string) {
+    await assertCanManageCourse(context, classId);
+    if (!deps.normalizeCanonicalId(studentId)) throw new Meteor.Error(400, 'Student id is required');
     if (!deps.normalizeCanonicalId(assignmentId)) throw new Meteor.Error(400, 'Assignment id is required');
     const assignment = await deps.Assignments.findOneAsync(
       { _id: assignmentId, courseId: classId },
@@ -1271,11 +1272,27 @@ export function createCourseService(deps: CourseMethodsDeps) {
     if (!assignment || !assignmentMemberTdfIds(assignment).includes(tdfId)) {
       throw new Meteor.Error(404, 'Course assignment not found for due date exception');
     }
+    const sections = await deps.Sections.find({ courseId: classId }, { fields: { _id: 1 } }).fetchAsync();
+    const membership = await deps.SectionUserMap.findOneAsync({ userId: studentId, sectionId: { $in: sections.map(section => section._id) } }, { fields: { _id: 1 } });
+    if (!membership) throw new Meteor.Error(403, 'Due-date changes require current course enrollment');
     return assignment;
+  }
+  const exceptionPolicy = Object.freeze({ kind: 'course-management', operation: 'enrolled-student-exception', authorize: authorizeDueDateException } as const);
+
+  async function editStudentExceptions(studentId: string, edit: (current: DueDateException[]) => DueDateException[]) {
+    const student = await deps.usersCollection.findOneAsync({ _id: studentId }, { fields: { dueDateExceptions: 1 } });
+    if (!student) throw new Meteor.Error(404, 'Student account not found');
+    const current = student.dueDateExceptions;
+    if (current != null && !Array.isArray(current)) throw new Meteor.Error(409, 'Invalid stored due-date exceptions');
+    const changed = await deps.usersCollection.updateAsync(
+      { _id: studentId, dueDateExceptions: current === undefined ? { $exists: false } : current },
+      { $set: { dueDateExceptions: edit(current ?? []) } },
+    );
+    if (changed !== 1) throw new Meteor.Error(409, 'Due-date exceptions changed during save. Reload before editing.');
   }
 
   async function addUserDueDateException(this: MethodContext, userId: string, tdfId: string, classId: string, date: string | number | Date, assignmentId: string) {
-    const assignment = await resolveAssignmentForDueDateException.call(this, classId, tdfId, assignmentId);
+    const assignment = await exceptionPolicy.authorize(this, userId, classId, tdfId, assignmentId);
     deps.serverConsole('addUserDueDateException', userId, tdfId, date, assignment._id);
     const now = new Date();
     const exception = {
@@ -1286,21 +1303,11 @@ export function createCourseService(deps: CourseMethodsDeps) {
       createdAt: now,
       updatedAt: now,
     };
-    const user = await deps.usersCollection.findOneAsync({ _id: userId });
-    const dueDateExceptions = Array.isArray(user.dueDateExceptions) ? user.dueDateExceptions : [];
-    const existingIndex = dueDateExceptions.findIndex((item: DueDateException) => item.assignmentId === exception.assignmentId);
-    if (existingIndex >= 0) {
-      dueDateExceptions[existingIndex] = {
-        ...dueDateExceptions[existingIndex],
-        ...exception,
-        createdAt: dueDateExceptions[existingIndex].createdAt || now,
-        updatedAt: now,
-      };
-    } else {
-      dueDateExceptions.push(exception);
-    }
-    user.dueDateExceptions = dueDateExceptions;
-    await deps.usersCollection.updateAsync({ _id: userId }, user);
+    await editStudentExceptions(userId, current => {
+      const index = current.findIndex(item => item.assignmentId === exception.assignmentId && item.courseId === classId);
+      if (index < 0) return [...current, exception];
+      return current.map((item, i) => i === index ? { ...item, ...exception, createdAt: item.createdAt || now } : item);
+    });
   }
 
   async function checkForTDFData(tdfId: string) {
@@ -1320,20 +1327,10 @@ export function createCourseService(deps: CourseMethodsDeps) {
 
   async function removeUserDueDateException(this: MethodContext, userId: string, tdfId: string, classId: string, assignmentId: string) {
     if (!classId || !assignmentId) throw new Meteor.Error(400, 'Course and assignment ids are required');
-    const assignment = await resolveAssignmentForDueDateException.call(this, classId, tdfId, assignmentId);
+    const assignment = await exceptionPolicy.authorize(this, userId, classId, tdfId, assignmentId);
     deps.serverConsole('removeUserDueDateException', userId, tdfId);
-    const user = await deps.usersCollection.findOneAsync({ _id: userId });
-    if (user.dueDateExceptions) {
-      const exceptionIndex = (user.dueDateExceptions as DueDateException[]).findIndex((item: DueDateException) => (
-        item.assignmentId === String(assignment._id) && item.courseId === classId
-      ));
-      if (exceptionIndex > -1) {
-        user.dueDateExceptions.splice(exceptionIndex, 1);
-      } else {
-        deps.serverConsole('removeUserDueDateException ERROR, no exception found', userId, tdfId);
-      }
-    }
-    await deps.usersCollection.updateAsync({ _id: userId }, user);
+    await editStudentExceptions(userId, current => current.filter(item =>
+      item.assignmentId !== String(assignment._id) || item.courseId !== classId));
   }
 
   const methods = {
@@ -1358,6 +1355,9 @@ export function createCourseService(deps: CourseMethodsDeps) {
   return {
     methods,
     methodBindings: Object.freeze([
+      ...Object.values(COURSE_EXCEPTION_VERIFICATIONS).map(verification => Object.freeze({
+        handler: methods[verification.method], verification, policy: exceptionPolicy, dataEgress: 'none' as const,
+      })),
       Object.freeze({ handler: methods.saveCourseAssignments, verification: COURSE_ASSIGNMENT_SAVE_VERIFICATION,
         policy: courseManagementPolicy, dataEgress: 'assignment-editor-snapshot' as const }),
       bind('getCourseAssignmentEditorSnapshot', courseManagementPolicy, 'assignment-editor-snapshot'),

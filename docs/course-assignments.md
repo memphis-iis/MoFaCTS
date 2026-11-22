@@ -788,6 +788,7 @@ Reporting due-date precedence:
 Compatibility:
 
 - Existing due-date exceptions matching `{ classId/courseId, TDFId }` must continue to work.
+- Adding, changing, or removing an exception requires current student enrollment in a section of the course. Leaving the course preserves the existing exception. It can be edited again after re-enrollment.
 - New due-date exceptions must store `assignmentId`.
 - Existing exceptions continue to read old `{ classId/courseId, TDFId }` shapes.
 - Assignment `dueAt` is authoritative over TDF `setspec.duedate` for course reporting.

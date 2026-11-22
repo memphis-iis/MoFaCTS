@@ -2577,6 +2577,37 @@ describe('course method authorization', function() {
     expect(denied).to.include({ error: code });
   }
 
+  it('requires current course enrollment for each due-date exception edit', async function() {
+    const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const student = await MeteorUsersAny.insertAsync({ username: Random.id(), profile: { retained: true } });
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    const course = await CoursesAny.insertAsync({ teacherUserId: teacher });
+    const section = await SectionsAny.insertAsync({ courseId: course });
+    const lesson = Random.id();
+    const assignment = await AssignmentsAny.insertAsync({ courseId: course, assignmentType: 'lesson', TDFId: lesson });
+    const handlers = MeteorAny.server.method_handlers;
+    const actor = { userId: teacher };
+    const add = (date: number) => handlers.addUserDueDateException.call(actor, student, lesson, course, date, assignment);
+    const remove = () => handlers.removeUserDueDateException.call(actor, student, lesson, course, assignment);
+    await expectCourseDenial(() => add(1000), 403);
+    await expectCourseDenial(remove, 403);
+    const membership = await SectionUserMapAny.insertAsync({ sectionId: section, userId: student });
+    await add(1000);
+    await add(2000);
+    const read = () => MeteorUsersAny.findOneAsync(student);
+    const saved = (await read()).dueDateExceptions;
+    expect(saved).to.have.length(1);
+    expect(saved[0]).to.include({ courseId: course, assignmentId: assignment, date: 2000 });
+    await SectionUserMapAny.removeAsync(membership);
+    await expectCourseDenial(() => add(3000), 403);
+    await expectCourseDenial(remove, 403);
+    expect((await read()).dueDateExceptions).to.deep.equal(saved);
+    await SectionUserMapAny.insertAsync({ sectionId: section, userId: student });
+    await remove();
+    expect((await read()).dueDateExceptions).to.deep.equal([]);
+    expect((await read()).profile).to.deep.equal({ retained: true });
+  });
+
   it('preserves assigned lessons after sharing ends and checks every new use', async function() {
     const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
     const admin = await MeteorUsersAny.insertAsync({ username: Random.id() });

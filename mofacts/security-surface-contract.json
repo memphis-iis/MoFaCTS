@@ -52,7 +52,8 @@
     },
     {
       "name": "addUserDueDateException",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Requires course management, exact lesson and assignment membership, and a currently enrolled target student. Writes only due-date exceptions."
     },
     {
       "name": "addUserToTeachersClass",
@@ -704,7 +705,8 @@
     },
     {
       "name": "removeUserDueDateException",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Requires course management, exact lesson and assignment membership, and a currently enrolled target student. Writes only due-date exceptions."
     },
     {
       "name": "renameTheme",

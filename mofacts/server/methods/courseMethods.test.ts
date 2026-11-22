@@ -311,6 +311,8 @@ describe('course method operational errors', function() {
     ] }]);
     const { methods } = createCourseService(createDeps({
       usersCollection: users,
+      Sections: createMemoryCollection([{ _id: 'section', courseId: 'course' }]),
+      SectionUserMap: createMemoryCollection([{ userId: 'student', sectionId: 'section' }]),
       Courses: createMemoryCollection([{ _id: 'course', teacherUserId: 'teacher' }]),
       Assignments: createMemoryCollection([{ _id: 'target', courseId: 'course', assignmentType: 'lesson', TDFId: 'lesson' }]),
     }));
