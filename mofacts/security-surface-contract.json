@@ -174,7 +174,8 @@
     },
     {
       "name": "copyTdf",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Owners, shared accessors and administrators may copy. Only a source-owner copy retains lesson provider keys and source archive references. Returns the new lesson ID and name."
     },
     {
       "name": "createExperimentState",

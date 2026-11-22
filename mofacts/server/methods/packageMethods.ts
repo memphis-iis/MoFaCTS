@@ -1293,6 +1293,15 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       newTdf.content.tdfs.tutor.setspec.lessonname = newName;
       newTdf.content.tdfs.tutor.setspec.userselect = 'false';
     }
+    if (!isOwner) {
+      const settings = newTdf.content?.tdfs?.tutor?.setspec;
+      if (settings) {
+        for (const field of LESSON_PROVIDER_KEY_FIELDS) delete settings[field];
+      }
+      // A retained ZIP can contain the source owner's keys. Export the copy from its own content.
+      delete newTdf.packageFile;
+      delete newTdf.packageAssetId;
+    }
     delete newTdf.sourceIdentity;
     newTdf.tdfRevision = 1;
 

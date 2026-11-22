@@ -115,7 +115,9 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Trace stored provider-key fields through shared upload details and the owner editor. Both return the lesson settings block. The owner editor copies saved values back on an ordinary save. The server reads encrypted values and also accepts historical plaintext values. This is source evidence; no stored keys or live lessons were inspected.
 - [x] Omit stored provider-key values from both editor/upload detail publications. The owner receives configured field names. Preserve keys on ordinary saves and restrict explicit replacement and clearing to the lesson owner.
 - [x] Verify publication redaction and the owner/shared save contract in native Meteor.
-- [ ] Decide provider-key inheritance in copyTdf: the current copy clones all lesson content and assigns ownership to the caller, including when a shared accessor copies a lesson.
+- [x] Implement owner-only inheritance of lesson provider keys in copyTdf. Non-owner copies also drop the source archive references so a ZIP containing embedded keys does not follow the lesson.
+- [ ] Verify all three key fields in owner, shared and administrator copies, denial for an unrelated user, and the original document in native Meteor.
+- [ ] Decide the credential policy for downloadable package exports and explicit lesson-family ownership transfers. The export builder decrypts known lesson provider keys for the archive; the transfer updates ownership for all family members. Existing archive remediation is a separate scope.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
@@ -1823,9 +1825,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 52 total, 51 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 53 total, 51 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
+
+Slot 53 reserved for the owner-only lesson-copy key policy.
 
 Slot 52 consumed on b6483382. Native Meteor passed 12:54:43 to 12:55:52 UTC on 2026-11-22 with 1,107 server and 1,249 Chromium passes, zero failures, 15 and seven pending. Confirmed both named cases for stored-key redaction and owner/shared saves. Source snapshot SHA-256: 958fa0b3c350e66135e60b25526d0fe627b244f88c6990b00c238b653b34f7b4. Full typecheck and lint passed. Source-security checks had 453 passes and seven skips. Wiki 488dd77. Staging2 qualification remains open.
 
