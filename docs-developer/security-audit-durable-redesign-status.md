@@ -111,7 +111,9 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Verify the seven publication retirements, single-lesson runtime behavior and scoped assignment dates in native Meteor.
 - [x] Trace client use of all seven remaining direct named publications in server/publications.ts. Six have active callers. The Assignments publication has no tracked subscriber or client collection reader; learner courses and the assignment editor use scoped snapshot methods.
 - [x] Retire the unused Assignments publication and register the six remaining named publications in server/publications.ts. Each descriptor binds the signed-in async policy, returned data and native verification case. Existing lesson, role and sharing rules remain in their handlers.
-- [ ] Verify the installed six registrations, signed-out readiness, asset filtering, editor and shared upload access, target scope and retired Assignments name in Meteor.
+- [x] Verify the installed six registrations, signed-out readiness, asset filtering, editor and shared upload access, target scope and retired Assignments name in Meteor.
+- [x] Trace stored provider-key fields through shared upload details and the owner editor. Both return the lesson settings block. The owner editor copies saved values back on an ordinary save. The server reads encrypted values and also accepts historical plaintext values. This is source evidence; no stored keys or live lessons were inspected.
+- [ ] Decide whether to omit stored provider-key values from both browser responses and preserve unchanged keys on the server. The editor publication is owner-only, but saveTdfContent currently permits owners and shared accessors via userCanManageTdf. Decide whether only owners may explicitly change keys while shared accessors retain their existing ordinary content-save permissions. Verify known-key fields are absent with synthetic fixtures before closing.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
@@ -1819,11 +1821,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 51 total, 49 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 51 total, 50 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
 
-Slot 51 reserved for the six active publication registrations and Assignments retirement.
+Slot 51 consumed on a371595f. Native Meteor passed 11:59:21 to 12:01:08 UTC on 2026-11-22, with 1,106 server and 1,249 Chromium passes, zero failures and 15 and seven pending. The registry binding, retired subscription, signed-out readiness, runtime lesson, asset metadata, upload/editor permissions and experiment-target cases passed. Source snapshot SHA-256: ec9f79450cda4e98f4b454f4f32debb5072132c1a6017f6321e3527cff9ca123. Typecheck and lint passed; 324 security surfaces. Linux source-security tests: 453 passed and seven skipped. Staging2 qualification remains open.
 
 Slot 50 consumed on 38f1da2e. Native Meteor passed 01:52:29 to 01:53:37 UTC on 2026-11-22, with 1,102 server and 1,249 Chromium passes, zero failures, 15 and seven pending. All three named cases passed: seven retired names, single accessible runtime lesson, and effective due dates scoped to instructor courses. Source snapshot SHA-256: 4f17be0e707f6795144f74a2c4da07fd6105cc76153e6d72d2b82c1f2e8f8557. Typecheck and lint passed; 325 security surfaces. Linux source-security tests: 453 passed, seven skipped. Wiki updated on 1098324.
 
