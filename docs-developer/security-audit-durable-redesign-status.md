@@ -104,7 +104,10 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Delete ownedTdfs and pagedTdfsListing and the pagination-only field stripping helper. The admin user list still requires normalizePageRequest.
 - [x] Verify both retired names are absent and the two active listing handlers retain their authenticated cursors and signed-out readiness.
 - [x] Confirm no independent client uses the four remaining obsolete lesson subscriptions. Retire tdfByIds, tdfForEditMetadata, dashboardTdfsListing and contentUploadOwners, their contract entries and dashboard-only resolver code.
-- [ ] Verify all six retired subscriptions are absent and the instructor listing still works in native Meteor.
+- [x] Verify all six retired subscriptions are absent and the instructor listing still works in native Meteor.
+- [x] Trace the remaining allTdfsListing subscription. Its only tracked client is instructor reporting. It uses the selected lesson for the authored due date when the assignment has none. The existing instructor-scoped assignment query already joins that lesson.
+- [ ] Decide whether to retire allTdfsListing by returning the effective due date in the instructor assignment response and preserving assignment-date precedence. This would remove the independent authenticated listing, including its broad lesson metadata fields.
+- [ ] Reconcile currentTdf with its exact-ID inventory description. The retained runtime handler also accepts arrays; the two tracked subscription sites pass a current lesson ID.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
@@ -1812,11 +1815,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 49 total, 47 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 49 total, 48 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
 
-Slot 49 reserved for the four-subscription retirement batch.
+Slot 49 consumed on 14cdef82. Native Meteor passed 01:40:36 to 01:41:42 UTC on 2026-11-22: 1,100 server and 1,249 Chromium passes, zero failures, 15 and seven pending. The six-name absence and instructor-listing regression passed. Three tests solely for deleted dashboard selector helpers were removed. Source snapshot SHA-256: 35e748467d394675888a321114b48713c544181075ded358f5bb482276137714. Full typecheck and lint passed; 326 security surfaces remain. Source-security suite: 453 passed, seven skipped. Wiki reference updated on 3d43626.
 
 Slot 48 consumed on d65e8e02. The named retirement and retained-listing case passed. Native Meteor passed 23:37:17 to 23:38:37 UTC on 2026-11-21 with 1,103 server and 1,249 Chromium passes, zero failures, and 15 and seven pending respectively. Source snapshot SHA-256: fd04d262c40ffdc7c931a5f90dba3de6219a9ff7d5756b040609e13c67fda14c. Full typecheck and lint passed. Linux source-security checks had 453 passes and seven skips.
 
