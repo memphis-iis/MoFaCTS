@@ -55,7 +55,7 @@ import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
 import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
-import { AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -69,7 +69,7 @@ import { HistoryCommitState, historyCommitStorage } from './lib/historyCommitMon
 import { refreshDashboardHistory } from './lib/dashboardHistoryMongo';
 import { archiveDashboardHistory } from './lib/dashboardHistoryArchive';
 import { writeConditionState } from './lib/conditionAllocationMongo';
-import { createAuthMethods } from './methods/authMethods';
+import { createAuthMethods, ssoProfilePolicy } from './methods/authMethods';
 import { createContentMethods } from './methods/contentMethods';
 import { createCourseMethods } from './methods/courseMethods';
 import type { CourseAssignmentHistoryContext } from '../common/courseAssignments.contracts';
@@ -1214,6 +1214,7 @@ registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...warningRegistration.methodBindings,
   ...simulationTelemetry.methodBindings,
   ...experimentRegistration.methodBindings,
+  { verification: SSO_PROFILE_VERIFICATION, handler: methods.populateSSOProfile, policy: ssoProfilePolicy, dataEgress: 'account-email-or-status' },
   { verification: AUDIO_SAVE_VERIFICATION, handler: methods.saveAudioSettings, policy: audioSavePolicy, dataEgress: 'save-status' },
   ...PREFERENCE_VERIFICATIONS.map(verification => ({
     verification, handler: methods[verification.method], policy: preferencePolicy,

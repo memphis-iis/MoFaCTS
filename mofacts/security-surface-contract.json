@@ -683,7 +683,8 @@
     },
     {
       "name": "populateSSOProfile",
-      "access": "authenticated-self"
+      "access": "role-checked",
+      "review": "The account holder or an administrator may complete the profile. The provider credential stays in provider storage."
     },
     {
       "name": "processPackageUpload",

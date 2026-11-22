@@ -29,6 +29,10 @@ export type MeteorMethodBinding = Readonly<{
     operation: 'self';
     authorize: (...args: never[]) => Promise<string> | string;
   }> | Readonly<{
+    kind: 'sso-profile';
+    operation: 'self-or-admin';
+    authorize: (...args: never[]) => Promise<string>;
+  }> | Readonly<{
     kind: 'history-download';
     operation: 'owned-lessons' | 'own-history' | 'disabled-class' | 'owned-lesson';
     authorize: (...args: never[]) => unknown;
@@ -58,7 +62,7 @@ export type MeteorMethodBinding = Readonly<{
     | 'filename-reference-migration-report' | 'history-download-capability' | 'none'
     | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'
     | 'experiment-login-token' | 'participant-session' | 'public-demo-launch'
-    | 'accessor-identities' | 'recipient-lookup-result' | 'statistics-expanded' | 'save-status' | 'saved-wait' | 'owned-lesson-list' | 'transfer-status' | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
+    | 'account-email-or-status' | 'accessor-identities' | 'recipient-lookup-result' | 'statistics-expanded' | 'save-status' | 'saved-wait' | 'owned-lesson-list' | 'transfer-status' | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
 }>;
 
 let observe: (() => ReturnType<typeof observeMeteorMethodBindings>) | undefined;

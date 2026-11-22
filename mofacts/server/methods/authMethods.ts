@@ -127,6 +127,22 @@ async function setPasswordForUser(userId: string, newPassword: string) {
   throw new Meteor.Error('accounts-set-password-unavailable', 'Server password update API is unavailable');
 }
 
+export const ssoProfilePolicy = Object.freeze({
+  kind: 'sso-profile',
+  operation: 'self-or-admin',
+  authorize(deps: MethodAuthorizationDeps, actingUserId: string | null | undefined, subjectUserId: string) {
+    return requireUserMatchesOrHasRole(deps, {
+      actingUserId,
+      subjectUserId,
+      roles: ['admin'],
+      notLoggedInMessage: 'Must be logged in',
+      notLoggedInCode: 401,
+      forbiddenMessage: 'Can only populate your own SSO profile',
+      forbiddenCode: 403,
+    });
+  },
+} as const);
+
 export function createAuthMethods(deps: AuthMethodsDeps) {
   return {
     getCurrentUserRoleFlags: async function(this: MethodContext) {
@@ -364,15 +380,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     },
 
     populateSSOProfile: async function(this: MethodContext, userId: string) {
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
-        subjectUserId: userId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Can only populate your own SSO profile',
-        forbiddenCode: 403,
-      });
+      await ssoProfilePolicy.authorize(deps.getMethodAuthorizationDeps(), this.userId, userId);
 
       if (await privateParticipantActivity(this)) return;
       const user = await deps.usersCollection.findOneAsync({ _id: userId });
@@ -391,7 +399,6 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
         const profile = {
           email: serviceEmail,
           service,
-          refreshToken: serviceProfile.refreshToken,
         };
         const normalizedEmail = deps.normalizeCanonicalEmail(serviceEmail);
         await deps.usersCollection.updateAsync({ _id: userId }, { $set: {

@@ -228,9 +228,32 @@ describe('server auth and session methods', function() {
     expect(await passwordMatches(replayPassword)).to.equal(false);
   });
 
-  it('logs canonical email changes when populateSSOProfile updates the account email', async function() {
+  it('binds SSO profile completion to the account holder or an administrator', async function() {
+    const registry = registeredMeteorMethodSurfaces();
+    if (registry.state !== 'observed') throw new Error('Expected observed Meteor methods');
+    const rows = registry.surfaces.filter(row => row.name === 'populateSSOProfile');
+    expect(rows).to.have.length(1);
+    expect(rows[0]?.policy).to.deep.equal({ kind: 'sso-profile', operation: 'self-or-admin' });
+    const handler = MeteorAny.server.method_handlers.populateSSOProfile;
+    const subject = Random.id();
+    for (const [userId, code] of [[null, 401], [Random.id(), 403]] as const) {
+      let denial: unknown;
+      try { await handler.call({ userId }, subject); } catch (error) { denial = error; }
+      expect(denial).to.be.instanceOf(Meteor.Error);
+      expect(denial).to.include({ error: code });
+    }
+    const admin = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await Roles.createRoleAsync('admin', { unlessExists: true });
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    const email = subject + '@example.com';
+    await MeteorUsersAny.insertAsync({ _id: subject, services: { google: { email } } });
+    expect(await handler.call({ userId: admin }, subject)).to.equal('success: ' + email);
+  });
+
+  it('keeps the SSO credential in provider storage and logs canonical email changes', async function() {
     const originalEmail = `original-${Random.id()}@example.com`;
     const nextEmail = `updated-${Random.id()}@example.com`;
+    const providerCredential = Random.id();
     const password = `LongPassword-${Random.id()}123`;
 
     const result = await methods.signUpUser.call({}, originalEmail, password);
@@ -240,7 +263,7 @@ describe('server auth and session methods', function() {
       services: {
         google: {
           email: nextEmail,
-          refreshToken: Random.id()
+          refreshToken: providerCredential
         }
       }
     }});
@@ -253,6 +276,8 @@ describe('server auth and session methods', function() {
     }) as any;
 
     expect(populateResult).to.equal(`success: ${nextEmail}`);
+    expect(updatedUser.profile).to.deep.equal({ email: nextEmail, service: 'google', username: nextEmail.toLowerCase() });
+    expect(updatedUser.services.google.refreshToken).to.equal(providerCredential);
     expect(updatedUser.email_canonical).to.equal(nextEmail.toLowerCase());
     expect(auditEntry).to.exist;
     expect(auditEntry.details.previousEmailCanonical).to.equal(originalEmail.toLowerCase());

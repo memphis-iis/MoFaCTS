@@ -638,6 +638,14 @@ export const LESSON_SHARING_VERIFICATION = Object.freeze({
     'rejects missing new recipients atomically and allows retaining or revoking stale entries']),
 } as const);
 
+export const SSO_PROFILE_VERIFICATION = Object.freeze({
+  ...middlewareTest, suite: 'server auth and session methods', method: 'populateSSOProfile', surfaceId: 'method:populateSSOProfile',
+  verificationId: 'method.sso-profile.populate', cases: Object.freeze([
+    'keeps the SSO credential in provider storage and logs canonical email changes',
+    'binds SSO profile completion to the account holder or an administrator',
+  ]),
+} as const);
+
 export const AUDIO_SAVE_VERIFICATION = Object.freeze({
   ...middlewareTest, suite: 'personal audio settings', method: 'saveAudioSettings', surfaceId: 'method:saveAudioSettings',
   verificationId: 'method.personal-audio.save', cases: Object.freeze(['validates the whole patch and preserves omitted personal audio choices']),
@@ -690,7 +698,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

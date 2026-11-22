@@ -1,3 +1,4 @@
+import { registerDirectWriteDenial } from '../../../server/securitySurfaces/registerDirectWriteDenial.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
@@ -156,21 +157,15 @@ test('Phase 0 compatibility: backup authorization, validation, unblock and actor
   assert.deepEqual(calls, [['authorize', null]]);
 });
 
-test('Phase 0 compatibility: current synchronous collection mutation rules stay synchronous', () => {
-  const source = sourceFile('common/Collections.ts');
-  const rule = (name, bindings = {}) => {
-    const call = registration(source, `${name}.allow`);
-    const property = oneNode(call.arguments[0], (node) => ts.isPropertyAssignment(node) && node.name.getText(source) === 'update');
-    return evaluateNode(property.initializer, source, bindings);
-  };
-  const owned = rule('GlobalExperimentStates');
-  assert.equal(owned('synthetic-owner', { userId: 'synthetic-owner' }, [], {}), true);
-  assert.equal(owned('synthetic-other', { userId: 'synthetic-owner' }, [], {}), false);
-  const admin = rule('DynamicSettings', { Meteor: { roleAssignment: { findOne: (query) =>
-    query['user._id'] === 'synthetic-admin' && query['role._id'] === 'admin' ? {} : undefined } } });
-  assert.equal(admin('synthetic-admin'), true);
-  assert.equal(admin('synthetic-other'), false);
-  assert.equal(rule('DynamicSettings', { Meteor: {} })('synthetic-admin'), false);
+test('Phase 0 compatibility: direct progress and settings denials stay synchronous', () => {
+  for (const [name, operations] of [['progress', ['insert', 'update']], ['settings', ['update']]]) {
+    let installed;
+    registerDirectWriteDenial({ deny(rules) { installed = rules; } }, name);
+    assert.deepEqual(Object.keys(installed).sort(), operations);
+    for (const operation of operations) {
+      assert.equal(installed[operation](), true);
+    }
+  }
 });
 
 test('Phase 0 compatibility: public/shared/owned content routes retain different intentional permissions', () => {
