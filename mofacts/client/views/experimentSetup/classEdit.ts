@@ -350,6 +350,13 @@ Template.classEdit.helpers({
   draftCourseName(): string {
     return (Template.instance() as ClassEditInstance).draftCourse.get().courseName;
   },
+  existingSections() {
+    return (Template.instance() as ClassEditInstance).draftCourse.get().existingSections?.map(section => ({ ...section, _id: section.sectionId }));
+  },
+  sectionDisabledAttrs(remove: boolean) { return remove ? { disabled: true } : {}; },
+  sectionRemovedAttrs(remove: boolean) { return remove ? { checked: true } : {}; },
+  sectionNamesPlaceholder() { return (Template.instance() as ClassEditInstance).selectedCourseId.get() ? '' : courseText('courseManagement.sectionNamesPlaceholder'); },
+  editingExistingCourse() { return Boolean((Template.instance() as ClassEditInstance).selectedCourseId.get()); },
   draftSectionNames(): string {
     return sectionNamesText((Template.instance() as ClassEditInstance).draftCourse.get().sections);
   },
@@ -428,6 +435,12 @@ Template.classEdit.events({
     updateDraft(instance, { timezone: String((event.currentTarget as HTMLSelectElement).value || '').trim() });
   },
 
+  'input .existing-section-name, change .remove-course-section'(event: Event, instance: ClassEditInstance) {
+    const input = event.currentTarget as HTMLInputElement;
+    const existingSections = instance.draftCourse.get().existingSections?.map(section => section.sectionId === input.dataset.sectionId
+      ? { ...section, ...(input.type === 'checkbox' ? { remove: input.checked } : { sectionName: input.value }) } : section);
+    if (existingSections) updateDraft(instance, { existingSections });
+  },
   'input #sectionNames'(event: Event, instance: ClassEditInstance) {
     updateDraft(instance, { sections: normalizeSectionNames(String((event.currentTarget as HTMLTextAreaElement).value || '')) });
   },

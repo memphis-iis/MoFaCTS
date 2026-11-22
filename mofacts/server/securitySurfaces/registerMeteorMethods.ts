@@ -70,7 +70,7 @@ export type MeteorMethodBinding = Readonly<{
     | 'filename-reference-migration-report' | 'history-download-capability' | 'none'
     | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'
     | 'experiment-login-token' | 'participant-session' | 'public-demo-launch'
-    | 'assignment-editor-snapshot' | 'course-section-list' | 'teacher-display-list' | 'learner-course-snapshot' | 'assignments-by-course' | 'instructor-course-list'
+    | 'course-id' | 'assignment-editor-snapshot' | 'course-section-list' | 'teacher-display-list' | 'learner-course-snapshot' | 'assignments-by-course' | 'instructor-course-list'
     | 'account-email-or-status' | 'accessor-identities' | 'recipient-lookup-result' | 'statistics-expanded' | 'save-status' | 'saved-wait' | 'owned-lesson-list' | 'transfer-status' | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
 }>;
 

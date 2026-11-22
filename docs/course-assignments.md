@@ -45,6 +45,7 @@ Implementation should stay inside the active MoFaCTS app tree under `mofacts/`.
 - Public course browsing must not create section membership or enrollment records.
 - Removing an ordinary private lesson assignment ends access granted by that course, including for students who started it. Reassignment restores access to the saved progress. Another active assignment or direct lesson share can independently grant access. Experiment participants retain progress-backed passwordless return.
 - Progressive launch authorizes against the current course and section enrollment before returning member lesson content; a cached course snapshot cannot retain access after enrollment is removed. Current course owners and administrators retain their existing access.
+- Edit existing sections by ID. Renaming preserves the section ID, its invitation URL, and its enrollments. Only sections explicitly marked for deletion are removed when the course is saved. A stale list is rejected; reload the course before editing again.
 - Removing a course section also removes its enrollment references and invalidates snapshots that already reference the course, including learners no longer discoverable through its surviving sections.
 - Existing assignment rows containing only `courseId` and `TDFId` must remain readable during migration.
 - Course assignment context must be recorded into learner history when a learner launches from a course assignment.

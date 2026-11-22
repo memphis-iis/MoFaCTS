@@ -248,6 +248,7 @@
     {
       "name": "editCourse",
       "access": "role-checked",
+      "notes": "Owner or admin; validates section identity and explicit removals before committing course, sections, and enrollment changes together.",
       "notes": "Course owner/admin authorization is retained. Removing sections removes their enrollment references and invalidates existing assigned/public course snapshots, including learners no longer found through live sections."
     },
     {

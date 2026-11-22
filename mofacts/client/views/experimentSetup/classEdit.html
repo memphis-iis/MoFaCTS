@@ -52,8 +52,15 @@
                 </select>
               </div>
               <div class="col-12">
-                <label for="sectionNames" class="form-label">{{courseText 'courseManagement.sectionNames'}}</label>
-                <textarea class="form-control" rows="5" id="sectionNames" placeholder="{{courseText 'courseManagement.sectionNamesPlaceholder'}}">{{draftSectionNames}}</textarea>
+                {{#each existingSections}}
+                  <div class="mb-2">
+                    <label class="form-label" for="section-{{sectionId}}">{{originalName}}</label>
+                    <input class="form-control existing-section-name" id="section-{{sectionId}}" data-section-id="{{sectionId}}" value="{{sectionName}}" {{sectionDisabledAttrs remove}}>
+                    <label><input type="checkbox" class="remove-course-section" data-section-id="{{sectionId}}" {{sectionRemovedAttrs remove}}> {{courseText 'courseManagement.delete'}} {{originalName}}</label>
+                  </div>
+                {{/each}}
+                <label for="sectionNames" class="form-label">{{#if editingExistingCourse}}{{courseText 'courseManagement.additionalSections'}}{{else}}{{courseText 'courseManagement.sectionNames'}}{{/if}}</label>
+                <textarea class="form-control" rows="5" id="sectionNames" placeholder="{{sectionNamesPlaceholder}}">{{draftSectionNames}}</textarea>
               </div>
               {{#if classEditConfirmation}}
                 <div class="col-12">

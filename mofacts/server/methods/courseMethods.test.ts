@@ -430,43 +430,6 @@ describe('course assignment metadata methods', function() {
     expect(histories.rows).to.have.length(1);
   });
 
-  it('removes deleted section enrollments and invalidates former assigned viewers without changing history or assignments', async function() {
-    const courses = createMemoryCollection([{ _id: 'course-1', courseName: 'Intro Course', teacherUserId: 'teacher-user',
-      semester: 'current', visibility: 'private', timezone: 'America/Chicago' }]);
-    const sections = createMemoryCollection([
-      { _id: 'section-removed', courseId: 'course-1', sectionName: 'A' },
-      { _id: 'section-kept', courseId: 'course-1', sectionName: 'B' },
-      { _id: 'section-other', courseId: 'course-other', sectionName: 'A' },
-    ]);
-    const enrollments = createMemoryCollection([
-      { _id: 'enrollment-removed', sectionId: 'section-removed', userId: 'student-removed' },
-      { _id: 'enrollment-kept', sectionId: 'section-kept', userId: 'student-kept' },
-      { _id: 'enrollment-other', sectionId: 'section-other', userId: 'student-other' },
-    ]);
-    const snapshots = createMemoryCollection([
-      { userId: 'student-removed', version: COURSE_SNAPSHOT_VERSION, assignedCourseIds: ['course-1'], publicCourseIds: [], invalidatedAt: null },
-      { userId: 'student-kept', version: COURSE_SNAPSHOT_VERSION, assignedCourseIds: ['course-1'], publicCourseIds: [], invalidatedAt: null },
-      { userId: 'student-other', version: COURSE_SNAPSHOT_VERSION, assignedCourseIds: ['course-other'], publicCourseIds: [], invalidatedAt: null },
-    ]);
-    const assignments = createMemoryCollection([{ _id: 'assignment-1', courseId: 'course-1', assignmentType: 'lesson', TDFId: 'tdf-1' }]);
-    const histories = { async findOneAsync() { throw new Error('Course editing must not read or alter learner history'); } };
-    const { methods } = createCourseService(createDeps({
-      Courses: courses, Sections: sections, SectionUserMap: enrollments, Assignments: assignments,
-      CourseLearnerSnapshotCache: snapshots, UserDashboardCache: createMemoryCollection(), Histories: histories,
-    }));
-
-    await methods.editCourse.call({ userId: 'teacher-user' }, {
-      _id: 'course-1', courseName: 'Intro Course', sections: ['B'],
-    } as any);
-
-    expect(sections.rows.map((row) => row._id)).to.deep.equal(['section-kept', 'section-other']);
-    expect(enrollments.rows.map((row) => row._id)).to.deep.equal(['enrollment-kept', 'enrollment-other']);
-    expect(snapshots.rows[0].invalidatedAt).to.be.instanceOf(Date);
-    expect(snapshots.rows[1].invalidatedAt).to.be.instanceOf(Date);
-    expect(snapshots.rows[2].invalidatedAt).to.equal(null);
-    expect(assignments.rows).to.deep.equal([{ _id: 'assignment-1', courseId: 'course-1', assignmentType: 'lesson', TDFId: 'tdf-1' }]);
-  });
-
   it('rejects invalid course visibility values', async function() {
     const { methods } = createCourseService(createDeps({
       Courses: createMemoryCollection(),

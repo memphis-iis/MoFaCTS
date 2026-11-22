@@ -1,3 +1,4 @@
+import { COURSE_SNAPSHOT_VERSION } from './lib/courseLearnerSnapshotCache';
 import { COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './lib/prolificCollections';
 import { CourseLearnerSnapshotCache } from '../common/Collections';
@@ -2576,6 +2577,45 @@ describe('course method authorization', function() {
     expect(denied).to.be.instanceOf(Meteor.Error);
     expect(denied).to.include({ error: code });
   }
+
+  it('renames sections in place and deletes only explicitly selected sections', async function() {
+    const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const student = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    const courseId = await CoursesAny.insertAsync({ teacherUserId: teacher, semester: 'SU_2022', courseName: 'Original', timezone: 'America/Chicago' });
+    const sectionId = await SectionsAny.insertAsync({ courseId, sectionName: 'A' });
+    const sibling = await SectionsAny.insertAsync({ courseId, sectionName: 'B' });
+    const membership = await SectionUserMapAny.insertAsync({ userId: student, sectionId });
+    const formerStudent = Random.id();
+    const exiting = await SectionUserMapAny.insertAsync({ userId: formerStudent, sectionId: sibling });
+    const assignment = await AssignmentsAny.insertAsync({ courseId, TDFId: Random.id() });
+    await CourseLearnerSnapshotCache.insertAsync({ userId: student, assignedCourseIds: [courseId], publicCourseIds: [], version: COURSE_SNAPSHOT_VERSION } as any);
+    await CourseLearnerSnapshotCache.insertAsync({ userId: formerStudent, assignedCourseIds: [courseId], publicCourseIds: [], version: COURSE_SNAPSHOT_VERSION } as any);
+    const a = { sectionId, sectionName: 'Monday', originalName: 'A', remove: false };
+    const b = { sectionId: sibling, sectionName: 'B', originalName: 'B', remove: false };
+    const edit = (existingSections: unknown[], sections: string[] = [], userId = teacher) =>
+      MeteorAny.server.method_handlers.editCourse.call({ userId }, { courseId, courseName: 'Updated', existingSections, sections });
+    await expectCourseDenial(() => edit([a, b], [], student), 403);
+    await expectCourseDenial(() => edit([a]), 409);
+    await expectCourseDenial(() => edit([a, b], ['Monday']), 400);
+    expect((await CoursesAny.findOneAsync(courseId)).courseName).to.equal('Original');
+    expect((await SectionsAny.findOneAsync(sectionId)).sectionName).to.equal('A');
+    await edit([a, b]);
+    expect((await SectionsAny.findOneAsync(sectionId)).sectionName).to.equal('Monday');
+    expect(await SectionUserMapAny.findOneAsync(membership)).to.include({ userId: student, sectionId });
+    expect(await MeteorAny.server.method_handlers.addUserToTeachersClass.call({ userId: student }, teacher, sectionId)).to.equal(true);
+    await expectCourseDenial(() => edit([a, { ...b, remove: true }]), 409);
+    expect(await SectionUserMapAny.findOneAsync(exiting)).to.exist;
+    await CourseLearnerSnapshotCache.updateAsync({ userId: formerStudent }, { $set: { invalidatedAt: null } } as any);
+    await edit([{ ...a, originalName: 'Monday' }, { ...b, remove: true }], ['Tuesday']);
+    expect(await SectionsAny.findOneAsync(sibling)).not.to.exist;
+    expect(await SectionUserMapAny.findOneAsync(exiting)).not.to.exist;
+    expect(await SectionsAny.findOneAsync({ courseId, sectionName: 'Tuesday' })).to.exist;
+    expect(await SectionUserMapAny.findOneAsync(membership)).to.exist;
+    expect(await AssignmentsAny.findOneAsync(assignment)).to.exist;
+    expect((await CourseLearnerSnapshotCache.findOneAsync({ userId: formerStudent }))?.invalidatedAt).to.be.instanceOf(Date);
+    expect((await CourseLearnerSnapshotCache.findOneAsync({ userId: student }))?.invalidatedAt).to.be.instanceOf(Date);
+  });
 
   it('requires current course enrollment for each due-date exception edit', async function() {
     const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });

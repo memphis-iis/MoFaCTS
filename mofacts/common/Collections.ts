@@ -150,4 +150,4 @@ Object.assign(globalThis, {
   DynamicAssets,
 });
 
-export { Tdfs, GlobalExperimentStates, Histories, DynamicSettings, UserDashboardCache, CourseLearnerSnapshotCache, StimulusCrowdStats, BackupJobs, TdfMutationJobs };
+export { Courses, Sections, SectionUserMap, Tdfs, GlobalExperimentStates, Histories, DynamicSettings, UserDashboardCache, CourseLearnerSnapshotCache, StimulusCrowdStats, BackupJobs, TdfMutationJobs };

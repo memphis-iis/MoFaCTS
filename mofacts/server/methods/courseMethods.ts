@@ -1,4 +1,5 @@
-import { COURSE_EXCEPTION_VERIFICATIONS, COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { commitCourseEdit } from '../lib/courseSectionEdit';
+import { COURSE_EDIT_VERIFICATION, COURSE_EXCEPTION_VERIFICATIONS, COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
 import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 import { enrolledCourseLessonIds } from '../lib/enrolledCourseLessons';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
@@ -301,13 +302,6 @@ function normalizeCourseDocumentForRead<T extends Record<string, any>>(course: T
     endDate: parseNullablePersistedDate(course?.endDate),
     timezone: normalizeTimezone(course?.timezone, true),
   };
-}
-
-function getSetAMinusB<T>(arrayA: T[], arrayB: T[]) {
-  const a = new Set(arrayA);
-  const b = new Set(arrayB);
-  const difference = new Set([...a].filter((x) => !b.has(x)));
-  return Array.from(difference);
 }
 
 function throwLoggedCourseOperationError(
@@ -1145,9 +1139,9 @@ export function createCourseService(deps: CourseMethodsDeps) {
   }
 
   async function editCourse(this: MethodContext, mycourse: { _id: string; courseId: string; sections: string[] } & UnknownRecord) {
-    assertKnownFields(mycourse, ['_id', 'courseId', 'courseName', 'teacherUserId', 'semester', 'beginDate', 'endDate', 'timezone', 'visibility', 'sections'], 'Course');
+    assertKnownFields(mycourse, ['_id', 'courseId', 'courseName', 'teacherUserId', 'semester', 'beginDate', 'endDate', 'timezone', 'visibility', 'sections', 'existingSections'], 'Course');
     const targetCourseId = deps.normalizeCanonicalId(mycourse._id) || deps.normalizeCanonicalId(mycourse.courseId);
-    const { course, actingUserId, roleFlags } = await assertCanManageCourse(this, targetCourseId || '');
+    const { course, actingUserId, roleFlags } = await courseManagementPolicy.authorize(this, targetCourseId || '');
     const { beginDate, endDate, timezone } = normalizeCourseDates(mycourse, course);
     const courseName = normalizeCourseName(mycourse.courseName);
     if (!courseName) {
@@ -1162,43 +1156,9 @@ export function createCourseService(deps: CourseMethodsDeps) {
     const visibility = mycourse.visibility === undefined
       ? normalizeCourseVisibility(course.visibility)
       : normalizeCourseVisibility(mycourse.visibility);
-    const courseUpdate = {
-      $set: {
-        courseName,
-        teacherUserId,
-        semester,
-        beginDate,
-        endDate,
-        timezone,
-        visibility,
-      },
-    };
-    deps.serverConsole('editCourse:' + JSON.stringify(courseUpdate));
-    await deps.Courses.updateAsync({ _id: targetCourseId }, courseUpdate);
-    const newSections = normalizeCourseSections(mycourse.sections);
-    const curCourseSections = await deps.Sections.find(
-      { courseId: targetCourseId },
-      { fields: { _id: 1, sectionName: 1 } },
-    ).fetchAsync();
-    const oldSections = curCourseSections.map((section: { sectionName: string }) => section.sectionName);
-    deps.serverConsole('old/new', oldSections, newSections);
-
-    const sectionsAdded = getSetAMinusB(newSections, oldSections);
-    const sectionsRemoved = getSetAMinusB(oldSections, newSections);
-    deps.serverConsole('sectionsAdded,', sectionsAdded);
-    deps.serverConsole('sectionsRemoved,', sectionsRemoved);
-
-    for (const sectionName of sectionsAdded) {
-      await deps.Sections.insertAsync({ courseId: targetCourseId, sectionName });
-    }
-    const removedSectionIds = curCourseSections
-      .filter((section: any) => sectionsRemoved.includes(section.sectionName))
-      .map((section: any) => section._id);
-    if (removedSectionIds.length > 0) {
-      await deps.SectionUserMap.removeAsync({ sectionId: { $in: removedSectionIds } });
-      await deps.Sections.removeAsync({ _id: { $in: removedSectionIds } });
-    }
-
+    await commitCourseEdit(String(course._id), course.teacherUserId, {
+      courseName, teacherUserId, semester, beginDate, endDate, timezone, visibility,
+    }, mycourse.existingSections, mycourse.sections);
     await invalidateCourseSnapshotsForCourse(String(targetCourseId), 'course-updated');
     return targetCourseId;
   }
@@ -1355,6 +1315,7 @@ export function createCourseService(deps: CourseMethodsDeps) {
   return {
     methods,
     methodBindings: Object.freeze([
+      Object.freeze({ handler: methods.editCourse, verification: COURSE_EDIT_VERIFICATION, policy: courseManagementPolicy, dataEgress: 'course-id' as const }),
       ...Object.values(COURSE_EXCEPTION_VERIFICATIONS).map(verification => Object.freeze({
         handler: methods[verification.method], verification, policy: exceptionPolicy, dataEgress: 'none' as const,
       })),
