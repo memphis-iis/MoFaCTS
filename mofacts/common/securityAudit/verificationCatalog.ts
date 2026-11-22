@@ -647,8 +647,6 @@ export const COURSE_READ_VERIFICATIONS = Object.freeze({
   getLearnerCoursesSnapshot: courseReadVerification('getLearnerCoursesSnapshot', 'binds the learner course snapshot to the current account session'),
   getTdfAssignmentsByCourseIdMap: courseReadVerification('getTdfAssignmentsByCourseIdMap', 'binds instructor course reads to the instructor or an administrator'),
   getAllCoursesForInstructor: courseReadVerification('getAllCoursesForInstructor', 'binds instructor course reads to the instructor or an administrator'),
-  getAllCourseAssignmentsForInstructor: courseReadVerification('getAllCourseAssignmentsForInstructor', 'binds instructor course reads to the instructor or an administrator'),
-  getTdfNamesAssignedByInstructor: courseReadVerification('getTdfNamesAssignedByInstructor', 'binds instructor course reads to the instructor or an administrator'),
 });
 
 export const SSO_PROFILE_VERIFICATION = Object.freeze({

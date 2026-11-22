@@ -148,10 +148,6 @@
       "access": "role-checked"
     },
     {
-      "name": "checkForUserException",
-      "access": "role-checked"
-    },
-    {
       "name": "cleanupExpiredPasswordResetTokens",
       "access": "admin-only"
     },
@@ -254,10 +250,6 @@
       "notes": "Course owner/admin authorization is retained. Removing sections removes their enrollment references and invalidates existing assigned/public course snapshots, including learners no longer found through live sections."
     },
     {
-      "name": "editCourseAssignments",
-      "access": "role-checked"
-    },
-    {
       "name": "ensureDashboardCacheCurrent",
       "access": "role-checked",
       "notes": "Ordinary authenticated-self only. Normal refresh reads only committed history after the saved source sequence. Initial or explicitly invalidated caches rebuild inside a Mongo snapshot; history and summary positions are never accepted from the client."
@@ -326,15 +318,7 @@
       "access": "role-checked"
     },
     {
-      "name": "getAllCourseAssignmentsForInstructor",
-      "access": "role-checked"
-    },
-    {
       "name": "getAllCourseSections",
-      "access": "role-checked"
-    },
-    {
-      "name": "getAllCourses",
       "access": "role-checked"
     },
     {
@@ -542,10 +526,6 @@
       "name": "getTdfById",
       "access": "role-checked",
       "notes": "Existing lesson/course access checks retained; authenticated runtime reads exclude the server-owned conditionAllocation block."
-    },
-    {
-      "name": "getTdfNamesAssignedByInstructor",
-      "access": "role-checked"
     },
     {
       "name": "getTdfOwnersMap",

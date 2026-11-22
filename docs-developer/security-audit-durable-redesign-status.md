@@ -1869,7 +1869,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 61 total, 60 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 62 total, 60 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 62 is reserved for the five course command retirements and corrected learner-session verification.
 
 Slot 61 ran on 1b793608 on November 22. Native Meteor recorded 1,119 server passes, one server failure, 1,249 Chromium passes, 15/seven pending and zero hook failures. The course command and helper absence case and all four instructor reads passed. The new learner snapshot test manually bound a connection without an Accounts login token, so it was not recognized as a study session. The correction moves the denial assertion to the existing authenticated passwordless DDP session. Native verification of the correction is pending. The worker reused its image and cleaned up. Retained failure receipt /var/tmp/mofacts-integration.aAuLRzsn/results/meteor-run.json SHA-256 a91639347dd73b0a4659265f39b781f95d1ea7f78c27d5a8719654026c9b2583.
 

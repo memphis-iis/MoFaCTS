@@ -23,13 +23,10 @@ import {
   MIN_PROGRESSIVE_MEMBERS,
   progressiveTdfIneligibilityReasons,
 } from '../../common/progressiveAssignments';
-import { getCourse } from '../orm';
 import { normalizeOptionalString } from './dashboardCacheShared';
 import {
   getUserRoleFlags,
   requireAuthenticatedUser,
-  requireUserMatchesOrHasRole,
-  requireUserWithRoles,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
 import { courseIsDateVisible, createCourseLearnerSnapshotCacheHelpers } from '../lib/courseLearnerSnapshotCache';
@@ -484,27 +481,6 @@ export function createCourseService(deps: CourseMethodsDeps) {
     return sourceSentencesRet.sourceSentences;
   }
 
-  async function getAllCourses(this: MethodContext) {
-    await requireUserWithRoles(deps.getMethodAuthorizationDeps(), {
-      userId: this.userId,
-      roles: ['admin'],
-      notLoggedInMessage: 'Must be logged in',
-      notLoggedInCode: 401,
-      forbiddenMessage: 'Admin access required',
-      forbiddenCode: 403,
-    });
-    try {
-      const coursesRet = await deps.Courses.find().fetchAsync();
-      const courses = [];
-      for (const course of coursesRet) {
-        courses.push(getCourse(normalizeCourseDocumentForRead(course)));
-      }
-      return courses;
-    } catch (e: unknown) {
-      throwLoggedCourseOperationError(deps, 'getAllCourses', e);
-    }
-  }
-
   async function getAllCourseSections(this: MethodContext) {
     const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
     try {
@@ -569,65 +545,6 @@ export function createCourseService(deps: CourseMethodsDeps) {
       { fields: { _id: 1, courseName: 1, teacherUserId: 1, semester: 1, visibility: 1, beginDate: 1, endDate: 1, timezone: 1 } }
     ).fetchAsync();
     return courses.map(normalizeCourseDocumentForRead);
-  }
-
-  async function getAllCourseAssignmentsForInstructor(this: MethodContext, instructorId: string) {
-    try {
-      instructorId = await instructorReadPolicy.authorize(this, instructorId);
-      deps.serverConsole('getAllCourseAssignmentsForInstructor:' + instructorId);
-      return await deps.Assignments.rawCollection().aggregate([
-        {
-          $set: {
-            effectiveTdfIds: {
-              $cond: [
-                { $eq: ['$assignmentType', 'progressive'] },
-                '$memberTdfIds',
-                ['$TDFId'],
-              ],
-            },
-          },
-        },
-        { $unwind: '$effectiveTdfIds' },
-        {
-          $lookup: {
-            from: 'tdfs',
-            localField: 'effectiveTdfIds',
-            foreignField: '_id',
-            as: 'TDF',
-          },
-        },
-        {
-          $unwind: { path: '$TDF' },
-        },
-        {
-          $lookup: {
-            from: 'course',
-            localField: 'courseId',
-            foreignField: '_id',
-            as: 'course',
-          },
-        },
-        {
-          $unwind: { path: '$course' },
-        },
-        {
-          $match: {
-            'course.teacherUserId': instructorId,
-            'course.semester': curSemester,
-          },
-        },
-        {
-          $project: {
-            _id: 0,
-            fileName: '$TDF.content.fileName',
-            courseName: '$course.courseName',
-            courseId: '$course._id',
-          },
-        },
-      ]).toArray();
-    } catch (e: unknown) {
-      throwLoggedCourseOperationError(deps, 'getAllCourseAssignmentsForInstructor', e, instructorId);
-    }
   }
 
   async function sendCourseAssignmentEmail(userId: string, course: any, section: any) {
@@ -928,30 +845,6 @@ export function createCourseService(deps: CourseMethodsDeps) {
     return await getCourseAssignmentEditorSnapshot.call(this, String(course._id));
   }
 
-  async function editCourseAssignments(this: MethodContext, newCourseAssignment: { courseId: string; tdfIds: string[] }) {
-    try {
-      await assertCanManageCourse(this, newCourseAssignment.courseId);
-      if (!Array.isArray(newCourseAssignment.tdfIds)) {
-        throw new Meteor.Error(400, 'Assignment payload requires a tdfIds array');
-      }
-      const tdfIds = [...new Set(newCourseAssignment.tdfIds.map((tdfId) => String(tdfId || '').trim()).filter(Boolean))];
-      const result = await saveCourseAssignments.call(this, {
-        courseId: newCourseAssignment.courseId,
-        assignments: tdfIds.map((tdfId, order) => ({
-          assignmentType: 'lesson' as const,
-          TDFId: tdfId,
-          order,
-          releaseAt: null,
-          dueAt: null,
-          required: true,
-        })),
-      });
-      return result;
-    } catch (e: unknown) {
-      throwLoggedCourseOperationError(deps, 'editCourseAssignments', e, newCourseAssignment.courseId);
-    }
-  }
-
   async function getTdfAssignmentsByCourseIdMap(this: MethodContext, instructorId: string) {
     instructorId = await instructorReadPolicy.authorize(this, instructorId);
     deps.serverConsole('getTdfAssignmentsByCourseIdMap', instructorId);
@@ -1151,54 +1044,6 @@ export function createCourseService(deps: CourseMethodsDeps) {
       memberTdfIds: prefixTdfIds,
       tdfs: launchTdfs,
     };
-  }
-
-  async function getTdfNamesAssignedByInstructor(this: MethodContext, instructorID: string) {
-    try {
-      instructorID = await instructorReadPolicy.authorize(this, instructorID);
-      let assignmentTdfFileNames = await deps.Courses.rawCollection().aggregate([
-        {
-          $lookup: {
-            from: 'assessments',
-            localField: '_id',
-            foreignField: 'courseId',
-            as: 'assessment',
-          },
-        },
-        {
-          $unwind: { path: '$assessment' },
-        },
-        {
-          $lookup: {
-            from: 'tdfs',
-            localField: 'assessment.TDFId',
-            foreignField: '_id',
-            as: 'TDF',
-          },
-        },
-        {
-          $unwind: { path: '$TDF' },
-        },
-        {
-          $match: {
-            semester: curSemester,
-            teacherUserId: instructorID,
-          },
-        },
-        {
-          $project: {
-            _id: 0,
-            fileName: '$TDF.content.fileName',
-            TDFId: '$TDF._id',
-          },
-        },
-      ]).toArray();
-      assignmentTdfFileNames = [...new Set(assignmentTdfFileNames.map((item: { fileName?: string; TDFId?: string }) => item.fileName || item.TDFId))];
-      deps.serverConsole('assignmentTdfFileNames', assignmentTdfFileNames);
-      return assignmentTdfFileNames;
-    } catch (e: unknown) {
-      throwLoggedCourseOperationError(deps, 'getTdfNamesAssignedByInstructor', e);
-    }
   }
 
   async function getTdfIdsByOwnerId(ownerId: string) {
@@ -1444,29 +1289,6 @@ export function createCourseService(deps: CourseMethodsDeps) {
     return !!tdf;
   }
 
-  async function checkForUserException(this: MethodContext, userId: string, assignmentId: string) {
-    await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-      actingUserId: this.userId,
-      subjectUserId: userId,
-      roles: ['admin'],
-      notLoggedInMessage: 'Must be logged in',
-      notLoggedInCode: 401,
-      forbiddenMessage: 'Can only read your own due date exceptions',
-      forbiddenCode: 403,
-    });
-    if (!deps.normalizeCanonicalId(assignmentId)) throw new Meteor.Error(400, 'Assignment id is required');
-    const user = await deps.usersCollection.findOneAsync({ _id: userId });
-    if (user.dueDateExceptions) {
-      const exceptions = user.dueDateExceptions as DueDateException[];
-      const exception = exceptions.find((item) => item.assignmentId === assignmentId);
-      if (exception) {
-        const exceptionDate = new Date(exception.date);
-        return exceptionDate.toLocaleDateString();
-      }
-    }
-    return false;
-  }
-
   async function removeUserDueDateException(this: MethodContext, userId: string, tdfId: string, classId: string, assignmentId: string) {
     if (!classId || !assignmentId) throw new Meteor.Error(400, 'Course and assignment ids are required');
     const assignment = await resolveAssignmentForDueDateException.call(this, classId, tdfId, assignmentId);
@@ -1486,24 +1308,19 @@ export function createCourseService(deps: CourseMethodsDeps) {
   }
 
   const methods = {
-    getAllCourses,
     getAllCourseSections,
     getAllCoursesForInstructor,
-    getAllCourseAssignmentsForInstructor,
     getCourseAssignmentEditorSnapshot,
     saveCourseAssignments,
-    editCourseAssignments,
     getTdfAssignmentsByCourseIdMap,
     getLearnerCoursesSnapshot,
     getProgressiveAssignmentLaunch,
-    getTdfNamesAssignedByInstructor,
     getAllTeachers,
     addCourse,
     editCourse,
     deleteCourse,
     addUserToTeachersClass,
     addUserDueDateException,
-    checkForUserException,
     removeUserDueDateException,
   };
   function bind(name: keyof typeof COURSE_READ_VERIFICATIONS, dataEgress: MeteorMethodBinding['dataEgress']): MeteorMethodBinding {
@@ -1516,8 +1333,6 @@ export function createCourseService(deps: CourseMethodsDeps) {
       bind('getLearnerCoursesSnapshot', 'learner-course-snapshot'),
       bind('getTdfAssignmentsByCourseIdMap', 'assignments-by-course'),
       bind('getAllCoursesForInstructor', 'instructor-course-list'),
-      bind('getAllCourseAssignmentsForInstructor', 'instructor-assignment-list'),
-      bind('getTdfNamesAssignedByInstructor', 'assigned-lesson-names'),
     ]),
     resolveAssignedRootTdfIdsForUser,
     invalidateCourseSnapshotsForCourse,

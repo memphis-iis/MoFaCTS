@@ -301,7 +301,7 @@ describe('course method operational errors', function() {
     expect(queries).to.equal(0);
   });
 
-  it('reads and removes exceptions by assignment without matching another course or old formats', async function() {
+  it('removes exceptions by assignment without matching another course or old formats', async function() {
     const date = new Date('2026-09-10T12:00:00Z');
     const users = createMemoryCollection([{ _id: 'student', dueDateExceptions: [
       { assignmentId: 'other', courseId: 'other-course', TDFId: 'lesson', date },
@@ -314,41 +314,9 @@ describe('course method operational errors', function() {
       Courses: createMemoryCollection([{ _id: 'course', teacherUserId: 'teacher' }]),
       Assignments: createMemoryCollection([{ _id: 'target', courseId: 'course', assignmentType: 'lesson', TDFId: 'lesson' }]),
     }));
-    expect(await methods.checkForUserException.call({ userId: 'student' }, 'student', 'target')).to.equal(date.toLocaleDateString());
-    expect(await methods.checkForUserException.call({ userId: 'student' }, 'student', 'lesson')).to.equal(false);
     await methods.removeUserDueDateException.call({ userId: 'teacher' }, 'student', 'lesson', 'course', 'target');
     expect(users.rows[0].dueDateExceptions).to.have.length(3);
     expect(users.rows[0].dueDateExceptions[0].assignmentId).to.equal('other');
-    expect(await methods.checkForUserException.call({ userId: 'student' }, 'student', 'target')).to.equal(false);
-  });
-  it('returns an empty array for a valid empty broad course listing', async function() {
-    const { methods } = createCourseService(createDeps());
-
-    const result = await methods.getAllCourses.call({ userId: 'admin-user' });
-
-    expect(result).to.deep.equal([]);
-  });
-
-  it('throws Meteor.Error instead of returning null for listing failures', async function() {
-    const { methods } = createCourseService(createDeps({
-      Courses: {
-        ...createDeps().Courses,
-        find: () => ({
-          async fetchAsync() {
-            throw new Error('database unavailable');
-          },
-        }),
-      },
-    }));
-
-    try {
-      await methods.getAllCourses.call({ userId: 'admin-user' });
-      expect.fail('Expected getAllCourses to throw');
-    } catch (error) {
-      expect(error).to.be.instanceOf(Meteor.Error);
-      expect((error as Meteor.Error).error).to.equal('course-operation-failed');
-      expect((error as Meteor.Error).reason).to.equal('getAllCourses failed');
-    }
   });
 });
 

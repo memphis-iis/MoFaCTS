@@ -483,7 +483,7 @@ Query requirements:
 
 ### `saveCourseAssignments(input)`
 
-Replaces `editCourseAssignments({ courseId, tdfs })` for new UI code.
+Assignment writers accept TDF IDs directly and fail clearly when an ID is missing or inaccessible.
 
 Authorization:
 
@@ -644,13 +644,6 @@ Performance rules:
 
 - Include `visibility`, `beginDate`, `endDate`, and `timezone` in the projected course fields so Class Management can render existing values without an extra method call.
 - Keep the method field-limited.
-
-### Legacy `editCourseAssignments`
-
-- Keep temporarily only for confirmed old callers, but new UI must call `saveCourseAssignments`.
-- If retained, implement it as a thin compatibility wrapper around `saveCourseAssignments` that converts the old file-name array into assignment rows.
-- Assignment writers accept TDF IDs directly and fail clearly when an ID is missing or inaccessible; filenames are presentation metadata only.
-- Do not maintain two independent assignment-save paths.
 
 ## Course Management UI
 
@@ -911,4 +904,4 @@ UI verification:
 - Progressive practice has no aggregate completion state. Per-member history and metrics remain authoritative even when teachers later insert, remove, or reorder members.
 - A new progressive launch uses the current saved order. The server records the ordering in `Assignments.progressiveRevisions`, keyed by its SHA-256 digest, when first launched. Identical orderings reuse the same entry; assignment edits preserve existing entries. The required `progressiveRevisionId` travels through the lesson URL, runtime context, and trial context. Reads, writes, crowd statistics, and reloads resolve the original prefix from that server-owned revision. Inserting or reordering lessons affects subsequent launches only. Removing a member revokes writes for that source and excludes it from subsequent course-context reads; removing the endpoint revokes the session. Reloading a session whose prefix includes a removed member requires a new launch. Existing history is retained. Deleting the assignment deletes its revisions and revokes its launches.
 - Existing trial records do not require migration: their original lesson and unit identities remain unchanged. An open progressive URL/context without a revision must be relaunched from Courses after this update; the server never infers an old ordering from the current assignment.
-- Due-date exceptions use only `assignmentId`, `courseId`, `TDFId`, `date`, `createdAt`, and `updatedAt`. Reads and removals match assignment identity; `checkForUserException(userId, assignmentId)` accepts an assignment ID. Older assignment-less and lowercase identity formats are unsupported. No exception migration is required for the production database checked on September 4, 2026 (zero exception records).
+- Due-date exceptions use only `assignmentId`, `courseId`, `TDFId`, `date`, `createdAt`, and `updatedAt`. Reads and removals match assignment identity. Older assignment-less and lowercase identity formats are unsupported. No exception migration is required for the production database checked on September 4, 2026 (zero exception records).

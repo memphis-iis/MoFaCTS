@@ -2602,16 +2602,14 @@ describe('course method authorization', function() {
       await AssignmentsAny.insertAsync({ courseId: id, assignmentType: 'lesson', TDFId: lessonId });
     }
     await TdfsAny.insertAsync({ _id: lessonId, content: { fileName } });
-    for (const name of ['getAllCoursesForInstructor', 'getAllCourseAssignmentsForInstructor', 'getTdfNamesAssignedByInstructor', 'getTdfAssignmentsByCourseIdMap'] as const) {
+    for (const name of ['getAllCoursesForInstructor', 'getTdfAssignmentsByCourseIdMap'] as const) {
       const read = boundCourseRead(name, 'instructor-or-admin');
       await expectCourseDenial(() => read.call({}, teacher), 401);
       await expectCourseDenial(() => read.call({ userId: Random.id() }, teacher), 403);
       await expectCourseDenial(() => read.call({ userId: teacher }, admin), 403);
       const own = await read.call({ userId: teacher }, teacher);
       if (name === 'getAllCoursesForInstructor') expect(own.map((row: any) => row._id)).to.deep.equal([courseId]);
-      if (name === 'getAllCourseAssignmentsForInstructor') expect(own.map((row: any) => row.courseId)).to.deep.equal([courseId]);
       if (name === 'getTdfAssignmentsByCourseIdMap') expect(Object.keys(own)).to.deep.equal([courseId]);
-      if (name === 'getTdfNamesAssignedByInstructor') expect(own).to.deep.equal([fileName]);
       expect(await read.call({ userId: admin }, teacher)).to.deep.equal(own);
     }
   });
@@ -2640,43 +2638,6 @@ describe('course method authorization', function() {
     }
   });
 
-  it('denies assignment edits by teachers who do not own the course', async function() {
-    await Roles.addUsersToRolesAsync('teacher-a', 'teacher');
-    await Roles.addUsersToRolesAsync('teacher-b', 'teacher');
-    await CoursesAny.insertAsync({
-      _id: 'course-owned-by-a',
-      teacherUserId: 'teacher-a',
-      courseName: 'Owned Course',
-    });
-
-    try {
-      await (asyncMethods.editCourseAssignments as any).call({ userId: 'teacher-b' }, {
-        courseId: 'course-owned-by-a',
-        tdfIds: [],
-      });
-      expect.fail('Expected cross-course assignment edit to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-    }
-  });
-
-  it('requires admin access for broad course listing', async function() {
-    try {
-      await (asyncMethods.getAllCourses as any).call({ userId: 'student-user' });
-      expect.fail('Expected broad course listing to require admin access');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-    }
-  });
-
-  it('denies cross-user due date exception reads', async function() {
-    try {
-      await (asyncMethods.checkForUserException as any).call({ userId: 'student-user' }, 'other-user', 'tdf-id');
-      expect.fail('Expected cross-user due date exception read to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-    }
-  });
 });
 
 describe('content helper authorization', function() {
@@ -2705,7 +2666,8 @@ describe('content helper authorization', function() {
   it('keeps the retired course lookup and internal course helpers out of Meteor', function() {
     const handlers = MeteorAny.server.method_handlers;
     for (const name of [
-      'getTdfsAssignedToStudent', 'resolveAssignedRootTdfIdsForUser', 'invalidateCourseSnapshotForUser',
+      'getAllCourses', 'getAllCourseAssignmentsForInstructor', 'getTdfNamesAssignedByInstructor',
+      'editCourseAssignments', 'checkForUserException', 'getTdfsAssignedToStudent', 'resolveAssignedRootTdfIdsForUser', 'invalidateCourseSnapshotForUser',
       'invalidateCourseSnapshotsForCourse', 'invalidateCourseSnapshotsForAssignment',
       'getTdfIdsByOwnerId', 'getSourceSentences', 'checkForTDFData',
     ]) {
