@@ -901,7 +901,6 @@ export const methods: any = {
     extractSrcFromHtml,
     getStimuliSetIdCandidates,
     findDynamicAssetsScopedBatch,
-    decryptData,
     deleteTdfRuntimeData,
     updateStimDisplayTypeMap,
     rebuildStimDisplayTypeMapSnapshot,

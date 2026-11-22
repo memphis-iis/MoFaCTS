@@ -117,7 +117,8 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Verify publication redaction and the owner/shared save contract in native Meteor.
 - [x] Implement owner-only inheritance of lesson provider keys in copyTdf. Non-owner copies also drop the source archive references so a ZIP containing embedded keys does not follow the lesson.
 - [x] Verify all three key fields in owner, shared and administrator copies, denial for an unrelated user, and the original document in native Meteor (slot 53).
-- [ ] Decide the credential policy for downloadable package exports and explicit lesson-family ownership transfers. The export builder decrypts known lesson provider keys for the archive; the transfer updates ownership for all family members. Existing archive remediation is a separate scope.
+- [x] Adopt the approved rule for new downloads and ownership transfers. Omit all three lesson provider keys on export, including for the owner. Clear the keys from all members in the ownership transaction. A request to transfer to the same owner preserves the keys.
+- [ ] Verify key-free exported ZIPs, refusal to reuse older archives, and actual MongoDB family transfers in native Meteor. Existing archive remediation is a separate decision.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
@@ -1825,9 +1826,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 53 total, 52 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 54 total, 52 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
+
+Slot 54 reserved for the combined package-export and lesson-family transfer change on local Linux.
 
 Slot 53 consumed and passed on e2099adf on 2026-11-22, 18:03:53 to 18:05:15 UTC. The named lesson-copy provider-key regression ran in Meteor. Server 1,108 passed and 15 pending. Chromium 1,249 passed and seven pending. Zero failures and zero hook failures. Both source observations matched. The repaired worker reused image sha256:18975f65e74d445f4a96f49cbafdb00ca7c9895f15a3c4dfe6f96a333d701ca8. C: had 327.48 GiB free before preparation and 323.53 GiB before execution. Full logs, suite evidence and receipt remain in /var/tmp/mofacts-integration.ycRVSZDb/results. Native receipt SHA-256 5cd33cb179d30d23b165049c734c1b730887ef55cf112e0b34011b07f94be80e. Verified removal of the three generated directories and absence of labelled job containers, networks and volumes. The next policy decision covers package exports and ownership transfers.
 

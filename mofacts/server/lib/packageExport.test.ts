@@ -1,3 +1,4 @@
+import { LESSON_PROVIDER_KEY_FIELDS } from '../../common/lessonProviderKeys';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -61,6 +62,11 @@ describe('packageExport identity', function() {
     (root.rawStimuliFile.setspec as any).clusters = clusters;
     (child.rawStimuliFile.setspec as any).clusters = clusters;
     const docs = [root, child];
+    for (const doc of docs) {
+      Object.assign(doc.content.tdfs.tutor.setspec, Object.fromEntries(
+        LESSON_PROVIDER_KEY_FIELDS.map(field => [field, doc._id + field])
+      ));
+    }
     let zipBuffer: Buffer | null = null;
     let storedAsset: any = null;
     let writes = 0;
@@ -83,9 +89,6 @@ describe('packageExport identity', function() {
       },
       normalizeCanonicalId(value: unknown) {
         return typeof value === 'string' && value.trim() ? value.trim() : null;
-      },
-      decryptData(value: string) {
-        return value;
       },
       DynamicAssets: {
         async findOneAsync(_selector: unknown, options?: { fields?: unknown }) {
@@ -122,15 +125,22 @@ describe('packageExport identity', function() {
       },
     } as any;
     await getOrBuildCurrentPackageAsset('root-id', dependencies);
+    delete storedAsset.meta.packageExportFormatVersion;
+    const rebuilt = await getOrBuildCurrentPackageAsset('root-id', dependencies);
+    assert.equal(rebuilt.reusedExisting, false);
     const cached = await getOrBuildCurrentPackageAsset('root-id', dependencies);
     assert.equal(cached.reusedExisting, true);
     assert.equal(cached.link, '/export.zip');
-    assert.equal(writes, 1);
+    assert.equal(writes, 2);
 
     assert.ok(zipBuffer);
     const zip = await JSZip.loadAsync(zipBuffer!);
     const rootExport = JSON.parse(await zip.file('Root Lesson.json').async('string'));
     const childExport = JSON.parse(await zip.file('Child Lesson.json').async('string'));
+    for (const field of LESSON_PROVIDER_KEY_FIELDS) {
+      for (const exported of [rootExport, childExport]) assert.equal(Object.hasOwn(exported.tutor.setspec, field), false);
+      for (const doc of docs) assert.equal(Reflect.get(doc.content.tdfs.tutor.setspec, field), doc._id + field);
+    }
     assert.equal(rootExport.tdfId, 'root-id');
     assert.equal(childExport.tdfId, 'child-id');
     assert.deepEqual(rootExport.tutor.setspec.conditionTdfIds, ['child-id']);

@@ -1,3 +1,4 @@
+import { LESSON_PROVIDER_KEY_FIELDS } from '../../common/lessonProviderKeys';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { tmpdir } from 'node:os';
@@ -24,6 +25,8 @@ type DynamicAssetRef = {
   link?: () => string;
 };
 
+const PACKAGE_EXPORT_FORMAT_VERSION = 2;
+
 type BuildAndStoreCurrentPackageAssetDeps = {
   parseLocalMediaReference: (src: string) => {
     raw?: string;
@@ -40,7 +43,6 @@ type BuildAndStoreCurrentPackageAssetDeps = {
     fileNames: string[];
   }) => Promise<any[]>;
   normalizeCanonicalId: (value: unknown) => string | null;
-  decryptData: (value: string) => string;
   DynamicAssets: {
     findOneAsync: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<DynamicAssetRef | null>;
     addFile: (path: string, options: Record<string, any>) => Promise<DynamicAssetRef>;
@@ -87,18 +89,6 @@ function hashPackageExportPayload(value: unknown) {
 
 function cloneJsonValue<T>(value: T): T {
   return value == null ? value : JSON.parse(JSON.stringify(value));
-}
-
-function maybeDecryptPackageExportSecret(value: unknown, deps: BuildAndStoreCurrentPackageAssetDeps): unknown {
-  if (typeof value !== 'string' || !value.trim()) {
-    return value;
-  }
-  try {
-    const decrypted = deps.decryptData(value);
-    return decrypted || value;
-  } catch (_error) {
-    return value;
-  }
 }
 
 function isInvalidZipFilename(fileName: string) {
@@ -500,15 +490,7 @@ async function preparePackageExportState(
 
     const setspec = (tutorDoc as { setspec?: Record<string, unknown> | null })?.setspec;
     if (setspec && typeof setspec === 'object') {
-      if (Object.prototype.hasOwnProperty.call(setspec, 'speechAPIKey')) {
-        setspec.speechAPIKey = maybeDecryptPackageExportSecret(setspec.speechAPIKey, deps);
-      }
-      if (Object.prototype.hasOwnProperty.call(setspec, 'textToSpeechAPIKey')) {
-        setspec.textToSpeechAPIKey = maybeDecryptPackageExportSecret(setspec.textToSpeechAPIKey, deps);
-      }
-      if (Object.prototype.hasOwnProperty.call(setspec, 'openRouterApiKey')) {
-        setspec.openRouterApiKey = maybeDecryptPackageExportSecret(setspec.openRouterApiKey, deps);
-      }
+      for (const field of LESSON_PROVIDER_KEY_FIELDS) delete setspec[field];
     }
 
     const exportTdfDoc = { tdfId: memberTdfId, tutor: tutorDoc };
@@ -659,7 +641,7 @@ async function maybeReuseCurrentPackageAsset(
   }
 
   const meta = packageAsset.meta || {};
-  if (!meta.contentUploadCurrentExport) {
+  if (!meta.contentUploadCurrentExport || meta.packageExportFormatVersion !== PACKAGE_EXPORT_FORMAT_VERSION) {
     return null;
   }
   if (String(meta.rootTdfId || '').trim() !== rootTdfId) {
@@ -731,6 +713,7 @@ async function buildAndStorePreparedPackageAsset(
       meta: {
         public: true,
         contentUploadCurrentExport: true,
+        packageExportFormatVersion: PACKAGE_EXPORT_FORMAT_VERSION,
         rootTdfId,
         packageExportSignature: preparedState.packageSignature
       }

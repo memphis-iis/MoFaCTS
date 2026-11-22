@@ -98,7 +98,6 @@ type ContentMethodsDeps = {
   extractSrcFromHtml: (htmlString: string) => string[];
   getStimuliSetIdCandidates: (stimuliSetId: string | number | null | undefined) => Array<string | number>;
   findDynamicAssetsScopedBatch: (params: any) => Promise<unknown>;
-  decryptData: (value: string) => string;
   deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
   updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
   rebuildStimDisplayTypeMapSnapshot: (deps: any) => Promise<unknown>;
@@ -357,7 +356,6 @@ export function createContentMethods(deps: ContentMethodsDeps) {
           getStimuliSetIdCandidates: deps.getStimuliSetIdCandidates,
           findDynamicAssetsScopedBatch: deps.findDynamicAssetsScopedBatch,
           normalizeCanonicalId: deps.normalizeCanonicalId,
-          decryptData: deps.decryptData,
           DynamicAssets: deps.DynamicAssets,
           storageBoundary: deps.storageBoundary,
           storageRoot: deps.storageRoot,

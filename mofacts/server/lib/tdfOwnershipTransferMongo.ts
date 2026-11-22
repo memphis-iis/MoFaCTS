@@ -1,7 +1,14 @@
+import { LESSON_PROVIDER_KEY_FIELDS } from '../../common/lessonProviderKeys';
 import { MongoInternals } from 'meteor/mongo';
 import { Meteor } from 'meteor/meteor';
 import { Tdfs } from '../../common/Collections';
 import { createTdfOwnershipTransfer } from './tdfOwnershipTransfer';
+
+const transferredFieldsToClear = {
+  ...Object.fromEntries(LESSON_PROVIDER_KEY_FIELDS.map(field => [`content.tdfs.tutor.setspec.${field}`, '' as const])),
+  packageFile: '' as const,
+  packageAssetId: '' as const,
+};
 
 export const transferTdfOwnership = createTdfOwnershipTransfer({
   transaction: async work => {
@@ -19,6 +26,7 @@ export const transferTdfOwnership = createTdfOwnershipTransfer({
           updateOwners: async (ids, currentOwnerId, newOwnerId) => {
             const updated = await tdfs.updateMany({ _id: { $in: ids }, ownerId: currentOwnerId }, {
               $set: { ownerId: newOwnerId }, $inc: { tdfRevision: 1 },
+              ...(currentOwnerId === newOwnerId ? {} : { $unset: transferredFieldsToClear }),
             }, { session });
             return updated.matchedCount;
           },
