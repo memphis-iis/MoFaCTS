@@ -942,7 +942,7 @@
     {
       "name": "updateExperimentState",
       "access": "authenticated-self",
-      "notes": "Existing record ownership and root authorization retained. not-max state writes preserve the server-assigned condition atomically, including stale writes and replacement initialization."
+      "notes": "Direct browser progress writes are denied. This server method checks existing record ownership and root authorization. not-max state writes preserve the server-assigned condition atomically, including stale writes and replacement initialization."
     },
     {
       "name": "updateOwnOpenRouterSettings",
@@ -1197,7 +1197,7 @@
     {
       "name": "sparcRetrievalEmbeddings",
       "access": "role-checked",
-      "notes": "Lesson-authorized ID/vector-only runtime cache; admin author testing retained. Private own-user content-use metadata filters eligibility before publishing candidate vectors and updates it live. No content, credentials, learner answers, usage ledger or conversation history is published. Historical metadata initialization is bounded; missing required eligibility data fails clearly."
+      "notes": "Registered SPARC lesson authorization runs before category parsing and all observer setup. ID/vector-only runtime cache; admin author testing retained. Private own-user content-use metadata filters eligibility before publishing candidate vectors and updates it live. No content, credentials, learner answers, usage ledger or conversation history is published. Historical metadata initialization is bounded; missing required eligibility data fails clearly."
     }
   ],
   "httpRoutes": [

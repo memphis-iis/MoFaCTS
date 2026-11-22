@@ -1,3 +1,4 @@
+import { withSparcLessonAccess, type SparcRetrievalAuthorization } from '../lib/sparcRetrievalPublicationHandler';
 import { Roles } from 'meteor/alanning:roles';
 import { Meteor } from 'meteor/meteor';
 import type { NAMED_PUBLICATION_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
@@ -10,9 +11,10 @@ type Policy =
   | Readonly<{ kind: 'public'; applicationRateLimit: 'none' }>
   | Readonly<{ kind: 'authenticated' | 'authenticated-self'; delivery: 'sync' | 'async' }>
   | Readonly<{ kind: 'authenticated'; delivery: 'async'; denial: 'not-authorized' }>
+  | Readonly<{ kind: 'sparc-lesson'; authorize: SparcRetrievalAuthorization }>
   | Readonly<{ kind: 'role'; role: 'admin' }>;
 type Egress =
-  | 'owned-or-shared-upload-metadata' | 'theme-settings' | 'deployment-brand-profile' | 'own-dashboard-cache' | 'client-log-setting'
+  | 'eligible-entry-embeddings' | 'owned-or-shared-upload-metadata' | 'theme-settings' | 'deployment-brand-profile' | 'own-dashboard-cache' | 'client-log-setting'
   | 'own-audio-settings' | 'own-experiment-progress' | 'system-settings'
   | 'accessible-asset-metadata' | 'stimulus-set-asset-metadata' | 'runtime-lesson' | 'owner-editor-content'
   | 'owner-or-shared-upload-details' | 'experiment-lesson-family'
@@ -22,6 +24,7 @@ type Registration = Descriptor & Readonly<{ name: Name; surfaceId: `publication:
 const registrations: Registration[] = [];
 
 function applyPolicy(policy: Policy, handler: Handler): Handler {
+  if (policy.kind === 'sparc-lesson') return withSparcLessonAccess(policy.authorize, handler);
   if (policy.kind === 'public') return handler;
   if (policy.kind === 'role') {
     return async function(...args) {

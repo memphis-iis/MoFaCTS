@@ -125,6 +125,9 @@ Use the evidence entries below for individual completed bindings. These are the 
   - [x] Remove the stimulus-file selector and filename-based publication lookup with operator approval. Remove the editor query labels, keep the expanded lesson's stimulus details, and advance the browser snapshot format. Six cache/projection tests passed. A focused invocation of the actual click handler verified the root, ordinary condition and SPARC condition routes.
   - [x] Bind contentUploadMetadata to the named publication registry with the existing asynchronous not-authorized denial, owner/shared lesson scope, and condition/asset metadata. Full typecheck and lint passed (324 surfaces).
   - [x] Verify the installed contentUploadMetadata binding and its anonymous/owner/shared/unrelated behavior in native Meteor.
+  - [x] Retire direct browser progress inserts/updates and direct site-settings updates by operator decision. Remove the unreachable progress write in client cleanup. Record synchronous server-side denials for account profile updates, direct progress writes and settings updates. Normal progress and administrator settings methods remain active.
+  - [x] Register the SPARC retrieval publication with its existing lesson authorizer, administrator access and vector-only delivery. Add named/default publication and external runtime-config proofs to the common verification catalog.
+  - [ ] Verify the installed direct-write denials, normal save and passwordless progress return, and registered SPARC subscription in native Meteor.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
 - [ ] Verify static bypass detection across active source roots and retire the old manifest and inference checker after parity.
@@ -1831,11 +1834,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 59 total, 54 consumed, 0 reserved, 4 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 59 total, 54 consumed, 1 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
 
-Five further Phase 3 invocations authorized. Slot 55 consumed and passed on aa9b3a23 on local Linux: 1,110 server and 1,249 Chromium passes, zero failures or hook failures, 15/seven pending. The installed upload metadata test passed, the image was reused and cleanup completed. Receipt /var/tmp/mofacts-integration.8JmdlPj9/results/native-verification.json SHA-256 fbf0d6e5b81b8c67bc9bdddbbe0f08f6dddd52b1392726874283af9446811320. Slots 56–59 are available. The earlier health-only allowance remains separate.
+Five further Phase 3 invocations authorized. Slot 55 consumed and passed on aa9b3a23 on local Linux: 1,110 server and 1,249 Chromium passes, zero failures or hook failures, 15/seven pending. The installed upload metadata test passed, the image was reused and cleanup completed. Receipt /var/tmp/mofacts-integration.8JmdlPj9/results/native-verification.json SHA-256 fbf0d6e5b81b8c67bc9bdddbbe0f08f6dddd52b1392726874283af9446811320. Slot 56 reserved for the combined direct-write retirements, SPARC subscription and catalog corrections. Slots 57–59 available. The earlier health-only allowance remains separate.
 
 Slot 54 consumed and passed on 2246fbbd on 2026-11-22, 18:21:30 to 18:22:49 UTC. Native Meteor recorded 1,109 server and 1,249 Chromium passes, zero test or hook failures, and 15/seven existing pending. Both the ZIP-content/cache test and the MongoDB intact-family credential transfer test passed. Identical source observations, retained results and generated-directory cleanup verified. Existing worker image reused. Receipt /var/tmp/mofacts-integration.4dRYQM7h/results/native-verification.json, SHA-256 dc07bd955e7b68358f23a3977b7ba0f88aa7fd84552aa8f805573b605abc3a7d. Full typecheck and lint passed (324 surfaces), as did 369 focused regressions and 172 source-security tests on Linux. Windows source checks could not reach WSL from the restricted process. The Linux run used a process-scoped Git ownership exception for the exact shared checkout.
 

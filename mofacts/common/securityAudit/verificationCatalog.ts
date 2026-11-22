@@ -340,6 +340,16 @@ export const DEFAULT_PUBLICATION_VERIFICATIONS = Object.freeze({
     verificationId: 'publication.default.role-assignments-self',
     cases: Object.freeze(['automatically publishes only the current role assignments'] as const) }),
 });
+const directWriteTest = { kind: 'integrationTest', lane: 'meteor', suite: 'direct collection write rules',
+  expectedOutcome: 'pass', mutation: 'none' } as const;
+export const DIRECT_WRITE_VERIFICATIONS = Object.freeze({
+  settings: Object.freeze({ ...directWriteTest, surfaceId: 'collection:dynaminc_settings:deny:update', verificationId: 'collection.settings.deny-update',
+    cases: Object.freeze(['requires the server methods for administrator settings changes'] as const) }),
+  profile: Object.freeze({ ...directWriteTest, surfaceId: 'collection:users:deny:update', verificationId: 'collection.users.deny-update',
+    cases: Object.freeze(['keeps direct account updates denied synchronously'] as const) }),
+  progress: Object.freeze({ ...directWriteTest, surfaceId: 'collection:global_experiment_state:deny:insert-update', verificationId: 'collection.progress.deny-write',
+    cases: Object.freeze(['rejects direct progress inserts and updates and preserves saved progress'] as const) }),
+});
 const brandingPublications = 'preserves public branding cursors and their exact setting keys';
 const selfPublications = 'preserves authenticated dashboard, runtime setting, and audio scope';
 const adminPublications = 'preserves administrator-only snapshots, cursor scope and readiness';
@@ -366,6 +376,7 @@ export const NAMED_PUBLICATION_VERIFICATIONS = Object.freeze({
   deploymentBrandProfile: namedPublicationVerification('deploymentBrandProfile', brandingPublications),
   dashboardCache: namedPublicationVerification('dashboardCache', selfPublications),
   clientRuntimeSettings: namedPublicationVerification('clientRuntimeSettings', selfPublications),
+  sparcRetrievalEmbeddings: namedPublicationVerification('sparcRetrievalEmbeddings', 'checks SPARC lesson access before parsing a retrieval category'),
   contentUploadMetadata: namedPublicationVerification('contentUploadMetadata', 'rejects anonymous upload metadata and publishes only authorized roots'),
   userAudioSettings: namedPublicationVerification('userAudioSettings', selfPublications),
   userExperimentState: namedPublicationVerification('userExperimentState',
@@ -672,6 +683,8 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...AUTHENTICATION_SESSION_VERIFICATIONS,
   ...HTTP_HEALTH_VERIFICATIONS.endpoints, HTTP_HEALTH_VERIFICATIONS.fallthrough,
   HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download, ...Object.values(HTTP_FILE_VERIFICATIONS),
+  ...Object.values(DIRECT_WRITE_VERIFICATIONS), HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION, ...Object.values(DEFAULT_PUBLICATION_VERIFICATIONS),
+  ...Object.values(NAMED_PUBLICATION_VERIFICATIONS),
   ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat(), ...Object.values(FILES_DDP_VERIFICATIONS),
   ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS), DEPLOYMENT_READINESS_VERIFICATION, ...Object.values(BACKUP_METHOD_VERIFICATIONS),
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,

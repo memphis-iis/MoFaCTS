@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { AUTHORIZATION_VERIFICATIONS, auditVerification, AUDIT_VERIFICATIONS, AUTHENTICATION_CONTROL_CASES,
+  DEFAULT_PUBLICATION_VERIFICATIONS, NAMED_PUBLICATION_VERIFICATIONS, HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION,
   AUTHENTICATION_PROTOCOL_MUTATIONS, AUTHORIZATION_MUTATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 
 import { AUDIT_ADMIN_METHOD_VERIFICATIONS, FILES_DDP_VERIFICATIONS, HTTP_FILE_VERIFICATIONS, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
@@ -30,6 +31,12 @@ test('file and unmounted registrations use the original callback and framework c
   assert.equal(captured[0]?.verification, HTTP_FILE_VERIFICATIONS.cdn);
   assert.equal(captured[1]?.verification, HTTP_MIDDLEWARE_VERIFICATIONS.headers);
   assert.ok(Object.isFrozen(captured));
+});
+
+test('the common evidence catalog includes each registered publication and the external runtime configuration', () => {
+  for (const verification of [...Object.values(DEFAULT_PUBLICATION_VERIFICATIONS), ...Object.values(NAMED_PUBLICATION_VERIFICATIONS), HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION]) {
+    assert.equal(AUDIT_VERIFICATIONS.find(entry => entry.verificationId === verification.verificationId), verification);
+  }
 });
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../../../security-surface-contract.json', import.meta.url)));

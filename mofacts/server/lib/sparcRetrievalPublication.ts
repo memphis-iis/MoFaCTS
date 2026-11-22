@@ -1,3 +1,5 @@
+import { NAMED_PUBLICATION_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registerNamedPublication } from '../securitySurfaces/registerNamedPublication.ts';
 import { Meteor } from 'meteor/meteor';
 import { requireSparcLessonAccess } from './sparcLessonAccess';
 import type { MethodAuthorizationDeps } from './methodAuthorization';
@@ -9,8 +11,11 @@ import { SparcFigureRequests } from './sparcFigureLibraryStorage';
 import { createSparcRetrievalPublicationHandler } from './sparcRetrievalPublicationHandler';
 
 export function registerSparcRetrievalPublication(getAuthorization: () => MethodAuthorizationDeps) {
-  Meteor.publish('sparcRetrievalEmbeddings', createSparcRetrievalPublicationHandler({
-    authorize: (userId, tdfId) => requireSparcLessonAccess(getAuthorization(), userId, tdfId),
+  registerNamedPublication(Meteor, 'sparcRetrievalEmbeddings', {
+    policy: { kind: 'sparc-lesson', authorize: (userId, tdfId) => requireSparcLessonAccess(getAuthorization(), userId, tdfId) },
+    dataEgress: 'eligible-entry-embeddings',
+    verification: NAMED_PUBLICATION_VERIFICATIONS.sparcRetrievalEmbeddings,
+  }, createSparcRetrievalPublicationHandler({
     initializeCatalog: () => ensureSparcContentUseCatalog(SparcInstructionalLibrary.rawCollection() as unknown as SparcContentUseCollection),
     initializeUser: ensureSparcContentUseForUser,
     observeMoves: async (selector, options, callbacks) => SparcMoveRequests.find(selector, options).observeChanges(callbacks),

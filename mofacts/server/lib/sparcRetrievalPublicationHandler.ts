@@ -19,9 +19,19 @@ export type SparcRetrievalPublication = {
   error(error: Error): void;
 };
 
+export type SparcRetrievalAuthorization = (actor: string | null | undefined, lesson: unknown) => Promise<string>;
+
+export function withSparcLessonAccess<T extends { userId?: string | null }, R>(
+  authorize: SparcRetrievalAuthorization, handler: (this: T, category: unknown, userId: string) => R,
+) {
+  return async function(this: T, category: unknown, lesson?: unknown): Promise<Awaited<R>> {
+    const userId = await authorize(this.userId, lesson);
+    return await handler.call(this, category, userId);
+  };
+}
+
 /** Authorization, initialization and live eligibility share one observable lifecycle. */
 export function createSparcRetrievalPublicationHandler(deps: {
-  authorize(userId: string | null | undefined, tdfId: unknown): Promise<string>;
   initializeCatalog(): Promise<void>;
   initializeUser(userId: string): Promise<void>;
   observeMoves: Observe;
@@ -29,8 +39,7 @@ export function createSparcRetrievalPublicationHandler(deps: {
   observeEntries: Observe;
   unavailableError(): Error;
 }) {
-  return async function(this: SparcRetrievalPublication, value: unknown, tdfId?: string) {
-    const userId = await deps.authorize(this.userId, tdfId);
+  return async function(this: SparcRetrievalPublication, value: unknown, userId: string) {
     const category = parseSparcRetrievalCategory(value);
     const prefix = `${sparcRetrievalCategoryKey(category)}:`;
     let stopped = false;

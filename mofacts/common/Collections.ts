@@ -151,26 +151,3 @@ Object.assign(globalThis, {
 });
 
 export { Tdfs, GlobalExperimentStates, Histories, DynamicSettings, UserDashboardCache, CourseLearnerSnapshotCache, StimulusCrowdStats, BackupJobs, TdfMutationJobs };
-
-GlobalExperimentStates.allow({
-  update: function(userId: string, doc: unknown, _fieldNames: string[], _modifier: any) {
-    return userId === (doc as { userId?: string }).userId;
-  },
-  insert: function(userId: string, doc: unknown) {
-    return userId === (doc as { userId?: string }).userId;
-  }
-});
-
-DynamicSettings.allow({
-  update: function(userId: string) {
-    // allow/deny rules must be synchronous; use Meteor.roleAssignment which is
-    // set unconditionally by alanning:roles v4 at package load time.
-    const col = (Meteor as any).roleAssignment;
-    if (!col) return false;
-    const assignment = col.findOne({
-      'user._id': userId,
-      'role._id': 'admin'
-    });
-    return !!assignment;
-  }
-});

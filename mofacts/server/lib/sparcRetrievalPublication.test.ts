@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { createSparcRetrievalPublicationHandler, type SparcRetrievalPublication } from './sparcRetrievalPublicationHandler';
+import { withSparcLessonAccess, createSparcRetrievalPublicationHandler, type SparcRetrievalPublication } from './sparcRetrievalPublicationHandler';
 
 type Callbacks = {
   added(id: string, fields: Record<string, unknown>): void;
@@ -32,21 +32,23 @@ describe('SPARC retrieval publication lifecycle', () => {
       }
       return { stop: () => { stoppedHandles++; } };
     };
-    const handler = createSparcRetrievalPublicationHandler({
-      authorize: async (userId, tdfId) => {
+    const handler = withSparcLessonAccess(
+      async (userId, tdfId) => {
         events.push({ operation: 'authorize' });
         assert.equal(userId, publication.userId); assert.equal(tdfId, 'synthetic-lesson');
         if (options.unauthorized) throw new Error('Not authorized');
         return 'synthetic-learner';
       },
-      initializeCatalog: async () => { events.push({ operation: 'catalog-metadata' }); },
-      initializeUser: async userId => {
-        assert.equal(userId, publication.userId); events.push({ operation: 'user-metadata' });
-        if (options.stopDuringInitialization) for (const callback of stopCallbacks) callback();
-      },
-      observeMoves: observe('moves'), observeVisuals: observe('visuals'), observeEntries: observe('catalog'),
-      unavailableError: () => new Error('Its content eligibility is unavailable.'),
-    });
+      createSparcRetrievalPublicationHandler({
+        initializeCatalog: async () => { events.push({ operation: 'catalog-metadata' }); },
+        initializeUser: async userId => {
+          assert.equal(userId, publication.userId); events.push({ operation: 'user-metadata' });
+          if (options.stopDuringInitialization) for (const callback of stopCallbacks) callback();
+        },
+        observeMoves: observe('moves'), observeVisuals: observe('visuals'), observeEntries: observe('catalog'),
+        unavailableError: () => new Error('Its content eligibility is unavailable.'),
+      }),
+    );
     return { events, queries, observers, stoppedHandles: () => stoppedHandles,
       stop: () => { for (const callback of stopCallbacks) callback(); },
       run: () => handler.call(publication, { kind: 'instruction', readingLevel: 'unbiased', responseFormat: 'text' }, 'synthetic-lesson') };

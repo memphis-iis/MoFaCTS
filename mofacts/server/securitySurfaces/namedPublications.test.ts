@@ -1,3 +1,4 @@
+import { strict as assert } from 'node:assert';
 import { expect } from 'chai';
 import { Roles } from 'meteor/alanning:roles';
 import { Meteor } from 'meteor/meteor';
@@ -213,10 +214,18 @@ describe('named application publications', function() {
     }
   });
 
+  it('checks SPARC lesson access before parsing a retrieval category', async function() {
+    for (const [actor, error] of [[null, 401], [owner, 400]] as const) {
+      const subscription = invoke('sparcRetrievalEmbeddings', actor, {}, '');
+      await assert.rejects(subscription.result, { error });
+      expect(subscription.emitted).to.be.empty;
+    }
+    await assert.rejects(invoke('sparcRetrievalEmbeddings', admin, {}, '').result, /Invalid retrieval category/);
+  });
+
   it('rejects anonymous upload metadata and publishes only authorized roots', async function() {
     const anonymous = invoke('contentUploadMetadata', null);
-    await import('node:assert/strict').then(({ rejects }) =>
-      rejects(anonymous.result, { error: 'not-authorized', reason: 'Must be logged in' }));
+    await assert.rejects(anonymous.result, { error: 'not-authorized', reason: 'Must be logged in' });
     expect(anonymous.readyCalls).to.equal(0);
     const ids = [Random.id(), Random.id(), Random.id()];
     let observation: ReturnType<typeof invoke> | undefined;
