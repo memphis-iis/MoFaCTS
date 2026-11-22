@@ -61,7 +61,7 @@ type CollectionLike = {
 type CourseMethodsDeps = {
   serverConsole: Logger;
   Roles: {
-    getUsersInRoleAsync: (roles: string, options: { queryOptions: { fields: Record<string, 1> } }) => Promise<Cursor>;
+    getUsersInRoleAsync: (roles: string, scope: undefined, userQuery: { fields: Record<string, 1> }) => Promise<Cursor>;
   };
   Courses: CollectionLike;
   Sections: CollectionLike;
@@ -1079,15 +1079,9 @@ export function createCourseService(deps: CourseMethodsDeps) {
       visibleTeachers = new Set(owners.map((owner: { _id: string }) => owner._id));
       if (!visibleTeachers.size) return [];
     }
-    const teacherCursor = await deps.Roles.getUsersInRoleAsync('teacher', {
-      queryOptions: {
-        fields: {
-          _id: 1,
-          username: 1,
-          email_canonical: 1,
-          'emails.address': 1,
-        },
-      },
+    // The third argument projects user records. Putting fields in role options also projects assignment records.
+    const teacherCursor = await deps.Roles.getUsersInRoleAsync('teacher', undefined, {
+      fields: { _id: 1, username: 1, email_canonical: 1, 'emails.address': 1 },
     });
     const allTeachers = await teacherCursor.fetchAsync();
 

@@ -250,11 +250,11 @@ describe('course method operational errors', function() {
       { _id: 'current-teacher', username: 'Teacher', email_canonical: 'teacher@example.test', emails: [{ address: 'teacher@example.test', verified: true }], roles: [], privateSetting: 'private' },
       { _id: 'former-teacher', username: 'Former teacher', email_canonical: 'former@example.test', emails: [], roles: ['teacher'] },
     ];
-    const queries: Array<{ role: string; options: unknown }> = [];
+    const queries: Array<{ role: string; scope: undefined; userQuery: unknown }> = [];
     const { methods } = createCourseService(createDeps({
       Roles: {
-        async getUsersInRoleAsync(role: string, options: { queryOptions: { fields: Record<string, 1> } }) {
-          queries.push({ role, options });
+        async getUsersInRoleAsync(role: string, scope: undefined, userQuery: { fields: Record<string, 1> }) {
+          queries.push({ role, scope, userQuery });
           return cursor(users.filter(user => assignments.has(user._id)).map(user => ({
             _id: user._id,
             username: user.username,
@@ -281,7 +281,8 @@ describe('course method operational errors', function() {
     expect(queries).to.have.length(3);
     for (const query of queries) expect(query).to.deep.equal({
       role: 'teacher',
-      options: { queryOptions: { fields: { _id: 1, username: 1, email_canonical: 1, 'emails.address': 1 } } },
+      scope: undefined,
+      userQuery: { fields: { _id: 1, username: 1, email_canonical: 1, 'emails.address': 1 } },
     });
   });
 
