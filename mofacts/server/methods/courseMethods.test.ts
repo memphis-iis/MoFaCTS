@@ -612,6 +612,11 @@ describe('course assignment metadata methods', function() {
 
   it('saves and launches the current ordered progressive prefix without creating aggregate progress', async function() {
     const assignments = createMemoryCollection();
+    const lessons = createMemoryCollection([
+      progressiveMember('lesson-1', 'set-1'),
+      progressiveMember('lesson-2', 'set-2'),
+      progressiveMember('lesson-3', 'set-3'),
+    ]);
     const { methods } = createCourseService(createDeps({
       Courses: createMemoryCollection([{
         _id: 'course-progressive',
@@ -624,11 +629,8 @@ describe('course assignment metadata methods', function() {
       Sections: createMemoryCollection(),
       SectionUserMap: createMemoryCollection(),
       Assignments: assignments,
-      Tdfs: createMemoryCollection([
-        progressiveMember('lesson-1', 'set-1'),
-        progressiveMember('lesson-2', 'set-2'),
-        progressiveMember('lesson-3', 'set-3'),
-      ]),
+      Tdfs: lessons,
+      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async (_id: string, roles: string[]) => roles.includes('teacher') }),
       CourseLearnerSnapshotCache: createMemoryCollection(),
       UserDashboardCache: createMemoryCollection([{ userId: 'teacher-user', tdfStats: {} }]),
       usersCollection: createMemoryCollection([{ _id: 'teacher-user', username: 'Teacher' }]),
@@ -665,6 +667,7 @@ describe('course assignment metadata methods', function() {
     expect(launch.tdfs.map((tdf: any) => tdf._id)).to.deep.equal(['lesson-1', 'lesson-2']);
     expect(launch.tdfs.map((tdf: any) => tdf.stimuli[0].stimuliSetId)).to.deep.equal(['set-1', 'set-2']);
     // An insertion before the endpoint affects new launches only.
+    await lessons.updateAsync({ _id: 'lesson-2' }, { $set: { ownerId: 'another-owner' } });
     await methods.saveCourseAssignments.call({ userId: 'teacher-user' }, {
       courseId: 'course-progressive',
       assignments: [{ assignmentId: progressive!.assignmentId, assignmentType: 'progressive',

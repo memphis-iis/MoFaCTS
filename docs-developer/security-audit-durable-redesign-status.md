@@ -1875,7 +1875,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 63 total, 62 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 64 total, 62 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 64 reserved for retained course assignments and corrected teacher discovery.
 
 Slot 63 ran on 3ba206ff on November 22. The direct invitation browser case passed. Native Meteor reported 1,115 server passes and one failure, 1,250 Chromium passes, 15/seven pending and zero hook failures. The genuine teacher-role assignment case failed because alanning:roles 4.0.0 also applied the supplied user projection to the role assignment query, omitting user._id. The corrected call supplies user fields in the separate third argument. A focused test against both installed package functions confirmed the corrected projection with synthetic collection adapters. A fresh native run is still required. The worker reused its image and completed cleanup. Receipt: /var/tmp/mofacts-integration.fKqZrpG6/results/meteor-run.json SHA-256 c8b8dab71a7aa4e04ddc2d686b7dde16b3e53fd219d6cdf2b80afd7d5d21ed28.
 

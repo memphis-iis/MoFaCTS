@@ -643,7 +643,13 @@ function courseReadVerification<N extends string>(method: N, observedCase: strin
     method, surfaceId: `method:${method}` as const, verificationId: `method.course-read.${method}` as const,
     cases: Object.freeze([observedCase]) });
 }
+export const COURSE_ASSIGNMENT_SAVE_VERIFICATION = Object.freeze({
+  ...middlewareTest, suite: 'course method authorization', method: 'saveCourseAssignments',
+  surfaceId: 'method:saveCourseAssignments', verificationId: 'method.course-assignment.save',
+  cases: Object.freeze(['preserves assigned lessons after sharing ends and checks every new use']),
+} as const);
 export const COURSE_READ_VERIFICATIONS = Object.freeze({
+  getCourseAssignmentEditorSnapshot: courseReadVerification('getCourseAssignmentEditorSnapshot', 'preserves assigned lessons after sharing ends and checks every new use'),
   getAllCourseSections: courseReadVerification('getAllCourseSections', 'limits learner teacher discovery to public or enrolled sections'),
   getAllTeachers: courseReadVerification('getAllTeachers', 'limits learner teacher discovery to public or enrolled sections'),
   getLearnerCoursesSnapshot: courseReadVerification('getLearnerCoursesSnapshot', 'binds the learner course snapshot to the current account session'),
@@ -711,7 +717,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

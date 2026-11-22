@@ -483,7 +483,7 @@ Query requirements:
 
 ### `saveCourseAssignments(input)`
 
-Assignment writers accept TDF IDs directly and fail clearly when an ID is missing or inaccessible.
+An instructor may add a lesson they own or that is shared with them. After sharing ends, a saved assignment may keep that lesson, including as a member of the same progressive assignment. It may be removed, but moving it to another assignment, converting its assignment type, or adding it again requires current access. Administrators can assign any existing lesson.
 
 Authorization:
 

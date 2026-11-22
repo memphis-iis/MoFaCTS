@@ -1,4 +1,4 @@
-import { COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
 import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 import { enrolledCourseLessonIds } from '../lib/enrolledCourseLessons';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
@@ -349,6 +349,8 @@ export function createCourseService(deps: CourseMethodsDeps) {
     return { course, actingUserId, roleFlags };
   }
 
+  const courseManagementPolicy = Object.freeze({ kind: 'course-management', operation: 'manage-course', authorize: assertCanManageCourse } as const);
+
   async function assertUniqueCourseNameForTeacher(courseName: string, teacherUserId: string, semester: string, excludingCourseId?: string) {
     const normalizedCourseName = courseName.toLowerCase();
     const existingCourses = await deps.Courses.find(
@@ -395,10 +397,14 @@ export function createCourseService(deps: CourseMethodsDeps) {
     };
   }
 
-  async function getTdfSummariesByIds(tdfIds: string[]) {
+  function assignableLessonSelectors(userId: string) {
+    return [{ ownerId: userId }, { accessors: userId }, { 'accessors.userId': userId }];
+  }
+
+  async function getTdfSummariesByIds(tdfIds: string[], scope: UnknownRecord = {}) {
     if (tdfIds.length === 0) return new Map<string, ReturnType<typeof getTdfSummary>>();
     const tdfs = await deps.Tdfs.find(
-      { _id: { $in: [...new Set(tdfIds)] } },
+      { _id: { $in: [...new Set(tdfIds)] }, ...scope },
       {
         fields: {
           _id: 1,
@@ -595,12 +601,11 @@ export function createCourseService(deps: CourseMethodsDeps) {
   }
 
   async function getCourseAssignmentEditorSnapshot(this: MethodContext, courseId: string): Promise<CourseAssignmentEditorSnapshot> {
-    const { course } = await assertCanManageCourse(this, courseId);
+    const { course, actingUserId, roleFlags } = await courseManagementPolicy.authorize(this, courseId);
     const assignments = await fetchNormalizedAssignmentSummaries(String(course._id));
-    const { actingUserId, roleFlags } = await requireTeacherOrAdmin(this);
     const tdfSelector = roleFlags.admin
       ? {}
-      : { $or: [{ ownerId: actingUserId }, { accessors: actingUserId }, { 'accessors.userId': actingUserId }] };
+      : { $or: assignableLessonSelectors(actingUserId) };
     const assignableTdfs = await deps.Tdfs.find(
       tdfSelector,
       {
@@ -749,7 +754,7 @@ export function createCourseService(deps: CourseMethodsDeps) {
       throw new Meteor.Error(400, 'Assignment save payload must be an object');
     }
     assertKnownFields(input as unknown as UnknownRecord, ['courseId', 'assignments'], 'Assignment save payload');
-    const { course } = await assertCanManageCourse(this, input.courseId);
+    const { course, actingUserId, roleFlags } = await courseManagementPolicy.authorize(this, input.courseId);
     const timezone = normalizeTimezone(course.timezone, true);
     if (!Array.isArray(input.assignments)) {
       throw new Meteor.Error(400, 'Assignments must be an array');
@@ -764,7 +769,27 @@ export function createCourseService(deps: CourseMethodsDeps) {
     if (duplicateTdfIds.length > 0) {
       throw new Meteor.Error(400, `Duplicate TDF assignments are not allowed: ${[...new Set(duplicateTdfIds)].join(', ')}`);
     }
-    const tdfSummaries = await getTdfSummariesByIds(allTdfIds);
+    const existingRows = await deps.Assignments.find(
+      { courseId: String(course._id) },
+      { fields: { _id: 1, courseId: 1, assignmentType: 1, TDFId: 1, memberTdfIds: 1 } }
+    ).fetchAsync();
+    const existingById = new Map(existingRows.map((row: any) => [String(row._id), row]));
+    const retainedIds: string[] = [];
+    const submittedIds = new Set<string>();
+    for (const row of normalizedRows) {
+      if (!row.assignmentId) continue;
+      const existing = existingById.get(row.assignmentId);
+      if (!existing || submittedIds.has(row.assignmentId)) {
+        throw new Meteor.Error(400, 'Each existing assignment must belong to this course and appear only once');
+      }
+      submittedIds.add(row.assignmentId);
+      if (existing.assignmentType === row.assignmentType) {
+        const previous = new Set(assignmentMemberTdfIds(existing));
+        retainedIds.push(...assignmentMemberTdfIds(row).filter(id => previous.has(id)));
+      }
+    }
+    const scope = roleFlags.admin ? {} : { $or: [...assignableLessonSelectors(actingUserId), { _id: { $in: retainedIds } }] };
+    const tdfSummaries = await getTdfSummariesByIds(allTdfIds, scope);
     for (const tdfId of allTdfIds) {
       if (!tdfSummaries.has(tdfId)) throw new Meteor.Error(404, `Assignable TDF not found: ${tdfId}`);
     }
@@ -782,28 +807,22 @@ export function createCourseService(deps: CourseMethodsDeps) {
         throw new Meteor.Error(400, `${lessonTitle} cannot be used in a progressive assignment: ${reasons.join(' ')}`);
       }
     }
-    const existingRows = await deps.Assignments.find(
-      { courseId: String(course._id) },
-      { fields: { _id: 1, courseId: 1, assignmentType: 1, TDFId: 1, memberTdfIds: 1 } }
-    ).fetchAsync();
-    const existingById = new Map(existingRows.map((row: any) => [String(row._id), row]));
     const keepIds = new Set<string>();
     const now = new Date();
     const changedAssignmentIds = new Set<string>();
 
     for (const row of normalizedRows) {
       const existing = row.assignmentId ? existingById.get(row.assignmentId) : undefined;
-      if (row.assignmentId && !existing) {
-        throw new Meteor.Error(400, `Assignment id does not belong to this course: ${row.assignmentId}`);
-      }
       if (existing) {
         keepIds.add(String(existing._id));
         changedAssignmentIds.add(String(existing._id));
         const assignmentFields = row.assignmentType === 'lesson'
           ? { assignmentType: 'lesson', TDFId: row.TDFId }
           : { assignmentType: 'progressive', title: row.title, memberTdfIds: row.memberTdfIds };
-        await deps.Assignments.updateAsync(
-          { _id: existing._id, courseId: String(course._id) },
+        const previousMembers = existing.assignmentType === 'progressive'
+          ? { memberTdfIds: existing.memberTdfIds } : { TDFId: existing.TDFId };
+        const changed = await deps.Assignments.updateAsync(
+          { _id: existing._id, courseId: String(course._id), assignmentType: existing.assignmentType, ...previousMembers },
           {
             $set: {
               ...assignmentFields,
@@ -821,6 +840,7 @@ export function createCourseService(deps: CourseMethodsDeps) {
               : { TDFId: '' },
           }
         );
+        if (changed !== 1) throw new Meteor.Error(409, 'Course assignment changed during save. Reload before editing.');
       } else {
         const assignmentFields = row.assignmentType === 'lesson'
           ? { assignmentType: 'lesson', TDFId: row.TDFId }
@@ -1338,6 +1358,9 @@ export function createCourseService(deps: CourseMethodsDeps) {
   return {
     methods,
     methodBindings: Object.freeze([
+      Object.freeze({ handler: methods.saveCourseAssignments, verification: COURSE_ASSIGNMENT_SAVE_VERIFICATION,
+        policy: courseManagementPolicy, dataEgress: 'assignment-editor-snapshot' as const }),
+      bind('getCourseAssignmentEditorSnapshot', courseManagementPolicy, 'assignment-editor-snapshot'),
       bind('getAllTeachers', directoryPolicy, 'teacher-display-list'),
       bind('getAllCourseSections', directoryPolicy, 'course-section-list'),
       bind('getLearnerCoursesSnapshot', snapshotPolicy, 'learner-course-snapshot'),

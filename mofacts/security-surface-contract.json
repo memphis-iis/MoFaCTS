@@ -765,7 +765,8 @@
     },
     {
       "name": "saveCourseAssignments",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Course owner or admin. Newly used lessons must be assignable to the instructor; continuing use is limited to the same persisted course assignment and type."
     },
     {
       "name": "saveDeploymentBrandProfileDraft",

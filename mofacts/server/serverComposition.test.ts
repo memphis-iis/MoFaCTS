@@ -2577,6 +2577,45 @@ describe('course method authorization', function() {
     expect(denied).to.include({ error: code });
   }
 
+  it('preserves assigned lessons after sharing ends and checks every new use', async function() {
+    const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const admin = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    const courseId = await CoursesAny.insertAsync({ teacherUserId: teacher, semester: 'SU_2022', timezone: 'America/Chicago' });
+    const first = await TdfsAny.insertAsync({ ownerId: admin, accessors: [{ userId: teacher }] });
+    const second = await TdfsAny.insertAsync({ ownerId: teacher });
+    const save = MeteorAny.server.method_handlers.saveCourseAssignments;
+    const editor = MeteorAny.server.method_handlers.getCourseAssignmentEditorSnapshot;
+    const registry = registeredMeteorMethodSurfaces();
+    if (registry.state !== 'observed') throw new Error('Expected installed Meteor methods');
+    for (const name of ['saveCourseAssignments', 'getCourseAssignmentEditorSnapshot']) {
+      expect(registry.surfaces.find(row => row.name === name)?.policy).to.deep.equal({ kind: 'course-management', operation: 'manage-course' });
+    }
+    const row = { assignmentType: 'lesson', TDFId: first, order: 0, required: false };
+    const write = (assignments: unknown[], userId = teacher) => save.call({ userId }, { courseId, assignments });
+    await expectCourseDenial(() => write([row], Random.id()), 403);
+    await write([row]);
+    const original = await AssignmentsAny.findOneAsync({ courseId, TDFId: first });
+    await TdfsAny.updateAsync(first, { $set: { accessors: [] } });
+    const snapshot = await editor.call({ userId: teacher }, courseId);
+    expect(snapshot.assignableTdfs.map((tdf: any) => tdf.TDFId)).not.to.include(first);
+    expect(snapshot.assignments.map((a: any) => a.assignmentId)).to.include(original._id);
+    const kept = { ...row, assignmentId: original._id, required: true };
+    await write([kept, { ...row, TDFId: second }]);
+    expect((await AssignmentsAny.findOneAsync(original._id)).required).to.equal(true);
+    const other = await AssignmentsAny.findOneAsync({ courseId, TDFId: second });
+    await expectCourseDenial(() => write([{ ...kept, assignmentId: other._id }]), 404);
+    await expectCourseDenial(() => write([{ ...kept, assignmentType: 'progressive', TDFId: undefined,
+      title: 'Sequence', memberTdfIds: [first, second] }]), 404);
+    await expectCourseDenial(() => write([row]), 404);
+    expect(await AssignmentsAny.find({ courseId }).countAsync()).to.equal(2);
+    await write([]);
+    await expectCourseDenial(() => write([row]), 404);
+    await write([row], admin);
+    expect(await AssignmentsAny.find({ courseId, TDFId: first }).countAsync()).to.equal(1);
+  });
+
   it('limits learner teacher discovery to public or enrolled sections', async function() {
     const directory = boundCourseRead('getAllTeachers', 'section-directory');
     const sections = boundCourseRead('getAllCourseSections', 'section-directory');
