@@ -1127,10 +1127,6 @@
       "notes": "Signed-in users receive the single client verbosity setting. No application subscription rate limit is registered."
     },
     {
-      "name": "contentUploadOwners",
-      "access": "role-checked"
-    },
-    {
       "name": "currentTdf",
       "access": "role-checked",
       "notes": "Existing exact-ID runtime authorization retained; excludes the server-owned conditionAllocation block alongside runtime secrets."
@@ -1139,10 +1135,6 @@
       "name": "dashboardCache",
       "access": "authenticated-self",
       "notes": "Own-account cache for an ordinary session. A study connection receives readiness without account-wide progress."
-    },
-    {
-      "name": "dashboardTdfsListing",
-      "access": "role-checked"
     },
     {
       "name": "deploymentBrandProfile",
@@ -1170,20 +1162,11 @@
       "access": "role-checked"
     },
     {
-      "name": "tdfByIds",
-      "access": "role-checked",
-      "notes": "Existing bounded runtime authorization retained; excludes the server-owned conditionAllocation block alongside runtime secrets."
-    },
-    {
       "name": "tdfForContentUploadDetails",
       "access": "role-checked"
     },
     {
       "name": "tdfForEdit",
-      "access": "role-checked"
-    },
-    {
-      "name": "tdfForEditMetadata",
       "access": "role-checked"
     },
     {

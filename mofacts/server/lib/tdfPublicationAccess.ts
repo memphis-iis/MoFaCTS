@@ -1,6 +1,5 @@
 import {
     buildConditionChildSelector,
-    buildConditionVisibilityTerms,
     createLessonFamilyResolver,
 } from './tdfLessonFamilyResolver';
 
@@ -27,7 +26,6 @@ export type TdfPublicationAccessResolverDeps = {
     tdfs: TdfPublicationCollection;
     users: UserPublicationCollection;
     roles: PublicationRoles;
-    resolveAssignedRootTdfIdsForUser(userId: string): Promise<string[]>;
 };
 
 export type TdfPublicationAccessResolverOptions = {
@@ -201,43 +199,6 @@ export function createTdfPublicationAccessResolver(
         return { $or: visibilityTerms };
     }
 
-    async function resolveDashboardSelectorUncached(userId: string) {
-        const [assignedRootIds, user] = await Promise.all([
-            deps.resolveAssignedRootTdfIdsForUser(userId),
-            deps.users.findOneAsync(
-                { _id: userId },
-                { fields: { accessedTDFs: 1 } }
-            )
-        ]);
-
-        const explicitDashboardIds = [
-            ...new Set([
-                ...normalizeIdList(assignedRootIds),
-                ...normalizeIdList(user?.accessedTDFs || [])
-            ])
-        ];
-        const visibilityTerms: PublicationSelector[] = baseVisibilityTerms(userId);
-        if (explicitDashboardIds.length > 0) {
-            visibilityTerms.push({ _id: { $in: explicitDashboardIds } });
-        }
-
-        const accessibleRoots = await deps.tdfs.find(
-            { $or: visibilityTerms },
-            {
-                fields: {
-                    _id: 1,
-                    'content.fileName': 1,
-                    'content.tdfs.tutor.setspec.condition': 1,
-                    'content.tdfs.tutor.setspec.conditionTdfIds': 1
-                }
-            }
-        ).fetchAsync();
-
-        visibilityTerms.push(...buildConditionVisibilityTerms(accessibleRoots));
-
-        return { $or: visibilityTerms };
-    }
-
     async function resolveAssetStimuliSetIdsUncached(userId: string) {
         const [isAdmin, isTeacher, user] = await Promise.all([
             deps.roles.userIsInRoleAsync(userId, ['admin']),
@@ -320,9 +281,6 @@ export function createTdfPublicationAccessResolver(
     return {
         resolveListingSelector(userId: string) {
             return cached(`listing:${userId}`, () => resolveListingSelectorUncached(userId));
-        },
-        resolveDashboardSelector(userId: string) {
-            return cached(`dashboard:${userId}`, () => resolveDashboardSelectorUncached(userId));
         },
         resolveAssetStimuliSetIds(userId: string) {
             return cached(`assets:${userId}`, () => resolveAssetStimuliSetIdsUncached(userId));

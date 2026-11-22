@@ -103,7 +103,8 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Verify the exact installed audio projection and dashboard preference read for the same synthetic user.
 - [x] Delete ownedTdfs and pagedTdfsListing and the pagination-only field stripping helper. The admin user list still requires normalizePageRequest.
 - [x] Verify both retired names are absent and the two active listing handlers retain their authenticated cursors and signed-out readiness.
-- [ ] Decide whether external consumers still require tdfByIds, tdfForEditMetadata, dashboardTdfsListing or contentUploadOwners. No literal caller was found in the tracked application or configuration repository. The wiki lists dashboardTdfsListing. All four remain registered pending the decision.
+- [x] Confirm no independent client uses the four remaining obsolete lesson subscriptions. Retire tdfByIds, tdfForEditMetadata, dashboardTdfsListing and contentUploadOwners, their contract entries and dashboard-only resolver code.
+- [ ] Verify all six retired subscriptions are absent and the instructor listing still works in native Meteor.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
@@ -1811,9 +1812,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 48 total, 47 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 49 total, 47 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
+
+Slot 49 reserved for the four-subscription retirement batch.
 
 Slot 48 consumed on d65e8e02. The named retirement and retained-listing case passed. Native Meteor passed 23:37:17 to 23:38:37 UTC on 2026-11-21 with 1,103 server and 1,249 Chromium passes, zero failures, and 15 and seven pending respectively. Source snapshot SHA-256: fd04d262c40ffdc7c931a5f90dba3de6219a9ff7d5756b040609e13c67fda14c. Full typecheck and lint passed. Linux source-security checks had 453 passes and seven skips.
 

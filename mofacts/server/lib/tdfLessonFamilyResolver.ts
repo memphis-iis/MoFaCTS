@@ -109,15 +109,6 @@ export function buildParentRootSelector(
     : null;
 }
 
-export function buildConditionVisibilityTerms(rootTdfs: any[]): LessonFamilySelector[] {
-  const refs = collectLessonFamilyRefs(rootTdfs);
-  const terms: LessonFamilySelector[] = [];
-  if (refs.conditionTdfIds.length > 0) {
-    terms.push({ _id: { $in: refs.conditionTdfIds } });
-  }
-  return terms;
-}
-
 export function createLessonFamilyResolver(deps: LessonFamilyResolverDeps) {
   async function findRootsForChildRefs(params: {
     childRefs: string[];

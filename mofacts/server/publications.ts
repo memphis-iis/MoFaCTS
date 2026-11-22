@@ -356,13 +356,6 @@ Meteor.publish('currentTdf', async function(tdfId: any) {
     return publishRuntimeTdfsByIds(this, tdfId);
 });
 
-Meteor.publish('tdfByIds', async function(tdfIds: any) {
-    if (!Array.isArray(tdfIds)) {
-        return this.ready();
-    }
-    return publishRuntimeTdfsByIds(this, tdfIds);
-});
-
 // Publication for content/TDF editor - returns TDF with full content for editing
 Meteor.publish('tdfForEdit', async function(tdfId: any) {
     if (!this.userId) return this.ready();
@@ -388,37 +381,6 @@ Meteor.publish('tdfForEdit', async function(tdfId: any) {
     }
 
     return Tdfs.find({ _id: tdfId }, { fields: editFields });
-});
-
-// Lightweight publication for editor initial load - excludes full stimuli array
-// Use this for faster initial page load, then fetch stimuli separately if needed
-Meteor.publish('tdfForEditMetadata', async function(tdfId: any) {
-    if (!this.userId) return this.ready();
-    if (!tdfId) return this.ready();
-
-    // Metadata fields only - excludes large stimuli array (~90% payload reduction)
-    const metadataFields = {
-        stimuliSetId: 1,
-        stimulusFileName: 1,
-        ownerId: 1,
-        accessors: 1,
-        'content.fileName': 1,
-        'content.tdfs.tutor.setspec': 1,
-        // Include rawStimuliFile structure info but not full data
-        'rawStimuliFile.setspec.clusters': 1,
-        'rawStimuliFile.setspec.sparcPages': 1
-        // Explicitly EXCLUDES: stimuli (large array)
-    };
-
-    const tdf = await Tdfs.findOneAsync({ _id: tdfId }, { fields: { ownerId: 1, accessors: 1 } });
-    if (!tdf) {
-        throw new Meteor.Error('not-found', 'TDF not found');
-    }
-    if (!isTdfOwner(this.userId, tdf)) {
-        throw new Meteor.Error('not-authorized', 'Only owner can edit this TDF');
-    }
-
-    return Tdfs.find({ _id: tdfId }, { fields: metadataFields });
 });
 
 // ===== LIGHTWEIGHT TDF LISTING PUBLICATION =====
@@ -514,8 +476,7 @@ async function resolveAssignedRootTdfIdsForUser(userId: string) {
 const tdfPublicationAccess = createTdfPublicationAccessResolver({
     tdfs: Tdfs as any,
     users: Meteor.users as any,
-    roles: Roles,
-    resolveAssignedRootTdfIdsForUser
+    roles: Roles
 });
 const lessonFamilyResolver = createLessonFamilyResolver({ tdfs: Tdfs as any });
 const resolveExperimentTargetFamily = createExperimentTargetFamilyResolver({ Tdfs: Tdfs as any });
@@ -527,17 +488,6 @@ Meteor.publish('allTdfsListing', async function() {
     }
 
     const selector = await tdfPublicationAccess.resolveListingSelector(this.userId);
-    return Tdfs.find(selector, { fields: TDF_LISTING_FIELDS });
-});
-
-// ===== DASHBOARD TDF LISTING =====
-// Like allTdfsListing, but only shows condition TDFs when their parent is accessible.
-Meteor.publish('dashboardTdfsListing', async function() {
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const selector = await tdfPublicationAccess.resolveDashboardSelector(this.userId);
     return Tdfs.find(selector, { fields: TDF_LISTING_FIELDS });
 });
 
@@ -553,44 +503,6 @@ Meteor.publish('tdfForContentUploadDetails', async function(tdfId: any) {
         return this.ready();
     }
     return Tdfs.find({ _id: tdfId }, { fields: TDF_CONTENT_UPLOAD_DETAIL_FIELDS });
-});
-
-Meteor.publish('contentUploadOwners', async function(ownerIds: any[] = []) {
-    if (!this.userId || !Array.isArray(ownerIds) || ownerIds.length === 0) {
-        return this.ready();
-    }
-
-    const requestedIds = ownerIds.filter((id: any) => typeof id === 'string');
-    if (requestedIds.length === 0) {
-        return this.ready();
-    }
-
-    const allowedOwnerIds = (await Tdfs.find(
-        {
-            ownerId: this.userId
-        },
-        { fields: { ownerId: 1 } }
-    ).fetchAsync())
-        .map((tdf: any) => tdf.ownerId)
-        .filter((id: any) => typeof id === 'string' && id.length > 0) as string[];
-
-    const uniqueOwnerIds = [...new Set(allowedOwnerIds)];
-    if (uniqueOwnerIds.length === 0) {
-        return this.ready();
-    }
-
-    return Meteor.users.find(
-        { _id: { $in: uniqueOwnerIds } },
-        {
-            fields: {
-                username: 1,
-                'profile.displayName': 1,
-                'profile.avatarType': 1,
-                'profile.avatarIconId': 1,
-                'profile.avatarImageData': 1
-            }
-        }
-    );
 });
 
 Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any) {
