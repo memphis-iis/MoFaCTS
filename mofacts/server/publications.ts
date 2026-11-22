@@ -1,3 +1,4 @@
+import { publishLessonEditorFields } from './lib/publishLessonEditorFields';
 import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
 import { Roles } from 'meteor/alanning:roles';
 import { Meteor } from 'meteor/meteor';
@@ -338,7 +339,7 @@ registerNamedPublication(Meteor, 'tdfForEdit', {
         throw new Meteor.Error('not-authorized', 'Only owner can edit this TDF');
     }
 
-    return Tdfs.find({ _id: tdfId }, { fields: editFields });
+    return publishLessonEditorFields(this, { _id: tdfId, ownerId: tdf.ownerId }, editFields, true);
 });
 
 const TDF_CONTENT_UPLOAD_DETAIL_FIELDS = {
@@ -414,7 +415,7 @@ registerNamedPublication(Meteor, 'tdfForContentUploadDetails', {
     if (!tdf || !(isTdfOwner(this.userId, tdf) || hasSharedTdfAccess(this.userId, tdf))) {
         return this.ready();
     }
-    return Tdfs.find({ _id: tdfId }, { fields: TDF_CONTENT_UPLOAD_DETAIL_FIELDS });
+    return publishLessonEditorFields(this, { _id: tdfId, $or: [{ ownerId: this.userId }, { 'accessors.userId': this.userId }] }, TDF_CONTENT_UPLOAD_DETAIL_FIELDS, false);
 });
 
 registerNamedPublication(Meteor, 'tdfByExperimentTarget', {

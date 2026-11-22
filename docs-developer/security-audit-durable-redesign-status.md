@@ -113,7 +113,9 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Retire the unused Assignments publication and register the six remaining named publications in server/publications.ts. Each descriptor binds the signed-in async policy, returned data and native verification case. Existing lesson, role and sharing rules remain in their handlers.
 - [x] Verify the installed six registrations, signed-out readiness, asset filtering, editor and shared upload access, target scope and retired Assignments name in Meteor.
 - [x] Trace stored provider-key fields through shared upload details and the owner editor. Both return the lesson settings block. The owner editor copies saved values back on an ordinary save. The server reads encrypted values and also accepts historical plaintext values. This is source evidence; no stored keys or live lessons were inspected.
-- [ ] Decide whether to omit stored provider-key values from both browser responses and preserve unchanged keys on the server. The editor publication is owner-only, but saveTdfContent currently permits owners and shared accessors via userCanManageTdf. Decide whether only owners may explicitly change keys while shared accessors retain their existing ordinary content-save permissions. Verify known-key fields are absent with synthetic fixtures before closing.
+- [x] Omit stored provider-key values from both editor/upload detail publications. The owner receives configured field names. Preserve keys on ordinary saves and restrict explicit replacement and clearing to the lesson owner.
+- [ ] Verify publication redaction and the owner/shared save contract in native Meteor.
+- [ ] Decide provider-key inheritance in copyTdf: the current copy clones all lesson content and assigns ownership to the caller, including when a shared accessor copies a lesson.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
@@ -1821,9 +1823,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 51 total, 50 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 52 total, 50 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
+
+Slot 52 reserved for the owner-only provider-key batch.
 
 Slot 51 consumed on a371595f. Native Meteor passed 11:59:21 to 12:01:08 UTC on 2026-11-22, with 1,106 server and 1,249 Chromium passes, zero failures and 15 and seven pending. The registry binding, retired subscription, signed-out readiness, runtime lesson, asset metadata, upload/editor permissions and experiment-target cases passed. Source snapshot SHA-256: ec9f79450cda4e98f4b454f4f32debb5072132c1a6017f6321e3527cff9ca123. Typecheck and lint passed; 324 security surfaces. Linux source-security tests: 453 passed and seven skipped. Staging2 qualification remains open.
 

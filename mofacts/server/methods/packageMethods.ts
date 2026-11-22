@@ -1,3 +1,5 @@
+import { LESSON_PROVIDER_KEY_FIELDS } from '../../common/lessonProviderKeys';
+import { isTdfOwner } from '../lib/contentAccessPolicy';
 import { createReadStream } from 'node:fs';
 import { storePackageFile } from '../lib/packageFileStorage';
 import { getContentUpdateWarnings, type ContentUpdateWarning, type ContentUpdateConfirmation, type ContentUpdateReview } from '../../common/lib/contentUpdateWarnings';
@@ -1121,6 +1123,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     check(tdfId, String);
     check(tdfContent, Object);
     check(apiKeyUpdates, Object);
+    if (Object.entries(apiKeyUpdates).some(([key, value]) =>
+      !LESSON_PROVIDER_KEY_FIELDS.some(field => field === key) || typeof value !== 'boolean')) {
+      throw new Meteor.Error('invalid-provider-key-update', 'Unknown provider key or invalid update flag.');
+    }
     check(removedTutorPaths, [String]);
 
     const tdf = await deps.Tdfs.findOneAsync({_id: tdfId});
@@ -1133,7 +1139,8 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       throw new Meteor.Error('not-authorized', 'You do not have permission to edit this TDF');
     }
 
-    if (!tdfContent.tdfs?.tutor?.setspec?.lessonname) {
+    const submittedSettings = tdfContent.tdfs?.tutor?.setspec;
+    if (!submittedSettings?.lessonname) {
       throw new Meteor.Error('invalid-tdf', 'TDF must have a lesson name');
     }
 
@@ -1157,41 +1164,39 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       }
     }
     const setspec = tdfContentToSave.tdfs?.tutor?.setspec;
-    if (setspec) {
-      const persistedSetspec = tdf.content?.tdfs?.tutor?.setspec;
-      if (Array.isArray(persistedSetspec?.condition)) {
-        setspec.condition = [...persistedSetspec.condition];
+    if (!setspec?.lessonname) throw new Meteor.Error('invalid-tdf', 'A saved lesson must retain its settings and name.');
+    const persistedSetspec = tdf.content?.tdfs?.tutor?.setspec;
+    if (Array.isArray(persistedSetspec?.condition)) {
+      setspec.condition = [...persistedSetspec.condition];
+    } else {
+      delete setspec.condition;
+    }
+    if (Array.isArray(persistedSetspec?.conditionTdfIds)) {
+      setspec.conditionTdfIds = [...persistedSetspec.conditionTdfIds];
+    } else {
+      delete setspec.conditionTdfIds;
+    }
+    for (const field of LESSON_PROVIDER_KEY_FIELDS) {
+      const action = apiKeyUpdates[field];
+      const supplied = Object.hasOwn(submittedSettings, field);
+      const removed = removedTutorPaths.includes('setspec.' + field);
+      if (action !== undefined || supplied || removed) {
+        if (!isTdfOwner(this.userId, tdf)) {
+          throw new Meteor.Error('not-authorized', 'Only the lesson owner may change provider keys.');
+        }
+        if (action === true && supplied && !removed) {
+          setspec[field] = validateAndEncryptUploadedApiKey({
+            encryptData: deps.encryptData, field, value: submittedSettings[field],
+          });
+        } else if (action === false && !supplied) {
+          delete setspec[field];
+        } else {
+          throw new Meteor.Error('invalid-provider-key-update', 'Specify a replacement or an explicit removal for the provider key.');
+        }
+      } else if (persistedSetspec && Object.hasOwn(persistedSetspec, field)) {
+        setspec[field] = persistedSetspec[field];
       } else {
-        delete setspec.condition;
-      }
-      if (Array.isArray(persistedSetspec?.conditionTdfIds)) {
-        setspec.conditionTdfIds = [...persistedSetspec.conditionTdfIds];
-      } else {
-        delete setspec.conditionTdfIds;
-      }
-      if (apiKeyUpdates.speechAPIKey && setspec.speechAPIKey) {
-        setspec.speechAPIKey = validateAndEncryptUploadedApiKey({
-          encryptData: deps.encryptData,
-          field: 'speechAPIKey',
-          value: setspec.speechAPIKey,
-        });
-        deps.serverConsole('saveTdfContent: Encrypted new speechAPIKey');
-      }
-      if (apiKeyUpdates.textToSpeechAPIKey && setspec.textToSpeechAPIKey) {
-        setspec.textToSpeechAPIKey = validateAndEncryptUploadedApiKey({
-          encryptData: deps.encryptData,
-          field: 'textToSpeechAPIKey',
-          value: setspec.textToSpeechAPIKey,
-        });
-        deps.serverConsole('saveTdfContent: Encrypted new textToSpeechAPIKey');
-      }
-      if (apiKeyUpdates.openRouterApiKey && setspec.openRouterApiKey) {
-        setspec.openRouterApiKey = validateAndEncryptUploadedApiKey({
-          encryptData: deps.encryptData,
-          field: 'openRouterApiKey',
-          value: setspec.openRouterApiKey,
-        });
-        deps.serverConsole('saveTdfContent: Encrypted new openRouterApiKey');
+        delete setspec[field];
       }
     }
     const familyValidation = validateConditionFamilyTutor(tdfContentToSave.tdfs?.tutor, {

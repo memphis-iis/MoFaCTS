@@ -1159,12 +1159,12 @@
     {
       "name": "tdfForContentUploadDetails",
       "access": "role-checked",
-      "notes": "Owners and shared accessors receive the upload detail projection, including the lesson settings block."
+      "notes": "Owners and shared accessors receive the upload detail projection, with stored provider-key values omitted."
     },
     {
       "name": "tdfForEdit",
       "access": "role-checked",
-      "notes": "Only the owner receives the editor fields, including full lesson content and stimuli."
+      "notes": "Only the owner receives the editor fields, including stimuli and lesson content with stored provider-key values omitted. The owner receives the names of configured key fields."
     },
     {
       "name": "theme",

@@ -1,3 +1,4 @@
+import { prepareEditorProviderKeyChanges } from '../../common/lessonProviderKeys';
 import assert from 'node:assert/strict';
 import { createPackageMethods } from './packageMethods';
 
@@ -19,6 +20,7 @@ function setup() {
         return 1;
       },
     },
+    encryptData: () => 'encrypted-fixture',
     userCanManageTdf: async () => authorized,
     userIsInRoleAsync: async () => false,
     canonicalizeStimDisplayMediaRefs: async () => {},
@@ -33,6 +35,37 @@ function setup() {
 // These exercise the authorized read/review/CAS boundary; package archive and
 // upload-plan integrity remain covered by the package workflow integration tests.
 describe('editor structural update confirmation', function() {
+  it('keeps stored provider keys server-side on owner and shared saves', async function() {
+    const h = setup();
+    h.doc.ownerId = 'owner';
+    const settings = h.doc.content.tdfs.tutor.setspec;
+    Object.assign(settings, { speechAPIKey: 'old-synthetic', textToSpeechAPIKey: 'another-synthetic' });
+    function save(actor: string, patch: Record<string, unknown>, flags = {}, removed: string[] = []) {
+      const content = structuredClone(h.doc.content);
+      content.tdfs.tutor.setspec = { lessonname: 'Synthetic lesson', ...patch };
+      return h.methods.saveTdfContent.call({ userId: actor }, h.doc._id, content, flags, removed);
+    }
+    const unchanged = { speechAPIKey: '' };
+    assert.deepEqual(prepareEditorProviderKeyChanges(unchanged, ['speechAPIKey'], []), {});
+    assert.deepEqual(unchanged, {});
+    assert.deepEqual(prepareEditorProviderKeyChanges({}, ['speechAPIKey'], ['setspec.speechAPIKey']), { speechAPIKey: false });
+    for (const actor of ['owner', 'shared']) {
+      await save(actor, {});
+      assert.equal(h.doc.content.tdfs.tutor.setspec.speechAPIKey, 'old-synthetic');
+    }
+    const before = structuredClone(h.doc);
+    await assert.rejects(save('shared', {}, { speechAPIKey: false }), /Only the lesson owner/);
+    await assert.rejects(save('shared', { speechAPIKey: 'test' }, { speechAPIKey: true }), /Only the lesson owner/);
+    await assert.rejects(save('shared', {}, {}, ['setspec.speechAPIKey']), /Only the lesson owner/);
+    await assert.rejects(save('owner', {}, {}, ['setspec']), /retain its settings/);
+    await assert.rejects(save('owner', { speechAPIKey: 'bad' }, { speechAPIKey: true, textToSpeechAPIKey: false }), /malformed/);
+    assert.deepEqual(h.doc, before);
+    const replacement = 'AIza' + 'synthetic'.repeat(4);
+    await save('owner', { speechAPIKey: replacement }, { speechAPIKey: true, textToSpeechAPIKey: false });
+    assert.equal(h.doc.content.tdfs.tutor.setspec.speechAPIKey, 'encrypted-fixture');
+    assert.ok(!Object.hasOwn(h.doc.content.tdfs.tutor.setspec, 'textToSpeechAPIKey'));
+  });
+
   for (const method of ['saveTdfContent', 'saveTdfStimuli'] as const) {
     it(`${method}: rejects invalid orientation modes before saving`, async function() {
       const h = setup();

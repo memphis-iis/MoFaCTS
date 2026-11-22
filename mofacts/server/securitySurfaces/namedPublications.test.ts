@@ -20,14 +20,20 @@ describe('named application publications', function() {
   function invoke(name: string, userId: string | null, ...args: unknown[]) {
     const emitted: Array<{ collection: string; id: string; fields: unknown }> = [];
     let readyCalls = 0;
+    let notifyChange: () => void;
+    const firstChange = new Promise<void>(resolve => { notifyChange = resolve; });
+    let stop: (() => unknown) | undefined;
     const handler = (Meteor as any).server.publish_handlers[name];
     expect(handler, name).to.be.a('function');
     const result = handler.call({
       userId,
+      onStop(callback: () => unknown) { stop = callback; },
+      changed(collection: string, id: string, fields: unknown) { emitted.push({ collection, id, fields }); notifyChange(); },
+      removed() {},
       added(collection: string, id: string, fields: unknown) { emitted.push({ collection, id, fields }); },
       ready() { readyCalls++; },
     }, ...args);
-    return { result, emitted, get readyCalls() { return readyCalls; } };
+    return { result, emitted, firstChange, stop: () => stop?.(), get readyCalls() { return readyCalls; } };
   }
 
   before(async function() {
@@ -129,16 +135,29 @@ describe('named application publications', function() {
     const id = Random.id(), stranger = Random.id();
     try {
       await Tdfs.insertAsync({ _id: id, ownerId: owner, accessors: [{ userId: admin }],
-        content: { fileName: 'fixture.json', tdfs: { tutor: { setspec: {}, unit: [{}] } } }, syntheticPrivate: true });
-      const edited = await (await invoke('tdfForEdit', owner, id).result).fetchAsync();
-      expect(edited[0]).to.have.keys('_id', 'ownerId', 'accessors', 'content');
+        content: { fileName: 'fixture.json', tdfs: { tutor: { setspec: { lessonname: 'fixture', speechAPIKey: 'synthetic-a', textToSpeechAPIKey: 'synthetic-b', openRouterApiKey: 'synthetic-c' }, unit: [{}] } } }, syntheticPrivate: true });
+      const edited = invoke('tdfForEdit', owner, id);
+      try {
+        await edited.result;
+        const fields = edited.emitted[0]!.fields as any;
+        expect(fields.content.tdfs.tutor.setspec).to.deep.equal({ lessonname: 'fixture' });
+        expect(fields.configuredProviderKeyFields).to.have.members(['speechAPIKey', 'textToSpeechAPIKey', 'openRouterApiKey']);
+        await Tdfs.updateAsync(id, { $set: { 'content.tdfs.tutor.setspec.openRouterApiKey': 'synthetic-d', 'content.fileName': 'changed.json' } });
+        await edited.firstChange;
+        expect((edited.emitted[1]!.fields as any).content.tdfs.tutor.setspec).to.deep.equal({ lessonname: 'fixture' });
+      } finally { await edited.stop(); }
       await expectPublicationError(invoke('tdfForEdit', admin, id).result, 'not-authorized');
       await expectPublicationError(invoke('tdfForEdit', owner, Random.id()).result, 'not-found');
       for (const actor of [owner, admin]) {
-        const details = await (await invoke('tdfForContentUploadDetails', actor, id).result).fetchAsync();
-        expect(details[0]._id).to.equal(id);
-        expect(details[0]).not.to.have.property('syntheticPrivate');
-        expect(details[0].content.tdfs.tutor).not.to.have.property('unit');
+        const details = invoke('tdfForContentUploadDetails', actor, id);
+        try {
+          await details.result;
+          expect(details.emitted[0]!.id).to.equal(id);
+          const fields = details.emitted[0]!.fields as any;
+          expect(fields).not.to.have.property('configuredProviderKeyFields');
+          expect(fields.content.tdfs.tutor).not.to.have.property('unit');
+          expect(fields.content.tdfs.tutor.setspec).to.deep.equal({ lessonname: 'fixture' });
+        } finally { await details.stop(); }
       }
       const denied = invoke('tdfForContentUploadDetails', stranger, id);
       await denied.result;
