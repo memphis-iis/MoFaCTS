@@ -14,7 +14,7 @@ function cursor(rows: any[]) {
 }
 
 describe('tdfPublicationAccess', function() {
-  it('normalizes asset stimulus ids and reuses the per-user cache inside the ttl', async function() {
+  it('normalizes asset stimulus ids and reads current permissions on each subscription', async function() {
     let findCalls = 0;
     let findOneCalls = 0;
     let userCalls = 0;
@@ -71,26 +71,25 @@ describe('tdfPublicationAccess', function() {
 
     expect(first).to.deep.equal(normalizeStimSetIds([101, 202, 303, 404]));
     expect(second).to.deep.equal(first);
-    expect(userCalls).to.equal(1);
-    expect(findOneCalls).to.equal(1);
-    expect(findCalls).to.equal(3);
+    expect(userCalls).to.equal(2);
+    expect(findOneCalls).to.equal(2);
+    expect(findCalls).to.equal(6);
     expect(findOptions[0]?.fields?.['content.tdfs.tutor.setspec.conditionTdfIds']).to.equal(1);
   });
 
-  it('bounds cached entries by evicting the oldest user lookup', async function() {
-    const userCalls: string[] = [];
+  it('observes a changed grant when the same user subscribes again', async function() {
+    let granted = true;
     const resolver = createTdfPublicationAccessResolver({
       tdfs: {
         find() {
-          return cursor([]);
+          return cursor(granted ? [{ stimuliSetId: 123 }] : []);
         },
         async findOneAsync() {
           return null;
         }
       },
       users: {
-        async findOneAsync(selector: PublicationSelector) {
-          userCalls.push(selector._id);
+        async findOneAsync() {
           return { accessedTDFs: [] };
         }
       },
@@ -99,12 +98,10 @@ describe('tdfPublicationAccess', function() {
           return false;
         }
       }
-    }, { maxCacheEntries: 1 });
+    });
 
-    await resolver.resolveAssetStimuliSetIds('user-1');
-    await resolver.resolveAssetStimuliSetIds('user-2');
-    await resolver.resolveAssetStimuliSetIds('user-1');
-
-    expect(userCalls).to.deep.equal(['user-1', 'user-2', 'user-1']);
+    expect(await resolver.resolveAssetStimuliSetIds('user-1')).to.deep.equal(normalizeStimSetIds([123]));
+    granted = false;
+    expect(await resolver.resolveAssetStimuliSetIds('user-1')).to.deep.equal([]);
   });
 });

@@ -28,17 +28,6 @@ export type TdfPublicationAccessResolverDeps = {
     roles: PublicationRoles;
 };
 
-export type TdfPublicationAccessResolverOptions = {
-    cacheTtlMs?: number;
-    maxCacheEntries?: number;
-    now?: () => number;
-};
-
-type CacheEntry<T> = {
-    expiresAt: number;
-    promise: Promise<T>;
-};
-
 export function normalizeOptionalStringId(value: any) {
     if (value === null || value === undefined) return null;
     if (typeof value === 'string') {
@@ -122,54 +111,10 @@ async function conditionStimSetIdsForRefs(
     ).fetchAsync()).map((tdf: any) => tdf.stimuliSetId);
 }
 
-export function createTdfPublicationAccessResolver(
-    deps: TdfPublicationAccessResolverDeps,
-    options: TdfPublicationAccessResolverOptions = {}
-) {
-    const cacheTtlMs = options.cacheTtlMs ?? 5000;
-    const maxCacheEntries = options.maxCacheEntries ?? 200;
-    const now = options.now ?? (() => Date.now());
-    const cache = new Map<string, CacheEntry<any>>();
+export function createTdfPublicationAccessResolver(deps: TdfPublicationAccessResolverDeps) {
     const lessonFamilies = createLessonFamilyResolver({ tdfs: deps.tdfs });
 
-    function pruneCache() {
-        const current = now();
-        for (const [key, entry] of cache.entries()) {
-            if (entry.expiresAt <= current) {
-                cache.delete(key);
-            }
-        }
-        while (cache.size > maxCacheEntries) {
-            const oldestKey = cache.keys().next().value as string | undefined;
-            if (!oldestKey) {
-                break;
-            }
-            cache.delete(oldestKey);
-        }
-    }
-
-    function cached<T>(key: string, loader: () => Promise<T>) {
-        const current = now();
-        const cachedEntry = cache.get(key);
-        if (cachedEntry && cachedEntry.expiresAt > current) {
-            return cachedEntry.promise as Promise<T>;
-        }
-
-        const promise = loader();
-        cache.set(key, { expiresAt: current + cacheTtlMs, promise });
-        pruneCache();
-
-        promise.catch(() => {
-            const currentEntry = cache.get(key);
-            if (currentEntry?.promise === promise) {
-                cache.delete(key);
-            }
-        });
-
-        return promise;
-    }
-
-    async function resolveAssetStimuliSetIdsUncached(userId: string) {
+    async function resolveAssetStimuliSetIds(userId: string) {
         const [isAdmin, isTeacher, user] = await Promise.all([
             deps.roles.userIsInRoleAsync(userId, ['admin']),
             deps.roles.userIsInRoleAsync(userId, ['teacher']),
@@ -246,20 +191,5 @@ export function createTdfPublicationAccessResolver(
         );
     }
 
-    return {
-        resolveAssetStimuliSetIds(userId: string) {
-            return cached(`assets:${userId}`, () => resolveAssetStimuliSetIdsUncached(userId));
-        },
-        clearCacheForUser(userId?: string) {
-            if (!userId) {
-                cache.clear();
-                return;
-            }
-            for (const key of Array.from(cache.keys())) {
-                if (key.endsWith(`:${userId}`)) {
-                    cache.delete(key);
-                }
-            }
-        }
-    };
+    return { resolveAssetStimuliSetIds };
 }
