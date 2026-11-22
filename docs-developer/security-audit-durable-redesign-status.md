@@ -116,7 +116,7 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Omit stored provider-key values from both editor/upload detail publications. The owner receives configured field names. Preserve keys on ordinary saves and restrict explicit replacement and clearing to the lesson owner.
 - [x] Verify publication redaction and the owner/shared save contract in native Meteor.
 - [x] Implement owner-only inheritance of lesson provider keys in copyTdf. Non-owner copies also drop the source archive references so a ZIP containing embedded keys does not follow the lesson.
-- [ ] Verify all three key fields in owner, shared and administrator copies, denial for an unrelated user, and the original document in native Meteor.
+- [x] Verify all three key fields in owner, shared and administrator copies, denial for an unrelated user, and the original document in native Meteor (slot 53).
 - [ ] Decide the credential policy for downloadable package exports and explicit lesson-family ownership transfers. The export builder decrypts known lesson provider keys for the archive; the transfer updates ownership for all family members. Existing archive remediation is a separate scope.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
@@ -1825,11 +1825,21 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 53 total, 51 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 53 total, 52 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
 
-Slot 53 reserved for the owner-only lesson-copy key policy.
+Slot 53 consumed and passed on e2099adf on 2026-11-22, 18:03:53 to 18:05:15 UTC. The named lesson-copy provider-key regression ran in Meteor. Server 1,108 passed and 15 pending. Chromium 1,249 passed and seven pending. Zero failures and zero hook failures. Both source observations matched. The repaired worker reused image sha256:18975f65e74d445f4a96f49cbafdb00ca7c9895f15a3c4dfe6f96a333d701ca8. C: had 327.48 GiB free before preparation and 323.53 GiB before execution. Full logs, suite evidence and receipt remain in /var/tmp/mofacts-integration.ycRVSZDb/results. Native receipt SHA-256 5cd33cb179d30d23b165049c734c1b730887ef55cf112e0b34011b07f94be80e. Verified removal of the three generated directories and absence of labelled job containers, networks and volumes. The next policy decision covers package exports and ownership transfers.
+
+2026-11-22 local worker storage follow-up. Offline Windows compaction of the Docker and Ubuntu-MoFaCTS disks completed. C: free space rose from 18.78 to 327.53 GiB. The four previously running container identities were verified after restart. Docker listed 27 volumes. The older 15-container inventory differs from the four entries visible after restart. The cause of that inventory change is unverified.
+
+The maintained worker now checks available space before preparation and execution, reuses the tool image by its six build inputs and cleans generated dependencies and build output after failed preparation and terminal runs. The retained image for e2099adf was verified against its original build context and tagged for reuse. Linux lifecycle regression passed for identical and changed inputs, successful execution, setup and execution failures, and low Windows space. Four receipt tests passed. Lifecycle tests used a simulated engine. Slot 53 was still unconsumed at that checkpoint.
+
+Earlier slot 53 reservation for e2099adf. Typecheck, lint and 453 source-security checks passed (seven skipped). Worker preparation stalled before the Meteor invocation with 6 MiB free on the Windows system drive. Stopped this preparation and inspection WSL clients. Guest cleanup was not confirmed. Removing the imported source bundle and five reproducible bundles from completed runs restored 186 MiB at the last check. Native acceptance and publication are pending disk recovery. Follow-up cleanup reclaimed 867 MiB from 29 additional Windows test-source bundles with matching Git identities, published commits and ledger records. Both staging recovery bundles are retained. Windows reported 2,290 MiB free. The Linux filesystem and Docker container-list checks did not return, including a direct Linux-root-directory check. No guest files or Docker objects were removed, no service was restarted, and the Meteor invocation remains reserved.
+
+2026-11-22 follow-up for slot 53: Docker recovered. Removed 41 older local integration tags and five other obsolete local build tags. All 15 containers (four running) and 27 volumes were retained. Docker build cache fell from 73.35 GB to zero and image count from 60 to 15. C: reported 17.78 GiB free afterward; no offline compaction was performed. A read-only staging2 check measured 2 CPUs, 3,836 MiB total RAM, 2,534 MiB available, zero swap and 18 GiB free on the root filesystem. Eight running containers included four JEDM services. The supported worker requires 8 GiB available before invocation. Slots 7 and 8 already recorded staging2 OOM failures. Slot 53 was not invoked on either host and remains reserved pending a suitable remote worker.
+
+Operator resumed local Meteor as the intended future worker; original staging is excluded. Storage recovery before slot 53: removed 174 generated dependency and build directories from 58 completed jobs, each checked against its successful exit record, commit and native receipt. Source snapshots, test receipts, release evidence and the pending job were retained. Free-space increase inside Ubuntu-MoFaCTS was 81.34 GiB. After trim, Docker data VHDX was about 301.66 GiB (41.1 GiB used inside) and the MoFaCTS VHDX about 118.86 GiB (35 GiB used inside). Windows still reported 18.80 GiB available. Offline compaction and service restoration are separate from in-guest cleanup. No Meteor invocation consumed.
 
 Slot 52 consumed on b6483382. Native Meteor passed 12:54:43 to 12:55:52 UTC on 2026-11-22 with 1,107 server and 1,249 Chromium passes, zero failures, 15 and seven pending. Confirmed both named cases for stored-key redaction and owner/shared saves. Source snapshot SHA-256: 958fa0b3c350e66135e60b25526d0fe627b244f88c6990b00c238b653b34f7b4. Full typecheck and lint passed. Source-security checks had 453 passes and seven skips. Wiki 488dd77. Staging2 qualification remains open.
 
@@ -8674,7 +8684,7 @@ An initial TypeScript syntax error in the new contract was caught by both Node a
 Unrelated pre-existing app-repository CI/test-harness edits were preserved, including the existing package lint/test-artifact edits; the new phase0 and capture test script entries are scoped additions to that file. The config command sheet, production overlay, private settings and environment files were not edited. The public capture guide documents the new opt-in commands and their limitations. Existing production/wiki procedures remain unchanged until actual qualification and command-sheet integration.
 
 
-## 2026-11-05 — approved storage-retention rehearsal, verification reservation
+## 2026-11-05 ï¿½ approved storage-retention rehearsal, verification reservation
 
 Phil approved one byte-identical candidate/current-pointer rehearsal in the
 existing optional AWS recovery store. Conditional Meteor slot **1 of 10 is
@@ -8688,12 +8698,12 @@ Provider validity, accepted operational rollback and staging2 consumer recovery
 remain separate. Phase 0 remains open.
 
 
-## 2026-11-05 — retention reader verified; one-shot activation
+## 2026-11-05 ï¿½ retention reader verified; one-shot activation
 
 Implementation `a983d97eacc5f0afadea3683441e8a47dc1768cb` passed full CI
 [42034704576](https://github.com/memphis-iis/MoFaCTS/actions/runs/42034704576)
 and Security [42034704430](https://github.com/memphis-iis/MoFaCTS/actions/runs/42034704430).
-Meteor conditional slot **1/10 used/passed** (13:24:35Z–13:25:34Z, attempt 1,
+Meteor conditional slot **1/10 used/passed** (13:24:35Zï¿½13:25:34Z, attempt 1,
 exit 0): server 975 passed/15 pending, client 1,237 passed/7 pending, zero
 failures/hook failures. Nine slots remain. Both full typechecks, lint, native
 source/capture checks, Compose build, exact source-to-image comparison, ABI,
@@ -8716,7 +8726,7 @@ activation changes no tested helper source and uses `[skip ci]` to avoid another
 Meteor invocation. Retire workflow/access/environment on either result.
 
 
-## 2026-11-05 — approved read-only confirmation; second conditional slot reserved
+## 2026-11-05 ï¿½ approved read-only confirmation; second conditional slot reserved
 
 Phil accepted publishing the failed observation and verified cleanup, and approved
 one read-only confirmation of the two existing versions. Cleanup was published
@@ -8737,13 +8747,13 @@ workflow and empty environment on either result. The previous mutation verifier
 remains unqualified for reuse; this confirmation makes no mutation.
 
 
-## 2026-11-05 — confirmation reader verified; one-shot read-only activation
+## 2026-11-05 ï¿½ confirmation reader verified; one-shot read-only activation
 
 Reader `60dfd6f09057530d0b1049e76c37f8610675a7a2` passed full CI
 [42048015246](https://github.com/memphis-iis/MoFaCTS/actions/runs/42048015246)
 and Security [42048015262](https://github.com/memphis-iis/MoFaCTS/actions/runs/42048015262).
 Conditional Meteor **2/10 used/passed; eight remain**. This invocation ran
-14:49:52Z–14:50:54Z, attempt 1, exit 0: server 975 passed/15 pending, client
+14:49:52Zï¿½14:50:54Z, attempt 1, exit 0: server 975 passed/15 pending, client
 1,237 passed/7 pending, zero failures/hook failures. Full lint, both typechecks,
 source/capture/native checks, canonical Compose build, image/source equality,
 ABI, topology rejection, Change Streams startup, protection and cleanup passed.
