@@ -103,7 +103,7 @@ In the existing synthetic experiment/condition fixture, each subscription perfor
 
 Source review of the course module accounts for seven of the 177. Its factory returns 27 properties. In serverComposition.ts, seven are removed before the other 20 are passed to Meteor. The seven are resolveAssignedRootTdfIdsForUser, invalidateCourseSnapshotForUser, invalidateCourseSnapshotsForCourse, invalidateCourseSnapshotsForAssignment, getTdfIdsByOwnerId, getSourceSentences and checkForTDFData. This leaves at most 170 further candidate names, including the 20 course methods. A name without a matching declaration can already have behavior tests. Keep the five exit groups open until their own acceptance criteria pass.
 
-After binding the assignment editor/save and two due-date methods, the source contract lists 231 methods. Of these, 72 match application test declarations and four match package declarations, leaving 155 names to reconcile. Native coverage for the two exception bindings remains pending. All 21 publications match declarations.
+At 1791151a the source contract lists 231 methods. Of these, 73 match application test declarations and four match package declarations, leaving 154 names to reconcile. The four remaining course commands are addCourse, deleteCourse, addUserToTeachersClass and getProgressiveAssignmentLaunch. All 21 publications match declarations.
 
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
 - [x] Reconcile the sharing transaction, both accessor reads and recipient resolution with the named passing Meteor cases in slots 38-40.
@@ -152,8 +152,10 @@ After binding the assignment editor/save and two due-date methods, the source co
   - [x] Verify retained and rejected new assignment uses, progressive launch, and administrator access in slot 64.
   - [x] Trace the two due-date exception commands to instructor reporting. The report lists students enrolled in a course section. Both server commands validate course management and the assignment but omit the target student’s course membership. The previous handlers also read and replaced the entire user document. The operator approved current enrollment for every edit.
   - [x] Enforce enrollment for exception adds, changes and removals. Update only the exception array and check its previous value to detect conflicting edits. Local handler tests passed for denial, grant, withdrawal, re-enrollment and preservation of unrelated fields.
-  - [ ] Verify the installed due-date handlers with MongoDB in the next combined Meteor batch. Slot 64 preceded this change.
+  - [x] Verify the installed due-date handlers with MongoDB on enrollment, withdrawal and re-enrollment (slot 65).
   - [x] Trace class section editing. The form submits a list of names without section IDs; changing a name creates a new section and removes the old section and its enrollments. Renaming an enrolled section safely requires distinguishing rename from deliberate removal in the edit contract. No existing enrollments were inspected or modified.
+  - [x] Preserve IDs and invitations when renaming an existing section, require explicit deletion, and commit the course and enrollment changes transactionally. The server rejects stale or incomplete lists. Installed server and rendered browser cases passed in slot 65.
+  - [x] Trace course owner selection: teachers create courses for themselves. Administrators may supply another account ID on creation or transfer, and neither operation verifies the proposed owner exists and holds a course-management role. No operator or learner accounts were inspected.
   - [x] Separate the 19 public course handlers from the course service helpers at their definition. Seven former inventory rows represented internal functions. None of those seven is a newly retired public command.
   - [x] Bind the learner course snapshot and four instructor reads to their existing authorization functions. Preserve the account-session requirement, instructor scope, administrator access, error ordering, and returned fields.
   - [x] Verify installed command and helper exclusions, and four instructor reads with synthetic assignments and teacher/admin authorization (slot 61).
@@ -1881,9 +1883,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 65 total, 63 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 65 total, 64 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
-Slot 65 reserved for section editing and pending due-date checks.
+Slot 65 passed on 1791151a. Native Meteor: 1,118 server and 1,251 Chromium passes, zero failures or hook failures, 15/seven pending. Confirmed the installed due-date enrollment rules, transactional section rename/deletion and stale-edit rollback, reuse of the original invitation IDs, membership and cache handling, and the rendered Blaze editor payload. Image reused and cleanup complete. Receipt: /var/tmp/mofacts-integration.8JGswhjU/results/native-verification.json SHA-256 326c19c452a9b936d87560dfb2754acfe6ce852f5c2ab986aec144e31380d56e.
 
 Slot 64 passed on eef7208f. The installed assignment editor and save, progressive retention and launch, teacher-directory scope and exact fields, and direct invitation all passed. Native Meteor recorded 1,117 server and 1,250 Chromium passes, zero failures and hook failures, and 15/seven pending. Image reused and cleanup complete. Receipt: /var/tmp/mofacts-integration.EM58eIYu/results/native-verification.json SHA-256 5c0ba741659f719336309085a3cf409015f19d63df38e03eb9d7d30fe00756d1.
 
