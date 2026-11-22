@@ -118,7 +118,8 @@ Use the evidence entries below for individual completed bindings. These are the 
 - [x] Implement owner-only inheritance of lesson provider keys in copyTdf. Non-owner copies also drop the source archive references so a ZIP containing embedded keys does not follow the lesson.
 - [x] Verify all three key fields in owner, shared and administrator copies, denial for an unrelated user, and the original document in native Meteor (slot 53).
 - [x] Adopt the approved rule for new downloads and ownership transfers. Omit all three lesson provider keys on export, including for the owner. Clear the keys from all members in the ownership transaction. A request to transfer to the same owner preserves the keys.
-- [ ] Verify key-free exported ZIPs, refusal to reuse older archives, and actual MongoDB family transfers in native Meteor. Existing archive remediation is a separate decision.
+- [x] Verify key-free exported ZIPs, refusal to reuse older archives, and actual MongoDB family transfers in native Meteor (slot 54).
+- [ ] Decide how to handle direct links to stored exports generated before format 2. Code review confirmed that the export builder marked ZIPs public and the asset handler serves public ZIPs with a one-year immutable cache policy. Rejecting cache reuse during export does not revoke an existing direct link. No historical archive or live credential was inspected.
 - [ ] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
@@ -1826,11 +1827,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 54 total, 52 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 54 total, 53 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
 
-Slot 54 reserved for the combined package-export and lesson-family transfer change on local Linux.
+Slot 54 consumed and passed on 2246fbbd on 2026-11-22, 18:21:30 to 18:22:49 UTC. Native Meteor recorded 1,109 server and 1,249 Chromium passes, zero test or hook failures, and 15/seven existing pending. Both the ZIP-content/cache test and the MongoDB intact-family credential transfer test passed. Identical source observations, retained results and generated-directory cleanup verified. Existing worker image reused. Receipt /var/tmp/mofacts-integration.4dRYQM7h/results/native-verification.json, SHA-256 dc07bd955e7b68358f23a3977b7ba0f88aa7fd84552aa8f805573b605abc3a7d. Full typecheck and lint passed (324 surfaces), as did 369 focused regressions and 172 source-security tests on Linux. Windows source checks could not reach WSL from the restricted process. The Linux run used a process-scoped Git ownership exception for the exact shared checkout.
 
 Slot 53 consumed and passed on e2099adf on 2026-11-22, 18:03:53 to 18:05:15 UTC. The named lesson-copy provider-key regression ran in Meteor. Server 1,108 passed and 15 pending. Chromium 1,249 passed and seven pending. Zero failures and zero hook failures. Both source observations matched. The repaired worker reused image sha256:18975f65e74d445f4a96f49cbafdb00ca7c9895f15a3c4dfe6f96a333d701ca8. C: had 327.48 GiB free before preparation and 323.53 GiB before execution. Full logs, suite evidence and receipt remain in /var/tmp/mofacts-integration.ycRVSZDb/results. Native receipt SHA-256 5cd33cb179d30d23b165049c734c1b730887ef55cf112e0b34011b07f94be80e. Verified removal of the three generated directories and absence of labelled job containers, networks and volumes. The next policy decision covers package exports and ownership transfers.
 
