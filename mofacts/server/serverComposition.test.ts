@@ -2578,6 +2578,35 @@ describe('course method authorization', function() {
     expect(denied).to.include({ error: code });
   }
 
+  it('limits new course owners to existing teachers and administrators', async function() {
+    const users = await Promise.all(['admin', 'teacher', 'otherAdmin', 'learner'].map(() =>
+      MeteorUsersAny.insertAsync({ username: Random.id() })));
+    const [admin, teacher, otherAdmin, learner] = users;
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    await Roles.addUsersToRolesAsync(otherAdmin, 'admin');
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    const handlers = MeteorAny.server.method_handlers;
+    const create = (userId: string, teacherUserId: string) => handlers.addCourse.call({ userId }, {
+      courseName: Random.id(), teacherUserId, sections: ['A'],
+    });
+    for (const id of [learner, Random.id(), '']) await expectCourseDenial(() => create(admin, id), 400);
+    expect(await CoursesAny.find({}).countAsync()).to.equal(0);
+    const own = await create(teacher, otherAdmin);
+    expect((await CoursesAny.findOneAsync(own)).teacherUserId).to.equal(teacher);
+    const courseId = await create(admin, teacher);
+    const section = await SectionsAny.findOneAsync({ courseId });
+    const transfer = (teacherUserId: string) => handlers.editCourse.call({ userId: admin }, {
+      courseId, courseName: 'Synthetic course', teacherUserId, sections: [],
+      existingSections: [{ sectionId: section._id, originalName: 'A', sectionName: 'A', remove: false }],
+    });
+    await Roles.removeUsersFromRolesAsync(teacher, 'teacher');
+    await transfer(teacher);
+    for (const id of [learner, Random.id()]) await expectCourseDenial(() => transfer(id), 400);
+    expect((await CoursesAny.findOneAsync(courseId)).teacherUserId).to.equal(teacher);
+    await transfer(otherAdmin);
+    expect((await CoursesAny.findOneAsync(courseId)).teacherUserId).to.equal(otherAdmin);
+  });
+
   it('renames sections in place and deletes only explicitly selected sections', async function() {
     const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
     const student = await MeteorUsersAny.insertAsync({ username: Random.id() });

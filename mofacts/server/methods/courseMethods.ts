@@ -1,5 +1,5 @@
 import { commitCourseEdit } from '../lib/courseSectionEdit';
-import { COURSE_EDIT_VERIFICATION, COURSE_EXCEPTION_VERIFICATIONS, COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, COURSE_EXCEPTION_VERIFICATIONS, COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
 import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 import { enrolledCourseLessonIds } from '../lib/enrolledCourseLessons';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
@@ -327,6 +327,20 @@ export function createCourseService(deps: CourseMethodsDeps) {
     return { actingUserId, roleFlags };
   }
 
+  async function resolveCourseOwner(actor: Awaited<ReturnType<typeof requireTeacherOrAdmin>>, requested: unknown, currentOwner?: string) {
+    const { actingUserId, roleFlags } = actor;
+    if (!roleFlags.admin) return actingUserId;
+    if (requested === undefined) return currentOwner ?? actingUserId;
+    if (typeof requested !== 'string' || !requested.trim()) throw new Meteor.Error(400, 'A valid course owner ID is required');
+    const ownerId = requested.trim();
+    if (ownerId === actingUserId || ownerId === currentOwner) return ownerId;
+    const user = await deps.usersCollection.findOneAsync({ _id: ownerId }, { fields: { _id: 1 } });
+    if (!user) throw new Meteor.Error(400, 'Course owner must be an existing teacher or administrator');
+    const roles = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), ownerId, ['admin', 'teacher'] as const);
+    if (!roles.teacher && !roles.admin) throw new Meteor.Error(400, 'Course owner must be an existing teacher or administrator');
+    return ownerId;
+  }
+
   async function assertCanManageCourse(thisArg: MethodContext, courseId: string) {
     const { actingUserId, roleFlags } = await requireTeacherOrAdmin(thisArg);
     const normalizedCourseId = deps.normalizeCanonicalId(courseId);
@@ -343,6 +357,7 @@ export function createCourseService(deps: CourseMethodsDeps) {
     return { course, actingUserId, roleFlags };
   }
 
+  const createCoursePolicy = Object.freeze({ kind: 'course-management', operation: 'create-course', authorize: requireTeacherOrAdmin } as const);
   const courseManagementPolicy = Object.freeze({ kind: 'course-management', operation: 'manage-course', authorize: assertCanManageCourse } as const);
 
   async function assertUniqueCourseNameForTeacher(courseName: string, teacherUserId: string, semester: string, excludingCourseId?: string) {
@@ -1106,7 +1121,7 @@ export function createCourseService(deps: CourseMethodsDeps) {
   }
 
   async function addCourse(this: MethodContext, mycourse: { sections: string[] } & UnknownRecord) {
-    const { actingUserId, roleFlags } = await requireTeacherOrAdmin(this);
+    const actor = await createCoursePolicy.authorize(this);
     assertKnownFields(mycourse, ['courseId', 'courseName', 'teacherUserId', 'semester', 'beginDate', 'endDate', 'timezone', 'visibility', 'sections'], 'Course');
     const { beginDate, endDate, timezone } = normalizeCourseDates(mycourse);
     const sections = normalizeCourseSections(mycourse.sections);
@@ -1114,10 +1129,7 @@ export function createCourseService(deps: CourseMethodsDeps) {
     if (!courseName) {
       throw new Meteor.Error(400, 'Course name is required');
     }
-    const adminTeacherUserId = deps.normalizeCanonicalId(mycourse.teacherUserId);
-    const teacherUserId = roleFlags.admin && adminTeacherUserId
-      ? adminTeacherUserId
-      : actingUserId;
+    const teacherUserId = await resolveCourseOwner(actor, mycourse.teacherUserId);
     const semester = normalizeOptionalString(mycourse.semester) || curSemester;
     await assertUniqueCourseNameForTeacher(courseName, teacherUserId, semester);
     const courseDoc = {
@@ -1141,16 +1153,14 @@ export function createCourseService(deps: CourseMethodsDeps) {
   async function editCourse(this: MethodContext, mycourse: { _id: string; courseId: string; sections: string[] } & UnknownRecord) {
     assertKnownFields(mycourse, ['_id', 'courseId', 'courseName', 'teacherUserId', 'semester', 'beginDate', 'endDate', 'timezone', 'visibility', 'sections', 'existingSections'], 'Course');
     const targetCourseId = deps.normalizeCanonicalId(mycourse._id) || deps.normalizeCanonicalId(mycourse.courseId);
-    const { course, actingUserId, roleFlags } = await courseManagementPolicy.authorize(this, targetCourseId || '');
+    const actor = await courseManagementPolicy.authorize(this, targetCourseId || '');
+    const { course } = actor;
     const { beginDate, endDate, timezone } = normalizeCourseDates(mycourse, course);
     const courseName = normalizeCourseName(mycourse.courseName);
     if (!courseName) {
       throw new Meteor.Error(400, 'Course name is required');
     }
-    const adminTeacherUserId = deps.normalizeCanonicalId(mycourse.teacherUserId);
-    const teacherUserId = roleFlags.admin && adminTeacherUserId
-      ? adminTeacherUserId
-      : (!roleFlags.admin ? actingUserId : course.teacherUserId);
+    const teacherUserId = await resolveCourseOwner(actor, mycourse.teacherUserId, course.teacherUserId);
     const semester = normalizeOptionalString(mycourse.semester) || course.semester || curSemester;
     await assertUniqueCourseNameForTeacher(courseName, teacherUserId, semester, targetCourseId || undefined);
     const visibility = mycourse.visibility === undefined
@@ -1315,6 +1325,7 @@ export function createCourseService(deps: CourseMethodsDeps) {
   return {
     methods,
     methodBindings: Object.freeze([
+      Object.freeze({ handler: methods.addCourse, verification: COURSE_CREATE_VERIFICATION, policy: createCoursePolicy, dataEgress: 'course-id' as const }),
       Object.freeze({ handler: methods.editCourse, verification: COURSE_EDIT_VERIFICATION, policy: courseManagementPolicy, dataEgress: 'course-id' as const }),
       ...Object.values(COURSE_EXCEPTION_VERIFICATIONS).map(verification => Object.freeze({
         handler: methods[verification.method], verification, policy: exceptionPolicy, dataEgress: 'none' as const,

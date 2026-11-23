@@ -30,7 +30,7 @@ export type MeteorMethodBinding = Readonly<{
     authorize: (...args: never[]) => Promise<string> | string;
   }> | Readonly<{
     kind: 'course-management';
-    operation: 'manage-course' | 'enrolled-student-exception';
+    operation: 'create-course' | 'manage-course' | 'enrolled-student-exception';
     authorize: (...args: never[]) => Promise<unknown>;
   }> | Readonly<{
     kind: 'course-read';

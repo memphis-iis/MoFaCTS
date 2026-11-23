@@ -48,7 +48,8 @@
     },
     {
       "name": "addCourse",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Teacher or administrator. Only an administrator may select another existing teacher or administrator as owner."
     },
     {
       "name": "addUserDueDateException",
@@ -248,7 +249,7 @@
     {
       "name": "editCourse",
       "access": "role-checked",
-      "notes": "Owner or admin; validates section identity and explicit removals before committing course, sections, and enrollment changes together.",
+      "notes": "Owner or admin; a newly selected owner must exist and hold a teacher or admin role. Validates section identity and explicit removals before committing course, sections, and enrollment changes together.",
       "notes": "Course owner/admin authorization is retained. Removing sections removes their enrollment references and invalidates existing assigned/public course snapshots, including learners no longer found through live sections."
     },
     {

@@ -628,7 +628,7 @@ Performance rules:
 - Validate `beginDate`, `endDate`, and `timezone`.
 - Require `timezone` for new courses.
 - Reject invalid visibility values.
-- Preserve existing teacher/admin ownership behavior.
+- Teachers manage their own courses. An administrator creating a course for another account or transferring ownership must select an existing teacher or administrator. An existing owner may stay assigned after losing that role.
 - Insert only recognized course fields; avoid persisting arbitrary UI fields from the client payload.
 
 ### `editCourse`
@@ -638,7 +638,7 @@ Performance rules:
 - Validate `beginDate`, `endDate`, and `timezone`.
 - Preserve existing course timezone when the edit payload omits timezone for a legacy caller.
 - Reject invalid visibility values.
-- Preserve existing teacher/admin ownership behavior.
+- Apply the same owner eligibility rule as course creation when an administrator transfers a course.
 - Update only recognized course fields.
 
 ### Enrollment teacher directory
