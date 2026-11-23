@@ -63,3 +63,5 @@ older staging installation outside this qualification batch.
 The manual creator and Anki importer upload a separate archive before asking for confirmation of a lesson update. The lesson editor uploads media to a new URL. Saving the lesson commits that URL. Cancelling an update, abandoning an edit, or failing to upload leaves the original available.
 
 Replacing a file does not grant permission to delete every copy with the same name. The application retains previously published files when it cannot establish that all references have been removed. Repeated replacements can therefore increase storage usage.
+
+In the Content Upload media list, dropping files and using the file picker both skip names already present in the lesson. Other files in the selection continue uploading. Use the lesson editor to replace a specific media reference, or give the new file another name to keep both.

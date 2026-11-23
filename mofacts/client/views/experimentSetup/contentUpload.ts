@@ -1,3 +1,4 @@
+import { uploadNewLessonMedia } from './uploadNewLessonMedia';
 import { startContentUploadCache } from '../../lib/contentUploadCache';
 import { createContentUploadProjection } from './contentUploadProjection';
 import { buildSparcVideoCatalog } from './sparcVideoCatalogBuilder';
@@ -1839,40 +1840,18 @@ async function uploadMediaFiles(files: any, tdfId: any, template: any) {
     return;
   }
 
-  if (validFiles.length !== files.length) {
-    const skipped = files.length - validFiles.length;
-    setUploadMessage(template, contentText('content.mediaFilesSkipped', { count: skipped }), 'warning', `media:${tdfId}`);
-  }
-
+  const messages: string[] = [];
+  const skipped = files.length - validFiles.length;
+  if (skipped) messages.push(contentText('content.mediaFilesSkipped', { count: skipped }));
   progressContainer.show();
-  let completed = 0;
   const total = validFiles.length;
-
-  for (const file of validFiles as any[]) {
-    statusText.text(`Uploading ${file.name} (${completed + 1}/${total})...`);
-
-    try {
-      // Check if file already exists
-      const existingFile = DynamicAssetsCollection.findOne({ name: file.name, 'meta.stimuliSetId': stimSetId });
-      if (existingFile) {
-        const confirmed = await requestContentConfirmation(template, {
-          placement: mediaPlacement(String(tdfId || '')),
-          title: contentText('content.overwriteMediaFile'),
-          message: contentText('content.mediaFileExistsOverwrite', { filename: file.name }),
-          confirmLabel: contentText('content.overwriteFile'),
-          cancelLabel: contentText('content.skip'),
-          level: 'warning'
-        });
-        if (!confirmed) {
-          completed++;
-          continue;
-        }
-        // Remove existing file first
-        await MeteorAny.callAsync('removeAssetById', existingFile._id);
-      }
-
-      // Upload using DynamicAssetsCollection
-      await new Promise((resolve: any, reject: any) => {
+  const batch = await uploadNewLessonMedia(
+    validFiles as File[],
+    String(stimSetId),
+    name => Boolean(DynamicAssetsCollection.findOne({ name, 'meta.stimuliSetId': stimSetId })),
+    (file, index) => {
+      statusText.text(file.name);
+      return new Promise<void>((resolve, reject) => {
         const upload = DynamicAssetsCollection.insert({
           transport: 'ddp',
           file: file,
@@ -1886,37 +1865,27 @@ async function uploadMediaFiles(files: any, tdfId: any, template: any) {
         }, false);
 
         upload.on('progress', function(progress: any) {
-          const overallProgress = ((completed + progress / 100) / total) * 100;
+          const overallProgress = ((index + progress / 100) / total) * 100;
           progressBar.css('width', overallProgress + '%');
         });
 
-        upload.on('end', function(error: any, fileObj: any) {
-          if (error) {
-            reject(error);
-          } else {
-            
-            resolve(fileObj);
-          }
-        });
-
+        upload.on('end', (error: unknown) => error ? reject(error) : resolve());
         upload.start();
       });
-
-      completed++;
-      progressBar.css('width', (completed / total) * 100 + '%');
-    } catch (error: any) {
-      clientConsole(1, '[MEDIA] Upload error for', file.name, ':', error);
-      setUploadMessage(template, contentText('content.uploadMediaError', { filename: file.name, error: uploadErrorText(error) }), 'error', `media:${tdfId}`);
-    }
-  }
-
-  // Hide progress immediately, then refresh
+    },
+  );
   progressContainer.hide();
   progressBar.css('width', '0%');
-  statusText.text('Upload complete!');
-  if (completed === total) {
-    setUploadMessage(template, contentText('content.uploadedMediaFiles', { count: completed }), 'success', `media:${tdfId}`);
+  if (batch.uploaded) messages.push(contentText('content.uploadedMediaFiles', { count: batch.uploaded }));
+  if (batch.duplicates.length) {
+    messages.push(contentText('content.mediaNamesAlreadyUsed', { filenames: batch.duplicates.join(', ') }));
   }
+  for (const { name, error } of batch.errors) {
+    clientConsole(1, '[MEDIA] Upload error for', name, ':', error);
+    messages.push(contentText('content.uploadMediaError', { filename: name, error: uploadErrorText(error) }));
+  }
+  const level = batch.errors.length ? 'error' : skipped || batch.duplicates.length ? 'warning' : 'success';
+  setUploadMessage(template, messages.join(' '), level, `media:${tdfId}`);
 
   // Refresh the assets list after a short delay to ensure UI updates
   setTimeout(() => {
