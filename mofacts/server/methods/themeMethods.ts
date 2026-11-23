@@ -274,31 +274,6 @@ export function createThemeMethods(deps: ThemeMethodDeps) {
       }
     },
 
-    toggleCustomTheme: async function(this: MethodContext) {
-      deps.serverConsole('toggleCustomTheme');
-      await deps.requireAdminUser(this.userId, 'Only admins can toggle themes', 'unauthorized');
-
-      const current = await themeRegistry.ensureActiveTheme();
-      const wasEnabled = current?.enabled !== false;
-      const nextState = {
-        ...current,
-        enabled: !wasEnabled,
-      };
-
-      await deps.DynamicSettings.upsertAsync({ key: 'customTheme' }, { $set: { value: nextState } });
-
-      const entry = nextState?.activeThemeId ? themeRegistry.getThemeEntry(nextState.activeThemeId) : null;
-      if (entry && !entry.readOnly) {
-        await themeRegistry.updateTheme(entry.id, (theme: ThemeMutable) => {
-          theme.enabled = nextState.enabled;
-          return theme;
-        });
-      }
-
-      deps.serverConsole('custom theme enabled:', nextState.enabled);
-      return nextState;
-    },
-
     createThemeFromBase: async function(
       this: MethodContext,
       options: { name: string; baseThemeId?: string; properties?: Record<string, unknown>; activate?: boolean }

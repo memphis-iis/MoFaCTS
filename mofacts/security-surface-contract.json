@@ -112,10 +112,6 @@
       "notes": "The V2 audit receiver checks administrator access before listing bounded report summaries."
     },
     {
-      "name": "adminCreateOrUpdateUser",
-      "access": "admin-only"
-    },
-    {
       "name": "assignAccessors",
       "access": "role-checked",
       "notes": "Only the owner may edit sharing. Each new recipient must match an account inside the transaction. Stale existing entries can be retained or revoked."
@@ -524,11 +520,6 @@
       "access": "role-checked"
     },
     {
-      "name": "initializeDashboardCache",
-      "access": "role-checked",
-      "notes": "Authenticated-self or administrator for another existing user. Full reconstruction is an initialization/repair operation; projected source history and cache position share one snapshot transaction."
-    },
-    {
       "name": "insertHistory",
       "access": "role-checked",
       "notes": "Authenticated-self and lesson/course write authorization retained. Assessment copies rejected. Worksheet and SPARC transition identities are validated; server-derived record IDs deduplicate retries using Mongo uniqueness. Conflicting sequence or transition writes fail. Competitive and student-selected AutoTutor policies and model/OET facts require an admin account at the common history-write boundary. SPARC assessment arrays are admin-only, limited to 256 records and 1 MiB, share one authorized lesson/attempt/response/course/policy scope, contain score-change rows followed by completion, and persist atomically in a Mongo transaction. All accepted single and batch history rows commit their server-owned per-user source sequence in the same transaction; duplicate durable writes allocate no new sequence, and practice saves never rebuild dashboard summaries. Actual SPARC tutor output also checks exact per-user content eligibility and records presentation-use metadata inside that same transaction; duplicate content rolls back both history and source position."
@@ -539,10 +530,6 @@
     },
     {
       "name": "isUserSpeechAPIKeySetup",
-      "access": "role-checked"
-    },
-    {
-      "name": "listManualContentDrafts",
       "access": "role-checked"
     },
     {
@@ -600,10 +587,6 @@
       "access": "authenticated-self"
     },
     {
-      "name": "refreshDashboardCache",
-      "access": "role-checked"
-    },
-    {
       "name": "getLearnerLessonAnalyticsHistoryPage",
       "access": "authenticated-self",
       "notes": "Existing learner lesson reauthorization and cursor limits retained; historical assessment copies are excluded."
@@ -627,10 +610,6 @@
     },
     {
       "name": "removeMultipleAssets",
-      "access": "role-checked"
-    },
-    {
-      "name": "removeTdfFromCache",
       "access": "role-checked"
     },
     {
@@ -786,10 +765,6 @@
     {
       "name": "testOwnOpenRouterSettings",
       "access": "authenticated-self"
-    },
-    {
-      "name": "toggleCustomTheme",
-      "access": "role-checked"
     },
     {
       "name": "transferDataOwnership",

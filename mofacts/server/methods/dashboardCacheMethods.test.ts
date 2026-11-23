@@ -843,6 +843,7 @@ describe('dashboardCacheMethods', function() {
   it('forces explicit initialization through the same lock after validating the target user', async function() {
     const calls: unknown[] = [];
     const methods = createDashboardMethodsFixture({
+      Roles: { userIsInRoleAsync: async () => true },
       usersCollection: { findOneAsync: async (selector: any) => { calls.push(selector); return { _id: selector._id }; } },
       refreshDashboardHistory: async (userId, options) => {
         calls.push({ userId, options });
@@ -853,7 +854,8 @@ describe('dashboardCacheMethods', function() {
         async withLock<T>(key: string, _ttl: number, work: () => Promise<T>) { calls.push(key); return await work(); },
       },
     });
-    expect(await methods.initializeDashboardCache.call({ userId: 'learner-1' })).to.deep.include({ success: true, tdfCount: 3 });
+    const result = await methods.refreshUserAdminUsageCaches.call({ userId: 'admin-1' }, ['learner-1']);
+    expect(result.refreshed).to.deep.equal([{ userId: 'learner-1', tdfCount: 3 }]);
     expect(calls).to.deep.equal([
       { _id: 'learner-1' }, 'dashboard-cache:ensure:learner-1',
       { userId: 'learner-1', options: { forceRebuild: true } },
@@ -863,20 +865,19 @@ describe('dashboardCacheMethods', function() {
   it('rejects unauthorized or missing-user initialization before refreshing history', async function() {
     let refreshes = 0;
     const methods = createDashboardMethodsFixture({
-      Roles: { userIsInRoleAsync: async () => false },
+      Roles: { userIsInRoleAsync: async (id: string) => id === 'admin-1' },
       usersCollection: { findOneAsync: async () => null },
       refreshDashboardHistory: async () => { refreshes++; return { success: true, action: 'current', tdfCount: 0 }; },
     });
-    for (const [context, target, expected] of [
-      [{ userId: null }, null, 'not-authorized'],
-      [{ userId: 'learner-1' }, 'other-user', 'not-authorized'],
-      [{ userId: 'learner-1' }, null, 'not-found'],
-    ] as const) {
+    for (const userId of [null, 'learner-1']) {
       try {
-        await methods.initializeDashboardCache.call(context, target);
+        await methods.refreshUserAdminUsageCaches.call({ userId }, ['missing']);
         expect.fail('Expected initialization boundary to reject the request');
-      } catch (error: any) { expect(error.error).to.equal(expected); }
+      } catch (error: any) { expect(error.error).to.equal('not-authorized'); }
     }
+    const result = await methods.refreshUserAdminUsageCaches.call({ userId: 'admin-1' }, ['missing']);
+    expect(result.success).to.equal(false);
+    expect(result.failed.map(row => row.userId)).to.deep.equal(['missing']);
     try {
       await methods.ensureDashboardCacheCurrent.call({ userId: null });
       expect.fail('Expected current-cache reads to require login');
@@ -884,17 +885,15 @@ describe('dashboardCacheMethods', function() {
     expect(refreshes).to.equal(0);
   });
 
-  it('allows an administrator to initialize another existing user and propagates owner failure', async function() {
+  it('reports a rebuild failure for the selected user to the administrator', async function() {
     const requests: unknown[] = [];
     const failure = new Error('Synthetic refresh failure');
     const methods = createDashboardMethodsFixture({
       Roles: { userIsInRoleAsync: async (userId: string, roles: string[]) => userId === 'admin-1' && roles.includes('admin') },
       refreshDashboardHistory: async (userId, options) => { requests.push({ userId, options }); throw failure; },
     });
-    try {
-      await methods.initializeDashboardCache.call({ userId: 'admin-1' }, 'learner-1');
-      expect.fail('Expected refresh owner failure to propagate');
-    } catch (error) { expect(error).to.equal(failure); }
+    const result = await methods.refreshUserAdminUsageCaches.call({ userId: 'admin-1' }, ['learner-1']);
+    expect(result.failed).to.deep.equal([{ userId: 'learner-1', error: failure.message }]);
     expect(requests).to.deep.equal([{ userId: 'learner-1', options: { forceRebuild: true } }]);
   });
   it('refreshUserAdminUsageCaches refreshes users with bounded concurrency and progress logging', async function() {
@@ -1139,23 +1138,6 @@ describe('dashboardCacheMethods', function() {
     }
     expect(historyRemoveCalled).to.equal(false);
     expect(experimentStateRemoveCalled).to.equal(false);
-  });
-
-  it('administrative cache pruning invalidates its source position so a later entry repairs the summary', async function() {
-    const stats = computeCacheStats([{ _id: 'old', levelUnitType: 'model', time: 1000, outcome: 'correct' }], 'Lesson', () => 0);
-    let modifier: any;
-    const methods = createDashboardMethodsFixture({
-      Roles: { userIsInRoleAsync: async () => true },
-      UserDashboardCache: {
-        find: () => ({ fetchAsync: async () => [{ _id: 'cache', tdfStats: { removed: stats, retained: stats } }] }),
-        updateAsync: async (_selector: unknown, update: unknown) => { modifier = update; },
-      },
-    });
-
-    expect(await methods.removeTdfFromCache.call({ userId: 'admin' }, 'removed')).to.deep.equal({ success: true, modified: 1 });
-    expect(modifier.$set.tdfStats).to.have.keys(['retained']);
-    expect(modifier.$set.summary.totalTrialsAllTime).to.equal(1);
-    expect(modifier.$unset).to.have.keys(['lastHistorySequence', 'historyRepairRevision', 'historyTdfTargets']);
   });
 
   it('resetOwnLessonProgress remains available when the learner is not enrolled in the assigned course', async function() {

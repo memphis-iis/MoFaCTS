@@ -1896,6 +1896,22 @@ describe('learner analytics method authorization', function() {
 
   });
 
+  it('exposes the active dashboard, draft, theme and user operations without the retired commands', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of [
+      'initializeDashboardCache', 'refreshDashboardCache', 'removeTdfFromCache',
+      'listManualContentDrafts', 'toggleCustomTheme', 'adminCreateOrUpdateUser',
+    ]) {
+      expect(handlers).not.to.have.own.property(name);
+    }
+    for (const name of [
+      'ensureDashboardCacheCurrent', 'refreshUserAdminUsageCaches', 'getManualContentDraft',
+      'saveManualContentDraft', 'setActiveTheme', 'insertNewUsers',
+    ]) {
+      expect(handlers[name]).to.be.a('function');
+    }
+  });
+
   it('excludes retired analytics reads and internal helpers from the Meteor registry', function() {
     const handlers = MeteorAny.server.method_handlers;
     for (const name of [

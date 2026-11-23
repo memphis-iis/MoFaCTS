@@ -164,48 +164,6 @@ export function createContentMethods(deps: ContentMethodsDeps) {
   return {
     ...assetMaintenanceMethods,
 
-    listManualContentDrafts: async function(this: MethodContext) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-
-      const drafts = await deps.ManualContentDrafts.find(
-        {
-          ownerId: this.userId,
-          draftType: 'manual-content-creator',
-        },
-        {
-          fields: {
-            lessonName: 1,
-            currentStep: 1,
-            summary: 1,
-            updatedAt: 1,
-            createdAt: 1,
-          },
-          sort: { updatedAt: -1 },
-          limit: 25,
-        }
-      ).fetchAsync();
-
-      return drafts.map((draft: any) => {
-        const currentStep = normalizeManualDraftStep(draft?.currentStep, 1);
-        const summary = deps.isPlainRecord(draft?.summary) ? draft.summary : {};
-        return {
-          _id: String(draft?._id || ''),
-          lessonName: typeof draft?.lessonName === 'string' && draft.lessonName.trim()
-            ? draft.lessonName.trim()
-            : (typeof summary.lessonName === 'string' && summary.lessonName.trim() ? summary.lessonName.trim() : 'Untitled draft'),
-          currentStep,
-          stepLabel: typeof summary.stepLabel === 'string' ? summary.stepLabel : getManualDraftStepLabel(currentStep),
-          status: typeof summary.status === 'string' ? summary.status : getManualDraftStepLabel(currentStep),
-          promptType: typeof summary.promptType === 'string' ? summary.promptType : null,
-          responseType: typeof summary.responseType === 'string' ? summary.responseType : null,
-          updatedAt: draft?.updatedAt || null,
-          createdAt: draft?.createdAt || null,
-        };
-      });
-    },
-
     getManualContentDraft: async function(this: MethodContext, draftId: string) {
       if (!this.userId) {
         throw new Meteor.Error(401, 'Must be logged in');

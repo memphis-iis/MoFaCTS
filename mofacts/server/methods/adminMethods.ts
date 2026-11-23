@@ -628,21 +628,6 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
       };
     },
 
-    adminCreateOrUpdateUser: async function(this: MethodContext, rawUserName: string, newUserPassword: string) {
-      check(rawUserName, String);
-      check(newUserPassword, String);
-      await deps.requireAdminUser(this.userId, 'Only admins can create or update users');
-
-      return await upsertManagedUser(deps, {
-        actingUserId: this.userId,
-        rawUserName,
-        password: newUserPassword,
-        existingUserSource: 'adminCreateOrUpdateUser.existingUser',
-        createdUserSource: 'adminCreateOrUpdateUser.createdUser',
-        verificationSource: 'adminCreateOrUpdateUser',
-      });
-    },
-
     userAdminRoleChange: async function(this: MethodContext, targetUserId: string, roleAction: string, roleName: string) {
       deps.serverConsole('userAdminRoleChange request received:', { roleAction, roleName });
       await deps.requireAdminUser(this.userId, 'You are not authorized to do that', 'not-authorized');
