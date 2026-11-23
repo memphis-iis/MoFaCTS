@@ -288,7 +288,9 @@ describe('server auth and session methods', function() {
   });
 
   it('exposes individual package deletion without installation-wide deletion', function() {
-    expect(MeteorAny.server.method_handlers).not.to.have.own.property('deleteAllFiles');
+    for (const name of ['deleteAllFiles', 'cleanupOrphanDynamicAssets']) {
+      expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);
+    }
     expect(MeteorAny.server.method_handlers.deletePackageFile).to.be.a('function');
   });
 

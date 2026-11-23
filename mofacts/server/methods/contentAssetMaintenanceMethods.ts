@@ -21,7 +21,6 @@ type DynamicAssetDoc = {
   type?: unknown;
   uploadedAt?: unknown;
   ext?: unknown;
-  extension?: unknown;
   meta?: { public?: boolean; stimuliSetId?: unknown; storageBackend?: unknown; storageKey?: unknown };
 };
 
@@ -36,23 +35,6 @@ type TdfLike = {
   content?: {
     fileName?: string;
   };
-};
-
-type DynamicAssetCleanupResult = {
-  scanned: number;
-  orphanCount: number;
-  removedCount: number;
-  sizeBytes: number;
-  dryRun: boolean;
-  limit: number;
-  hasMore: boolean;
-  assets: Array<{
-    assetId: string;
-    name: string | null;
-    size: unknown;
-    reason: string;
-    stimuliSetId: unknown;
-  }>;
 };
 
 type ContentAssetMaintenanceDeps = {
@@ -80,15 +62,6 @@ function hasNonEmptyValue(value: unknown): boolean {
   return value !== null && value !== undefined && String(value).trim() !== '';
 }
 
-function assetExtension(asset: DynamicAssetDoc): string {
-  const ext = String(asset.ext || asset.extension || '').trim().toLowerCase().replace(/^\./, '');
-  if (ext) {
-    return ext;
-  }
-  const name = String(asset.name || asset.fileName || '').trim().toLowerCase();
-  return name.match(/\.([a-z0-9]+)$/)?.[1] || '';
-}
-
 function stimuliSetCandidates(deps: ContentAssetMaintenanceDeps, stimuliSetId: unknown): Array<string | number> {
   if (!hasNonEmptyValue(stimuliSetId)) {
     return [];
@@ -98,20 +71,6 @@ function stimuliSetCandidates(deps: ContentAssetMaintenanceDeps, stimuliSetId: u
 
 function stimuliSetKey(value: unknown): string {
   return `${typeof value}:${String(value)}`;
-}
-
-function packageReferenceCandidates(asset: DynamicAssetDoc): string[] {
-  const values = new Set<string>();
-  for (const value of [asset._id, asset.name, asset.fileName]) {
-    if (typeof value === 'string' && value.trim()) {
-      values.add(value.trim());
-    }
-  }
-  const ext = assetExtension(asset);
-  if (asset._id && ext) {
-    values.add(`${asset._id}.${ext}`);
-  }
-  return Array.from(values);
 }
 
 async function removeAssetsForInactiveStimuliSets(deps: ContentAssetMaintenanceDeps, stimuliSetIds: unknown[]): Promise<number> {
@@ -149,110 +108,8 @@ async function removeAssetsForInactiveStimuliSets(deps: ContentAssetMaintenanceD
   return removedCount;
 }
 
-async function cleanupOrphanDynamicAssets(
-  deps: ContentAssetMaintenanceDeps,
-  options: { dryRun?: boolean; limit?: number } = {}
-): Promise<DynamicAssetCleanupResult> {
-  const dryRun = options.dryRun !== false;
-  const limit = Math.min(Math.max(Number(options.limit || 10000), 1), 50000);
-  const assets = await deps.DynamicAssets.find(
-    {},
-    {
-      fields: { _id: 1, name: 1, fileName: 1, size: 1, ext: 1, extension: 1, meta: 1 },
-      limit,
-    }
-  ).fetchAsync() as DynamicAssetDoc[];
-  const tdfs = await deps.Tdfs.find(
-    {},
-    { fields: { stimuliSetId: 1, packageAssetId: 1, packageFile: 1 } }
-  ).fetchAsync() as TdfLike[];
-
-  const activeStimuliSetKeys = new Set<string>();
-  const activePackageReferences = new Set<string>();
-  for (const tdf of tdfs) {
-    for (const candidate of stimuliSetCandidates(deps, tdf.stimuliSetId)) {
-      activeStimuliSetKeys.add(stimuliSetKey(candidate));
-    }
-    for (const value of [tdf.packageAssetId, tdf.packageFile]) {
-      if (typeof value === 'string' && value.trim()) {
-        activePackageReferences.add(value.trim());
-      }
-    }
-  }
-
-  const orphanAssets: DynamicAssetCleanupResult['assets'] = [];
-  let sizeBytes = 0;
-  for (const asset of assets) {
-    const assetId = typeof asset._id === 'string' ? asset._id : '';
-    if (!assetId) {
-      continue;
-    }
-    const assetStimuliSetId = asset.meta?.stimuliSetId;
-    let reason = '';
-    if (hasNonEmptyValue(assetStimuliSetId)) {
-      const hasActiveTdf = stimuliSetCandidates(deps, assetStimuliSetId)
-        .some((candidate) => activeStimuliSetKeys.has(stimuliSetKey(candidate)));
-      if (!hasActiveTdf) {
-        reason = 'noActiveTdfForStimuliSetId';
-      }
-    } else if (['zip', 'apkg'].includes(assetExtension(asset))) {
-      const hasActivePackageReference = packageReferenceCandidates(asset)
-        .some((candidate) => activePackageReferences.has(candidate));
-      if (!hasActivePackageReference) {
-        reason = 'unreferencedPackageUpload';
-      }
-    }
-
-    if (!reason) {
-      continue;
-    }
-    const numericSize = Number(asset.size);
-    if (Number.isFinite(numericSize) && numericSize > 0) {
-      sizeBytes += numericSize;
-    }
-    orphanAssets.push({
-      assetId,
-      name: asset.name || asset.fileName || null,
-      size: asset.size || null,
-      reason,
-      stimuliSetId: assetStimuliSetId ?? null,
-    });
-  }
-
-  let removedCount = 0;
-  if (!dryRun) {
-    for (const asset of orphanAssets) {
-      await deps.DynamicAssets.removeAsync({ _id: asset.assetId });
-      removedCount += 1;
-    }
-  }
-
-  return {
-    scanned: assets.length,
-    orphanCount: orphanAssets.length,
-    removedCount,
-    sizeBytes,
-    dryRun,
-    limit,
-    hasMore: assets.length >= limit,
-    assets: orphanAssets.slice(0, 500),
-  };
-}
-
 export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenanceDeps) {
   return {
-    cleanupOrphanDynamicAssets: async function(this: MethodContext, options: { dryRun?: boolean; limit?: number } = {}) {
-      await requireUserWithRoles(deps.getMethodAuthorizationDeps(), {
-        userId: this.userId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Admin access required',
-        forbiddenCode: 403,
-      });
-      return await cleanupOrphanDynamicAssets(deps, options || {});
-    },
-
     deletePackageFile: async function(
       this: MethodContext,
       packageAssetIdInput: string,

@@ -151,10 +151,6 @@
       "access": "role-checked"
     },
     {
-      "name": "cleanupOrphanDynamicAssets",
-      "access": "admin-only"
-    },
-    {
       "name": "confirmPackageUpload",
       "access": "role-checked",
       "notes": "Authenticated plan ownership and revision checks retained. Identity preflight rechecks each condition's persisted root before writes. Rollback compares the writer job ID and revision. Deleted systems cannot be recreated as active updates."
