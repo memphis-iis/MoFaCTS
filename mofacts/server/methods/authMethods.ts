@@ -45,13 +45,7 @@ type AuthMethodsDeps = {
     findOneAsync: (selector: UnknownRecord) => Promise<any>;
     insertAsync: (document: UnknownRecord) => Promise<unknown>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
-    removeAsync: (selector: UnknownRecord) => Promise<number>;
   };
-  requireAdminUser: (
-    userId: string | null | undefined,
-    errMsg?: string,
-    errorCode?: string | number
-  ) => Promise<void>;
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
   getUserRoleFlags: <RoleName extends string>(
     deps: MethodAuthorizationDeps,
@@ -301,17 +295,6 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       return { success: true };
     },
 
-    cleanupExpiredPasswordResetTokens: async function(this: MethodContext) {
-      await deps.requireAdminUser(this.userId, 'Admin access required');
-
-      const deleted = await deps.PasswordResetTokens.removeAsync({
-        expiresAt: { $lt: new Date() },
-      });
-
-      deps.serverConsole('Cleaned up', deleted, 'expired password reset tokens');
-      return { deleted };
-    },
-
     signUpUser: async function(this: MethodContext, newUserName: string, newUserPassword: string) {
       check(newUserName, String);
       check(newUserPassword, String);
@@ -412,24 +395,6 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
         return 'success: ' + serviceEmail;
       }
       return 'failure';
-    },
-
-    clearLoginData: async function(this: MethodContext) {
-      const userId = requireCurrentUserId(this.userId, 'User must be logged in to clear login data');
-      const user = await deps.usersCollection.findOneAsync({ _id: userId });
-      if (!user) {
-        throw new Meteor.Error(404, 'User not found');
-      }
-      const loginParams = user.loginParams || {};
-      loginParams.entryPoint = null;
-      loginParams.curTeacher = null;
-      loginParams.curClass = null;
-      loginParams.loginMode = null;
-      loginParams.authSessionState = null;
-      await deps.usersCollection.updateAsync({ _id: userId }, { $set: { loginParams } });
-      if (!await privateParticipantActivity(this)) await deps.writeAuditLog('auth.sessionRevoked', userId, userId, {
-        reason: 'clearLoginData',
-      });
     },
 
     isUserSpeechAPIKeySetup: async function(this: MethodContext) {

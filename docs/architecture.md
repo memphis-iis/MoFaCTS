@@ -47,6 +47,8 @@ Fixed assessment schedules are assembled by `learning-components/units/assessmen
 
 ## Server Runtime
 
+Password reset links expire one hour after issue. MongoDB automatically removes reset-request records on its background cleanup cycle once they are two minutes past expiry. This interval permits the audit to verify rejection of a still-present expired link. Reset audit events are stored separately.
+
 Server code handles persistence, authentication and authorization checks, content upload, external integrations, import/export workflows, and data access that cannot safely run on the client.
 
 New server methods should be added only when the task requires database access, authentication enforcement, secret handling, or external service access. Pure computation should live in `common/` or client-side code.

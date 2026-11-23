@@ -1891,7 +1891,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 71 total, 67 consumed, 0 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 71 total, 67 consumed, 1 reserved, 2 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 69 reserved for automatic reset-request expiry cleanup and two retired authentication commands.
 
 Slot 68 passed on 446105eb. Native Meteor recorded 1,123 server and 1,251 Chromium passes, zero failures or hook failures, and 15/seven pending. Worker image reused, cleanup complete. Receipt /var/tmp/mofacts-integration.5HVtcVts/results/native-verification.json SHA-256 646208492250e65fee3230206e5b9629d5e5c657d79621fd7cecde034637dfdb.
 

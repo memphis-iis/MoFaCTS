@@ -835,7 +835,6 @@ export const methods: any = {
     emailFrom,
     usersCollection: MeteorAny.users,
     PasswordResetTokens,
-    requireAdminUser,
     getMethodAuthorizationDeps,
     getUserRoleFlags,
     requireAllowPublicSignupSetting,
@@ -1235,6 +1234,8 @@ Meteor.startup(async function() {
   await ensureSparcVideoCatalogIndexes();
   await Histories.rawCollection().createIndex({ userId: 1, TDFId: 1, eventType: 1, _id: 1 });
   await ensureSparcFigureBrowseIndexes();
+  // Keep the expired, unused record briefly for the one-hour expiry audit.
+  await PasswordResetTokens.rawCollection().createIndex({ expiresAt: 1 }, { expireAfterSeconds: 120 });
   await ensureSimulationTelemetryIndexes();
   await ensureProlificIndexes();
   // Test provisioning checks exact lesson families without course/user scope.

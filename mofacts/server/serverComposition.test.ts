@@ -191,14 +191,14 @@ describe('server auth and session methods', function() {
     const expired = randomBytes(32).toString('hex'), current = randomBytes(32).toString('hex');
     const expiredId = await PasswordResetTokensAny.insertAsync({ userId, email,
       tokenHash: createHash('sha256').update(expired).digest('hex'), used: false,
-      createdAt: new Date(now - 3900000), expiresAt: new Date(now - 300000) });
+      createdAt: new Date(now - 3601000), expiresAt: new Date(now - 1000) });
     const eligibleExpired = await PasswordResetTokensAny.findOneAsync({ userId, email,
       tokenHash: createHash('sha256').update(expired).digest('hex'), used: false });
     expect(eligibleExpired?._id).to.equal(expiredId);
     expect(eligibleExpired.expiresAt.getTime()).to.be.lessThan(now);
     // Synthetic record age in isolated Mongo, not a live mailbox/wall-clock claim.
     expect(unusedExpiredResetPrecondition({ owned: true, unused: true,
-      ageMs: 3900000, lifetimeMs, remainingMs: -300000 })).to.equal(true);
+      ageMs: 3601000, lifetimeMs, remainingMs: -1000 })).to.equal(true);
     let expiredCode: unknown;
     try { await methods.resetPasswordWithToken.call({}, email, expired, nextPassword); }
     catch (error: any) { expiredCode = error.error; }
@@ -287,49 +287,30 @@ describe('server auth and session methods', function() {
     expect(auditEntry.details.source).to.equal('populateSSOProfile');
   });
 
-  it('clears loginParams and records auth.sessionRevoked', async function() {
-    const email = `session-${Random.id()}@example.com`;
-    const password = `LongPassword-${Random.id()}123`;
-    const loginParams = {
-      entryPoint: Random.id(),
-      curTeacher: Random.id(),
-      curClass: Random.id(),
-      loginMode: 'test',
-      authSessionState: 'active'
-    };
-
-    const result = await methods.signUpUser.call({}, email, password);
-    const userId = result.userId;
-
-    await MeteorUsersAny.updateAsync({_id: userId}, {$set: { loginParams }});
-
-    const userAsyncStub = sinon.stub(MeteorAny, 'userAsync').resolves({
-      _id: userId,
-      loginParams
-    });
-    const userIdStub = sinon.stub(MeteorAny, 'userId').returns(userId);
-
-    try {
-      await methods.clearLoginData.call({ userId });
-    } finally {
-      userAsyncStub.restore();
-      userIdStub.restore();
+  it('retires manual reset cleanup and login-data clearing', function() {
+    for (const name of ['cleanupExpiredPasswordResetTokens', 'clearLoginData']) {
+      expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);
     }
+  });
 
-    const updatedUser = await MeteorUsersAny.findOneAsync({_id: userId}) as any;
-    const auditEntry = await AuditLogAny.findOneAsync({
-      action: 'auth.sessionRevoked',
-      actorUserId: userId,
-      targetUserId: userId
-    }) as any;
-
-    expect(updatedUser.loginParams.entryPoint).to.equal(null);
-    expect(updatedUser.loginParams.curTeacher).to.equal(null);
-    expect(updatedUser.loginParams.curClass).to.equal(null);
-    expect(updatedUser.loginParams.loginMode).to.equal(null);
-    expect(updatedUser.loginParams.authSessionState).to.equal(null);
-    expect(auditEntry).to.exist;
-    expect(auditEntry.details.reason).to.equal('clearLoginData');
+  it('automatically removes expired reset requests while preserving current requests', async function() {
+    this.timeout(110000);
+    const raw = PasswordResetTokensAny.rawCollection();
+    const indexes = await raw.indexes();
+    expect(indexes.some((index: any) => index.key.expiresAt === 1 && Object.keys(index.key).length === 1 &&
+      index.expireAfterSeconds === 120)).to.equal(true);
+    const now = Date.now();
+    const insert = (expiresAt: Date) => PasswordResetTokensAny.insertAsync({
+      userId: Random.id(), tokenHash: Random.id(), expiresAt, used: false,
+    });
+    const expired = await insert(new Date(now - 180000));
+    const current = await insert(new Date(now + 3600000));
+    const deadline = Date.now() + 95000;
+    while (await raw.countDocuments({ _id: expired }) && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    expect(await raw.countDocuments({ _id: expired })).to.equal(0);
+    expect(await raw.countDocuments({ _id: current })).to.equal(1);
   });
 
   it('blocks admin user deletion when the target owns authored content', async function() {

@@ -151,16 +151,8 @@
       "access": "role-checked"
     },
     {
-      "name": "cleanupExpiredPasswordResetTokens",
-      "access": "admin-only"
-    },
-    {
       "name": "cleanupOrphanDynamicAssets",
       "access": "admin-only"
-    },
-    {
-      "name": "clearLoginData",
-      "access": "authenticated-self"
     },
     {
       "name": "confirmPackageUpload",
