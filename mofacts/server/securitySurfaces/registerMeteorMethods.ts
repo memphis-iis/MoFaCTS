@@ -21,6 +21,10 @@ export type MeteorMethodBinding = Readonly<{
     operation: 'owner-assignment' | 'owner-read' | 'family-owner-transfer';
     authorize: (...args: never[]) => boolean;
   }> | Readonly<{
+    kind: 'lesson-file';
+    operation: 'owner-or-accessor';
+    authorize: (...args: never[]) => boolean | Promise<boolean>;
+  }> | Readonly<{
     kind: 'study-wait';
     operation: 'start-or-resume';
     authorize: (...args: never[]) => Promise<number | null>;
@@ -75,7 +79,7 @@ export type MeteorMethodBinding = Readonly<{
     | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'
     | 'experiment-login-token' | 'participant-session' | 'public-demo-launch'
     | 'delete-result' | 'progressive-lesson-content' | 'join-result' | 'course-id' | 'assignment-editor-snapshot' | 'course-section-list' | 'teacher-display-list' | 'learner-course-snapshot' | 'assignments-by-course' | 'instructor-course-list'
-    | 'account-email-or-status' | 'accessor-identities' | 'recipient-lookup-result' | 'statistics-expanded' | 'save-status' | 'saved-wait' | 'owned-lesson-list' | 'transfer-status' | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
+    | 'stimulus-file' | 'account-email-or-status' | 'accessor-identities' | 'recipient-lookup-result' | 'statistics-expanded' | 'save-status' | 'saved-wait' | 'owned-lesson-list' | 'transfer-status' | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
 }>;
 
 let observe: (() => ReturnType<typeof observeMeteorMethodBindings>) | undefined;

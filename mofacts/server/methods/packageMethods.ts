@@ -228,26 +228,6 @@ export function createPackageService(deps: PackageMethodsDeps) {
     return responseKCMap;
   }
 
-  async function getMaxResponseKC(){
-    const responseKC = await deps.Tdfs.rawCollection().aggregate([
-      {
-        $addFields: {
-          "maxResponseKC": {
-            $max: "$stimuli.responseKC"
-          }
-        }
-      },
-      {
-        $sort: {
-          "maxResponseKC": -1
-        }
-      },
-      {
-        $limit: 1
-      }]).toArray()
-    return responseKC[0].maxResponseKC;
-  }
-
   function getPackageUploadDeps(): ProcessPackageUploadDeps {
     return {
       DynamicAssets: deps.DynamicAssets,
@@ -1310,5 +1290,5 @@ export function createPackageService(deps: PackageMethodsDeps) {
     saveTdfContent,
     copyTdf,
   };
-  return { methods, getResponseKCMapForTdf, getMaxResponseKC, upsertStimFile, importPrivateRepoTdfBatch, normalizeOptionalString };
+  return { methods, getResponseKCMapForTdf, upsertStimFile, importPrivateRepoTdfBatch, normalizeOptionalString };
 }

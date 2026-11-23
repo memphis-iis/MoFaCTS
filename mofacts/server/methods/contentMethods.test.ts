@@ -95,7 +95,7 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
     isPlainRecord: (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value),
     cloneJsonLike: <T>(value: T) => JSON.parse(JSON.stringify(value)),
     normalizeCanonicalId: (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null,
-    canAccessContentUploadTdf: async () => true,
+    stimulusFilePolicy: { authorize: async () => true },
     getOrBuildCurrentPackageAsset: async () => ({ link: '/package.zip' }),
     parseLocalMediaReference: () => ({}),
     extractSrcFromHtml: () => [],
@@ -112,6 +112,16 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('contentMethods content upload summaries', function() {
+  it('waits for the stimulus file access decision', async function() {
+    const methods = createContentMethods(createContentDeps({
+      Tdfs: { findOneAsync: async () => ({ rawStimuliFile: {}, content: { tdfs: { tutor: { setspec: { stimulusfile: 'test.json' } } } } }) },
+      stimulusFilePolicy: { authorize: async () => false },
+    }));
+    let denied;
+    try { await methods.getStimuliFileForTdf.call({ userId: 'learner' }, 'lesson'); } catch (err) { denied = err; }
+    expect(denied).to.include({ error: 403 });
+  });
+
   it('keeps asset publications limited to fields needed by client link and metadata views', function() {
     expect(DYNAMIC_ASSET_PUBLICATION_FIELDS).to.deep.equal({
       _id: 1,

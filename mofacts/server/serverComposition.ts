@@ -55,7 +55,7 @@ import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
 import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
-import { SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -738,6 +738,8 @@ const waitingPeriodPolicy = Object.freeze({
   },
 } as const);
 
+const stimulusFilePolicy = Object.freeze({ kind: 'lesson-file', operation: 'owner-or-accessor', authorize: canAccessContentUploadTdf } as const);
+
 export const methods: any = {
   ...prolificRegistration.methods,
   ...warningRegistration.methods,
@@ -858,7 +860,7 @@ export const methods: any = {
     isPlainRecord,
     cloneJsonLike,
     normalizeCanonicalId,
-    canAccessContentUploadTdf,
+    stimulusFilePolicy,
     getOrBuildCurrentPackageAsset,
     storageRoot: getLocalStoragePaths(Meteor.settings, process.env).dynamicAssetsPath,
     storageBoundary,
@@ -1177,6 +1179,7 @@ export const asyncMethods: Record<string, unknown> = {
 registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...securityAuditRuntime.methodBindings,
   ...courseReadBindings,
+  { verification: STIMULUS_FILE_VERIFICATION, handler: methods.getStimuliFileForTdf, policy: stimulusFilePolicy, dataEgress: 'stimulus-file' },
   deploymentReadiness.methodBinding,
   ...backupRegistration.methodBindings,
   ...brandProfileRegistration.methodBindings,

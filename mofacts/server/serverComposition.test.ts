@@ -15,7 +15,7 @@ import { Accounts } from 'meteor/accounts-base';
 import { createHash, randomBytes } from 'node:crypto';
 import { unusedExpiredResetPrecondition, resetAttemptOutcome } from '../common/securityAudit/resetProtocol';
 import { sessionLifetimeStatus } from '../common/securityAudit/sessionLifetime';
-import { CONDITION_COUNT_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
+import { CONDITION_COUNT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { registeredMeteorMethodSurfaces } from './securitySurfaces/registerMeteorMethods';
 
 const MeteorAny = Meteor as any;
@@ -2865,21 +2865,40 @@ describe('content helper authorization', function() {
     await clearServerCompositionCollections();
   });
 
-  it('requires login for owner display lookup', async function() {
-    try {
-      await (methods.getTdfOwnersMap as any).call({}, ['owner-user']);
-      expect.fail('Expected anonymous owner lookup to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(401);
+  it('omits retired owner lookups and returns only the selected lesson response mapping', async function() {
+    for (const name of ['getTdfOwnersMap', 'getTdfsByOwnerId']) {
+      expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);
     }
+    const owner = Random.id();
+    const lesson = async (answer: string, responseKC: number) => TdfsAny.insertAsync({
+      ownerId: owner, stimuli: [{ correctResponse: answer, responseKC }],
+    });
+    const selected = await lesson('Alpha', 3);
+    await lesson('Beta', 99);
+    const map = await MeteorAny.server.method_handlers.getResponseKCMapForTdf.call({ userId: owner }, selected);
+    expect(map).to.deep.equal({ alpha: 3 });
   });
 
-  it('denies cross-owner TDF listing', async function() {
-    try {
-      await (methods.getTdfsByOwnerId as any).call({ userId: 'student-user' }, 'owner-user');
-      expect.fail('Expected cross-owner TDF listing to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
+  it('returns stimulus files only to the lesson owner and explicit accessors', async function() {
+    const name = 'getStimuliFileForTdf';
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed method bindings');
+    const rows = observed.surfaces.filter(row => row.name === name);
+    expect(rows).to.have.length(1);
+    expect(rows[0]?.verification).to.equal(STIMULUS_FILE_VERIFICATION);
+    expect(rows[0]?.policy).to.deep.equal({ kind: 'lesson-file', operation: 'owner-or-accessor' });
+    const owner = Random.id(), shared = Random.id();
+    const file = { setspec: { name: 'synthetic' } };
+    const id = await TdfsAny.insertAsync({ ownerId: owner, accessors: [{ userId: shared }],
+      rawStimuliFile: file, content: { tdfs: { tutor: { setspec: { stimulusfile: 'test.json', userselect: 'true' } } } } });
+    const read = MeteorAny.server.method_handlers[name];
+    for (const [context, expected] of [[{}, 401], [{ userId: Random.id() }, 403]] as const) {
+      let denied;
+      try { await read.call(context, id); } catch (err) { denied = err; }
+      expect(denied).to.include({ error: expected });
+    }
+    for (const userId of [owner, shared]) {
+      expect(await read.call({ userId }, id)).to.deep.equal({ fileName: 'test.json', stimFile: file });
     }
   });
 

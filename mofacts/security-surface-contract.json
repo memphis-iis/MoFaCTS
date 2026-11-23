@@ -466,7 +466,8 @@
     },
     {
       "name": "getStimuliFileForTdf",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Requires the lesson owner or an explicit accessor before returning its named stimulus file."
     },
     {
       "name": "getStimuliSetById",
@@ -502,14 +503,6 @@
       "name": "getTdfById",
       "access": "role-checked",
       "notes": "Existing lesson/course access checks retained; authenticated runtime reads exclude the server-owned conditionAllocation block."
-    },
-    {
-      "name": "getTdfOwnersMap",
-      "access": "authenticated-self"
-    },
-    {
-      "name": "getTdfsByOwnerId",
-      "access": "authenticated-self"
     },
     {
       "name": "getUploadQuotaStatus",

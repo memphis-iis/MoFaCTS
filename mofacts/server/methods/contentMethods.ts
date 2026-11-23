@@ -85,7 +85,7 @@ type ContentMethodsDeps = {
   isPlainRecord: (value: unknown) => value is UnknownRecord;
   cloneJsonLike: <T>(value: T) => T;
   normalizeCanonicalId: (value: unknown) => string | null;
-  canAccessContentUploadTdf: (userId: string, tdf: any) => boolean | Promise<boolean>;
+  stimulusFilePolicy: { authorize: (userId: string, tdf: any) => boolean | Promise<boolean> };
   storageRoot: string;
   getOrBuildCurrentPackageAsset: (
     tdfId: string,
@@ -399,7 +399,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
       if (!tdf) {
         throw new Meteor.Error(404, 'TDF not found');
       }
-      if (!deps.canAccessContentUploadTdf(this.userId, tdf)) {
+      if (!await deps.stimulusFilePolicy.authorize(this.userId, tdf)) {
         throw new Meteor.Error(403, 'Not authorized to download this stimulus file');
       }
       if (!tdf.rawStimuliFile) {
@@ -445,76 +445,6 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         name: asset.name,
         fileName: asset.fileName,
       };
-    },
-
-    getTdfOwnersMap: async function(this: MethodContext, ownerIds: string[]) {
-      const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
-      if (!Array.isArray(ownerIds)) {
-        throw new Meteor.Error(400, 'Invalid owner id list');
-      }
-      const uniqueOwnerIds = [...new Set(
-        ownerIds
-          .filter((id) => typeof id === 'string')
-          .map((id) => id.trim())
-          .filter(Boolean)
-      )];
-      if (uniqueOwnerIds.length > 100) {
-        throw new Meteor.Error(400, 'Too many owner ids requested');
-      }
-      const canReadAnyOwner = await hasUserRole(deps.getMethodAuthorizationDeps(), actingUserId, ['admin']);
-      const allowedOwnerIds = new Set<string>();
-      if (canReadAnyOwner) {
-        for (const ownerId of uniqueOwnerIds) {
-          allowedOwnerIds.add(ownerId);
-        }
-      } else {
-        const tdfs = await deps.Tdfs.find(
-          { ownerId: { $in: uniqueOwnerIds } },
-          { fields: { _id: 1, ownerId: 1, accessors: 1, 'content.tdfs.tutor.setspec.userselect': 1 } }
-        ).fetchAsync();
-        for (const tdf of tdfs) {
-          if (tdf?.ownerId && await deps.canAccessContentUploadTdf(actingUserId, tdf)) {
-            allowedOwnerIds.add(tdf.ownerId);
-          }
-        }
-      }
-      const ownerMap: Record<string, string> = {};
-      for (const id of allowedOwnerIds) {
-        const foundUser = await deps.usersCollection.findOneAsync({ _id: id });
-        if (typeof foundUser !== 'undefined') {
-          ownerMap[id] = foundUser.username;
-        }
-      }
-      return ownerMap;
-    },
-
-    getTdfsByOwnerId: async function(this: MethodContext, ownerId: string) {
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
-        subjectUserId: ownerId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Can only read your own TDF list',
-        forbiddenCode: 403,
-      });
-      const tdfs = await deps.Tdfs.find(
-        { ownerId },
-        {
-          fields: {
-            _id: 1,
-            ownerId: 1,
-            accessors: 1,
-            stimuliSetId: 1,
-            conditionCounts: 1,
-            'content.fileName': 1,
-            'content.tdfs.tutor.setspec.lessonname': 1,
-            'content.tdfs.tutor.setspec.userselect': 1,
-            'content.tdfs.tutor.setspec.condition': 1,
-          },
-        }
-      ).fetchAsync();
-      return tdfs || [];
     },
 
     getUploadQuotaStatus: async function(this: MethodContext) {
