@@ -103,7 +103,7 @@ In the existing synthetic experiment/condition fixture, each subscription perfor
 
 Source review of the course module accounts for seven of the 177. Its factory returns 27 properties. In serverComposition.ts, seven are removed before the other 20 are passed to Meteor. The seven are resolveAssignedRootTdfIdsForUser, invalidateCourseSnapshotForUser, invalidateCourseSnapshotsForCourse, invalidateCourseSnapshotsForAssignment, getTdfIdsByOwnerId, getSourceSentences and checkForTDFData. This leaves at most 170 further candidate names, including the 20 course methods. A name without a matching declaration can already have behavior tests. Keep the five exit groups open until their own acceptance criteria pass.
 
-After binding section enrollment, the source contract lists 231 methods. Of these, 75 match application test declarations and four match package declarations, leaving 152 names to reconcile. The two remaining course commands are deleteCourse and getProgressiveAssignmentLaunch. All 21 publications match declarations.
+After binding course deletion and progressive assignment launch, the source contract lists 231 methods. Of these, 77 match application test declarations and four match package declarations, leaving 150 names to reconcile. All 21 publications match declarations.
 
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
 - [x] Reconcile the sharing transaction, both accessor reads and recipient resolution with the named passing Meteor cases in slots 38-40.
@@ -159,6 +159,8 @@ After binding section enrollment, the source contract lists 231 methods. Of thes
   - [x] Exercise the source owner selector with synthetic account and role lookups: teacher self-ownership, missing and ineligible recipients, existing teachers and administrators, unchanged ownership and transfer from a former teacher.
   - [x] Trace section enrollment notification handling: the membership is inserted before sending the course assignment email. An email preparation error (for example, an account without an address) therefore rejects a join that already persisted. Repeating the join skips the notification on an existing membership. No live account or notification was used.
   - [x] Record and verify a successful saved enrollment when confirmation email preparation or delivery fails; registration, anonymous and mismatched-teacher rejection, repeat joins, and sanitized failure diagnostics covered in slot 66.
+  - [x] Bind and verify the last two course commands (slot 68). Course deletion requires the owner or an administrator. Progressive assignments require an ordinary account session on launch and reopen. The resumed passwordless session still reads its study progress. All 14 active course commands now have declarations.
+  - [x] Trace two authentication commands selected for review. No tracked application caller uses clearLoginData or cleanupExpiredPasswordResetTokens. The former clears five saved login preferences and records session revocation without revoking a Meteor token. The latter deletes expired reset-request records only on an administrator call. Password reset already rejects expired links and records reset events separately. Decide automatic deletion of expired reset-request records before changing retention.
   - [x] Verify the corrected owner-selection case in native Meteor (slot 67). Slot 66 encountered a missing timezone in the test setup.
   - [x] Trace course owner selection: teachers create courses for themselves. Administrators may supply another account ID on creation or transfer, and before the repair neither operation verified the proposed owner exists and holds a course-management role. No operator or learner accounts were inspected.
   - [x] Separate the 19 public course handlers from the course service helpers at their definition. Seven former inventory rows represented internal functions. None of those seven is a newly retired public command.
@@ -184,7 +186,8 @@ After binding section enrollment, the source contract lists 231 methods. Of thes
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
 - [ ] Verify static bypass detection across active source roots and retire the old manifest and inference checker after parity.
   - [x] Check direct references to Meteor.methods and Meteor.publish in application server JavaScript and TypeScript, including renamed imports, aliases, literal property access and destructuring. Shadowed unrelated names are covered by a source regression. Other roots, dynamically computed dispatch, HTTP and package ownership still need their own checks.
-  - [x] Extend direct Meteor registration checks to JavaScript and TypeScript in client, common and learning-components. Computed Meteor access that cannot be resolved is now reported. Checked 218 server, 380 client, 107 common and 163 learning-component files. Svelte components, package owners and the other registration APIs are separate open coverage.
+  - [x] Extend direct Meteor registration checks to JavaScript and TypeScript in client, common and learning-components. Computed Meteor access that cannot be resolved is now reported. Checked 218 server, 380 client, 107 common and 163 learning-component files. Package owners and other registration APIs have separate acceptance checks.
+  - [x] Check direct Meteor method/publication registration across 61 tracked Svelte components. Cover authored typed scripts, module/instance scope, template event expressions and unrelated shadowed names. The full source check still finds 306 declared surfaces.
 - [ ] Qualify the complete matched image and scanner on staging2, including login, ordinary learner behavior and enabled providers. The earlier condition-index cutover covered that specific change only.
 
 ## Phase 3 HTTP characterization started (2026-11-18)
@@ -1888,9 +1891,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 71 total, 66 consumed, 1 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 71 total, 67 consumed, 0 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
 
-Slot 68 reserved for the course deletion binding and ordinary-account progressive launch and resume. Verify both study-session denials and retain passwordless study return.
+Slot 68 passed on 446105eb. Native Meteor recorded 1,123 server and 1,251 Chromium passes, zero failures or hook failures, and 15/seven pending. Worker image reused, cleanup complete. Receipt /var/tmp/mofacts-integration.5HVtcVts/results/native-verification.json SHA-256 646208492250e65fee3230206e5b9629d5e5c657d79621fd7cecde034637dfdb.
 
 Slot 67 passed on a32c1ddb under the November 22 five-run allowance (slots 67–71). Native Meteor recorded 1,121 server and 1,251 Chromium passes, zero failures or hook failures, and 15/seven pending. Worker image reused. Receipt /var/tmp/mofacts-integration.kKH0E13h/results/native-verification.json SHA-256 f31e29832c721a793af2feb970cec9638e41e0c279bf2c204410fe0c5e7cc469.
 

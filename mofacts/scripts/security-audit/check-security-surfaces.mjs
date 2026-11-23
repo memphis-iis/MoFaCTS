@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
-import { directMeteorRegistrationReferences } from './checkApplicationMeteorRegistration.mjs';
+import { componentRegistrationReferences, directMeteorRegistrationReferences } from './checkApplicationMeteorRegistration.mjs';
 import { uploadMethodNames } from '../../packages/ostrio-files/upload-policy.js';
 
 const toolAppRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1')), '..', '..');
@@ -15,7 +15,7 @@ async function filesUnder(directory) {
   for (const entry of entries) {
     const full = path.join(directory, entry.name);
     if (entry.isDirectory()) files.push(...await filesUnder(full));
-    else if (entry.isFile() && /\.(?:[cm]?[jt]s)$/.test(entry.name) && !/\.test\.[cm]?[jt]s$/.test(entry.name)) files.push(full);
+    else if (entry.isFile() && /\.(?:[cm]?[jt]s|svelte)$/.test(entry.name) && !/\.test\.[cm]?[jt]s$/.test(entry.name)) files.push(full);
   }
   return files;
 }
@@ -71,7 +71,7 @@ function regexMatches(text, pattern, mapper) {
 async function checkedApplicationSource(file) {
   const text = await fs.readFile(file, 'utf8');
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
-  const bypasses = directMeteorRegistrationReferences(source);
+  const bypasses = file.endsWith('.svelte') ? componentRegistrationReferences(file, text) : directMeteorRegistrationReferences(source);
   if (bypasses.length) {
     throw new Error(bypasses.map(({ member, line }) =>
       path.relative(sourceRepoRoot, file) + ':' + line + ' references Meteor.' + member + ' outside the application adapter.'
@@ -91,6 +91,7 @@ export async function discoverSecuritySurfaces() {
   const httpMiddleware = [];
   for (const file of serverFiles) {
     const source = await checkedApplicationSource(file);
+    if (file.endsWith('.svelte')) continue;
     const text = source.text;
     methods.push(...discoverMethods(source));
     httpMiddleware.push(...regexMatches(text, /registerHttpMiddleware\(\s*\w+,\s*'(?:handlers|connectHandlers)',\s*\{\s*surfaceId:\s*'(middleware:[^']+)'/g, (match) => match[1]));

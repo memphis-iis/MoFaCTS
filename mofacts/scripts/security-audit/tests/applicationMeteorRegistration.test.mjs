@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import ts from 'typescript';
-import { directMeteorRegistrationReferences } from '../checkApplicationMeteorRegistration.mjs';
+import { componentRegistrationReferences, directMeteorRegistrationReferences } from '../checkApplicationMeteorRegistration.mjs';
 
 function members(source, file) {
   return directMeteorRegistrationReferences(ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true))
@@ -23,4 +23,13 @@ test('reports computed Meteor references that require explicit resolution', () =
   assert.deepEqual(members("import { Meteor as app } from 'meteor/meteor'; app[operation](handlers);", 'shared.js'), ['[unresolved property]']);
   assert.deepEqual(members("const { ['publish']: register, [key]: unknown } = Meteor;", 'client.ts'), ['publish', '[unresolved property]']);
   assert.deepEqual(members("const opts = {}; opts[operation](); Meteor['callAsync']('read');", 'client.js'), []);
+});
+
+test('checks authored component scripts and compiled template bindings', () => {
+  const check = text => componentRegistrationReferences('Widget.svelte', text);
+  assert.deepEqual(check("<script lang='ts'>\nimport { Meteor as api } from 'meteor/meteor';\nconst fn = (api as any).methods;\n</script>"),
+    [{ member: 'methods', line: 3 }]);
+  assert.deepEqual(check("<script module>import { Meteor as framework } from 'meteor/meteor';</script><button onclick={() => framework.publish('x')}>x</button>").map(row => row.member), ['publish']);
+  assert.deepEqual(check("<script module>const Meteor = { methods() {} };</script><script>Meteor.methods();</script>"), []);
+  assert.deepEqual(check("<script>const Meteor = { methods: () => true };</script><button onclick={() => Meteor.methods()}>Meteor.publish</button>"), []);
 });

@@ -1,3 +1,4 @@
+import { compile, parse } from 'svelte/compiler';
 import ts from 'typescript';
 
 // Application adapters register on their injected server. A direct reference
@@ -71,4 +72,28 @@ export function directMeteorRegistrationReferences(source) {
   }
   visit(source);
   return findings;
+}
+
+export function componentRegistrationReferences(filename, text) {
+  const ast = parse(text, { filename, modern: true });
+  const findings = [];
+  for (const script of [ast.module, ast.instance]) {
+    if (!script) continue;
+    const { start, end } = script.content;
+    const offset = text.slice(0, start).split('\n').length - 1;
+    const body = text.slice(start, end);
+    // Module declarations are in scope inside the instance, which may shadow them.
+    const outer = script === ast.instance && ast.module
+      ? text.slice(ast.module.content.start, ast.module.content.end) + '\n{\n' : '';
+    const prefixLines = outer.split('\n').length - 1;
+    const source = ts.createSourceFile(filename + '.ts', outer + body + (outer ? '\n}' : ''), ts.ScriptTarget.Latest, true);
+    for (const row of directMeteorRegistrationReferences(source)) {
+      if (row.line > prefixLines) findings.push({ ...row, line: row.line - prefixLines + offset });
+    }
+  }
+  if (findings.length) return findings;
+  // Compilation resolves template expressions and references across script scopes.
+  const { js } = compile(text, { filename, generate: 'client' });
+  const emitted = ts.createSourceFile(filename + '.js', js.code, ts.ScriptTarget.Latest, true);
+  return directMeteorRegistrationReferences(emitted).map(row => ({ ...row, line: 'generated line ' + row.line }));
 }
