@@ -1888,7 +1888,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 66 total, 65 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 71 total, 65 consumed, 1 reserved, 4 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 67 reserved for the corrected course ownership fixture under the November 22 five-run allowance (slots 67–71).
 
 Slot 66 ran on 8fc56cde. Both enrollment cases passed: the installed join succeeded with a saved membership and no recipient; a rejected delivery was recorded without private details or a duplicate email on repeat join. Native Meteor reported 1,120 server passes and one failure, 1,251 Chromium passes, 15/seven pending, zero hook failures. The course owner fixture omitted the required course timezone, so its creation/transfer result is unverified. The correction supplies the timezone and asserts the specific rejection reasons. The image was reused and cleanup completed. Receipt: /var/tmp/mofacts-integration.NJkkxrzx/results/meteor-run.json SHA-256 91d0f9af1552191e2095871dd53c3b75fe76e5763dbd852b05c6b89c2ea94f2a.
 
