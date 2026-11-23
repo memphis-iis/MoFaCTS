@@ -159,7 +159,7 @@ After binding section enrollment, the source contract lists 231 methods. Of thes
   - [x] Exercise the source owner selector with synthetic account and role lookups: teacher self-ownership, missing and ineligible recipients, existing teachers and administrators, unchanged ownership and transfer from a former teacher.
   - [x] Trace section enrollment notification handling: the membership is inserted before sending the course assignment email. An email preparation error (for example, an account without an address) therefore rejects a join that already persisted. Repeating the join skips the notification on an existing membership. No live account or notification was used.
   - [x] Record and verify a successful saved enrollment when confirmation email preparation or delivery fails; registration, anonymous and mismatched-teacher rejection, repeat joins, and sanitized failure diagnostics covered in slot 66.
-  - [ ] Verify the corrected owner-selection case in the next authorized native Meteor run; slot 66 encountered an unrelated missing timezone in the test setup.
+  - [x] Verify the corrected owner-selection case in native Meteor (slot 67). Slot 66 encountered a missing timezone in the test setup.
   - [x] Trace course owner selection: teachers create courses for themselves. Administrators may supply another account ID on creation or transfer, and before the repair neither operation verified the proposed owner exists and holds a course-management role. No operator or learner accounts were inspected.
   - [x] Separate the 19 public course handlers from the course service helpers at their definition. Seven former inventory rows represented internal functions. None of those seven is a newly retired public command.
   - [x] Bind the learner course snapshot and four instructor reads to their existing authorization functions. Preserve the account-session requirement, instructor scope, administrator access, error ordering, and returned fields.
@@ -1888,9 +1888,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 71 total, 65 consumed, 1 reserved, 4 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 71 total, 66 consumed, 0 reserved, 4 generally available, and 1 for the earlier `/health` batch only.**
 
-Slot 67 reserved for the corrected course ownership fixture under the November 22 five-run allowance (slots 67–71).
+Slot 67 passed on a32c1ddb under the November 22 five-run allowance (slots 67–71). Native Meteor recorded 1,121 server and 1,251 Chromium passes, zero failures or hook failures, and 15/seven pending. Worker image reused. Receipt /var/tmp/mofacts-integration.kKH0E13h/results/native-verification.json SHA-256 f31e29832c721a793af2feb970cec9638e41e0c279bf2c204410fe0c5e7cc469.
 
 Slot 66 ran on 8fc56cde. Both enrollment cases passed: the installed join succeeded with a saved membership and no recipient; a rejected delivery was recorded without private details or a duplicate email on repeat join. Native Meteor reported 1,120 server passes and one failure, 1,251 Chromium passes, 15/seven pending, zero hook failures. The course owner fixture omitted the required course timezone, so its creation/transfer result is unverified. The correction supplies the timezone and asserts the specific rejection reasons. The image was reused and cleanup completed. Receipt: /var/tmp/mofacts-integration.NJkkxrzx/results/meteor-run.json SHA-256 91d0f9af1552191e2095871dd53c3b75fe76e5763dbd852b05c6b89c2ea94f2a.
 
