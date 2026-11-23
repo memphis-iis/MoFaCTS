@@ -602,18 +602,11 @@ const analyticsRegistration = createAnalyticsMethodRegistration({
   },
   syncUsernameCaches,
   getClassPerformanceByTdfWorkflow,
-  getStimuliSetById,
   hasMeaningfulProgressSignal,
 
 });
 
-const {
-  getHistoryByTDFID: getHistoryByTDFIDMethod,
-  getStimSetFromLearningSessionByClusterList: _getStimSetFromLearningSessionByClusterList,
-  getUserLastFeedbackTypeFromHistory: _getUserLastFeedbackTypeFromHistory,
-  ...publicAnalyticsMethods
-} = analyticsRegistration.methods as Record<string, unknown>;
-const getHistoryByTDFID = getHistoryByTDFIDMethod as (TDFId: string) => Promise<any[]>;
+const { getHistoryByTDFID } = analyticsRegistration;
 
 const speechMethods = createSpeechMethods({
   serverConsole,
@@ -1110,7 +1103,7 @@ export const asyncMethods: Record<string, unknown> = {
   ...tdfIdentityMigration.methods,
   getTdfByExperimentTarget: getTdfByExperimentTargetPublic,
 
-  ...publicAnalyticsMethods,
+  ...analyticsRegistration.methods,
   ...publicCourseMethods,
 
   getStimDisplayTypeMap: getStimDisplayTypeMapPublic,

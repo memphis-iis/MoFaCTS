@@ -189,7 +189,6 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
     },
     syncUsernameCaches: () => {},
     getClassPerformanceByTdfWorkflow: async () => ({}),
-    getStimuliSetById: async () => [],
     hasMeaningfulProgressSignal: () => false,
     ...overrides,
   };

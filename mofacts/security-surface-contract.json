@@ -349,15 +349,6 @@
       "access": "role-checked"
     },
     {
-      "name": "getHistoryByTDFID",
-      "access": "role-checked",
-      "notes": "Internal export helper preserves its caller authorization boundary and excludes historical assessment copies."
-    },
-    {
-      "name": "getLastTDFAccessed",
-      "access": "authenticated-self"
-    },
-    {
       "name": "getLearnerAnalyticsOverview",
       "access": "role-checked"
     },
@@ -377,10 +368,6 @@
     },
     {
       "name": "getManualContentDraft",
-      "access": "role-checked"
-    },
-    {
-      "name": "getNumDroppedItemsByUserIDAndTDFId",
       "access": "role-checked"
     },
     {
@@ -461,10 +448,6 @@
       "access": "role-checked"
     },
     {
-      "name": "getStimSetFromLearningSessionByClusterList",
-      "access": "authenticated-self"
-    },
-    {
       "name": "getStimuliFileForTdf",
       "access": "role-checked",
       "notes": "Requires the lesson owner or an explicit accessor before returning its named stimulus file."
@@ -481,11 +464,6 @@
       "name": "getStudentPerformanceByIdAndTDFIdFromHistory",
       "access": "role-checked",
       "notes": "Existing subject/lesson authorization retained; original assessment and adaptive-practice histories share the copy exclusion rule."
-    },
-    {
-      "name": "getStudentPerformanceForClassAndTdfId",
-      "access": "role-checked",
-      "notes": "Existing instructor authorization and enrollment scope retained; aggregates count original histories once."
     },
     {
       "name": "getStudentPerformanceForUnitFromHistory",
@@ -513,17 +491,9 @@
       "access": "role-checked"
     },
     {
-      "name": "getUserLastFeedbackTypeFromHistory",
-      "access": "role-checked"
-    },
-    {
       "name": "getUserPreference",
       "access": "authenticated-self",
       "notes": "Only the signed-in user and the boolean practiceTableStatisticsExpanded field."
-    },
-    {
-      "name": "getUserRecentTDFs",
-      "access": "authenticated-self"
     },
     {
       "name": "getVideoCompletedCheckpointQuestionCountFromHistory",

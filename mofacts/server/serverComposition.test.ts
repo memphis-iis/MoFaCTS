@@ -1886,7 +1886,7 @@ describe('learner analytics method authorization', function() {
     expect(rows[1]).to.have.nested.property('sparc.pageKey', 'doc-1');
   });
 
-  it('denies cross-user experiment-state and recent-TDF reads', async function() {
+  it('denies cross-user experiment-state reads', async function() {
     try {
       await (asyncMethods.getExperimentState as any).call({ userId: 'current-user' }, 'other-user', 'tdf-1');
       expect.fail('Expected cross-user experiment state read to be denied');
@@ -1894,12 +1894,24 @@ describe('learner analytics method authorization', function() {
       expect(error.error).to.equal(403);
     }
 
-    try {
-      await (asyncMethods.getLastTDFAccessed as any).call({ userId: 'current-user' }, 'other-user');
-      expect.fail('Expected cross-user recent TDF read to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
+  });
+
+  it('excludes retired analytics reads and internal helpers from the Meteor registry', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of [
+      'getLastTDFAccessed',
+      'getUserRecentTDFs',
+      'getNumDroppedItemsByUserIDAndTDFId',
+      'getStudentPerformanceForClassAndTdfId',
+      'getHistoryByTDFID',
+      'getStimSetFromLearningSessionByClusterList',
+      'getUserLastFeedbackTypeFromHistory',
+    ]) {
+      expect(handlers).not.to.have.own.property(name);
     }
+    expect(handlers.getStimuliSetById).to.be.a('function');
+    expect(handlers.getClassPerformanceByTDF).to.be.a('function');
+    expect(handlers.getExperimentState).to.be.a('function');
   });
 
   it('derives experiment-state creation actor from method context', async function() {

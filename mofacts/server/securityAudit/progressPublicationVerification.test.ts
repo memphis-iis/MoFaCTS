@@ -173,8 +173,6 @@ describe('approved progress-privacy selection on the registered Meteor publicati
       for (const lessonId of [ids.other, ids.shared]) {
         expect((await method(ws, 'getExperimentState', userId, lessonId)).error.error).to.equal(403);
       }
-      expect((await method(ws, 'getLastTDFAccessed')).result).to.equal(ids.condition);
-      expect((await method(ws, 'getUserRecentTDFs')).result.map((row: { _id: string }) => row._id)).to.deep.equal([ids.condition, ids.root]);
       expect((await method(ws, 'getLearnerProgressSignals')).result.attemptedTdfIds.sort()).to.deep.equal([ids.root, ids.condition].sort());
       expect((await method(ws, 'getLearnerProgressSignals', otherUserId)).error.error).to.equal('not-authorized');
       expect((await method(ws, 'getAssessmentCompletedTrialCountFromHistory', userId, ids.condition, 0)).result).to.equal(0);

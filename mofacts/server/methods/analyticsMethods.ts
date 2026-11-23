@@ -88,7 +88,6 @@ type AnalyticsMethodsDeps = {
     deps: any,
     assignmentContext?: { assignmentId?: string | null; dueAt?: Date | number | string | null }
   ) => Promise<unknown>;
-  getStimuliSetById: (stimuliSetId: string | number) => Promise<Array<{ clusterKC?: string | number; stimulusKC?: string | number }>>;
   hasMeaningfulProgressSignal: (experimentState: unknown) => boolean;
   insertSparcHistoryBatch?: (records: readonly (UnknownRecord & { _id: string; userId: string })[]) => Promise<readonly UnknownRecord[]>;
 };
@@ -628,18 +627,6 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
     }
   }
 
-  async function getUserLastFeedbackTypeFromHistory(tdfID: string) {
-    const userHistory = await deps.Histories.findOneAsync(
-      { TDFId: tdfID, userId: (Meteor as any).userId, ...operationalHistorySelector() },
-      { sort: { time: -1 } }
-    );
-    let feedbackType = 'undefined';
-    if (userHistory && userHistory.feedbackType) {
-      feedbackType = userHistory.feedbackType;
-    }
-    return feedbackType;
-  }
-
   function assessmentScope(record: UnknownRecord): string {
     const sparc = record.sparc as { pageKey?: unknown; stateTransition?: { event?: { eventId?: unknown; payload?: { policyId?: unknown } } } } | undefined;
     return JSON.stringify([record.userId, record.TDFId, record.sessionID, record.levelUnit,
@@ -788,17 +775,6 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
         totalMs: elapsedMsSince(methodStartTime),
       });
     }
-  }
-
-  async function getLastTDFAccessed(userId: string, lessonIds: string[] | null) {
-    const lastExperimentStateUpdated = await deps.GlobalExperimentStates.findOneAsync(
-      { userId, ...(lessonIds ? { TDFId: { $in: lessonIds } } : {}) },
-      { sort: { 'experimentState.lastActionTimeStamp': -1 }, limit: 1 }
-    );
-    if (!lastExperimentStateUpdated?.TDFId) {
-      return null;
-    }
-    return lastExperimentStateUpdated.TDFId;
   }
 
   async function getHistoryByTDFID(TDFId: string) {
@@ -1056,25 +1032,6 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
     );
   }
 
-  async function getUserRecentTDFs(userId: string, lessonIds: string[] | null) {
-    const history = await deps.Histories.find({
-      userId, ...operationalHistorySelector(),
-      ...(lessonIds ? { TDFId: { $in: lessonIds } } : {}),
-    }, { sort: { time: -1 }, limit: 5 }).fetchAsync();
-    const recentTdfIds = history
-      .map((historyRecord: any) => deps.normalizeCanonicalId(historyRecord?.TDFId))
-      .filter((tdfId: string | null): tdfId is string => typeof tdfId === 'string');
-    if (recentTdfIds.length === 0) {
-      return [];
-    }
-
-    const recentTdfDocs = await deps.Tdfs.find({ _id: { $in: [...new Set(recentTdfIds)] } }).fetchAsync();
-    const recentTdfById = new Map(
-      recentTdfDocs.map((tdf: any) => [String(tdf?._id || ''), tdf])
-    );
-    return recentTdfIds.map((tdfId: string) => recentTdfById.get(tdfId));
-  }
-
   async function getClassPerformanceByTDF(this: MethodContext, classId: string, tdfId: string, date: number | false = false) {
     requireAccountProgressSession(this);
     if (!this.userId) {
@@ -1110,25 +1067,6 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
         { fields: { _id: 1, username: 1, dueDateExceptions: 1 } }
       ).fetchAsync(),
     }, assignment ? { assignmentId: String(assignment._id || ''), dueAt: assignment.dueAt ?? null } : undefined);
-  }
-
-  async function getStimSetFromLearningSessionByClusterList(stimuliSetId: string | number, clusterList: Array<string | number>) {
-    deps.serverConsole('getStimSetFromLearningSessionByClusterList', stimuliSetId, clusterList);
-    const itemRet = await deps.getStimuliSetById(stimuliSetId);
-    const learningSessionItem: Array<string | number> = [];
-    for (const item of itemRet) {
-      const clusterKC = item.clusterKC;
-      const stimulusKC = item.stimulusKC;
-      if (
-        typeof clusterKC !== 'undefined' &&
-        typeof stimulusKC !== 'undefined' &&
-        clusterList.includes(clusterKC) &&
-        learningSessionItem.includes(stimulusKC) === false
-      ) {
-        learningSessionItem.push(stimulusKC);
-      }
-    }
-    return learningSessionItem;
   }
 
   async function getStudentPerformanceByIdAndTDFIdFromHistory(userId: string, TDFId: string, returnRows: number | null = null) {
@@ -1485,181 +1423,6 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
     return hiddenStimulusKCs;
   }
 
-  async function getNumDroppedItemsByUserIDAndTDFId(userId: string, TDFId: string) {
-    deps.serverConsole('getNumDroppedItemsByUserIDAndTDFId', userId, TDFId);
-    return await deps.Histories.find({ userId, TDFId, CFItemRemoved: true, ...modelPracticeHistorySelector() }).countAsync();
-  }
-
-  async function getStudentPerformanceForClassAndTdfId(instructorId: string, date: number | null = null) {
-    const courses = await deps.Courses.find({ teacherUserId: instructorId }).fetchAsync();
-    if (courses.length === 0) {
-      return [{}, {}];
-    }
-    const courseIds = courses.map((course: { _id: string }) => course._id);
-
-    const sections = await deps.Sections.find({ courseId: { $in: courseIds } }).fetchAsync();
-    if (sections.length === 0) {
-      return [{}, {}];
-    }
-    const sectionIds = sections.map((section: { _id: string }) => section._id);
-    const sectionToCourse: Record<string, string> = {};
-    for (const section of sections) {
-      sectionToCourse[section._id] = section.courseId;
-    }
-
-    const enrollments = await deps.SectionUserMap.find({ sectionId: { $in: sectionIds } }).fetchAsync();
-    if (enrollments.length === 0) {
-      return [{}, {}];
-    }
-    const enrolledUserIds = [...new Set(enrollments.map((enrollment: { userId: string }) => enrollment.userId))];
-    const userSectionMap: Record<string, Array<{ sectionId: string; courseId: string }>> = {};
-    for (const enrollment of enrollments) {
-      const courseId = sectionToCourse[enrollment.sectionId];
-      if (!courseId) {
-        continue;
-      }
-      if (!userSectionMap[enrollment.userId]) {
-        userSectionMap[enrollment.userId] = [];
-      }
-      userSectionMap[enrollment.userId]!.push({ sectionId: enrollment.sectionId, courseId });
-    }
-
-    const histMatch: Record<string, unknown> = {
-      ...modelPracticeHistorySelector(),
-      userId: { $in: enrolledUserIds },
-    };
-    if (date) {
-      histMatch.recordedServerTime = { $lt: date };
-    }
-
-    const pipeline = [
-      { $match: histMatch },
-      {
-        $group: {
-          _id: { userId: '$userId', TDFId: '$TDFId' },
-          correct: { $sum: { $cond: [{ $eq: ['$outcome', 'correct'] }, 1, 0] } },
-          incorrect: { $sum: { $cond: [{ $ne: ['$outcome', 'correct'] }, 1, 0] } },
-          totalPracticeDuration: { $sum: { $add: [{ $ifNull: ['$CFEndLatency', 0] }, { $ifNull: ['$CFFeedbackLatency', 0] }] } },
-        },
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id.userId',
-          foreignField: '_id',
-          as: '_user',
-        },
-      },
-      {
-        $addFields: {
-          username: { $ifNull: [{ $arrayElemAt: ['$_user.username', 0] }, ''] },
-        },
-      },
-      { $project: { _user: 0 } },
-    ];
-
-    const aggResults: Array<{
-      _id: { userId: string; TDFId: string };
-      correct: number;
-      incorrect: number;
-      totalPracticeDuration: number;
-      username: string;
-    }> = await deps.Histories.rawCollection().aggregate(pipeline).toArray();
-
-    type ClassTotal = { count: number; totalTime: number; numCorrect: number; percentCorrect?: string; totalTimeDisplay?: string };
-    type StudentTotal = ClassTotal & { username: string; userId: string };
-    const studentPerformanceForClass: Record<string, Record<string, ClassTotal>> = {};
-    const studentPerformanceForClassAndTdfIdMap: Record<string, Record<string, Record<string, StudentTotal>>> = {};
-
-    for (const row of aggResults) {
-      const userId = row._id.userId;
-      const TDFId = row._id.TDFId;
-      const correct = Number(row.correct);
-      const incorrect = Number(row.incorrect);
-      const totalPracticeDuration = Number(row.totalPracticeDuration);
-      const count = correct + incorrect;
-      const studentUsername = row.username || '';
-
-      if (studentUsername) {
-        deps.syncUsernameCaches(String(userId), studentUsername);
-      }
-
-      const userSections = userSectionMap[userId];
-      if (!userSections) {
-        continue;
-      }
-
-      for (const { courseId } of userSections) {
-        if (!studentPerformanceForClass[courseId]) {
-          studentPerformanceForClass[courseId] = {};
-        }
-        if (!studentPerformanceForClass[courseId][TDFId]) {
-          studentPerformanceForClass[courseId][TDFId] = { count: 0, totalTime: 0, numCorrect: 0 };
-        }
-        const classTdf = studentPerformanceForClass[courseId][TDFId];
-        if (classTdf) {
-          classTdf.numCorrect += correct;
-          classTdf.count += count;
-          classTdf.totalTime += totalPracticeDuration;
-        }
-
-        if (!studentPerformanceForClassAndTdfIdMap[courseId]) {
-          studentPerformanceForClassAndTdfIdMap[courseId] = {};
-        }
-        if (!studentPerformanceForClassAndTdfIdMap[courseId][TDFId]) {
-          studentPerformanceForClassAndTdfIdMap[courseId][TDFId] = {};
-        }
-        if (!studentPerformanceForClassAndTdfIdMap[courseId][TDFId][userId]) {
-          studentPerformanceForClassAndTdfIdMap[courseId][TDFId][userId] = {
-            count: 0,
-            totalTime: 0,
-            numCorrect: 0,
-            username: studentUsername,
-            userId,
-          };
-        }
-        const studentEntry = studentPerformanceForClassAndTdfIdMap[courseId][TDFId][userId];
-        if (studentEntry) {
-          studentEntry.numCorrect += correct;
-          studentEntry.count += count;
-          studentEntry.totalTime += totalPracticeDuration;
-        }
-      }
-    }
-
-    for (const courseId of Object.keys(studentPerformanceForClass)) {
-      const courseTotals = studentPerformanceForClass[courseId];
-      if (!courseTotals) {
-        continue;
-      }
-      for (const tdfId of Object.keys(courseTotals)) {
-        const tdfTotal = courseTotals[tdfId];
-        if (!tdfTotal) {
-          continue;
-        }
-        tdfTotal.percentCorrect = ((tdfTotal.numCorrect / tdfTotal.count) * 100).toFixed(2) + '%';
-        tdfTotal.totalTimeDisplay = (tdfTotal.totalTime / (60 * 1000)).toFixed(1);
-      }
-    }
-    for (const courseId of Object.keys(studentPerformanceForClassAndTdfIdMap)) {
-      const courseTotals = studentPerformanceForClassAndTdfIdMap[courseId];
-      if (!courseTotals) {
-        continue;
-      }
-      for (const tdfId of Object.keys(courseTotals)) {
-        const tdfTotals = courseTotals[tdfId];
-        if (!tdfTotals) {
-          continue;
-        }
-        for (const studentTotal of Object.values(tdfTotals)) {
-          studentTotal.percentCorrect = ((studentTotal.numCorrect / studentTotal.count) * 100).toFixed(2) + '%';
-          studentTotal.totalTimeDisplay = (studentTotal.totalTime / (60 * 1000)).toFixed(1);
-        }
-      }
-    }
-    return [studentPerformanceForClass, studentPerformanceForClassAndTdfIdMap];
-  }
-
   function requireSelfScopedUserId(
     thisArg: MethodContext | undefined,
     requestedUserId: unknown,
@@ -1809,28 +1572,6 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
         }
       ).fetchAsync();
     },
-    getNumDroppedItemsByUserIDAndTDFId: async function(this: MethodContext, userId: string, TDFId: string) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getNumDroppedItemsByUserIDAndTDFId(scopedUserId, await requireProgressTdfId(this, TDFId));
-    },
-    getStudentPerformanceForClassAndTdfId: async function(this: MethodContext, instructorId: string, date: number | null = null) {
-      requireAccountProgressSession(this);
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-      const requestedInstructorId = deps.normalizeCanonicalId(instructorId) || this.userId;
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
-        subjectUserId: requestedInstructorId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Can only access your own instructor performance data',
-        forbiddenCode: 403,
-      });
-      return await getStudentPerformanceForClassAndTdfId(requestedInstructorId, date);
-    },
-    getStimSetFromLearningSessionByClusterList,
     getExperimentState: async function(this: MethodContext, userId: string, TDFId: string) {
       const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only read experiment state for the current user');
       const lessonId = await requireProgressTdfId(this, TDFId);
@@ -1854,19 +1595,8 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
         where || 'methods.setExperimentState'
       );
     },
-    getLastTDFAccessed: async function(this: MethodContext, userId: string | null = null) {
-      const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only read recent TDFs for the current user');
-      return await getLastTDFAccessed(scopedUserId, await participantProgressLessonIds(this, deps.Tdfs));
-    },
     insertHistory,
-    getHistoryByTDFID,
     getStimulusCrowdStatsForDeck,
-    getUserRecentTDFs: async function(this: MethodContext, userId: string | null = null) {
-      const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only read recent TDFs for the current user');
-      return await getUserRecentTDFs(scopedUserId, await participantProgressLessonIds(this, deps.Tdfs));
-    },
-    getUserLastFeedbackTypeFromHistory,
-
     getLearnerProgressSignals: async function(this: MethodContext, targetUserId?: string) {
       const currentUserId = this.userId;
       if (!currentUserId) {
@@ -1967,5 +1697,5 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
     ...downloads.methods,
     ...conditionCounts.methods,
   };
-  return { methods, methodBindings: Object.freeze([...conditionCounts.methodBindings, ...downloads.methodBindings]) };
+  return { methods, getHistoryByTDFID, methodBindings: Object.freeze([...conditionCounts.methodBindings, ...downloads.methodBindings]) };
 }
