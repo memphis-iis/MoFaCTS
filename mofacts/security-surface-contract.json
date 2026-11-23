@@ -121,10 +121,6 @@
       "notes": "Only the owner may edit sharing. Each new recipient must match an account inside the transaction. Stale existing entries can be retained or revoked."
     },
     {
-      "name": "auditPublicAssetsWithoutSharedTdf",
-      "access": "admin-only"
-    },
-    {
       "name": "callAdminTestOpenRouterRequest",
       "access": "admin-only"
     },
@@ -249,10 +245,6 @@
     },
     {
       "name": "exportThemeFile",
-      "access": "role-checked"
-    },
-    {
-      "name": "generateFaviconsFromLogo",
       "access": "role-checked"
     },
     {
@@ -385,10 +377,6 @@
     },
     {
       "name": "getManualContentDraft",
-      "access": "role-checked"
-    },
-    {
-      "name": "getMaxResponseKC",
       "access": "role-checked"
     },
     {
@@ -560,10 +548,6 @@
       "notes": "The brand-profile policy checks administrator access before parsing or storing an imported draft."
     },
     {
-      "name": "importPrivateRepoTdfBatch",
-      "access": "role-checked"
-    },
-    {
       "name": "importThemeFile",
       "access": "role-checked"
     },
@@ -616,10 +600,6 @@
       "name": "migrateFilenameTdfReferences",
       "access": "admin-only",
       "notes": "Administrator authorization precedes option validation. Writes require explicit confirmation and the fingerprint from a reviewed dry run."
-    },
-    {
-      "name": "normalizeOptionalString",
-      "access": "role-checked"
     },
     {
       "name": "populateSSOProfile",
@@ -697,10 +677,6 @@
     },
     {
       "name": "renameTheme",
-      "access": "role-checked"
-    },
-    {
-      "name": "repairAiGeneratedPackageMedia",
       "access": "role-checked"
     },
     {
@@ -887,10 +863,6 @@
       "name": "updateTdfConditionCounts",
       "access": "role-checked",
       "notes": "The registered replacement policy checks study access. For not-max it first checks root ownership or admin role and validates integer counts before authorizing the study mutation."
-    },
-    {
-      "name": "upsertStimFile",
-      "access": "role-checked"
     },
     {
       "name": "userAdminDeleteUser",
@@ -1242,10 +1214,6 @@
     },
     {
       "name": "method:processPackageUpload",
-      "access": "role-checked"
-    },
-    {
-      "name": "method:repairAiGeneratedPackageMedia",
       "access": "role-checked"
     },
     {

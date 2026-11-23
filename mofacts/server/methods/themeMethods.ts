@@ -274,11 +274,6 @@ export function createThemeMethods(deps: ThemeMethodDeps) {
       }
     },
 
-    generateFaviconsFromLogo: async function(this: MethodContext, logoDataUrl: string) {
-      await deps.requireAdminUser(this.userId, 'Only admins can generate favicons', 'unauthorized');
-      return await generateFaviconsFromLogoInternal(deps.serverConsole, logoDataUrl);
-    },
-
     toggleCustomTheme: async function(this: MethodContext) {
       deps.serverConsole('toggleCustomTheme');
       await deps.requireAdminUser(this.userId, 'Only admins can toggle themes', 'unauthorized');

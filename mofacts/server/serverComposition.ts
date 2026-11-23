@@ -83,7 +83,7 @@ import { registerSecurityAuditHttp } from './http/securityAudits';
 import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
 import { createExperimentMethodRegistration, issueExperimentLoginToken } from './methods/experimentMethods';
 import { createExperimentTargetFamilyResolver } from './lib/experimentTargetFamilyResolver';
-import { createPackageMethods } from './methods/packageMethods';
+import { createPackageService } from './methods/packageMethods';
 import {
   createOpenRouterCatalogMethods,
   createOpenRouterModelCatalogService,
@@ -481,7 +481,7 @@ const {
   canonicalizeFlatStimuliMediaRefs,
 } = mediaReferenceHelpers;
 
-const packageMethods = createPackageMethods({
+const packageService = createPackageService({
   storageRoot: getLocalStoragePaths(Meteor.settings, process.env).dynamicAssetsPath,
   Tdfs,
   TdfMutationJobs,
@@ -521,8 +521,8 @@ const packageMethods = createPackageMethods({
   canonicalizeStimDisplayMediaRefs,
   canonicalizeFlatStimuliMediaRefs,
 });
+const { getResponseKCMapForTdf, upsertStimFile, importPrivateRepoTdfBatch, normalizeOptionalString } = packageService;
 const {
-  getResponseKCMapForTdf,
   processPackageUpload,
   confirmPackageUpload,
   cancelPackageUpload,
@@ -530,10 +530,7 @@ const {
   saveTdfStimuli,
   saveTdfContent,
   copyTdf,
-  upsertStimFile,
-  importPrivateRepoTdfBatch,
-  normalizeOptionalString,
-} = packageMethods;
+} = packageService.methods;
 
 const dashboardCacheMethods = createDashboardCacheMethods({
   getAccessibleTdf: (userId, tdfId, options) => getTdfById.call({ userId }, tdfId, options),

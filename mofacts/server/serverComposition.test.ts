@@ -287,6 +287,17 @@ describe('server auth and session methods', function() {
     expect(auditEntry.details.source).to.equal('populateSSOProfile');
   });
 
+  it('keeps retired maintenance commands and package helpers out of Meteor', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of ['auditPublicAssetsWithoutSharedTdf', 'repairAiGeneratedPackageMedia', 'generateFaviconsFromLogo',
+      'getMaxResponseKC', 'upsertStimFile', 'importPrivateRepoTdfBatch', 'normalizeOptionalString']) {
+      expect(handlers).not.to.have.own.property(name);
+    }
+    for (const name of ['saveAiGeneratedPackageContent', 'confirmPackageUpload', 'getResponseKCMapForTdf']) {
+      expect(handlers[name]).to.be.a('function');
+    }
+  });
+
   it('exposes individual package deletion without installation-wide deletion', function() {
     for (const name of ['deleteAllFiles', 'cleanupOrphanDynamicAssets']) {
       expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);

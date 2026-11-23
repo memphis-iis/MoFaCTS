@@ -6,7 +6,7 @@ import { Mongo } from 'meteor/mongo';
 import { Random } from 'meteor/random';
 
 import { createContentAssetMaintenanceMethods } from '../methods/contentAssetMaintenanceMethods';
-import { createPackageMethods } from '../methods/packageMethods';
+import { createPackageService } from '../methods/packageMethods';
 import { processPackageUploadWorkflow } from './packageUpload';
 import type { ProcessPackageUploadDeps } from './packageUploadShared';
 
@@ -205,10 +205,10 @@ describe('package upload identity confirmation integration', function() {
         const deps = createWorkflowDeps(state);
         const tdfs = new Mongo.Collection<any>(`packageVisibility${Random.id()}`);
         let nextStimuliSet = 101;
-        const methods = createPackageMethods({ ...deps, Tdfs: tdfs,
+        const { methods } = createPackageService({ ...deps, Tdfs: tdfs,
           usersCollection: { async findOneAsync() { return { profile: { displayName: 'Synthetic teacher' } }; } },
           allocateNextStimuliSetId: () => nextStimuliSet++,
-        } as unknown as Parameters<typeof createPackageMethods>[0]);
+        } as unknown as Parameters<typeof createPackageService>[0]);
         const asset = { _id: 'asset-visibility', path: zipPath, userId: 'owner-1', ext: 'zip',
           name: 'condition-package.zip', size: fs.statSync(zipPath).size };
         const conditionIds = 'content.tdfs.tutor.setspec.conditionTdfIds';

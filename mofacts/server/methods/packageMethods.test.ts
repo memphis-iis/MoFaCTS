@@ -1,6 +1,6 @@
 import { prepareEditorProviderKeyChanges } from '../../common/lessonProviderKeys';
 import assert from 'node:assert/strict';
-import { createPackageMethods } from './packageMethods';
+import { createPackageService } from './packageMethods';
 
 function setup() {
   const doc: any = { _id: 'synthetic-lesson', tdfRevision: 7, stimuliSetId: 'synthetic-set',
@@ -9,7 +9,7 @@ function setup() {
   let authorized = true;
   let race = false;
   const writes: any[] = [];
-  const methods = createPackageMethods({
+  const { methods } = createPackageService({
     Tdfs: {
       findOneAsync: async () => structuredClone(doc),
       updateAsync: async (selector: any, update: any) => {
@@ -28,7 +28,7 @@ function setup() {
     processAudioFilesForTDF: async () => {},
     updateStimDisplayTypeMap: async () => {},
     serverConsole: () => {},
-  } as unknown as Parameters<typeof createPackageMethods>[0]);
+  } as unknown as Parameters<typeof createPackageService>[0]);
   return { doc, writes, methods, deny: () => { authorized = false; }, race: () => { race = true; } };
 }
 
