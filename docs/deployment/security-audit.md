@@ -100,6 +100,10 @@ before retrying an upload whose transport outcome is uncertain.
 ## Verification and release ownership
 
 From `mofacts/`, lint includes `security-surface-contract.json` verification.
+It also checks direct Meteor method and publication registrations in local
+packages with a Meteor package manifest. The maintained upload package has one
+reviewed registration in its FilesCollection constructor. Its installed handlers
+are verified separately by the integration suite.
 Discovered surfaces still require human-reviewed source authorization
 classification; a matching manifest is not proof of all runtime registrations.
 The standard repository executor runs both source-security entry points and the

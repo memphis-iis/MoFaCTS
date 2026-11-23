@@ -3,7 +3,7 @@ import ts from 'typescript';
 
 // Application adapters register on their injected server. A direct reference
 // to either framework function bypasses those adapters, even if called later.
-export function directMeteorRegistrationReferences(source) {
+export function directMeteorRegistrationReferences(source, acceptsRegistration = () => false) {
   let checker;
   function declarationOf(identifier) {
     if (!checker) {
@@ -54,7 +54,7 @@ export function directMeteorRegistrationReferences(source) {
     if (ts.isElementAccessExpression(node) && member === undefined && isMeteor(node.expression)) {
       findings.push({ member: '[unresolved property]', line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 });
     }
-    if ((member === 'methods' || member === 'publish') && isMeteor(node.expression)) {
+    if ((member === 'methods' || member === 'publish') && isMeteor(node.expression) && !acceptsRegistration(node)) {
       findings.push({ member, line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 });
     }
     if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && isMeteor(node.initializer)) {
@@ -96,4 +96,22 @@ export function componentRegistrationReferences(filename, text) {
   const { js } = compile(text, { filename, generate: 'client' });
   const emitted = ts.createSourceFile(filename + '.js', js.code, ts.ScriptTarget.Latest, true);
   return directMeteorRegistrationReferences(emitted).map(row => ({ ...row, line: 'generated line ' + row.line }));
+}
+
+export function packageRegistrationReferences(source, isUploadOwner) {
+  let accepted = 0;
+  const findings = directMeteorRegistrationReferences(source, node => {
+    const call = node.parent;
+    const statement = call.parent;
+    const body = statement.parent;
+    if (!isUploadOwner || !ts.isPropertyAccessExpression(node) || node.name.text !== 'methods' ||
+        !ts.isCallExpression(call) || call.expression !== node || call.arguments.length !== 1 ||
+        !ts.isIdentifier(call.arguments[0]) || call.arguments[0].text !== '_methods' ||
+        !ts.isExpressionStatement(statement) || !ts.isBlock(body) || !ts.isConstructorDeclaration(body.parent) ||
+        body.parent.parent.name?.text !== 'FilesCollection') return false;
+    accepted++;
+    return true;
+  });
+  if (isUploadOwner && accepted !== 1) throw new Error('Expected exactly one FilesCollection constructor upload registration');
+  return findings;
 }
