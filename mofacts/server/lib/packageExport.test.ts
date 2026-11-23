@@ -70,6 +70,7 @@ describe('packageExport identity', function() {
     let zipBuffer: Buffer | null = null;
     let storedAsset: any = null;
     let writes = 0;
+    const removedIds: string[] = [];
 
     const directory = await mkdtemp(join(tmpdir(), 'mofacts-export-test-'));
     try {
@@ -97,10 +98,10 @@ describe('packageExport identity', function() {
         },
         async addFile(filePath: string, options: any) {
           zipBuffer = await readFile(filePath); writes++;
-          storedAsset = { _id: 'export-asset', name: options.fileName, meta: options.meta, _downloadRoute: '/cdn/storage', _collectionName: 'Assets' };
-          return { _id: 'export-asset', link: () => '/export.zip' };
+          storedAsset = { _id: 'export-asset-' + writes, name: options.fileName, meta: options.meta, _downloadRoute: '/cdn/storage', _collectionName: 'Assets' };
+          return { _id: storedAsset._id, link: () => '/export.zip' };
         },
-        async removeAsync() {},
+        async removeAsync(selector: any) { removedIds.push(selector._id); },
         link(file: any) {
           assert.equal(file._downloadRoute, '/cdn/storage');
           assert.equal(file._collectionName, 'Assets');
@@ -132,6 +133,7 @@ describe('packageExport identity', function() {
     assert.equal(cached.reusedExisting, true);
     assert.equal(cached.link, '/export.zip');
     assert.equal(writes, 2);
+    assert.deepEqual(removedIds, []);
 
     assert.ok(zipBuffer);
     const zip = await JSZip.loadAsync(zipBuffer!);

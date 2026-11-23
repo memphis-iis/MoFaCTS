@@ -1,3 +1,4 @@
+import { versionedAssetFileName } from '../../../common/lib/versionedAssetFileName';
 import { createContentUpdateConfirmation, saveEditedContent } from '../../lib/contentUpdateWarningsClient';
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
@@ -1245,19 +1246,10 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
         if (!tdf?._id || tdf.stimuliSetId === undefined || tdf.stimuliSetId === null) {
             throw new Error('The content media target is unavailable. Reload the editor and try again.');
         }
-        // Check for existing file with same name
-        const existingFile = (globalThis as any).DynamicAssets.findOne({
-            name: file.name,
-            'meta.stimuliSetId': tdf.stimuliSetId,
-        });
-        if (existingFile) {
-            // Remove existing file before uploading new one
-            await meteorCallAsync('removeAssetById', existingFile._id);
-        }
-
         const upload = (globalThis as any).DynamicAssets.insert({
             transport: 'ddp',
             file: file,
+            fileName: versionedAssetFileName(file.name),
             chunkSize: 'dynamic',
             meta: {
                 uploadPurpose: 'content-media',

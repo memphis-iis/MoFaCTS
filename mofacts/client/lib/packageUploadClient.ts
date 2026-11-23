@@ -1,4 +1,15 @@
+import { versionedAssetFileName } from '../../common/lib/versionedAssetFileName';
 import type { ContentUpdateWarning } from '../../common/lib/contentUpdateWarnings';
+
+export async function createLessonArchiveUpload(
+  blob: Blob,
+  name: string,
+  findExisting: (name: string) => Promise<unknown>,
+): Promise<File> {
+  const uploadName = await findExisting(name) ? versionedAssetFileName(name) : name;
+  return new File([blob], uploadName, { type: 'application/zip' });
+}
+
 export type PackageUploadIntegrity = { expectedSize: number; sha256?: string };
 
 type PackageUploadCollection = {

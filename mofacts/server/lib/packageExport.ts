@@ -77,7 +77,6 @@ type PreparedPackageExportState = {
   zipFileName: string;
   packageSignature: string;
   memberIds: string[];
-  oldPackageAssetIds: string[];
   preparedEntries: PreparedPackageExportEntry[];
   assetsByZipName: Map<string, any>;
   reusablePackageAssetId: string | null;
@@ -592,34 +591,10 @@ async function preparePackageExportState(
     zipFileName,
     packageSignature,
     memberIds,
-    oldPackageAssetIds,
     preparedEntries,
     assetsByZipName,
     reusablePackageAssetId
   };
-}
-
-async function cleanupPackageAssetIfUnreferenced(
-  packageAssetId: unknown,
-  excludeTdfIds: string[],
-  deps: BuildAndStoreCurrentPackageAssetDeps
-) {
-  const normalizedPackageAssetId = deps.normalizeCanonicalId(packageAssetId);
-  if (!normalizedPackageAssetId) {
-    return;
-  }
-
-  const selector: Record<string, unknown> = { packageAssetId: normalizedPackageAssetId };
-  if (excludeTdfIds.length > 0) {
-    selector._id = { $nin: excludeTdfIds };
-  }
-
-  const stillReferenced = await deps.Tdfs.findOneAsync(selector, { fields: { _id: 1 } });
-  if (stillReferenced) {
-    return;
-  }
-
-  await deps.DynamicAssets.removeAsync({ _id: normalizedPackageAssetId });
 }
 
 async function maybeReuseCurrentPackageAsset(
@@ -752,13 +727,7 @@ async function buildAndStorePreparedPackageAsset(
       );
     }
 
-    const stalePackageAssetIds = preparedState.oldPackageAssetIds.filter((oldAssetId) => oldAssetId !== packageAssetId);
-    if (stalePackageAssetIds.length > 0) {
-      await Promise.all(
-        stalePackageAssetIds.map((oldAssetId) => cleanupPackageAssetIfUnreferenced(oldAssetId, preparedState.memberIds, deps))
-      );
-    }
-
+    // Saving the family reference cannot establish that a prior download URL is unused.
     const link = typeof fileRef?.link === 'function'
       ? fileRef.link()
       : deps.DynamicAssets.link({ ...fileRef });

@@ -5,7 +5,6 @@ import path from 'node:path';
 import { Mongo } from 'meteor/mongo';
 import { Random } from 'meteor/random';
 
-import { createContentAssetMaintenanceMethods } from '../methods/contentAssetMaintenanceMethods';
 import { createPackageService } from '../methods/packageMethods';
 import { processPackageUploadWorkflow } from './packageUpload';
 import type { ProcessPackageUploadDeps } from './packageUploadShared';
@@ -44,6 +43,7 @@ async function writePackage(zip: any) {
 function createWorkflowDeps(state: IntegrationState): ProcessPackageUploadDeps {
   const existingTdf = {
     _id: 'known-tdf-id',
+    packageAssetId: 'original-archive',
     tdfFileName: 'previous-name.json',
     tdfRevision: 0,
     tdfAvailability: 'repair-required',
@@ -297,12 +297,13 @@ describe('package upload identity confirmation integration', function() {
     assert.equal(state.contentWrites, 1);
     assert.equal(state.storedTdf._id, 'known-tdf-id');
     assert.equal(state.storedTdf.stimuliSetId, 17);
+    assert.deepEqual(state.removedAssetIds, []);
     assert.equal(state.mutationJob.status, 'complete');
     assert.equal(state.mutationJob.confirmationExpiresAt, undefined);
     assert.ok(state.mutationJob.cleanupAt.getTime() > Date.now());
   });
 
-  it('uses the authorized asset-removal path when confirmation is canceled', async function() {
+  it('cancels the actual confirmation plan without deleting a potentially shared archive', async function() {
     zipPath = await writeIdentityPackage('known-tdf-id');
     const state: IntegrationState = { contentWrites: 0, removedAssetIds: [], storedTdf: null };
     const deps = createWorkflowDeps(state);
@@ -319,35 +320,12 @@ describe('package upload identity confirmation integration', function() {
     ) as any;
     assert.equal(initial.status, 'confirmation-required');
 
-    const assetMethods = createContentAssetMaintenanceMethods({
-      Tdfs: {
-        find: () => ({ fetchAsync: async () => [] }),
-        findOneAsync: async () => null,
-        removeAsync: async () => 0,
-      },
-      DynamicAssets: {
-        find: () => ({ fetchAsync: async () => [], countAsync: async () => 0 }),
-        findOneAsync: async (selector: any) => selector._id === asset._id ? asset : null,
-        removeAsync: async (selector: any) => {
-          state.removedAssetIds.push(String(selector._id));
-          return 1;
-        },
-      },
-      serverConsole() {},
-      normalizeCanonicalId(value: unknown) {
-        return typeof value === 'string' && value.trim() ? value.trim() : null;
-      },
-      getStimuliSetIdCandidates: () => [],
-      deleteTdfRuntimeData: async () => {},
-      updateStimDisplayTypeMap: async () => {},
-      rebuildStimDisplayTypeMapSnapshot: async () => {},
-      getStimDisplayTypeMapDeps: () => ({}),
-      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => false }),
-    });
-    await assetMethods.removeAssetById.call({ userId: 'owner-1' }, asset._id);
+    const { methods } = createPackageService(deps as any);
+    await methods.cancelPackageUpload.call({ userId: 'owner-1' }, initial.uploadPlanId);
 
     assert.equal(state.contentWrites, 0);
-    assert.deepEqual(state.removedAssetIds, ['asset-cancel']);
+    assert.equal(state.mutationJob.status, 'cancelled');
+    assert.deepEqual(state.removedAssetIds, []);
   });
 
   it('rolls back a create when another upload claims the supplied id after preflight', async function() {
@@ -408,6 +386,8 @@ describe('package upload identity confirmation integration', function() {
     );
 
     assert.equal(state.mutationJob.status, 'rolled-back');
+    assert.deepEqual(state.removedAssetIds, []);
+    assert.equal(state.storedTdf.packageAssetId, 'original-archive');
     assert.equal(state.storedTdf.tdfFileName, 'previous-name.json');
     assert.equal(state.storedTdf.content.fileName, 'previous-name.json');
     assert.equal(state.storedTdf.tdfAvailability, 'repair-required');

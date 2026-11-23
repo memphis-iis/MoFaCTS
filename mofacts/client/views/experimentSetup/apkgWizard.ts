@@ -18,7 +18,7 @@ import { clientConsole } from '../..';
 import { getErrorMessage } from '../../lib/errorUtils';
 import { getImportIndexSelectionCount, parseImportIndexSpec } from '../../lib/importRangeUtils';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
-import { uploadAndProcessPackage } from '../../lib/packageUploadClient';
+import { createLessonArchiveUpload, uploadAndProcessPackage } from '../../lib/packageUploadClient';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import './draftEditorWorkspace';
@@ -752,27 +752,7 @@ Template.apkgWizard.events({
         ? `${firstManifest.tdfName}.zip`
         : 'learning-package.zip';
 
-      // Create File object from blob
-      const file = new File([result.zipBlob], filename, { type: 'application/zip' });
-
-      // Upload using DynamicAssets (same pattern as doPackageUpload)
-      const existingFile = await DynamicAssets.findOne({ name: file.name, userId: Meteor.userId() });
-      if (existingFile) {
-        const confirmed = await requestApkgConfirmation(template, {
-          id: 'overwrite-package',
-          title: apkgText('apkg.overwritePackageTitle'),
-          message: apkgText('apkg.overwritePackageMessage'),
-          confirmLabel: apkgText('apkg.overwriteAndUpload')
-        });
-
-        if (confirmed) {
-          await (Meteor as any).callAsync('removeAssetById', existingFile._id);
-          closeInlineConfirmation(template, false);
-        } else {
-          return;
-        }
-      }
-
+      const file = await createLessonArchiveUpload(result.zipBlob, filename, name => (Meteor as any).callAsync('getUserAssetByName', name));
       const { processing: processResult } = await uploadAndProcessPackage({
         dynamicAssets: DynamicAssets,
         file,

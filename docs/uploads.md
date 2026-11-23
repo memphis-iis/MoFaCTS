@@ -57,3 +57,9 @@ cookie absence after login/reload/reconnect, and existing CSP, public/private
 assets, learner resume, Anki analysis, hosted fonts and YouTube playback. A WAV
 response alone does not establish successful playback. Keep production and the
 older staging installation outside this qualification batch.
+
+## Replacing lesson files
+
+The manual creator and Anki importer upload a separate archive before asking for confirmation of a lesson update. The lesson editor uploads media to a new URL. Saving the lesson commits that URL. Cancelling an update, abandoning an edit, or failing to upload leaves the original available.
+
+Replacing a file does not grant permission to delete every copy with the same name. The application retains previously published files when it cannot establish that all references have been removed. Repeated replacements can therefore increase storage usage.

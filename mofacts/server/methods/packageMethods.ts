@@ -1,3 +1,4 @@
+import { versionedAssetFileName } from '../../common/lib/versionedAssetFileName';
 import { LESSON_PROVIDER_KEY_FIELDS } from '../../common/lessonProviderKeys';
 import { isTdfOwner } from '../lib/contentAccessPolicy';
 import { createReadStream } from 'node:fs';
@@ -373,9 +374,7 @@ export function createPackageService(deps: PackageMethodsDeps) {
     if (cancelled !== 1) {
       throw new Meteor.Error(404, 'Upload plan unavailable');
     }
-    if (job?.packageAssetId) {
-      await deps.DynamicAssets.removeAsync({ _id: job.packageAssetId });
-    }
+    // A plan can reprocess a previously saved archive. Cancelling owns only the plan.
     return { status: 'cancelled' };
   }
 
@@ -392,62 +391,15 @@ export function createPackageService(deps: PackageMethodsDeps) {
     } else {
       scopedQuery.userId = owner;
     }
-    const existingFiles = await deps.DynamicAssets.find(scopedQuery).fetchAsync();
-    const stagedPreviousAssets: Array<{
-      _id: string;
-      name?: string;
-      fileName?: string;
-      meta?: Record<string, unknown>;
-    }> = [];
-    if (existingFiles.length > 0 && options.mutationJobId) {
-      if (typeof deps.DynamicAssets.collection?.updateAsync !== 'function') {
-        throw new Error('Package media replacement requires DynamicAssets.collection.updateAsync');
-      }
-      for (const existing of existingFiles) {
-        stagedPreviousAssets.push({
-          _id: String(existing._id),
-          name: existing.name,
-          fileName: existing.fileName,
-          meta: existing.meta,
-        });
-      }
-      const plannedJournaled = await deps.TdfMutationJobs.updateAsync(
-        { _id: options.mutationJobId, status: 'committing' },
-        {
-          $push: { mediaMutations: { newAssetId: '', previousAssets: stagedPreviousAssets } },
-          $set: { updatedAt: new Date() },
-        },
-      );
-      if (plannedJournaled !== 1) throw new Error('Package media replacement could not be planned');
-      for (const existing of existingFiles) {
-        const backupName = `${media.name}.mofacts-backup-${options.mutationJobId}-${existing._id}`;
-        await deps.DynamicAssets.collection.updateAsync(
-          { _id: existing._id },
-          {
-            $set: {
-              name: backupName,
-              fileName: backupName,
-              'meta.mutationBackupFor': options.mutationJobId,
-            },
-          },
-        );
-      }
-    } else if (existingFiles.length > 0) {
-      for (const existing of existingFiles) {
-        await deps.DynamicAssets.removeAsync({_id: existing._id});
-      }
-      deps.serverConsole(`File ${media.name} already exists in scope, overwritting ${existingFiles.length} record(s).`);
-    } else {
-      deps.serverConsole(`File ${media.name} doesn't exist, uploading`)
-    }
-
+    const collision = await deps.DynamicAssets.findOneAsync(scopedQuery, { fields: { _id: 1 } });
+    const storedName = collision ? versionedAssetFileName(media.name) : media.name;
     const mimeType = deps.getMimeTypeForAssetName(media.name);
     let writtenAssetId = '';
 
     try {
       if (!media.source) throw new Error(`Media has no staged source: ${media.name}`);
       const fileRef = await storePackageFile(deps.DynamicAssets, deps.storageRoot, media.source.path, {
-        fileName: media.name,
+        fileName: storedName,
         userId: owner,
         type: mimeType,
         meta: {
@@ -461,7 +413,7 @@ export function createPackageService(deps: PackageMethodsDeps) {
         if (!fileRef?._id) {
           throw new Error(`S3 storage requires DynamicAssets.writeAsync to return an asset id for ${media.name}`);
         }
-        const storageKey = `dynamic-assets/${fileRef._id}/${media.name}`;
+        const storageKey = `dynamic-assets/${fileRef._id}/${storedName}`;
         await deps.storageBoundary.putObject(storageKey, createReadStream(media.source.path), mimeType, media.source.size);
         if (typeof deps.DynamicAssets.collection?.updateAsync !== 'function') {
           throw new Error('S3 storage requires DynamicAssets.collection.updateAsync');
@@ -486,7 +438,7 @@ export function createPackageService(deps: PackageMethodsDeps) {
       if (options.mutationJobId && fileRef?._id) {
         fileRef.replacement = {
           newAssetId: String(fileRef._id),
-          previousAssets: stagedPreviousAssets,
+          previousAssets: [],
         };
         const journaled = await deps.TdfMutationJobs.updateAsync(
           { _id: options.mutationJobId, status: 'committing' },
@@ -497,12 +449,6 @@ export function createPackageService(deps: PackageMethodsDeps) {
       return fileRef;
     } catch (error: unknown) {
       if (writtenAssetId) await deps.DynamicAssets.removeAsync({ _id: writtenAssetId });
-      for (const previousAsset of stagedPreviousAssets) {
-        await deps.DynamicAssets.collection?.updateAsync?.(
-          { _id: previousAsset._id },
-          { $set: { name: previousAsset.name, fileName: previousAsset.fileName, meta: previousAsset.meta || {} } },
-        );
-      }
       deps.serverConsole(`File ${media.name} could not be uploaded`, error);
       throw error;
     }

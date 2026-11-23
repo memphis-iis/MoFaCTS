@@ -1902,7 +1902,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 76 total, 72 consumed, 0 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 76 total, 72 consumed, 1 reserved, 2 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 74 reserved for preserving originals across package and lesson media replacement.
 
 Slot 73 passed on e0f76f7a. Native Meteor recorded 1,125 server and 1,251 Chromium passes, zero failures or hook failures and 15/seven pending. Verified both owner methods absent, owned-lesson listing, the exact selected lesson response mapping, owner/shared stimulus-file reads and denial for anonymous and unrelated callers. The asynchronous denial regression passed. Image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.0iGWmB7b/results/native-verification.json SHA-256 0983523ccef98c9371acaf5defa6a24207bec85b44e6c184c3eb12633618734a.
 

@@ -381,31 +381,11 @@ export async function processPackageUploadWorkflow(
           { _id: mediaMutation.newAssetId, 'meta.mutationJobId': state.mutationJobId },
           { $unset: { 'meta.mutationJobId': '' } },
         );
-        for (const previousAsset of mediaMutation.previousAssets) {
-          await deps.DynamicAssets.removeAsync?.({ _id: previousAsset._id, 'meta.mutationBackupFor': state.mutationJobId });
-        }
       } catch (cleanupError) {
         deps.serverConsole('Committed package media cleanup failed:', mediaMutation.newAssetId, cleanupError);
       }
     }
-    const supersededPackageAssetIds = new Set(
-      identityPlan.entries
-        .map((entry) => deps.normalizeCanonicalId(entry.beforeImage?.packageAssetId))
-        .filter((assetId): assetId is string => Boolean(assetId) && assetId !== packageAssetId),
-    );
-    for (const supersededAssetId of supersededPackageAssetIds) {
-      try {
-        const remainingReferences = await deps.Tdfs.find(
-          { packageAssetId: supersededAssetId },
-          { fields: { _id: 1 } },
-        ).fetchAsync();
-        if (remainingReferences.length === 0 && typeof deps.DynamicAssets.removeAsync === 'function') {
-          await deps.DynamicAssets.removeAsync({ _id: supersededAssetId });
-        }
-      } catch (cleanupError) {
-        deps.serverConsole('Superseded package asset cleanup failed:', supersededAssetId, cleanupError);
-      }
-    }
+    // Previously published archives can still be linked by ID or filename.
     return terminalResult;
   } catch (error: unknown) {
     const domainErrorCode = error && typeof error === 'object' ? String((error as { error?: unknown }).error || '') : '';
@@ -446,15 +426,7 @@ export async function processPackageUploadWorkflow(
           $unset: { confirmationExpiresAt: '' },
         },
       );
-      if (!rollbackFailed) {
-        const remainingReferences = await deps.Tdfs.find(
-          { packageAssetId },
-          { fields: { _id: 1 } },
-        ).fetchAsync();
-        if (remainingReferences.length === 0 && typeof deps.DynamicAssets.removeAsync === 'function') {
-          await deps.DynamicAssets.removeAsync({ _id: packageAssetId });
-        }
-      }
+
     }
     deps.serverConsole(
       `Package upload ${failureStage} failure details:`,
@@ -471,14 +443,6 @@ export async function processPackageUploadWorkflow(
       'message=',
       message
     );
-    if (!state.stimSetId && fileObj?._id && typeof deps.DynamicAssets.removeAsync === 'function') {
-      try {
-        await deps.DynamicAssets.removeAsync({ _id: fileObj._id });
-        deps.serverConsole('Removed package asset after failed initialization:', fileObj._id);
-      } catch (cleanupError: unknown) {
-        deps.serverConsole('Could not remove package asset after failed initialization:', fileObj._id, cleanupError);
-      }
-    }
     if (
       domainErrorCode === 'package-upload-failed'
       || domainErrorCode === 'generated-package-name-conflict'
