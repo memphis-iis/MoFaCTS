@@ -2571,11 +2571,12 @@ describe('course method authorization', function() {
     return MeteorAny.server.method_handlers[name];
   }
 
-  async function expectCourseDenial(call: () => Promise<unknown>, code: number) {
+  async function expectCourseDenial(call: () => Promise<unknown>, code: number, reason?: string) {
     let denied: unknown;
     try { await call(); } catch (error) { denied = error; }
     expect(denied).to.be.instanceOf(Meteor.Error);
     expect(denied).to.include({ error: code });
+    if (reason !== undefined) expect(denied).to.include({ reason });
   }
 
   it('returns a successful section join when the confirmation has no recipient', async function() {
@@ -2601,9 +2602,11 @@ describe('course method authorization', function() {
     await Roles.addUsersToRolesAsync(teacher, 'teacher');
     const handlers = MeteorAny.server.method_handlers;
     const create = (userId: string, teacherUserId: string) => handlers.addCourse.call({ userId }, {
-      courseName: Random.id(), teacherUserId, sections: ['A'],
+      courseName: Random.id(), timezone: 'America/Chicago', teacherUserId, sections: ['A'],
     });
-    for (const id of [learner, Random.id(), '']) await expectCourseDenial(() => create(admin, id), 400);
+    const ineligible = 'Course owner must be an existing teacher or administrator';
+    for (const id of [learner, Random.id()]) await expectCourseDenial(() => create(admin, id), 400, ineligible);
+    await expectCourseDenial(() => create(admin, ''), 400, 'A valid course owner ID is required');
     expect(await CoursesAny.find({}).countAsync()).to.equal(0);
     const own = await create(teacher, otherAdmin);
     expect((await CoursesAny.findOneAsync(own)).teacherUserId).to.equal(teacher);
@@ -2615,7 +2618,7 @@ describe('course method authorization', function() {
     });
     await Roles.removeUsersFromRolesAsync(teacher, 'teacher');
     await transfer(teacher);
-    for (const id of [learner, Random.id()]) await expectCourseDenial(() => transfer(id), 400);
+    for (const id of [learner, Random.id()]) await expectCourseDenial(() => transfer(id), 400, ineligible);
     expect((await CoursesAny.findOneAsync(courseId)).teacherUserId).to.equal(teacher);
     await transfer(otherAdmin);
     expect((await CoursesAny.findOneAsync(courseId)).teacherUserId).to.equal(otherAdmin);

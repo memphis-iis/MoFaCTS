@@ -103,7 +103,7 @@ In the existing synthetic experiment/condition fixture, each subscription perfor
 
 Source review of the course module accounts for seven of the 177. Its factory returns 27 properties. In serverComposition.ts, seven are removed before the other 20 are passed to Meteor. The seven are resolveAssignedRootTdfIdsForUser, invalidateCourseSnapshotForUser, invalidateCourseSnapshotsForCourse, invalidateCourseSnapshotsForAssignment, getTdfIdsByOwnerId, getSourceSentences and checkForTDFData. This leaves at most 170 further candidate names, including the 20 course methods. A name without a matching declaration can already have behavior tests. Keep the five exit groups open until their own acceptance criteria pass.
 
-After binding addCourse, the source contract lists 231 methods. Of these, 74 match application test declarations and four match package declarations, leaving 153 names to reconcile. The three remaining course commands are deleteCourse, addUserToTeachersClass and getProgressiveAssignmentLaunch. All 21 publications match declarations.
+After binding section enrollment, the source contract lists 231 methods. Of these, 75 match application test declarations and four match package declarations, leaving 152 names to reconcile. The two remaining course commands are deleteCourse and getProgressiveAssignmentLaunch. All 21 publications match declarations.
 
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
 - [x] Reconcile the sharing transaction, both accessor reads and recipient resolution with the named passing Meteor cases in slots 38-40.
@@ -158,7 +158,8 @@ After binding addCourse, the source contract lists 231 methods. Of these, 74 mat
   - [x] Require a newly designated course owner to be an existing teacher or administrator. Preserve teacher self-ownership, existing owners on metadata edits, and administrator transfer away from a former teacher.
   - [x] Exercise the source owner selector with synthetic account and role lookups: teacher self-ownership, missing and ineligible recipients, existing teachers and administrators, unchanged ownership and transfer from a former teacher.
   - [x] Trace section enrollment notification handling: the membership is inserted before sending the course assignment email. An email preparation error (for example, an account without an address) therefore rejects a join that already persisted. Repeating the join skips the notification on an existing membership. No live account or notification was used.
-  - [ ] Verify the owner-selection case in the next authorized combined native Meteor run.
+  - [x] Record and verify a successful saved enrollment when confirmation email preparation or delivery fails; registration, anonymous and mismatched-teacher rejection, repeat joins, and sanitized failure diagnostics covered in slot 66.
+  - [ ] Verify the corrected owner-selection case in the next authorized native Meteor run; slot 66 encountered an unrelated missing timezone in the test setup.
   - [x] Trace course owner selection: teachers create courses for themselves. Administrators may supply another account ID on creation or transfer, and before the repair neither operation verified the proposed owner exists and holds a course-management role. No operator or learner accounts were inspected.
   - [x] Separate the 19 public course handlers from the course service helpers at their definition. Seven former inventory rows represented internal functions. None of those seven is a newly retired public command.
   - [x] Bind the learner course snapshot and four instructor reads to their existing authorization functions. Preserve the account-session requirement, instructor scope, administrator access, error ordering, and returned fields.
@@ -1887,9 +1888,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 66 total, 64 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 66 total, 65 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
-Slot 66 reserved for course ownership and enrollment confirmations.
+Slot 66 ran on 8fc56cde. Both enrollment cases passed: the installed join succeeded with a saved membership and no recipient; a rejected delivery was recorded without private details or a duplicate email on repeat join. Native Meteor reported 1,120 server passes and one failure, 1,251 Chromium passes, 15/seven pending, zero hook failures. The course owner fixture omitted the required course timezone, so its creation/transfer result is unverified. The correction supplies the timezone and asserts the specific rejection reasons. The image was reused and cleanup completed. Receipt: /var/tmp/mofacts-integration.NJkkxrzx/results/meteor-run.json SHA-256 91d0f9af1552191e2095871dd53c3b75fe76e5763dbd852b05c6b89c2ea94f2a.
 
 Slot 65 passed on 1791151a. Native Meteor: 1,118 server and 1,251 Chromium passes, zero failures or hook failures, 15/seven pending. Confirmed the installed due-date enrollment rules, transactional section rename/deletion and stale-edit rollback, reuse of the original invitation IDs, membership and cache handling, and the rendered Blaze editor payload. Image reused and cleanup complete. Receipt: /var/tmp/mofacts-integration.8JGswhjU/results/native-verification.json SHA-256 326c19c452a9b936d87560dfb2754acfe6ce852f5c2ab986aec144e31380d56e.
 
