@@ -178,11 +178,6 @@
       "access": "admin-only"
     },
     {
-      "name": "deleteAllFiles",
-      "access": "admin-only",
-      "notes": "Bulk uploaded-asset deletion uses the SPARC curation owner for teaching images, including uncataloged generated assets. Content-free receipts and dependent-content cleanup precede media removal; learner decisions, histories and model records are preserved."
-    },
-    {
       "name": "deleteCourse",
       "access": "role-checked",
       "notes": "Only the course owner with a teacher role or an administrator may remove the course and its assignments, sections and enrollments."

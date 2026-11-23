@@ -287,6 +287,11 @@ describe('server auth and session methods', function() {
     expect(auditEntry.details.source).to.equal('populateSSOProfile');
   });
 
+  it('exposes individual package deletion without installation-wide deletion', function() {
+    expect(MeteorAny.server.method_handlers).not.to.have.own.property('deleteAllFiles');
+    expect(MeteorAny.server.method_handlers.deletePackageFile).to.be.a('function');
+  });
+
   it('retires manual reset cleanup and login-data clearing', function() {
     for (const name of ['cleanupExpiredPasswordResetTokens', 'clearLoginData']) {
       expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);

@@ -44,16 +44,13 @@ type AdminMethodsDeps = {
   Tdfs: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => CountAndFetchCursor;
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
-    removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
   DynamicAssets: {
-    find: (selector: UnknownRecord, options?: UnknownRecord) => CountAndFetchCursor;
     collection: {
       rawCollection: () => {
         countDocuments: (selector: UnknownRecord) => Promise<number>;
       };
     };
-    removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
   Courses: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { countAsync: () => Promise<number> };
@@ -103,11 +100,8 @@ type AdminMethodsDeps = {
   sendVerificationEmailForUser: (userId: string, actorUserId: string | null, source: string) => Promise<boolean>;
   getUserDisplayIdentifier: (user: any) => string;
   syncUsernameCaches: (userId: string, nextUsername: string, previousUsername?: string) => void;
-  deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
-  removeUploadedAsset: (assetId: string) => Promise<void>;
   removeSparcFigureUserDecisions: (userId: string) => Promise<void>;
   removeSimulationResearchUserRecords: (userId: string) => Promise<void>;
-  clearStimDisplayTypeMap: () => void;
   encryptData?: (value: string) => string;
   decryptData?: (value: string) => string;
   openRouterModelCatalogService: OpenRouterModelCatalogService;
@@ -736,59 +730,6 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         targetUserId: normalizedTargetUserId,
         deletedIdentifier: deps.getUserDisplayIdentifier(targetUser),
       };
-    },
-
-    deleteAllFiles: async function(this: MethodContext) {
-      await deps.requireAdminUser(this.userId, 'Admin access required to delete all files');
-
-      try {
-        deps.serverConsole('delete all uploaded files');
-
-        const tdfs = await deps.Tdfs.find({}).fetchAsync();
-        deps.serverConsole('TDFs to remove: ' + tdfs.length);
-        let tdfsRemoved = 0;
-
-        for (const tdf of tdfs) {
-          const tdfId = String(tdf?._id || '');
-          if (!tdfId) {
-            continue;
-          }
-          try {
-            await deps.deleteTdfRuntimeData(tdfId);
-            await deps.Tdfs.removeAsync({ _id: tdfId });
-            tdfsRemoved++;
-            deps.serverConsole('removed TDF ' + tdfId);
-          } catch (tdfError: unknown) {
-            deps.serverConsole('Error removing TDF ' + tdfId + ':', tdfError);
-          }
-        }
-
-        const files = await deps.DynamicAssets.find({}).fetchAsync();
-        deps.serverConsole('Asset files to remove: ' + files.length);
-        let filesRemoved = 0;
-
-        for (const file of files) {
-          const fileId = String(file?._id || '');
-          if (!fileId) {
-            continue;
-          }
-          try {
-            deps.serverConsole('removing file ' + fileId);
-            await deps.removeUploadedAsset(fileId);
-            filesRemoved++;
-          } catch (fileError: unknown) {
-            deps.serverConsole('Error removing file ' + fileId + ':', fileError);
-          }
-        }
-
-        deps.clearStimDisplayTypeMap();
-        deps.serverConsole('removed ' + tdfsRemoved + ' TDFs and ' + filesRemoved + ' asset files');
-        return filesRemoved + tdfsRemoved;
-      } catch (error: unknown) {
-        deps.serverConsole('Error in deleteAllFiles:', error);
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Meteor.Error('delete-failed', 'Failed to delete files: ' + message);
-      }
     },
 
     insertNewUsers: async function(this: MethodContext, filename: string, filecontents: string) {

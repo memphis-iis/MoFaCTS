@@ -497,9 +497,6 @@ Template.contentUpload.helpers({
     const pending = (Template.instance() as ContentUploadInstance).commandRegistry.getState(scope).status === 'pending';
     return pending ? { disabled: true, 'aria-busy': 'true' } : {};
   },
-  adminUploadMessage() {
-    return (Template.instance() as any).uploadMessages?.get()?.admin || null;
-  },
   contentListUploadMessage() {
     return (Template.instance() as any).uploadMessages?.get()?.['content-list'] || null;
   },
@@ -514,9 +511,6 @@ Template.contentUpload.helpers({
   },
   uploadConfirmationOpen() {
     return inlineConfirmationPlacement(Template.instance()) === 'upload-package';
-  },
-  adminDangerConfirmationOpen() {
-    return inlineConfirmationPlacement(Template.instance()) === 'admin-danger';
   },
   quotaStatus() {
     const state = (Template.instance() as ContentUploadInstance).quotaPresentation.get();
@@ -869,12 +863,6 @@ Template.contentUpload.helpers({
     }
     const currentList = listValue(template);
     return currentList ? currentList.hasMore : false;
-  },
-  'showDeleteAllButton': function(this: any){
-    // Only show delete all button if user is admin AND setting is enabled
-    const isAdmin = currentUserHasRole('admin');
-    const settingEnabled = Meteor.settings.public.enableDeleteAllButton || false;
-    return isAdmin && settingEnabled;
   },
   disabledAttr(isEnabled: any) {
     return isEnabled ? null : { disabled: true };
@@ -1527,30 +1515,6 @@ Template.contentUpload.events({
       getErrorMessage: (error: any) => contentText('content.stimulusDownloadError', { error: uploadErrorText(error) }),
       onFailure: (error: any) => clientConsole(1, '[DOWNLOAD] Stimulus download failed:', error),
     });
-  },
-  'click #deleteAllAssetsConfirm': async function(e: any, template: any) {
-    e.preventDefault();
-    const confirmed = await requestContentConfirmation(template, {
-      placement: 'admin-danger',
-      title: contentText('content.deleteAllUploadedFiles'),
-      message: contentText('content.deleteAllWarning'),
-      confirmLabel: contentText('content.deleteAllUploadedFiles'),
-      cancelLabel: contentText('content.cancel'),
-      level: 'error'
-    });
-    if (!confirmed) {
-      return;
-    }
-    
-    MeteorAny.callAsync('deleteAllFiles',
-      function(error: any, result: any) {
-        if (error) {
-          setUploadMessage(template, contentText('content.errorDeletingFiles', { error: uploadErrorText(error) }), 'error', 'admin');
-        } else {
-          setUploadMessage(template, contentText('content.deletedFiles', { count: result }), 'success', 'admin');
-        }
-      }
-    );
   },
   'click .imageLink'(e: any, template: any) {
     const url = $(e.currentTarget).data('link');

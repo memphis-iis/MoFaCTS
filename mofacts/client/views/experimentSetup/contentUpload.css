@@ -535,9 +535,6 @@
     gap: var(--app-space-2);
 }
 
-.content-upload-danger-icon {
-    color: var(--feedback-error-color);
-}
 
 .action-buttons-row {
     display: flex;

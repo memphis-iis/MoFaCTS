@@ -140,13 +140,6 @@ function buildStimDisplayTypeMapEntries(
   return entries;
 }
 
-export function clearStimDisplayTypeMap() {
-  stimDisplayTypeMap = {};
-  stimDisplayTypeMapHasFullSnapshot = true;
-  stimDisplayTypeMapVersion = bumpStimDisplayTypeMapVersion();
-  return stimDisplayTypeMapVersion;
-}
-
 export async function rebuildStimDisplayTypeMapSnapshot(deps: StimDisplayTypeMapDeps) {
   deps.serverConsole('getStimDisplayTypeMap', 'full:explicit');
 

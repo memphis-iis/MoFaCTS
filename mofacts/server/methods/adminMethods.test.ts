@@ -89,11 +89,8 @@ function createAdminDeps(
     sendVerificationEmailForUser: async () => false,
     getUserDisplayIdentifier: (user: any) => String(user?.username || user?._id || ''),
     syncUsernameCaches: () => undefined,
-    deleteTdfRuntimeData: async () => undefined,
-    removeUploadedAsset: async () => undefined,
     removeSparcFigureUserDecisions: async () => undefined,
     removeSimulationResearchUserRecords: async () => undefined,
-    clearStimDisplayTypeMap: () => undefined,
     encryptData: (value: string) => `encrypted:${value}`,
     openRouterModelCatalogService: {
       getCatalog: async () => catalog,
@@ -103,25 +100,6 @@ function createAdminDeps(
 }
 
 describe('adminMethods', function() {
-  it('delegates bulk asset removal to its owner without deleting learner decisions', async function() {
-    const removedAssets: string[] = [];
-    const deps = createAdminDeps();
-    const methods = createAdminMethods({
-      ...deps,
-      DynamicAssets: {
-        ...deps.DynamicAssets,
-        find: () => ({ countAsync: async () => 2, fetchAsync: async () => [{ _id: 'teaching-image' }, { _id: 'uploaded-file' }] }),
-        removeAsync: async () => { throw new Error('Bulk removal must use the asset owner'); },
-      },
-      removeUploadedAsset: async id => { removedAssets.push(id); },
-      removeSparcFigureUserDecisions: async () => { throw new Error('Bulk content removal must preserve learner decisions'); },
-      removeSimulationResearchUserRecords: async () => { throw new Error('Bulk content removal must preserve research traces'); },
-    });
-
-    expect(await methods.deleteAllFiles.call({ userId: 'admin-user' })).to.equal(2);
-    expect(removedAssets).to.deep.equal(['teaching-image', 'uploaded-file']);
-  });
-
   it('lists only uploaded SPARC pages compatible with the compound-interest evaluation', async function() {
     const compatibleDisplay = {
       unitType: 'sparc-autotutor-dialogue',

@@ -133,7 +133,6 @@ import {
   type ApiKeyResolutionDeps,
 } from './lib/apiKeyResolution';
 import {
-  clearStimDisplayTypeMap,
   getStimDisplayTypeMap as getStimDisplayTypeMapSnapshot,
   getStimDisplayTypeMapVersion as getStimDisplayTypeMapSnapshotVersion,
   rebuildStimDisplayTypeMapSnapshot,
@@ -782,16 +781,6 @@ export const methods: any = {
   }),
 
   ...createAdminMethods({
-    removeUploadedAsset: async assetId => {
-      const asset = await DynamicAssets.collection.findOneAsync({ _id: assetId }, { fields: { meta: 1 } });
-      if (!asset) return;
-      if (asset.meta?.uploadPurpose === SPARC_PROMPT_IMAGE_PURPOSE) {
-        if (asset.meta.public !== false) throw new Error('Administrative removal requires a private SPARC teaching asset');
-        await withSparcFigureLibraryLock(() => sparcLibraryCuration.removeImageAsset(assetId));
-      } else {
-        await DynamicAssets.removeAsync({ _id: assetId });
-      }
-    },
     removeSparcFigureUserDecisions: async userId => { await removeSparcFigureUserDecisions(userId); await removeSparcMoveUserRecords(userId); },
     removeSimulationResearchUserRecords,
     serverConsole,
@@ -823,8 +812,6 @@ export const methods: any = {
     sendVerificationEmailForUser,
     getUserDisplayIdentifier,
     syncUsernameCaches,
-    deleteTdfRuntimeData,
-    clearStimDisplayTypeMap,
     encryptData,
     decryptData,
     openRouterModelCatalogService,
