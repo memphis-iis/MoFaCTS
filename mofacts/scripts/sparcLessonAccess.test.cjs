@@ -129,7 +129,7 @@ test('runtime vector publication needs lesson membership; administrative browsin
  assert.deepEqual(publicationStorageCalls,['catalog','initialize-user:student','moves:student','visuals:student','entries']);
  assert.equal(readyCalls,1);stopPublication();await new Promise(resolve=>setImmediate(resolve));assert.equal(stoppedObservers,3);
  const methods=createSparcMoveLibraryMethods({store:{},getMethodAuthorizationDeps:()=>f.auth,verifyFigure:async()=>{}});
- for(const name of ['listSparcMoveLibrary','reviseSparcPrimitive'])await assert.rejects(methods[name].call({userId:'student'}),/Permission denied/);
+ await assert.rejects(methods.reviseSparcPrimitive.call({userId:'student'}),/Permission denied/);
  const curation=createSparcLibraryCurationMethods({getMethodAuthorizationDeps:()=>f.auth,remove:async()=>{throw new Error('Must not delete');},removed:async()=>['removed']});
  await assert.rejects(curation.deleteSparcInstructionalComponent.call({userId:'student'},'item'),/Permission denied/);
  assert.deepEqual(await curation.getSparcAdministrativeRemovals.call({userId:'student'},['removed'],'agent'),['removed']);
@@ -142,7 +142,7 @@ test('lesson-authorized image reads preserve other-user private assets and gener
  assert.match((await methods.getSparcPromptImage.call({userId:'student'},'abc123','agent')).dataUrl,/^data:image\/png/);
  await assert.rejects(methods.getSparcPromptImage.call({userId:'demo-user'},'abc123','demo'),/not found/);assert.equal(reads,1);
  await assert.rejects(methods.generateSparcPromptImage.call({userId:'demo-user'},{tdfId:'demo'}),/quota/);assert.equal(provider,0);
- await assert.rejects(methods.listSparcLibraryImages.call({userId:'student'}),/Permission denied/);
+ assert.equal(methods.listSparcLibraryImages,undefined);
 });
 test('teacher target repair is dry-run-first, idempotent, revision-guarded and reversible without replacing content/identity',async()=>{
  const context={module:{exports:{}},process:{env:{}}};vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../../deploy/repair-teacher-demo-target.mongosh.js'),'utf8'),context);

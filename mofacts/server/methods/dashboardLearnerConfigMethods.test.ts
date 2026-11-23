@@ -57,7 +57,6 @@ describe('learner settings access', function() {
     for (const call of [
       () => f.methods.getLearnerTdfConfig.call({}, 'lesson'),
       () => f.methods.saveLearnerTdfConfig.call({}, 'lesson', {}),
-      () => f.methods.resetLearnerTdfConfig.call({}, 'lesson'),
     ]) {
       try { await call(); expect.fail('Expected authentication failure'); }
       catch (error: any) { expect(error.message).to.include('Must be logged in'); }

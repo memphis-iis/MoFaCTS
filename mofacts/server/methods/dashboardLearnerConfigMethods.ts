@@ -1,7 +1,5 @@
 import {
   buildLearnerTdfConfig,
-  buildLearnerTdfSourceMetadata,
-  normalizeLearnerTdfOverrides,
   type LearnerTdfConfig,
   type LearnerTdfOverrides
 } from '../../common/lib/learnerTdfConfig';
@@ -127,50 +125,5 @@ export function createDashboardLearnerConfigMethods(deps: DashboardLearnerConfig
       };
     },
 
-    resetLearnerTdfConfig: async function(this: any, tdfId: string, scope: string | null = null, options: any = {}) {
-      if (!this.userId) {
-        throw new deps.Meteor.Error('not-authorized', 'Must be logged in');
-      }
-
-      const tdf = await getConfigurableTdfForUser(deps, this.userId, tdfId, options);
-      const cache = await deps.UserDashboardCache.findOneAsync({ userId: this.userId });
-      const existingConfig = cache?.learnerTdfConfigs?.[tdf._id] as LearnerTdfConfig | undefined;
-      if (!existingConfig?.overrides) {
-        return { success: true, config: null };
-      }
-
-      if (scope !== null && scope !== 'setspec' && scope !== 'unit') {
-        throw new deps.Meteor.Error('invalid-args', 'Scope must be setspec or unit');
-      }
-
-      const nextOverrides: LearnerTdfOverrides = {
-        ...(existingConfig.overrides || {})
-      };
-      if (scope === 'setspec') {
-        delete nextOverrides.setspec;
-        delete nextOverrides.deliverySettings;
-      } else if (scope === 'unit') {
-        delete nextOverrides.unit;
-      } else {
-        delete nextOverrides.setspec;
-        delete nextOverrides.deliverySettings;
-        delete nextOverrides.unit;
-      }
-
-      const normalizedOverrides = normalizeLearnerTdfOverrides(getTdfConfigSource(tdf), nextOverrides);
-      const nextConfig: LearnerTdfConfig | null = Object.keys(normalizedOverrides).length > 0
-        ? {
-            source: buildLearnerTdfSourceMetadata(getTdfConfigSource(tdf), tdf._id),
-            overrides: normalizedOverrides
-          }
-        : null;
-
-      await writeLearnerTdfConfig(deps, this.userId, tdf._id, nextConfig);
-
-      return {
-        success: true,
-        config: nextConfig
-      };
-    }
   };
 }

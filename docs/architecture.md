@@ -75,7 +75,7 @@ Personal `/data-download/own-history` exports retain the current user's scope an
 
 `server/lib/boundedExternalSort.ts` owns the stable external sort shared by exports and course migration ordering. It uses bounded in-memory runs, a bounded merge fan-in and private temporary files; records retain their Date and numeric values. Successful completion, errors and cancellation remove the active run. Canonical startup cleans only this owner's marked runs whose process is no longer alive. These files contain sensitive export or migration data and must remain in the server's private temporary storage.
 
-The obsolete `getOutcomesForAdaptiveLearning` method and unbounded `userHistory` publication have been removed. Adaptive learning reads raw authorized outcomes through `getAdaptiveOutcomeRows`; dashboard reads use the incremental cache contract above. `listSparcMoveLibrary` remains an authorized administrative listing pending confirmation of external consumers; new UI work uses the unified instructional-component listing.
+The obsolete `getOutcomesForAdaptiveLearning` method and unbounded `userHistory` publication have been removed. Adaptive learning reads raw authorized outcomes through `getAdaptiveOutcomeRows`; dashboard reads use the incremental cache contract above. The SPARC management browser uses the administrator-only `listSparcInstructionalComponents` listing for instructional content and images.
 
 ## Deployment
 

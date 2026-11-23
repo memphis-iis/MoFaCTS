@@ -354,10 +354,6 @@
       "notes": "Authenticated self-scoped version-5 derived snapshot. Its expiresAt deadline covers course visibility and assignment time transitions; expired or invalid expiry metadata triggers an owned rebuild. Launch authorization remains independently enforced."
     },
     {
-      "name": "getLearnerProgressSignals",
-      "access": "role-checked"
-    },
-    {
       "name": "getLearningHistoryForUnit",
       "access": "role-checked",
       "notes": "Existing self and course/lesson/unit scope retained. Selects original assessment and adaptive-practice rows and excludes historical assessment copies; provenance remains in the sparse projection."
@@ -419,11 +415,6 @@
       "name": "getSparcPromptImage",
       "access": "role-checked",
       "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
-    },
-    {
-      "name": "listSparcLibraryImages",
-      "access": "admin-only",
-      "notes": "Indexed cursor listing of all completed shared teaching figures or one selected current semantic cluster. Returns at most 24 descriptions, models, dates and reuse states; no embeddings, learner identifiers or private supported-Prompt assets. Group pages reject stale snapshots and invalid cursors."
     },
     {
       "name": "getSparcLibraryClusters",
@@ -635,10 +626,6 @@
       "access": "role-checked"
     },
     {
-      "name": "resetLearnerTdfConfig",
-      "access": "role-checked"
-    },
-    {
       "name": "resetOwnLessonProgress",
       "access": "authenticated-self",
       "notes": "Existing course reset restriction and canonical lesson-family scope retained. History deletion and its source repair revision commit together; no other learner's progress is reset."
@@ -725,11 +712,6 @@
     {
       "name": "setCustomThemeProperty",
       "access": "role-checked"
-    },
-    {
-      "name": "setExperimentState",
-      "access": "authenticated-self",
-      "notes": "Resume writes require current system existence and state ownership; archived or differently scoped state cannot be merged."
     },
     {
       "name": "setLockoutTimeStamp",
@@ -878,10 +860,6 @@
     {
       "name": "startProlificParticipation",
       "access": "public"
-    },
-    {
-      "name": "listSparcMoveLibrary",
-      "access": "admin-only"
     },
     {
       "name": "listSparcInstructionalComponents",

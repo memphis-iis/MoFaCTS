@@ -189,7 +189,6 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
     },
     syncUsernameCaches: () => {},
     getClassPerformanceByTdfWorkflow: async () => ({}),
-    hasMeaningfulProgressSignal: () => false,
     ...overrides,
   };
 
@@ -209,11 +208,13 @@ describe('analyticsMethods', function() {
     ]) {
       let writes = 0;
       const { deps } = createAnalyticsDeps({ GlobalExperimentStates: {
-        findOneAsync: async () => ({ _id: 'old-state', ...previous, experimentState: { progress: 99 } }),
+        findOneAsync: async (_selector: unknown, options?: { fields?: unknown }) => options?.fields
+          ? { userId: 'learner-1', TDFId: 'tdf-1' }
+          : { _id: 'old-state', ...previous, experimentState: { progress: 99 } },
         updateAsync: async () => { writes++; return 1; },
       } });
       let error: any;
-      try { await createAnalyticsMethods(deps as any).setExperimentState.call({ userId: 'learner-1' }, 'learner-1', 'tdf-1', 'old-state', {}, 'test'); }
+      try { await createAnalyticsMethods(deps as any).updateExperimentState.call({ userId: 'learner-1' }, {}, 'old-state'); }
       catch (caught) { error = caught; }
       expect(error?.error).to.equal(403);
       expect(writes).to.equal(0);

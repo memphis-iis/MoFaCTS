@@ -88,7 +88,6 @@ type AnalyticsMethodsDeps = {
     deps: any,
     assignmentContext?: { assignmentId?: string | null; dueAt?: Date | number | string | null }
   ) => Promise<unknown>;
-  hasMeaningfulProgressSignal: (experimentState: unknown) => boolean;
   insertSparcHistoryBatch?: (records: readonly (UnknownRecord & { _id: string; userId: string })[]) => Promise<readonly UnknownRecord[]>;
 };
 
@@ -1577,73 +1576,8 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
       const lessonId = await requireProgressTdfId(this, TDFId);
       return await getExperimentState(scopedUserId, lessonId);
     },
-    setExperimentState: async function(
-      this: MethodContext,
-      userId: string,
-      TDFId: string,
-      experimentStateId: string,
-      newExperimentState: UnknownRecord,
-      where: string
-    ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only mutate experiment state for the current user');
-      const lessonId = await requireProgressTdfId(this, TDFId);
-      return await setExperimentState(
-        scopedUserId,
-        lessonId,
-        experimentStateId,
-        newExperimentState,
-        where || 'methods.setExperimentState'
-      );
-    },
     insertHistory,
     getStimulusCrowdStatsForDeck,
-    getLearnerProgressSignals: async function(this: MethodContext, targetUserId?: string) {
-      const currentUserId = this.userId;
-      if (!currentUserId) {
-        throw new Meteor.Error('not-authorized', 'Must be logged in');
-      }
-
-      const requestedUserId = typeof targetUserId === 'string' && targetUserId.trim().length
-        ? targetUserId.trim()
-        : currentUserId;
-      if (participantConnectionRoot(this) && requestedUserId !== currentUserId) {
-        throw new Meteor.Error('not-authorized', 'Insufficient privileges to inspect another learner');
-      }
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: currentUserId,
-        subjectUserId: requestedUserId,
-        roles: ['admin', 'teacher'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 'not-authorized',
-        forbiddenMessage: 'Insufficient privileges to inspect another learner',
-        forbiddenCode: 'not-authorized',
-      });
-
-      const lessonIds = await participantProgressLessonIds(this, deps.Tdfs);
-      const docs = await deps.GlobalExperimentStates.find(
-        { userId: requestedUserId, ...(lessonIds ? { TDFId: { $in: lessonIds } } : {}) },
-        { fields: { TDFId: 1, experimentState: 1 } }
-      ).fetchAsync();
-
-      const attempted = new Set<string>();
-      const meaningful = new Set<string>();
-      for (const doc of docs) {
-        const tdfId = typeof doc?.TDFId === 'string' ? doc.TDFId : null;
-        if (!tdfId) {
-          continue;
-        }
-        attempted.add(tdfId);
-        if (deps.hasMeaningfulProgressSignal(doc?.experimentState)) {
-          meaningful.add(tdfId);
-        }
-      }
-
-      return {
-        attemptedTdfIds: Array.from(attempted),
-        meaningfulProgressTdfIds: Array.from(meaningful),
-      };
-    },
-
     updateExperimentState: async function(
       this: MethodContext,
       curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string },

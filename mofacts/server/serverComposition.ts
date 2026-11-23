@@ -120,7 +120,6 @@ import { registerMeteorMethods } from './securitySurfaces/registerMeteorMethods.
 import { createSparcDemoAccess } from './lib/sparcDemoAccess';
 import { createSparcLessonAuthorizer, requireSparcLessonAccess } from './lib/sparcLessonAccess';
 import {
-  hasMeaningfulProgressSignal,
 } from './lib/mappingPolicyClassifier';
 import {
   canAccessContentUploadTdf,
@@ -602,7 +601,6 @@ const analyticsRegistration = createAnalyticsMethodRegistration({
   },
   syncUsernameCaches,
   getClassPerformanceByTdfWorkflow,
-  hasMeaningfulProgressSignal,
 
 });
 

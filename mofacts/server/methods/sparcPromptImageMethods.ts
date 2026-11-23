@@ -12,7 +12,6 @@ import { sparcInstructionalNeedText, type SparcInstructionalNeed } from '../../.
 import type { SparcRetrievalSelection } from '../../common/lib/sparcRetrieval';
 import { getOrGenerateSparcLibraryVisual, type SparcFigureInspection, type SparcFigureLibraryStore } from '../lib/sparcFigureLibraryService';
 import type { createStorageBoundary } from '../lib/storageBoundary';
-import type { SparcLibraryImagePage } from '../../common/lib/sparcFigureLibrary';
 import { parseSparcRaster } from '../lib/sparcRaster';
 import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../learning-components/runtime/sparcAdministrativeRemoval';
 import { SparcContentAlreadyUsedError } from '../lib/sparcContentUse';
@@ -61,17 +60,6 @@ export function createSparcPromptImageMethods(deps: Deps) {
       model: asset.meta.humanReplacement === true ? 'Human replacement' : entry.imageModel,
       createdAt: (asset.meta.humanReplacement === true ? new Date(asset.meta.replacedAt) : entry.createdAt).toISOString(),
     };
-  };
-  const inspectImages = async (entries: SparcFigureInspection[]) => {
-    const assets = entries.length ? await deps.DynamicAssets.collection.find({ _id: { $in: entries.map(entry => entry._id) },
-      'meta.uploadPurpose': PURPOSE, 'meta.public': false, 'meta.ready': true },
-      { fields: { _id: 1, 'meta.description': 1, 'meta.figureLibraryVersion': 1, 'meta.humanReplacement': 1, 'meta.replacedAt': 1 } }).fetchAsync() : [];
-    const byId = new Map(assets.map(asset => [asset._id, asset]));
-    return entries.map(entry => {
-      const asset = byId.get(entry._id);
-      if (!asset) throw new Meteor.Error(500, 'A library figure is missing its completed canonical asset');
-      return imageMetadata(entry, asset);
-    });
   };
   const readBytes = async (asset: Asset) => {
     if (deps.storageBoundary.backend === 's3') {
@@ -219,18 +207,6 @@ export function createSparcPromptImageMethods(deps: Deps) {
       }
       if (!['image/png', 'image/jpeg', 'image/webp'].includes(asset.type ?? '') || bytes.length > SPARC_PROMPT_IMAGE_SETTINGS.maxBytes) throw new Meteor.Error(500, 'Invalid saved SPARC image');
       return { dataUrl: `data:${asset.type};base64,${bytes.toString('base64')}` };
-    },
-    async listSparcLibraryImages(this: Context, params: { afterId?: string; snapshotId?: string; clusterId?: string; cursor?: string } = {}): Promise<SparcLibraryImagePage> {
-      await authorize(this);
-      if (!params || typeof params !== 'object' || Array.isArray(params)
-        || Object.keys(params).some(key => !['afterId'].includes(key))) throw new Meteor.Error(400, 'Invalid image library request');
-      if (!deps.figureLibrary) throw new Meteor.Error(500, 'SPARC figure library is not configured');
-      const afterId = params?.afterId === undefined ? '' : bounded(params.afterId, 'Image cursor', 20);
-      if (afterId && !/^[a-zA-Z0-9]+$/.test(afterId)) throw new Meteor.Error(400, 'Invalid image cursor');
-      const entries = await deps.figureLibrary.inspectPage(afterId);
-      const page = entries.slice(0, SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize);
-      const images = await inspectImages(page);
-      return { images, nextCursor: entries.length > SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize ? page[page.length - 1]!._id : null };
     },
     async replaceSparcLibraryImage(this: Context, params: { assetId: string; description: string; mediaType: string; base64: string }) {
       await authorize(this); this.unblock?.();

@@ -173,8 +173,6 @@ describe('approved progress-privacy selection on the registered Meteor publicati
       for (const lessonId of [ids.other, ids.shared]) {
         expect((await method(ws, 'getExperimentState', userId, lessonId)).error.error).to.equal(403);
       }
-      expect((await method(ws, 'getLearnerProgressSignals')).result.attemptedTdfIds.sort()).to.deep.equal([ids.root, ids.condition].sort());
-      expect((await method(ws, 'getLearnerProgressSignals', otherUserId)).error.error).to.equal('not-authorized');
       expect((await method(ws, 'getAssessmentCompletedTrialCountFromHistory', userId, ids.condition, 0)).result).to.equal(0);
       expect((await method(ws, 'getAssessmentCompletedTrialCountFromHistory', userId, ids.other, 0)).error.error).to.equal(403);
       expect((await method(ws, 'getPracticeDashboardSnapshot')).error.error).to.equal(403);
@@ -186,7 +184,6 @@ describe('approved progress-privacy selection on the registered Meteor publicati
       expect((await method(ws, 'downloadOwnHistoryAcrossTdfs')).error.error).to.equal(403);
       expect((await method(ws, 'downloadDataById', ids.other)).error.error).to.equal(403);
       expect((await method(ws, 'createExperimentState', { currentRootTdfId: ids.other })).error.error).to.equal(403);
-      expect((await method(ws, 'setExperimentState', userId, ids.other, otherRowId, {}, 'test')).error.error).to.equal(403);
       expect((await method(ws, 'updateExperimentState', {}, otherRowId)).error.error).to.equal(403);
       expect((await GlobalExperimentStates.findOneAsync(otherRowId))?.experimentState.lastActionTimeStamp).to.equal(103);
     } finally {

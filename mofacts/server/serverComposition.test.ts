@@ -1896,6 +1896,17 @@ describe('learner analytics method authorization', function() {
 
   });
 
+  it('keeps the supported study, learner settings, SPARC and audited performance operations', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of [
+      'listSparcMoveLibrary', 'listSparcLibraryImages', 'getLearnerProgressSignals', 'resetLearnerTdfConfig', 'setExperimentState',
+    ]) expect(handlers).not.to.have.own.property(name);
+    for (const name of [
+      'createExperimentState', 'updateExperimentState', 'getExperimentState', 'getLearnerTdfConfig', 'saveLearnerTdfConfig',
+      'listSparcInstructionalComponents', 'getSparcPromptImage', 'getStudentPerformanceByIdAndTDFIdFromHistory',
+    ]) expect(handlers[name]).to.be.a('function');
+  });
+
   it('exposes the active dashboard, draft, theme and user operations without the retired commands', function() {
     const handlers = MeteorAny.server.method_handlers;
     for (const name of [

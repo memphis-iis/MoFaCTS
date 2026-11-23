@@ -35,13 +35,6 @@ export function createSparcMoveLibraryMethods(deps: { store: MoveStore;
     async publishSparcPrimitive(this: Context, ticket: SparcPrimitiveTicket, content: SparcPrimitiveContent) {
       const userId = await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), this.userId, ticket?.query?.tdfId); this.unblock?.(); return checked(service().publish(userId, ticket, content));
     },
-    async listSparcMoveLibrary(this: Context, kind: string | null = null, after = '') {
-      await auth(this);
-      if (typeof after !== 'string' || after.length > 64 || (kind !== null && !['feedback', 'explanation', 'richContent', 'question'].includes(kind))) throw new Meteor.Error(400, 'Invalid library page');
-      const entries = await deps.store.list(kind ?? undefined, after);
-      return { entries: entries.map(({ _id, kind, content, target, move, createdAt }) => ({ id: _id, kind, content, target, move, createdAt })),
-        nextCursor: entries.length === 25 ? entries.at(-1)!._id : null };
-    },
     async reviseSparcPrimitive(this: Context, id: string, content: SparcPrimitiveContent) {
       const userId = await auth(this); this.unblock?.();
       if (typeof id !== 'string' || !/^[a-f0-9]{64}$/.test(id)) throw new Meteor.Error(400, 'Invalid library entry');
