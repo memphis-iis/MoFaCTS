@@ -47,3 +47,5 @@ typecheck, lint, source-security tests, package-method Meteor integration tests,
 and owner/other-user/restart probes before promoting a new revision. Request fresh
 single-use authorization for each Meteor integration-suite invocation. Dependencies
 require separate approval if an upstream upgrade changes them.
+
+The server removal method returns the number of records MongoDB removed. Bulk media deletion uses this count to detect a selection that changed during removal.

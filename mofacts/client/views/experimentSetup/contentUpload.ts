@@ -1791,12 +1791,18 @@ Template.contentUpload.events({
     }
 
     await template.commandRegistry.run(`media:${tdfId}`, async () => {
-      await MeteorAny.callAsync('removeMultipleAssets', assetIds);
-      
-      // Refresh the assets list
+      const result = await MeteorAny.callAsync('removeMultipleAssets', assetIds);
+      panel.find('.media-select-checkbox, .select-all-media').prop('checked', false);
+      panel.find('.select-all-media').prop('indeterminate', false);
+      updateDeleteButtonState(tdfId);
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-      return { text: '' };
+      const countText = contentText('content.mediaDeletionCount', { count: result.deleted });
+      if (result.storageFailed || result.selectionChanged) {
+        const reason = result.storageFailed ? 'content.mediaDeletionInterrupted' : 'content.mediaSelectionChanged';
+        return { text: countText + ' ' + contentText(reason), level: result.storageFailed ? 'error' : 'warning' };
+      }
+      return { text: countText };
     }, {
       getErrorMessage: (error: any) => contentText('content.errorDeletingFiles', { error: uploadErrorText(error) }),
       onFailure: (error: any) => clientConsole(1, '[MEDIA] Batch delete error:', error),

@@ -1371,10 +1371,11 @@ class FilesCollection extends FilesCollectionCore {
     const files = this.find(selector);
     const count = await files.countDocuments();
 
+    let removed = 0;
     if (count > 0) {
       if (this.onAfterRemove) {
         const docs = await files.fetchAsync();
-        await this.collection.removeAsync(selector);
+        removed = await this.collection.removeAsync(selector);
 
         if (!(await this.onAfterRemove(docs))) {
           let i = 0;
@@ -1386,11 +1387,11 @@ class FilesCollection extends FilesCollectionCore {
         await files.forEachAsync(async (file) => {
           await this.unlinkAsync(file);
         });
-        await this.collection.removeAsync(selector);
+        removed = await this.collection.removeAsync(selector);
       }
     }
 
-    return count;
+    return removed;
   }
 
   /**

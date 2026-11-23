@@ -317,27 +317,34 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
         throw new Meteor.Error(400, 'Maximum 50 files per batch delete');
       }
 
-      const assets = await deps.DynamicAssets.find({ _id: { $in: assetIds } }).fetchAsync();
-      for (const asset of assets as Array<DynamicAssetDoc>) {
+      const ids = [...new Set(assetIds)];
+      const assets = await deps.DynamicAssets.find(
+        { _id: { $in: ids } }, { fields: { _id: 1, userId: 1 } },
+      ).fetchAsync();
+      for (const asset of assets) {
         await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
           actingUserId,
           subjectUserId: asset.userId,
           roles: ['admin'],
-          forbiddenMessage: `Cannot delete asset "${asset.name}" - not owned by you`,
+          forbiddenMessage: 'Can only delete your own assets',
           forbiddenCode: 403,
         });
       }
 
+      if (assets.length !== ids.length) return { deleted: 0, selectionChanged: true };
+
       let deleted = 0;
-      for (const assetId of assetIds) {
+      for (const asset of assets) {
         try {
-          await deps.DynamicAssets.removeAsync({ _id: assetId });
-          deleted++;
-        } catch (err: unknown) {
-          console.error('[removeMultipleAssets] Error deleting asset:', assetId, err);
+          const removed = await deps.DynamicAssets.removeAsync({ _id: asset._id, userId: asset.userId ?? null });
+          if (removed === 0) return { deleted, selectionChanged: true };
+          if (removed !== 1) throw new Error('Unexpected asset removal count');
+          deleted += removed;
+        } catch {
+          deps.serverConsole('[removeMultipleAssets] Storage did not confirm removal');
+          return { deleted, storageFailed: true };
         }
       }
-
       return { deleted };
     },
   };
