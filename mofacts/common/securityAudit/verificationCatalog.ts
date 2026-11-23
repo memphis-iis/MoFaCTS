@@ -652,6 +652,10 @@ export const COURSE_EXCEPTION_VERIFICATIONS = Object.freeze({
   addUserDueDateException: courseExceptionVerification('addUserDueDateException'),
   removeUserDueDateException: courseExceptionVerification('removeUserDueDateException'),
 });
+export const COURSE_DELETE_VERIFICATION = Object.freeze({
+  ...middlewareTest, suite: 'course method authorization', method: 'deleteCourse', surfaceId: 'method:deleteCourse',
+  verificationId: 'method.course.delete', cases: Object.freeze(['binds course deletion to its owner or an administrator']),
+} as const);
 export const COURSE_JOIN_VERIFICATION = Object.freeze({
   ...middlewareTest, suite: 'course method authorization', method: 'addUserToTeachersClass',
   surfaceId: 'method:addUserToTeachersClass', verificationId: 'method.course.join',
@@ -673,6 +677,7 @@ export const COURSE_ASSIGNMENT_SAVE_VERIFICATION = Object.freeze({
   cases: Object.freeze(['preserves assigned lessons after sharing ends and checks every new use']),
 } as const);
 export const COURSE_READ_VERIFICATIONS = Object.freeze({
+  getProgressiveAssignmentLaunch: courseReadVerification('getProgressiveAssignmentLaunch', 'requires an available progressive assignment before returning lesson content'),
   getCourseAssignmentEditorSnapshot: courseReadVerification('getCourseAssignmentEditorSnapshot', 'preserves assigned lessons after sharing ends and checks every new use'),
   getAllCourseSections: courseReadVerification('getAllCourseSections', 'limits learner teacher discovery to public or enrolled sections'),
   getAllTeachers: courseReadVerification('getAllTeachers', 'limits learner teacher discovery to public or enrolled sections'),
@@ -741,7 +746,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, COURSE_DELETE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

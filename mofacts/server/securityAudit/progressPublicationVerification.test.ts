@@ -181,6 +181,10 @@ describe('approved progress-privacy selection on the registered Meteor publicati
       expect((await method(ws, 'getAssessmentCompletedTrialCountFromHistory', userId, ids.other, 0)).error.error).to.equal(403);
       expect((await method(ws, 'getPracticeDashboardSnapshot')).error.error).to.equal(403);
       expect((await method(ws, 'getLearnerCoursesSnapshot')).error.error).to.equal(403);
+      for (const args of [[ids.root, ids.condition], [ids.root, ids.condition, 'saved-revision']]) {
+        const reply = await method(ws, 'getProgressiveAssignmentLaunch', ...args);
+        expect(reply.error).to.include({ error: 403, reason: 'Account-wide progress is unavailable in a study session' });
+      }
       expect((await method(ws, 'downloadOwnHistoryAcrossTdfs')).error.error).to.equal(403);
       expect((await method(ws, 'downloadDataById', ids.other)).error.error).to.equal(403);
       expect((await method(ws, 'createExperimentState', { currentRootTdfId: ids.other })).error.error).to.equal(403);

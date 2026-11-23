@@ -1,5 +1,5 @@
 import { commitCourseEdit } from '../lib/courseSectionEdit';
-import { COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, COURSE_EXCEPTION_VERIFICATIONS, COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { COURSE_DELETE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, COURSE_EXCEPTION_VERIFICATIONS, COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
 import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 import { enrolledCourseLessonIds } from '../lib/enrolledCourseLessons';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
@@ -975,13 +975,14 @@ export function createCourseService(deps: CourseMethodsDeps) {
     return await getCourseSnapshotCache().ensureLearnerCoursesSnapshot(userId);
   }
 
-  async function getProgressiveAssignmentLaunch(
-    this: MethodContext,
+  async function authorizeProgressiveLaunch(
+    context: MethodContext,
     assignmentId: string,
     endpointTdfId: string,
     revisionId?: string,
-  ): Promise<ProgressiveAssignmentLaunchPayload> {
-    const userId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+  ) {
+    const userId = requireAuthenticatedUser(context.userId, 'Must be logged in', 401);
+    requireAccountProgressSession(context);
     const normalizedAssignmentId = deps.normalizeCanonicalId(assignmentId);
     const normalizedEndpointId = deps.normalizeCanonicalId(endpointTdfId);
     if (!normalizedAssignmentId || !normalizedEndpointId) {
@@ -1042,6 +1043,13 @@ export function createCourseService(deps: CourseMethodsDeps) {
     if (!prefixTdfIds.every((id) => memberTdfIds.includes(id))) {
       throw new Meteor.Error(403, 'A lesson in this progressive session has been removed; launch again from Courses');
     }
+    return { normalizedAssignmentId, normalizedEndpointId, courseId: visibleAssignment.courseId, assignment, memberTdfIds, prefixTdfIds, orderingRevisionId };
+  }
+  const progressiveLaunchPolicy = Object.freeze({ kind: 'course-launch', operation: 'progressive-prefix', authorize: authorizeProgressiveLaunch } as const);
+
+  async function getProgressiveAssignmentLaunch(this: MethodContext, assignmentId: string, endpointTdfId: string, revisionId?: string): Promise<ProgressiveAssignmentLaunchPayload> {
+    const { normalizedAssignmentId, normalizedEndpointId, courseId, assignment, memberTdfIds, prefixTdfIds, orderingRevisionId } =
+      await progressiveLaunchPolicy.authorize(this, assignmentId, endpointTdfId, revisionId);
     const tdfs = await deps.Tdfs.find({ _id: { $in: prefixTdfIds } }).fetchAsync();
     const tdfById = new Map(tdfs.map((tdf: any) => [String(tdf?._id || ''), tdf]));
     const orderedTdfs = prefixTdfIds.map((tdfId) => tdfById.get(tdfId));
@@ -1083,7 +1091,7 @@ export function createCourseService(deps: CourseMethodsDeps) {
     return {
       progressiveRevisionId: orderingRevisionId,
       assignmentId: normalizedAssignmentId,
-      courseId: visibleAssignment.courseId,
+      courseId,
       title: String(assignment.title),
       endpointTdfId: normalizedEndpointId,
       memberTdfIds: prefixTdfIds,
@@ -1183,7 +1191,7 @@ export function createCourseService(deps: CourseMethodsDeps) {
 
   async function deleteCourse(this: MethodContext, courseId: string) {
     const targetCourseId = deps.normalizeCanonicalId(courseId);
-    const { course } = await assertCanManageCourse(this, targetCourseId || '');
+    const { course } = await courseManagementPolicy.authorize(this, targetCourseId || '');
     const sectionRows = await deps.Sections.find({ courseId: targetCourseId }, { fields: { _id: 1 } }).fetchAsync();
     const sectionIds = sectionRows.map((section: any) => String(section?._id || '')).filter(Boolean);
     await invalidateCourseSnapshotsForCourse(String(course._id), 'course-deleted');
@@ -1336,6 +1344,8 @@ export function createCourseService(deps: CourseMethodsDeps) {
   return {
     methods,
     methodBindings: Object.freeze([
+      bind('getProgressiveAssignmentLaunch', progressiveLaunchPolicy, 'progressive-lesson-content'),
+      Object.freeze({ handler: methods.deleteCourse, verification: COURSE_DELETE_VERIFICATION, policy: courseManagementPolicy, dataEgress: 'delete-result' as const }),
       Object.freeze({ handler: methods.addUserToTeachersClass, verification: COURSE_JOIN_VERIFICATION, policy: joinPolicy, dataEgress: 'join-result' as const }),
       Object.freeze({ handler: methods.addCourse, verification: COURSE_CREATE_VERIFICATION, policy: createCoursePolicy, dataEgress: 'course-id' as const }),
       Object.freeze({ handler: methods.editCourse, verification: COURSE_EDIT_VERIFICATION, policy: courseManagementPolicy, dataEgress: 'course-id' as const }),

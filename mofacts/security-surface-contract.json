@@ -192,7 +192,8 @@
     },
     {
       "name": "deleteCourse",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Only the course owner with a teacher role or an administrator may remove the course and its assignments, sections and enrollments."
     },
     {
       "name": "deleteManualContentDraft",
@@ -445,7 +446,7 @@
     {
       "name": "getProgressiveAssignmentLaunch",
       "access": "authenticated-self",
-      "notes": "Cached course availability is not authorization. Before returning member lesson content, the server verifies the current course, current owner/admin status or live section enrollment, course dates and assignment release."
+      "notes": "Starting or reopening a progressive course assignment requires an ordinary account session. Before returning member lesson content, the server verifies the current course, current owner/admin status or live section enrollment, course dates and assignment release."
     },
     {
       "name": "getResponseKCMapForTdf",

@@ -1,5 +1,5 @@
 import { COURSE_SNAPSHOT_VERSION } from './lib/courseLearnerSnapshotCache';
-import { COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
+import { COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './lib/prolificCollections';
 import { CourseLearnerSnapshotCache } from '../common/Collections';
 import { Meteor } from 'meteor/meteor';
@@ -2578,6 +2578,42 @@ describe('course method authorization', function() {
     expect(denied).to.include({ error: code });
     if (reason !== undefined) expect(denied).to.include({ reason });
   }
+
+  it('binds course deletion to its owner or an administrator', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed Meteor method bindings');
+    const rows = observed.surfaces.filter(row => row.name === 'deleteCourse');
+    expect(rows).to.have.length(1);
+    expect(rows[0]?.verification).to.equal(COURSE_DELETE_VERIFICATION);
+    expect(rows[0]?.policy).to.deep.equal({ kind: 'course-management', operation: 'manage-course' });
+    const [owner, other, admin, learner] = await Promise.all(Array.from({ length: 4 }, () =>
+      MeteorUsersAny.insertAsync({ username: Random.id() })));
+    await Roles.addUsersToRolesAsync([owner, other], 'teacher');
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    const create = () => CoursesAny.insertAsync({ teacherUserId: owner, courseName: Random.id() });
+    const [first, second, untouched] = await Promise.all([create(), create(), create()]);
+    const remove = MeteorAny.server.method_handlers.deleteCourse;
+    await expectCourseDenial(() => remove.call({}, first), 401);
+    for (const userId of [learner, other]) await expectCourseDenial(() => remove.call({ userId }, first), 403);
+    expect(await remove.call({ userId: owner }, first)).to.equal(true);
+    expect(await remove.call({ userId: admin }, second)).to.equal(true);
+    expect(await CoursesAny.find({ _id: { $in: [first, second, untouched] } }).countAsync()).to.equal(1);
+    expect(await CoursesAny.findOneAsync(untouched)).to.exist;
+  });
+
+  it('requires an available progressive assignment before returning lesson content', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed Meteor method bindings');
+    const rows = observed.surfaces.filter(row => row.name === 'getProgressiveAssignmentLaunch');
+    expect(rows).to.have.length(1);
+    expect(rows[0]?.verification).to.equal(COURSE_READ_VERIFICATIONS.getProgressiveAssignmentLaunch);
+    expect(rows[0]?.policy).to.deep.equal({ kind: 'course-launch', operation: 'progressive-prefix' });
+    const launch = MeteorAny.server.method_handlers.getProgressiveAssignmentLaunch;
+    const userId = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await expectCourseDenial(() => launch.call({}, Random.id(), Random.id()), 401);
+    await expectCourseDenial(() => launch.call({ userId }, Random.id(), Random.id()), 403,
+      'Progressive assignment is not available for this user');
+  });
 
   it('returns a successful section join when the confirmation has no recipient', async function() {
     const learner = await MeteorUsersAny.insertAsync({ username: Random.id() });

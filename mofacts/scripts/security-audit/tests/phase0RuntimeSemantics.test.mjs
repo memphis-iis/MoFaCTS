@@ -21,7 +21,7 @@ test('Phase 0 manifest: reviewed brand and progressive surfaces retain explicit 
   assert.deepEqual(manifest.methods.filter((entry) => entry.name === 'getProgressiveAssignmentLaunch'), [{
     name: 'getProgressiveAssignmentLaunch',
     access: 'authenticated-self',
-    notes: 'Cached course availability is not authorization. Before returning member lesson content, the server verifies the current course, current owner/admin status or live section enrollment, course dates and assignment release.',
+    notes: 'Starting or reopening a progressive course assignment requires an ordinary account session. Before returning member lesson content, the server verifies the current course, current owner/admin status or live section enrollment, course dates and assignment release.',
   }]);
   for (const [kind, name, access] of [
     ['publications', 'deploymentBrandProfile', 'public'],
@@ -92,12 +92,14 @@ test('Phase 0 compatibility: progressive launch uses caller snapshot and denies 
   }
   let snapshot = { assignedCourses: [], publicCourses: [] };
   const callers = [];
-  const launch = namedFunction(source, 'getProgressiveAssignmentLaunch', {
+  const authorize = namedFunction(source, 'authorizeProgressiveLaunch', {
     Meteor: { Error: SyntheticMeteorError },
     requireAuthenticatedUser: (id) => { if (!id) throw new SyntheticMeteorError(401, 'Synthetic authentication denial'); return id; },
+    requireAccountProgressSession: () => {},
     deps: { normalizeCanonicalId: (id) => id, Assignments: { findOneAsync: () => assert.fail('Denied launch must not query assignments') } },
     getCourseSnapshotCache: () => ({ ensureLearnerCoursesSnapshot: async (id) => { callers.push(id); return snapshot; } }),
   });
+  const launch = namedFunction(source, 'getProgressiveAssignmentLaunch', { progressiveLaunchPolicy: { authorize } });
   await assert.rejects(launch.call({ userId: null }, 'assignment', 'endpoint'), (error) => error.error === 401);
   assert.deepEqual(callers, []);
   await assert.rejects(launch.call({ userId: 'synthetic-learner' }, 'assignment', 'endpoint'), (error) => error.error === 403);
