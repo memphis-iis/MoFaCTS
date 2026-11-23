@@ -58,7 +58,8 @@
     },
     {
       "name": "addUserToTeachersClass",
-      "access": "role-checked"
+      "access": "authenticated-self",
+      "notes": "Requires a signed-in learner joining their own account and a section belonging to the supplied teacher. Confirmation email errors are recorded separately from membership."
     },
     {
       "name": "admin.backups.config",

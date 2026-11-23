@@ -2578,6 +2578,20 @@ describe('course method authorization', function() {
     expect(denied).to.include({ error: code });
   }
 
+  it('returns a successful section join when the confirmation has no recipient', async function() {
+    const learner = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const course = await CoursesAny.insertAsync({ teacherUserId: teacher, courseName: 'Enrollment test' });
+    const section = await SectionsAny.insertAsync({ courseId: course, sectionName: 'A' });
+    const join = MeteorAny.server.method_handlers.addUserToTeachersClass;
+    await expectCourseDenial(() => join.call({}, teacher, section), 401);
+    await expectCourseDenial(() => join.call({ userId: learner }, Random.id(), section), 403);
+    expect(await SectionUserMapAny.find({ userId: learner }).countAsync()).to.equal(0);
+    expect(await join.call({ userId: learner }, teacher, section)).to.equal(true);
+    expect(await join.call({ userId: learner }, teacher, section)).to.equal(true);
+    expect(await SectionUserMapAny.find({ userId: learner, sectionId: section }).countAsync()).to.equal(1);
+  });
+
   it('limits new course owners to existing teachers and administrators', async function() {
     const users = await Promise.all(['admin', 'teacher', 'otherAdmin', 'learner'].map(() =>
       MeteorUsersAny.insertAsync({ username: Random.id() })));

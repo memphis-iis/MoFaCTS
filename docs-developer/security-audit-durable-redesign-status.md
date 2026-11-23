@@ -1887,7 +1887,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 65 total, 64 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 66 total, 64 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 66 reserved for course ownership and enrollment confirmations.
 
 Slot 65 passed on 1791151a. Native Meteor: 1,118 server and 1,251 Chromium passes, zero failures or hook failures, 15/seven pending. Confirmed the installed due-date enrollment rules, transactional section rename/deletion and stale-edit rollback, reuse of the original invitation IDs, membership and cache handling, and the rendered Blaze editor payload. Image reused and cleanup complete. Receipt: /var/tmp/mofacts-integration.8JGswhjU/results/native-verification.json SHA-256 326c19c452a9b936d87560dfb2754acfe6ce852f5c2ab986aec144e31380d56e.
 

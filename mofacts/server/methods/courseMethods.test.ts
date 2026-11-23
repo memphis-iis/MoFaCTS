@@ -454,6 +454,32 @@ describe('course assignment metadata methods', function() {
     }
   });
 
+  it('records a redacted delivery failure once without undoing the join', async function() {
+    const membership = createMemoryCollection();
+    const diagnostics: unknown[][] = [];
+    let sends = 0;
+    const { methods } = createCourseService(createDeps({
+      Courses: createMemoryCollection([{ _id: 'course', teacherUserId: 'teacher' }]),
+      Sections: createMemoryCollection([{ _id: 'section', courseId: 'course' }]),
+      SectionUserMap: membership,
+      usersCollection: createMemoryCollection([{ _id: 'student', email_canonical: 'synthetic@example.test' }]),
+      CourseLearnerSnapshotCache: createMemoryCollection(),
+      UserDashboardCache: createMemoryCollection(),
+      serverConsole: (...args: unknown[]) => { diagnostics.push(args); },
+      sendEmail: async () => { sends++; throw new Error('synthetic private transport detail'); },
+    }));
+    const join = () => methods.addUserToTeachersClass.call({ userId: 'student' }, 'teacher', 'section');
+    expect(await join()).to.equal(true);
+    expect(await join()).to.equal(true);
+    expect(sends).to.equal(1);
+    expect(membership.rows).to.have.length(1);
+    expect(diagnostics.filter(args => args[1] === 'Course enrollment saved; confirmation email failed')).to.deep.equal([
+      [0, 'Course enrollment saved; confirmation email failed', { stage: 'delivery' }],
+    ]);
+    expect(JSON.stringify(diagnostics)).not.to.include('synthetic private transport detail');
+    expect(JSON.stringify(diagnostics)).not.to.include('synthetic@example.test');
+  });
+
   it('sends one course assignment email when a learner joins a new section membership', async function() {
     const sentEmails: any[] = [];
     const sectionUserMap = createMemoryCollection();

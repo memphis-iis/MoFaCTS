@@ -378,6 +378,7 @@ const {
   buildDiskUsageStatus,
   sendEmail,
   sendErrorReportSummaries,
+  sendEmailAsync,
 } = serverUtilities;
 
 const stimulusLookupHelpers = createStimulusLookupHelpers({
@@ -417,7 +418,7 @@ const { methods: publicCourseMethods, methodBindings: courseReadBindings, resolv
   Histories,
   itemSourceSentences,
   usersCollection: MeteorAny.users,
-  sendEmail,
+  sendEmail: sendEmailAsync,
   emailFrom,
   thisServerUrl,
   getMethodAuthorizationDeps,

@@ -1,5 +1,5 @@
 import { commitCourseEdit } from '../lib/courseSectionEdit';
-import { COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, COURSE_EXCEPTION_VERIFICATIONS, COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, COURSE_EXCEPTION_VERIFICATIONS, COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
 import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 import { enrolledCourseLessonIds } from '../lib/enrolledCourseLessons';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
@@ -83,7 +83,7 @@ type CourseMethodsDeps = {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
   };
-  sendEmail: (to: string, from: string, subject: string, text: string) => void;
+  sendEmail: (to: string, from: string, subject: string, text: string) => void | Promise<void>;
   emailFrom: string;
   thisServerUrl: string;
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
@@ -571,42 +571,50 @@ export function createCourseService(deps: CourseMethodsDeps) {
   }
 
   async function sendCourseAssignmentEmail(userId: string, course: any, section: any) {
-    const student = await deps.usersCollection.findOneAsync(
-      { _id: userId },
-      { fields: { username: 1, email_canonical: 1, emails: 1 } }
-    );
-    const to = getPrimaryUserEmail(student);
-    if (!to) {
-      throw new Meteor.Error(400, 'Cannot send course assignment email because the learner account has no email address');
+    let stage = 'recipient';
+    try {
+      const student = await deps.usersCollection.findOneAsync(
+        { _id: userId },
+        { fields: { username: 1, email_canonical: 1, emails: 1 } }
+      );
+      const to = getPrimaryUserEmail(student);
+      if (!to) {
+        throw new Meteor.Error(400, 'Cannot send course assignment email because the learner account has no email address');
+      }
+      stage = 'configuration';
+      const baseUrl = normalizeOptionalString(deps.thisServerUrl);
+      if (!baseUrl) {
+        throw new Meteor.Error(500, 'Cannot send course assignment email because ROOT_URL is not configured');
+      }
+      const from = normalizeOptionalString(deps.emailFrom);
+      if (!from) {
+        throw new Meteor.Error(500, 'Cannot send course assignment email because emailFrom is not configured');
+      }
+      stage = 'message';
+      const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
+      const coursesUrl = `${normalizedBaseUrl}/courses`;
+      const courseName = String(course?.courseName || 'your course');
+      const sectionName = String(section?.sectionName || 'your section');
+      const brandName = (await ensurePublishedDeploymentBrandProfile()).identity.name;
+      const subject = `${brandName} course assignment: ${courseName}`;
+      const displayName = deps.getUserDisplayIdentifier(student) || 'learner';
+      const text = [
+        `Hello ${displayName},`,
+        '',
+        `You have been assigned to ${courseName} (${sectionName}) in ${brandName}.`,
+        '',
+        `Open ${brandName}: ${normalizedBaseUrl}`,
+        `Go directly to Courses: ${coursesUrl}`,
+        '',
+        'After signing in, choose Courses from the Learn menu. Your assigned course will appear at the top of the Courses page. Select Start or Continue on an assignment to begin practicing.',
+        '',
+        'If you do not see the course after signing in, contact your instructor.',
+      ].join('\n');
+      stage = 'delivery';
+      await deps.sendEmail(to, from, subject, text);
+    } catch {
+      deps.serverConsole(0, 'Course enrollment saved; confirmation email failed', { stage });
     }
-    const baseUrl = normalizeOptionalString(deps.thisServerUrl);
-    if (!baseUrl) {
-      throw new Meteor.Error(500, 'Cannot send course assignment email because ROOT_URL is not configured');
-    }
-    const from = normalizeOptionalString(deps.emailFrom);
-    if (!from) {
-      throw new Meteor.Error(500, 'Cannot send course assignment email because emailFrom is not configured');
-    }
-    const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
-    const coursesUrl = `${normalizedBaseUrl}/courses`;
-    const courseName = String(course?.courseName || 'your course');
-    const sectionName = String(section?.sectionName || 'your section');
-    const brandName = (await ensurePublishedDeploymentBrandProfile()).identity.name;
-    const subject = `${brandName} course assignment: ${courseName}`;
-    const displayName = deps.getUserDisplayIdentifier(student) || 'learner';
-    const text = [
-      `Hello ${displayName},`,
-      '',
-      `You have been assigned to ${courseName} (${sectionName}) in ${brandName}.`,
-      '',
-      `Open ${brandName}: ${normalizedBaseUrl}`,
-      `Go directly to Courses: ${coursesUrl}`,
-      '',
-      'After signing in, choose Courses from the Learn menu. Your assigned course will appear at the top of the Courses page. Select Start or Continue on an assignment to begin practicing.',
-      '',
-      'If you do not see the course after signing in, contact your instructor.',
-    ].join('\n');
-    deps.sendEmail(to, from, subject, text);
   }
 
   async function getCourseAssignmentEditorSnapshot(this: MethodContext, courseId: string): Promise<CourseAssignmentEditorSnapshot> {
@@ -1195,13 +1203,12 @@ export function createCourseService(deps: CourseMethodsDeps) {
     return true;
   }
 
-  async function addUserToTeachersClass(this: MethodContext, teacherID: string, sectionId: string) {
-    const userId = this.userId;
-    deps.serverConsole('addUserToTeachersClass', userId, teacherID, sectionId);
+  async function authorizeCourseJoin(context: MethodContext, teacherID: string, sectionId: string) {
+    const userId = context.userId;
     if (!userId) {
       throw new Meteor.Error(401, 'Must be logged in');
     }
-    if (!teacherID || !sectionId) {
+    if (typeof teacherID !== 'string' || !teacherID.trim() || typeof sectionId !== 'string' || !sectionId.trim()) {
       throw new Meteor.Error(400, 'Teacher and section are required');
     }
 
@@ -1218,10 +1225,14 @@ export function createCourseService(deps: CourseMethodsDeps) {
       throw new Meteor.Error(403, 'Teacher does not own this section');
     }
 
+    return { userId, course, section };
+  }
+  const joinPolicy = Object.freeze({ kind: 'course-management', operation: 'join-section', authorize: authorizeCourseJoin } as const);
+
+  async function addUserToTeachersClass(this: MethodContext, teacherID: string, sectionId: string) {
+    const { userId, course, section } = await joinPolicy.authorize(this, teacherID, sectionId);
     const existingMappingCount = await deps.SectionUserMap.find({ sectionId, userId }).countAsync?.() || 0;
-    deps.serverConsole('existingMapping', existingMappingCount);
     if (existingMappingCount === 0) {
-      deps.serverConsole('new user, inserting into section_user_mapping', [sectionId, userId]);
       await deps.SectionUserMap.insertAsync({ sectionId, userId });
       await invalidateCourseSnapshotForUser(userId, 'membership-updated');
       await invalidateCourseSnapshotsForCourse(String(course._id), 'membership-updated');
@@ -1325,6 +1336,7 @@ export function createCourseService(deps: CourseMethodsDeps) {
   return {
     methods,
     methodBindings: Object.freeze([
+      Object.freeze({ handler: methods.addUserToTeachersClass, verification: COURSE_JOIN_VERIFICATION, policy: joinPolicy, dataEgress: 'join-result' as const }),
       Object.freeze({ handler: methods.addCourse, verification: COURSE_CREATE_VERIFICATION, policy: createCoursePolicy, dataEgress: 'course-id' as const }),
       Object.freeze({ handler: methods.editCourse, verification: COURSE_EDIT_VERIFICATION, policy: courseManagementPolicy, dataEgress: 'course-id' as const }),
       ...Object.values(COURSE_EXCEPTION_VERIFICATIONS).map(verification => Object.freeze({

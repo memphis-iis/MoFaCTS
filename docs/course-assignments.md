@@ -845,7 +845,7 @@ Server tests:
 - Learner course snapshot returns public courses to signed-in ordinary learners.
 - Private courses appear only for enrolled learners, owning teachers, and admins.
 - Public course browsing does not insert `SectionUserMap` rows.
-- New section membership sends a course assignment email with the app link, `/courses` link, and course-finding instructions.
+- A saved section membership is a successful join. If the confirmation cannot be prepared or sent, the server records the failure stage and the learner can continue. New section membership attempts a course assignment email with the app link, `/courses` link, and course-finding instructions.
 - Existing section membership does not resend the course assignment email.
 - Unreleased assignments appear as locked rows for ordinary learners and cannot launch.
 - Snapshot uses `UserDashboardCache.tdfStats` and `buildDashboardStatsProjection`.

@@ -652,6 +652,11 @@ export const COURSE_EXCEPTION_VERIFICATIONS = Object.freeze({
   addUserDueDateException: courseExceptionVerification('addUserDueDateException'),
   removeUserDueDateException: courseExceptionVerification('removeUserDueDateException'),
 });
+export const COURSE_JOIN_VERIFICATION = Object.freeze({
+  ...middlewareTest, suite: 'course method authorization', method: 'addUserToTeachersClass',
+  surfaceId: 'method:addUserToTeachersClass', verificationId: 'method.course.join',
+  cases: Object.freeze(['returns a successful section join when the confirmation has no recipient']),
+} as const);
 export const COURSE_CREATE_VERIFICATION = Object.freeze({
   ...middlewareTest, suite: 'course method authorization', method: 'addCourse',
   surfaceId: 'method:addCourse', verificationId: 'method.course.create',
@@ -736,7 +741,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }
