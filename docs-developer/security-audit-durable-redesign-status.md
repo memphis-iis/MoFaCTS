@@ -172,7 +172,7 @@ After retiring the two owner lookups and binding stimulus-file access, the sourc
   - [x] Implement the approved media-list rule and verify existing, repeated and overlapping filenames, mixed results, scoping and retries in Chromium (slot 75). Drag-and-drop and the file picker use the same batch handler; both entry points were traced in source. Duplicate guidance is present in all ten interface locales.
   - [x] Trace the separate, explicit Delete Selected operation in Content Upload. The server checks ownership/admin access for the records it finds, then passes every requested ID to deletion. It increments the reported count even when the storage library returns zero for an absent file. The screen does not inspect the result. Reviewed source only.
   - [x] Trace the owner-scoped filename lookup and upload quota through the manual creator, Anki and Canvas imports, the Content Upload quota display, the DDP upload check and the package counter. The filename lookup filters by the signed-in owner. For regular accounts, the three-per-UTC-day gate checks package and standalone media uploads, but only package processing increments the counter. Teachers and administrators bypass that daily gate. Source review only.
-  - [ ] Set the intended unit of the regular-account daily upload quota (lesson packages only, or packages plus separately uploaded media) before changing enforcement and its tests.
+  - [x] Operator chose lesson packages only for the regular-account daily allowance. Standalone media retain existing authorization and file-size checks.
   - [x] Operator selected full preflight for Delete Selected. A stale selection must leave all remaining files intact and prompt the author to review the refreshed list. Count only confirmed removals.
   - [x] Implement and verify full-selection checking, permission checks and confirmed counts for Delete Selected. Six native server regressions passed in slot 76, including stale selections, repeated IDs and interruptions after the first deletion. The client clears selection and refreshes its subscribed list. Interactive staging2 verification remains outstanding.
   - [x] Trace three additional lookup functions. The two registered owner lookups (getTdfOwnersMap and getTdfsByOwnerId) have denial tests but no tracked application, wiki or config caller. They return owner usernames or a lesson list for a specified owner. The internal getMaxResponseKC aggregate also has no tracked caller. Operator approved removal of all three.
@@ -1911,9 +1911,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 81 total, 75 consumed, 0 reserved, 5 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 81 total, 75 consumed, 1 reserved, 4 generally available, and 1 for the earlier `/health` batch only.**
 
-The operator authorized five additional general Meteor invocations (slots 77–81). None has been used or reserved.
+The operator authorized five additional general Meteor invocations (slots 77–81). Slot 77 is reserved for the package-only quota change.
 
 Slot 76 passed on d69a8e43. Native Linux Meteor recorded 1,131 server and 1,255 Chromium passes, zero failures or hook failures, 15 server and seven client pending. All six new bulk deletion cases passed. Image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.mwMXZFwv/results/native-verification.json SHA-256 ab4597cc3409d19bfab6f3a516709052148eeef7b4d46e20260ea80e91a0a18f.
 

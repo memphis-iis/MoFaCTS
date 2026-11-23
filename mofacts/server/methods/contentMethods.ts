@@ -1,3 +1,4 @@
+import { DAILY_LESSON_PACKAGE_LIMIT } from '../../common/fileUploadPolicy';
 import { Meteor } from 'meteor/meteor';
 import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
 import {
@@ -461,14 +462,13 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         date: today,
       });
 
-      const DAILY_LIMIT = 3;
       const used = quota?.uploadCount || 0;
 
       return {
         unlimited: false,
-        dailyLimit: DAILY_LIMIT,
+        dailyLimit: DAILY_LESSON_PACKAGE_LIMIT,
         used,
-        remaining: DAILY_LIMIT - used,
+        remaining: Math.max(0, DAILY_LESSON_PACKAGE_LIMIT - used),
         maxFileSize: '10MB',
         resetsAt: new Date(today + 'T00:00:00Z').getTime() + 86400000,
       };

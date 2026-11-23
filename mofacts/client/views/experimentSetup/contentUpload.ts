@@ -2089,6 +2089,7 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
                   return
                 }
               }
+              loadUploadQuotaStatus(template);
               // SUCCESS: Keep pending entry visible until the actual lesson row appears.
               const uploadData = template.pendingUploads.get(pendingUploadId);
               if (uploadData) {

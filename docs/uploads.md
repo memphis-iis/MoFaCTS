@@ -65,3 +65,5 @@ The manual creator and Anki importer upload a separate archive before asking for
 Replacing a file does not grant permission to delete every copy with the same name. The application retains previously published files when it cannot establish that all references have been removed. Repeated replacements can therefore increase storage usage.
 
 In the Content Upload media list, dropping files and using the file picker both skip names already present in the lesson. Other files in the selection continue uploading. Use the lesson editor to replace a specific media reference, or give the new file another name to keep both.
+
+Regular accounts have a daily allowance of three lesson packages, reset at midnight UTC. Standalone lesson media do not use the package allowance and can still be uploaded after it is reached. The 10 MiB per-file limit and lesson access checks still apply. Teachers and administrators are exempt from the daily allowance.
