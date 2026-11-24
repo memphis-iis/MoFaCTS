@@ -1168,11 +1168,12 @@ export const asyncMethods: Record<string, unknown> = {
 }
 
 // Server-side startup logic
-registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
+const installedMethods = { ...methods, ...asyncMethods };
+registerMeteorMethods(Meteor, installedMethods, [
   ...securityAuditRuntime.methodBindings,
   ...courseReadBindings,
   ...PROFILE_OPERATION_VERIFICATIONS.map(verification => ({
-    verification, handler: methods[verification.method],
+    verification, handler: installedMethods[verification.method],
     ...({
       updateOwnProfile: { policy: profileEditPolicy, dataEgress: 'save-status' },
       updateOwnUiLocale: { policy: profileEditPolicy, dataEgress: 'save-status' },
