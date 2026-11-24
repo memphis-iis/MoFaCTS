@@ -20,7 +20,7 @@ import {
   type StimulusCrowdStatsCollection,
 } from '../lib/stimulusCrowdStats';
 import { createAnalyticsConditionCountRegistration } from './analyticsConditionCountMethods';
-import { PROGRESS_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { CLASS_PERFORMANCE_VERIFICATION, PROGRESS_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
 import { createAnalyticsDownloadRegistration } from './analyticsDownloadMethods';
 import type { LearningHistoryReadOptions } from '../../../learning-components/units/UnitEngineServerMethods';
 import { curSemester } from '../../common/Definitions';
@@ -1032,10 +1032,17 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
     );
   }
 
+  const classPerformancePolicy = Object.freeze({
+    kind: 'course-read', operation: 'instructor-or-admin', authorize: requireUserMatchesOrHasRole,
+  } as const);
+
   async function getClassPerformanceByTDF(this: MethodContext, classId: string, tdfId: string, date: number | false = false) {
     requireAccountProgressSession(this);
     if (!this.userId) {
       throw new Meteor.Error(401, 'Must be logged in');
+    }
+    if (typeof classId !== 'string' || !classId || typeof tdfId !== 'string' || !tdfId) {
+      throw new Meteor.Error(400, 'Select a course and an assigned lesson');
     }
     const course = (await deps.Courses.find(
       { _id: classId },
@@ -1044,7 +1051,7 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
     if (!course) {
       throw new Meteor.Error(404, 'Course not found');
     }
-    await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
+    await classPerformancePolicy.authorize(deps.getMethodAuthorizationDeps(), {
       actingUserId: this.userId,
       subjectUserId: course.teacherUserId,
       roles: ['admin'],
@@ -1057,6 +1064,7 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
       { courseId: classId, $or: [{ TDFId: tdfId }, { assignmentType: 'progressive', memberTdfIds: tdfId }] },
       { fields: { _id: 1, dueAt: 1 } }
     );
+    if (!assignment) throw new Meteor.Error(403, 'This lesson is not assigned to the selected course');
     return deps.getClassPerformanceByTdfWorkflow(classId, tdfId, date, {
       serverConsole: deps.serverConsole,
       Sections: deps.Sections,
@@ -1066,7 +1074,7 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
         { _id: { $in: userIds } },
         { fields: { _id: 1, username: 1, dueDateExceptions: 1 } }
       ).fetchAsync(),
-    }, assignment ? { assignmentId: String(assignment._id || ''), dueAt: assignment.dueAt ?? null } : undefined);
+    }, { assignmentId: String(assignment._id), dueAt: assignment.dueAt ?? null });
   }
 
   async function getStudentPerformanceByIdAndTDFIdFromHistory(userId: string, TDFId: string, returnRows: number | null = null) {
@@ -1648,5 +1656,6 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
       getExperimentState: 'experiment-state',
     } as const)[verification.method],
   }));
-  return { methods, getHistoryByTDFID, methodBindings: Object.freeze([...conditionCounts.methodBindings, ...downloads.methodBindings, ...progressReadBindings]) };
+  return { methods, getHistoryByTDFID, methodBindings: Object.freeze([...conditionCounts.methodBindings, ...downloads.methodBindings, ...progressReadBindings,
+    { verification: CLASS_PERFORMANCE_VERIFICATION, handler: getClassPerformanceByTDF, policy: classPerformancePolicy, dataEgress: 'class-performance' as const }]) };
 }

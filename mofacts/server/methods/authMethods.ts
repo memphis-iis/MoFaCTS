@@ -97,8 +97,13 @@ type AuthMethodsDeps = {
   getApiKeyResolutionDeps: () => ApiKeyResolutionDeps;
 };
 
+export const accountSelfPolicy = Object.freeze({
+  kind: 'account-self', operation: 'current-caller',
+  authorize(userId: string | null | undefined) { return typeof userId === 'string' ? userId.trim() : ''; },
+} as const);
+
 function requireCurrentUserId(userId: string | null | undefined, message = 'Must be logged in') {
-  const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
+  const normalizedUserId = accountSelfPolicy.authorize(userId);
   if (!normalizedUserId) {
     throw new Meteor.Error(401, message);
   }
@@ -141,7 +146,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     getCurrentUserRoleFlags: async function(this: MethodContext) {
       const { admin, teacher } = await deps.getUserRoleFlags(
         deps.getMethodAuthorizationDeps(),
-        this.userId,
+        accountSelfPolicy.authorize(this.userId),
         ['admin', 'teacher'] as const
       );
       return { admin: !!admin, teacher: !!teacher };
@@ -398,16 +403,16 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     },
 
     isUserSpeechAPIKeySetup: async function(this: MethodContext) {
-      const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
+      const userId = accountSelfPolicy.authorize(this.userId);
       if (!userId) {
         return false;
       }
-      const speechAPIKey = (await deps.usersCollection.findOneAsync({ _id: userId }))?.speechAPIKey;
+      const speechAPIKey = (await deps.usersCollection.findOneAsync({ _id: userId }, { fields: { speechAPIKey: 1 } }))?.speechAPIKey;
       return !!speechAPIKey;
     },
 
     hasUserPersonalKeys: async function(this: MethodContext, tdfId?: string | null) {
-      const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
+      const userId = accountSelfPolicy.authorize(this.userId);
       if (!userId) {
         return { hasSR: false, hasTTS: false };
       }
@@ -442,7 +447,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     setUserSessionId: async function(this: MethodContext, sessionId: string, sessionIdTimestamp: number) {
       if (!await accountDiagnosticsPolicy.authorize(this)) return;
       deps.serverConsole('setUserSessionId request received');
-      const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
+      const userId = accountSelfPolicy.authorize(this.userId);
       if (!userId) {
         return;
       }
@@ -462,7 +467,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     },
 
     deleteUserSpeechAPIKey: async function(this: MethodContext) {
-      const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
+      const userId = accountSelfPolicy.authorize(this.userId);
       if (!userId) {
         return;
       }

@@ -1,5 +1,5 @@
 import { COURSE_SNAPSHOT_VERSION } from './lib/courseLearnerSnapshotCache';
-import { ACCOUNT_DIAGNOSTIC_VERIFICATIONS, COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
+import { PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, CLASS_PERFORMANCE_VERIFICATION, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './lib/prolificCollections';
 import { CourseLearnerSnapshotCache } from '../common/Collections';
 import { Meteor } from 'meteor/meteor';
@@ -137,6 +137,49 @@ describe('server auth and session methods', function() {
     await clearServerCompositionCollections();
     await Roles.createRoleAsync('admin', { unlessExists: true });
     await Roles.createRoleAsync('teacher', { unlessExists: true });
+  });
+
+  it('acknowledges unknown verification recipients and binds public account limits', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed public account methods');
+    for (const verification of PUBLIC_ACCOUNT_VERIFICATIONS) {
+      const row = observed.surfaces.find(item => item.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      const requests = ['requestPasswordReset', 'resendVerificationEmail'].includes(verification.method) ? 3 : 5;
+      expect(row?.policy).to.deep.equal({ kind: 'public-account', operation: verification.method,
+        rateLimit: { requests, windowMs: 3600000, scope: 'connection' } });
+    }
+    const result = await MeteorAny.server.method_handlers.resendVerificationEmail.call({ userId: null }, Random.id() + '@example.invalid');
+    expect(result).to.deep.equal({ success: true });
+  });
+
+  it('keeps installed account settings and sign-in updates scoped to the caller', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed account handlers');
+    for (const verification of ACCOUNT_SELF_VERIFICATIONS) {
+      const row = observed.surfaces.find(item => item.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      expect(row?.policy).to.deep.equal({ kind: 'account-self', operation: 'current-caller' });
+    }
+    const handlers = MeteorAny.server.method_handlers;
+    const actor = { userId: await MeteorUsersAny.insertAsync({ username: Random.id() }) };
+    const other = { userId: await MeteorUsersAny.insertAsync({ username: Random.id() }) };
+    const anon = { userId: null };
+    expect(await handlers.getCurrentUserRoleFlags.call(anon)).to.deep.equal({ admin: false, teacher: false });
+    expect(await handlers.hasUserPersonalKeys.call(anon)).to.deep.equal({ hasSR: false, hasTTS: false });
+    expect(await handlers.isUserSpeechAPIKeySetup.call(anon)).to.equal(false);
+    await handlers.saveUserSpeechAPIKey.call(actor, Random.secret());
+    expect(await handlers.isUserSpeechAPIKeySetup.call(actor)).to.equal(true);
+    expect(await handlers.isUserSpeechAPIKeySetup.call(other)).to.equal(false);
+    await handlers.deleteUserSpeechAPIKey.call(other);
+    expect(await handlers.isUserSpeechAPIKeySetup.call(actor)).to.equal(true);
+    await handlers.deleteUserSpeechAPIKey.call(actor);
+    expect(await handlers.isUserSpeechAPIKeySetup.call(actor)).to.equal(false);
+    await handlers.setUserLoginData.call(actor, 'section-invite', 'password');
+    expect((await MeteorUsersAny.findOneAsync(actor.userId)).loginParams.entryPoint).to.equal('section-invite');
+    expect((await MeteorUsersAny.findOneAsync(other.userId)).loginParams).to.equal(undefined);
+    await handlers.recordSessionRevocation.call(actor, 'auth-route-logout');
+    expect(await AuditLogAny.findOneAsync({ actorUserId: actor.userId, targetUserId: actor.userId, action: 'auth.sessionRevoked' })).to.exist;
   });
 
   it('writes auth.signupCompleted for native signup', async function() {
@@ -396,6 +439,44 @@ describe('server auth and session methods', function() {
 });
 
 describe('public TDF and stimulus method authorization', function() {
+  it('checks the installed lesson reads and rejects anonymous response mappings', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed lesson reads');
+    for (const verification of RUNTIME_LESSON_VERIFICATIONS) {
+      expect(observed.surfaces.find(row => row.name === verification.method)?.verification).to.equal(verification);
+    }
+    let code;
+    try {
+      await MeteorAny.server.method_handlers.getResponseKCMapForTdf.call({ userId: null }, Random.id());
+    } catch (error: any) { code = error.error; }
+    expect(code).to.equal(401);
+  });
+
+  it('requires access to the selected SPARC lesson before library or image operations', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed lesson methods');
+    const tdfId = Random.id();
+    const args = {
+      getSparcAdministrativeRemovals: [[], tdfId],
+      getSparcPromptImage: ['synthetic', tdfId],
+      lookupSparcPrimitive: [{ tdfId }, {}, []],
+      publishSparcPrimitive: [{ query: { tdfId } }, {}],
+      generateSparcPromptImage: [{ tdfId }],
+      resolveSparcVisualSupport: [{ tdfId }],
+    };
+    for (const verification of SPARC_LESSON_VERIFICATIONS) {
+      const row = observed.surfaces.find(item => item.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      expect(row?.policy).to.deep.equal({ kind: 'sparc-lesson', operation: 'accessible-lesson-or-admin' });
+      const handler = MeteorAny.server.method_handlers[verification.method];
+      for (const userId of [null, Random.id()]) {
+        let code;
+        try { await handler.apply({ userId }, args[verification.method]); } catch (error: any) { code = error.error; }
+        expect(userId ? [403, 404] : [401]).to.include(code, verification.method);
+      }
+    }
+  });
+
   beforeEach(async function() {
     await clearServerCompositionCollections();
   });
@@ -930,6 +1011,11 @@ describe('public TDF and stimulus method authorization', function() {
 
   it('allows owner public stimulus lookup by stimuliSetId', async function() {
     await TdfsAny.insertAsync({
+      _id: 'different-private-lesson', ownerId: 'different-owner', stimuliSetId: 105,
+      stimuli: [{ stimulusKC: 9, clusterKC: 1, correctResponse: 'separate lesson' }],
+      content: { fileName: 'different.json', tdfs: { tutor: { setspec: { userselect: 'false' } } } },
+    });
+    await TdfsAny.insertAsync({
       _id: 'stim-owned-tdf',
       ownerId: 'owner-user',
       stimuliSetId: 105,
@@ -1211,6 +1297,7 @@ describe('public TDF and stimulus method authorization', function() {
             setspec: {
               lessonname: 'Owned Experiment Root',
               experimentTarget: 'study-b',
+              speechAPIKey: 'synthetic', textToSpeechAPIKey: 'synthetic', openRouterApiKey: 'synthetic',
               userselect: 'false',
             },
             unit: [{ unitname: 'owner-visible unit' }],
@@ -1222,6 +1309,9 @@ describe('public TDF and stimulus method authorization', function() {
     const tdf = await (asyncMethods.getTdfByExperimentTarget as any).call({ userId: 'owner-user' }, 'study-b');
 
     expect(tdf._id).to.equal('owned-experiment-root');
+    for (const field of ['speechAPIKey', 'textToSpeechAPIKey', 'openRouterApiKey']) {
+      expect(tdf.content.tdfs.tutor.setspec).not.to.have.property(field);
+    }
     expect(tdf.content.fileName).to.equal('owned-experiment-root.json');
     expect(tdf.content.tdfs.tutor.unit).to.have.length(1);
   });
@@ -2656,6 +2746,34 @@ describe('course method authorization', function() {
     expect(denied).to.include({ error: code });
     if (reason !== undefined) expect(denied).to.include({ reason });
   }
+
+  it('counts all practice for enrolled learners only on assigned lessons', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed class performance handler');
+    const binding = observed.surfaces.find(row => row.name === 'getClassPerformanceByTDF');
+    expect(binding?.verification).to.equal(CLASS_PERFORMANCE_VERIFICATION);
+    const [owner, learner, outsider] = await Promise.all(Array.from({ length: 3 }, () =>
+      MeteorUsersAny.insertAsync({ username: Random.id() })));
+    const course = await CoursesAny.insertAsync({ teacherUserId: owner });
+    const section = await SectionsAny.insertAsync({ courseId: course });
+    await SectionUserMapAny.insertAsync({ userId: learner, sectionId: section });
+    const lesson = Random.id(), otherCourse = Random.id(), otherLesson = Random.id();
+    const assignment = await AssignmentsAny.insertAsync({ courseId: course, assignmentType: 'lesson', TDFId: lesson });
+    const run = (who: string, selected: string) => MeteorAny.server.method_handlers.getClassPerformanceByTDF.call({ userId: who }, course, selected);
+    for (const origin of [undefined, course, otherCourse]) {
+      await HistoriesAny.insertAsync({ userId: learner, TDFId: lesson, outcome: 'correct', recordedServerTime: 1,
+        ...(origin ? { courseAssignment: { courseId: origin } } : {}) });
+    }
+    await HistoriesAny.insertAsync({ userId: outsider, TDFId: lesson, outcome: 'correct', recordedServerTime: 1 });
+    await HistoriesAny.insertAsync({ userId: learner, TDFId: otherLesson, outcome: 'correct', recordedServerTime: 1 });
+    await expectCourseDenial(() => run(outsider, lesson), 403);
+    await expectCourseDenial(() => run(owner, otherLesson), 403);
+    const [met, late] = await run(owner, lesson);
+    expect(met.map((row: any) => [row.userId, row.count])).to.deep.equal([[learner, 3]]);
+    expect(late).to.deep.equal([]);
+    await AssignmentsAny.updateAsync(assignment, { $set: { assignmentType: 'progressive', memberTdfIds: [lesson] }, $unset: { TDFId: 1 } });
+    expect((await run(owner, lesson))[0][0].count).to.equal(3);
+  });
 
   it('binds course deletion to its owner or an administrator', async function() {
     const observed = registeredMeteorMethodSurfaces();

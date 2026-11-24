@@ -53,10 +53,11 @@ import { registerServerRuntime } from './runtime/serverRuntime';
 import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
 import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
-import { createStimulusLookupHelpers } from './lib/stimulusLookup';
+import { createStimulusLookupHelpers, prepareStimuliSetForRuntime } from './lib/stimulusLookup';
 import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
 import { accountDiagnosticsPolicy } from './lib/participantSession';
-import { ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { PUBLIC_ACCOUNT_REQUESTS_PER_HOUR } from './runtime/ddpRateLimits';
+import { PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -70,7 +71,7 @@ import { HistoryCommitState, historyCommitStorage } from './lib/historyCommitMon
 import { refreshDashboardHistory } from './lib/dashboardHistoryMongo';
 import { archiveDashboardHistory } from './lib/dashboardHistoryArchive';
 import { writeConditionState } from './lib/conditionAllocationMongo';
-import { createAuthMethods, ssoProfilePolicy } from './methods/authMethods';
+import { createAuthMethods, accountSelfPolicy, ssoProfilePolicy } from './methods/authMethods';
 import { createContentMethods, manualDraftPolicy, uploadReadPolicy } from './methods/contentMethods';
 import { createCourseService } from './methods/courseMethods';
 import type { CourseAssignmentHistoryContext } from '../common/courseAssignments.contracts';
@@ -980,7 +981,7 @@ async function getTdfByExperimentTargetPublic(this: MethodContext, experimentTar
     : null;
   if (userId && tdf?._id) {
     try {
-      return await getTdfById.call({ userId }, String(tdf._id));
+      return await getTdfByIdPublic.call({ userId }, String(tdf._id));
     } catch (error: unknown) {
       if (!(error instanceof Meteor.Error) || (error.error !== 401 && error.error !== 403)) {
         throw error;
@@ -1012,8 +1013,8 @@ async function getStimuliSetByIdPublic(this: MethodContext, stimuliSetId: string
       continue;
     }
     try {
-      await getTdfById.call({ userId }, tdfId);
-      return await getStimuliSetById(tdf.stimuliSetId ?? stimuliSetId);
+      const authorized = await getTdfById.call({ userId }, tdfId);
+      if (authorized) return prepareStimuliSetForRuntime(authorized);
     } catch (error: unknown) {
       if (error instanceof Meteor.Error && (error.error === 403 || error.error === 401)) {
         continue;
@@ -1169,6 +1170,47 @@ const installedMethods = { ...methods, ...asyncMethods };
 registerMeteorMethods(Meteor, installedMethods, [
   ...securityAuditRuntime.methodBindings,
   ...courseReadBindings,
+  ...PUBLIC_ACCOUNT_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: { kind: 'public-account' as const, operation: verification.method,
+      rateLimit: { requests: PUBLIC_ACCOUNT_REQUESTS_PER_HOUR[verification.method], windowMs: 3600000, scope: 'connection' as const },
+      authorize: applyMethodRateLimit },
+    dataEgress: verification.method === 'signUpUser' ? 'account-creation-result' as const : 'save-status' as const,
+  })),
+  ...RUNTIME_LESSON_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: { kind: 'runtime-lesson' as const, operation: verification.method === 'getTdfByExperimentTarget' ? 'public-entry-or-accessible-lesson' as const : 'accessible-lesson' as const, authorize: getTdfById },
+    dataEgress: ({
+      getTdfById: 'runtime-lesson',
+      getTdfByExperimentTarget: 'experiment-entry-lesson',
+      getStimuliSetById: 'runtime-stimuli',
+      getResponseKCMapForTdf: 'response-kc-map',
+    } as const)[verification.method],
+  })),
+  ...SPARC_LESSON_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: { kind: 'sparc-lesson' as const, operation: 'accessible-lesson-or-admin' as const, authorize: requireSparcLessonAccess },
+    dataEgress: ({
+      getSparcAdministrativeRemovals: 'removed-component-ids',
+      getSparcPromptImage: 'instructional-image',
+      lookupSparcPrimitive: 'instructional-component',
+      publishSparcPrimitive: 'instructional-component',
+      generateSparcPromptImage: 'instructional-figure-response',
+      resolveSparcVisualSupport: 'instructional-figure-response',
+    } as const)[verification.method],
+  })),
+  ...ACCOUNT_SELF_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method], policy: accountSelfPolicy,
+    dataEgress: ({
+      setUserLoginData: 'save-status',
+      recordSessionRevocation: 'save-status',
+      getCurrentUserRoleFlags: 'role-flags',
+      isUserSpeechAPIKeySetup: 'key-configured',
+      hasUserPersonalKeys: 'provider-settings-metadata',
+      saveUserSpeechAPIKey: 'none',
+      deleteUserSpeechAPIKey: 'none',
+    } as const)[verification.method],
+  })),
   ...ACCOUNT_DIAGNOSTIC_VERIFICATIONS.map(verification => ({
     verification, handler: installedMethods[verification.method], policy: accountDiagnosticsPolicy,
     dataEgress: ({ sendUserErrorReport: 'error-report-id', logUserAgentAndLoginTime: 'save-status', setUserSessionId: 'none' } as const)[verification.method],

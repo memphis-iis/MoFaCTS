@@ -61,6 +61,20 @@ export type MeteorMethodBinding = Readonly<{
     operation: 'own-account-session' | 'instructor-or-admin' | 'section-directory';
     authorize: (...args: never[]) => Promise<string> | string;
   }> | Readonly<{
+    kind: 'public-account'; operation: 'requestPasswordReset' | 'resetPasswordWithToken' | 'resendVerificationEmail' | 'signUpUser';
+    rateLimit: Readonly<{ requests: number; windowMs: number; scope: 'connection' }>;
+    authorize: (...args: never[]) => Promise<unknown>;
+  }> | Readonly<{
+    kind: 'runtime-lesson'; operation: 'public-entry-or-accessible-lesson' | 'accessible-lesson';
+    authorize: (...args: never[]) => Promise<unknown>;
+  }> | Readonly<{
+    kind: 'sparc-lesson'; operation: 'accessible-lesson-or-admin';
+    authorize: (...args: never[]) => Promise<string>;
+  }> | Readonly<{
+    kind: 'account-self';
+    operation: 'current-caller';
+    authorize: (userId: string | null | undefined) => string;
+  }> | Readonly<{
     kind: 'sso-profile';
     operation: 'self-or-admin';
     authorize: (...args: never[]) => Promise<string>;
@@ -95,7 +109,7 @@ export type MeteorMethodBinding = Readonly<{
     | 'error-report-id' | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'
     | 'experiment-login-token' | 'participant-session' | 'public-demo-launch'
     | 'delete-result' | 'progressive-lesson-content' | 'join-result' | 'course-id' | 'assignment-editor-snapshot' | 'course-section-list' | 'teacher-display-list' | 'learner-course-snapshot' | 'assignments-by-course' | 'instructor-course-list'
-    | 'performance-history' | 'completed-trial-count' | 'learning-history' | 'sparc-history' | 'hidden-stimulus-kcs' | 'experiment-state'
+    | 'account-creation-result' | 'runtime-lesson' | 'experiment-entry-lesson' | 'runtime-stimuli' | 'response-kc-map' | 'removed-component-ids' | 'instructional-figure-response' | 'instructional-image' | 'role-flags' | 'key-configured' | 'class-performance' | 'performance-history' | 'completed-trial-count' | 'learning-history' | 'sparc-history' | 'hidden-stimulus-kcs' | 'experiment-state'
     | 'model-catalog' | 'provider-test-result' | 'theme-document' | 'theme-export' | 'verbosity-level' | 'evaluation-page' | 'evaluation-page-list' | 'provider-settings-metadata' | 'account-deletion-result' | 'roster-import-result' | 'news-recipient-list'
     | 'usage-cache-results' | 'video-catalog-targets' | 'video-catalog-preparation' | 'video-catalog-passages' | 'stimulus-display-map-version'
     | 'instructional-clusters' | 'instructional-component-page' | 'image-metadata' | 'instructional-component'
@@ -122,7 +136,7 @@ export function observeMeteorMethodBindings(
     names.add(name);
     const policyMetadata = policy.kind === 'role'
       ? { kind: policy.kind, role: policy.role }
-      : policy.kind === 'experiment-entry'
+      : (policy.kind === 'experiment-entry' || policy.kind === 'public-account')
       ? { kind: policy.kind, operation: policy.operation, rateLimit: policy.rateLimit }
       : policy.kind === 'prolific' && policy.operation === 'researcher'
       ? { kind: policy.kind, operation: policy.operation, roles: policy.roles, rateLimit: policy.rateLimit }

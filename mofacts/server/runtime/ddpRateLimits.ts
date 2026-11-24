@@ -17,6 +17,9 @@ type DdpRateLimitDeps = {
 const DDPRateLimiterWithErrorMessage = DDPRateLimiter as DdpRateLimiterLike;
 
 let rateLimitsRegistered = false;
+export const PUBLIC_ACCOUNT_REQUESTS_PER_HOUR = Object.freeze({
+  requestPasswordReset: 3, resetPasswordWithToken: 5, signUpUser: 5, resendVerificationEmail: 3,
+} as const);
 export const PUBLIC_DEMO_RATE_LIMIT = Object.freeze({ requests: 10, windowMs: 3600000, scope: 'connection' } as const);
 
 export function isRateLimitedOpenRouterMethod(name: string): boolean {
@@ -82,19 +85,19 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     type: 'method',
     name: 'requestPasswordReset',
     connectionId() { return true; }
-  }, 3, 3600000);
+  }, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR.requestPasswordReset, 3600000);
 
   DDPRateLimiter.addRule({
     type: 'method',
     name: 'resetPasswordWithToken',
     connectionId() { return true; }
-  }, 5, 3600000);
+  }, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR.resetPasswordWithToken, 3600000);
 
   DDPRateLimiter.addRule({
     type: 'method',
     name: 'resendVerificationEmail',
     connectionId() { return true; }
-  }, 3, 3600000);
+  }, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR.resendVerificationEmail, 3600000);
 
   DDPRateLimiter.addRule({
     type: 'method',
@@ -106,7 +109,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     type: 'method',
     name: 'signUpUser',
     connectionId() { return true; }
-  }, 5, 3600000);
+  }, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR.signUpUser, 3600000);
 
   DDPRateLimiter.addRule({
     type: 'method',

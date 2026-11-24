@@ -317,7 +317,7 @@
     {
       "name": "getClassPerformanceByTDF",
       "access": "role-checked",
-      "notes": "Existing instructor/class authorization retained; aggregates exclude historical assessment copies."
+      "notes": "Course manager or admin, ordinary account session, and matching course assignment required. Counts enrolled learners’ practice on the assigned lesson from every course and independent practice. Existing assessment-copy exclusions and due-date rules apply."
     },
     {
       "name": "getCourseAssignmentEditorSnapshot",
@@ -442,7 +442,8 @@
     },
     {
       "name": "getStimuliSetById",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Runtime stimuli come from the exact lesson authorized for this caller."
     },
     {
       "name": "getStimulusCrowdStatsForDeck",
@@ -463,7 +464,8 @@
     },
     {
       "name": "getTdfByExperimentTarget",
-      "access": "role-checked"
+      "access": "public",
+      "notes": "Public experiment-entry projection. Authorized full runtime lessons omit speech, TTS and OpenRouter keys."
     },
     {
       "name": "getTdfById",

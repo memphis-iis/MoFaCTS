@@ -112,7 +112,7 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
 - [x] Slot 89 verified eight scoped progress reads, roster reimport with an enrolled account and one current news contact per account. The coverage command reports 121 application methods and four package methods among 200. That leaves 75 method names to reconcile. All 21 publication names have declarations. All five Phase 3 exit groups remain open.
 - [x] Operator selected removal of the unused manual error-report form. Preserve automatic timing diagnostics and the private study exclusion. Slot 90 verified the cleanup and the retained diagnostic flow.
 - [x] Slot 90 verified three account-diagnostic methods and fourteen administrator methods. Of 200 registered names, 138 application and four package methods now have verified declarations; 58 remain (54 fewer than the prior 112). Five exit groups remain open. No new manual reporting entry point.
-- [ ] Instructor performance reporting: enforce a matching course assignment before querying performance. Decide attribution for a student’s practice on the assigned lesson in another course or without course context; the existing report counts both toward course totals. This affects reported counts, accuracy and time. No change to reporting totals has been made.
+- [x] Instructor reporting attribution decision: all qualifying practice on a lesson counts for each enrolled learner, including independent and other-course practice. Require that the selected course assigns that lesson. Implementation awaits the combined installed-method run.
 
 
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
@@ -1937,7 +1937,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 91 total, 89 consumed, 0 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 91 total, 89 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 91 is reserved for instructor reporting, personal-account operations, SPARC access and runtime lesson reads.
 
 Slot 90 passed on a30c29a2. Server 1,143 passed, 15 pending; Chromium 1,255 passed, seven pending. No failures or hook failures, same tool image as slot 89, cleanup complete. Receipt /var/tmp/mofacts-integration.8Gji2ncw/results/native-verification.json SHA-256 d7ba09913ace171a7dc907422ceef2f2d05debbe592cefec86d5f802643f650d.
 
