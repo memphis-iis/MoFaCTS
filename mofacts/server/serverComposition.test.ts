@@ -1,6 +1,6 @@
 import { COURSE_SNAPSHOT_VERSION } from './lib/courseLearnerSnapshotCache';
 import { DDPRateLimiter } from 'meteor/ddp-rate-limiter';
-import { PUBLIC_READ_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, CLASS_PERFORMANCE_VERIFICATION, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
+import { LESSON_EDIT_VERIFICATIONS, PUBLIC_READ_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, CLASS_PERFORMANCE_VERIFICATION, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './lib/prolificCollections';
 import { CourseLearnerSnapshotCache } from '../common/Collections';
 import { Meteor } from 'meteor/meteor';
@@ -1346,6 +1346,26 @@ describe('public TDF and stimulus method authorization', function() {
 describe('editor save shape preservation methods', function() {
   beforeEach(async function() {
     await clearServerCompositionCollections();
+  });
+
+  it('limits installed editor saves to users who manage the lesson', async function() {
+    const lessonId = Random.id();
+    const content = { tdfs: { tutor: { setspec: { lessonname: 'Synthetic lesson' }, unit: [{}] } } };
+    await TdfsAny.insertAsync({ _id: lessonId, ownerId: 'synthetic-owner', content });
+    const inputs = { saveTdfContent: [content], saveTdfStimuli: [{ setspec: { clusters: [] } }, null] };
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw Error(observed.reason);
+    for (const verification of LESSON_EDIT_VERIFICATIONS) {
+      const row: typeof observed.surfaces[number] | undefined = observed.surfaces.find(entry => entry.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      try {
+        await MeteorAny.server.method_handlers[verification.method].call({ userId: 'unrelated-editor' }, lessonId, ...inputs[verification.method]);
+        expect.fail('An unrelated account cannot write to a lesson');
+      } catch (error: any) {
+        expect(error.error).to.equal('not-authorized');
+      }
+    }
+    expect((await TdfsAny.findOneAsync(lessonId)).content).to.deep.equal(content);
   });
 
   it('preserves condition-root fields and absence of tutor.unit when saving TDF editor changes', async function() {

@@ -20,6 +20,7 @@ describe('lesson copy provider keys', function() {
     }
     const handlers = (Meteor as any).server.method_handlers;
     const copy = handlers.copyTdf;
+    let ownerCopyId = '';
     try {
       for (const id of actors) await Meteor.users.insertAsync({ _id: id, profile: { displayName: 'Synthetic creator' } });
       await Roles.createRoleAsync('admin', { unlessExists: true });
@@ -41,18 +42,16 @@ describe('lesson copy provider keys', function() {
         });
         assert.equal(doc?.packageAssetId, undefined);
         assert.equal(doc?.packageFile, undefined);
-        if (actor === owner) {
-          await assert.rejects(handlers.getPackageDownloadLink.call({ userId: outsider }, reply.newTdfId), { error: 404 });
-          const result = await handlers.getPackageDownloadLink.call({ userId: actor }, reply.newTdfId);
-          const archivedCopy = await Tdfs.findOneAsync(reply.newTdfId);
-          assert.ok(result.link);
-          assert.ok(archivedCopy?.packageAssetId);
-          assert.notEqual(archivedCopy.packageAssetId, 'fixture-archive');
-          assert.deepEqual(await handlers.deletePackageFile.call({ userId: actor }, archivedCopy.packageAssetId, { wholeFamily: true }),
-            { deletedCount: 1 });
-          assert.ok(await Tdfs.findOneAsync(source));
-        }
+        if (actor === owner) ownerCopyId = reply.newTdfId;
       }
+      await assert.rejects(handlers.getPackageDownloadLink.call({ userId: outsider }, ownerCopyId), { error: 404 });
+      const result = await handlers.getPackageDownloadLink.call({ userId: owner }, ownerCopyId);
+      const archivedCopy = await Tdfs.findOneAsync(ownerCopyId);
+      assert.ok(result.link);
+      assert.ok(archivedCopy?.packageAssetId);
+      assert.notEqual(archivedCopy.packageAssetId, 'fixture-archive');
+      assert.deepEqual(await handlers.deletePackageFile.call({ userId: owner }, archivedCopy.packageAssetId, { wholeFamily: true }),
+        { deletedCount: 1 });
       await assert.rejects(copy.call({ userId: outsider }, source), { error: 'not-authorized' });
       assert.deepEqual(await Tdfs.findOneAsync(source), original);
     } finally {

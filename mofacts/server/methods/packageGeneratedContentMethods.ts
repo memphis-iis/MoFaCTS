@@ -1,3 +1,4 @@
+import { requireAuthenticatedUser } from '../lib/methodAuthorization';
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
 import {
@@ -157,6 +158,10 @@ export function prepareAiGeneratedPackage(
   };
 }
 
+export const generatedPackagePolicy = Object.freeze({
+  kind: 'package-upload', operation: 'generated-archive', authorize: requireAuthenticatedUser,
+} as const);
+
 export function createPackageGeneratedContentMethods(
   deps: PackageGeneratedContentDeps,
   callbacks: PackageGeneratedContentCallbacks
@@ -164,10 +169,7 @@ export function createPackageGeneratedContentMethods(
   return {
     saveAiGeneratedPackageContent: async function(this: MethodContext, payload: AiGeneratedPackageSavePayload) {
       check(payload, Object);
-      const actingUserId = deps.normalizeCanonicalId(this.userId);
-      if (!actingUserId) {
-        throw new Meteor.Error(401, 'Must be logged in to save generated content');
-      }
+      const actingUserId = generatedPackagePolicy.authorize(this.userId, 'Must be logged in to save generated content');
       await callbacks.requireCreatorDisplayName(actingUserId);
 
       let contract: AiContentSaveContract;

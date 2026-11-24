@@ -791,6 +791,28 @@ export const PACKAGE_UPLOAD_VERIFICATIONS = Object.freeze(([
   cases: Object.freeze(['binds package upload and confirmation to stored archives and owned plans']),
 })));
 
+export const LESSON_EDIT_VERIFICATIONS = Object.freeze((['saveTdfContent', 'saveTdfStimuli'] as const).map(method => Object.freeze({
+  ...middlewareTest, suite: 'editor save shape preservation methods', method, surfaceId: `method:${method}` as const,
+  verificationId: `method.content-maintenance.${method}` as const,
+  cases: Object.freeze(['limits installed editor saves to users who manage the lesson']),
+})));
+
+export const GENERATED_PACKAGE_VERIFICATION = Object.freeze({
+  ...middlewareTest, suite: 'AI generated package ingestion policy',
+  method: 'saveAiGeneratedPackageContent', surfaceId: 'method:saveAiGeneratedPackageContent',
+  verificationId: 'method.package-upload.generated',
+  cases: Object.freeze(['requires a signed-in creator and a stored package they can use']),
+} as const);
+
+export const OPENROUTER_CALL_VERIFICATIONS = Object.freeze(([
+  'getAiContentOpenRouterCapability', 'callAiContentOpenRouterRequest', 'getOpenRouterCapability',
+  'callResolvedOpenRouterJson', 'callResolvedOpenRouterEmbeddings',
+] as const).map(method => Object.freeze({
+  ...middlewareTest, suite: 'openRouterMethods Admin Tests configuration', method, surfaceId: `method:${method}` as const,
+  verificationId: `method.provider-access.${method}` as const,
+  cases: Object.freeze(['registers creator and lesson OpenRouter calls with an authenticated caller boundary']),
+})));
+
 export const PACKAGE_DOWNLOAD_VERIFICATION = Object.freeze({
   ...middlewareTest, suite: 'lesson copy provider keys',
   method: 'getPackageDownloadLink', surfaceId: 'method:getPackageDownloadLink',
@@ -974,7 +996,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, ...MANUAL_DRAFT_VERIFICATIONS, ...UPLOAD_READ_VERIFICATIONS, ...ADMIN_OPERATION_VERIFICATIONS, ...PROFILE_OPERATION_VERIFICATIONS, ...ACCOUNT_DIAGNOSTIC_VERIFICATIONS, ...ACCOUNT_SELF_VERIFICATIONS, ...PUBLIC_ACCOUNT_VERIFICATIONS, ...PUBLIC_READ_VERIFICATIONS, ...PACKAGE_UPLOAD_VERIFICATIONS, PACKAGE_DOWNLOAD_VERIFICATION, LESSON_COPY_VERIFICATION, PACKAGE_DELETION_VERIFICATION, ...CONTENT_MAINTENANCE_VERIFICATIONS, ...SPARC_LESSON_VERIFICATIONS, ...RUNTIME_LESSON_VERIFICATIONS, ...PROGRESS_READ_VERIFICATIONS, ...LEARNER_PROGRESS_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, STIMULUS_FILE_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, CLASS_PERFORMANCE_VERIFICATION, COURSE_DELETE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, ...MANUAL_DRAFT_VERIFICATIONS, ...UPLOAD_READ_VERIFICATIONS, ...ADMIN_OPERATION_VERIFICATIONS, ...PROFILE_OPERATION_VERIFICATIONS, ...ACCOUNT_DIAGNOSTIC_VERIFICATIONS, ...ACCOUNT_SELF_VERIFICATIONS, ...PUBLIC_ACCOUNT_VERIFICATIONS, ...PUBLIC_READ_VERIFICATIONS, ...PACKAGE_UPLOAD_VERIFICATIONS, ...LESSON_EDIT_VERIFICATIONS, GENERATED_PACKAGE_VERIFICATION, ...OPENROUTER_CALL_VERIFICATIONS, PACKAGE_DOWNLOAD_VERIFICATION, LESSON_COPY_VERIFICATION, PACKAGE_DELETION_VERIFICATION, ...CONTENT_MAINTENANCE_VERIFICATIONS, ...SPARC_LESSON_VERIFICATIONS, ...RUNTIME_LESSON_VERIFICATIONS, ...PROGRESS_READ_VERIFICATIONS, ...LEARNER_PROGRESS_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, STIMULUS_FILE_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, CLASS_PERFORMANCE_VERIFICATION, COURSE_DELETE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }
