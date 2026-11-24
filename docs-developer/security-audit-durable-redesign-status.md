@@ -117,8 +117,9 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
 - [x] Slot 92 verified the thirteen learner history, dashboard and analytics methods. The account dashboard and history stay account-scoped. Study progress stays limited to the study and its condition lessons. Coverage reached 173 application and four package declarations out of 200; 23 remained.
 - [x] Slot 93 verified public sign-in configuration and active help, single and bulk media removal and owner-only lesson visibility. Coverage reached 178 application and four package declarations out of 200, leaving 18.
 - [x] Operator approved retiring the unused stimulus display cache and its admin control. Source changes remove startup polling, both public reads, the admin rebuild and all refreshes during ingestion and editing. Slot 94 verified absence of all three installed Meteor methods. Coverage is now 177 application plus four package declarations across 197 method names. All 21 publications still have declarations.
-- [ ] Verify confirmed package deletion and upload ownership in slot 95. The operator approved removing collaborator uploads when their recorded lesson and stimulus set agree and no surviving lesson uses the file. The batch also resolves package archives from persisted records and verifies confirmation and cancellation ownership.
-- [ ] Verify the remaining **16 methods**: nine package/lesson-management methods and seven provider methods. No configuration, help or display reads remain in this backlog. Use the coverage command above for current names. The five Phase 3 exit groups remain open.
+- [x] Slot 95 verified confirmed package deletion, persisted archive processing, and ownership checks for upload confirmation and cancellation. Automatic collaborator-media removal requires a matching lesson target and stimulus-set identity. Shared media, matching names in unrelated uploads, and incomplete upload metadata were covered.
+- [ ] Resolve private-copy package ownership. The shipped copy button can link an owner's new copy to the source archive, and whole-package deletion selects TDFs through that link. Decide whether new copies receive independent package identity while continuing to share referenced media.
+- [ ] Verify the remaining **12 methods**: five package/lesson-management methods and seven provider methods. The source inventory has 181 application and four package declarations across 197 method names. All 21 publications have declarations. The five Phase 3 exit groups remain open.
 
 
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
@@ -1943,11 +1944,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 96 total, 93 consumed, 1 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 96 total, 94 consumed, 0 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
 
 The operator authorized up to five additional batched local Meteor integration invocations, including retries, for the remaining security-audit work (slots 92–96). Reserve each invocation here before starting the suite and record its outcome afterward.
 
-Slot 95 reserved for the combined package deletion, upload, confirmation and cancellation verification.
+Slot 95 passed on eecebf89. Server 1,154 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero test or hook failures. The worker reused the tool image, completed cleanup and wrote exit status 0. The outer PowerShell wrapper's trailing carriage return affected only its final checksum command. Separate read-back verified receipt /var/tmp/mofacts-integration.4C7RVJkO/results/native-verification.json SHA-256 7428ed0d7c113946768af40cc8229b9074d53b138d8f986e2f31e5a53642215b.
 
 Slot 94 passed on bc2e5d37. Server 1,153 passed and 15 pending; Chromium 1,255 passed and seven pending. Zero failures or hook failures. Same test image as slot 93; cleanup complete. Receipt /var/tmp/mofacts-integration.qvRirbpe/results/native-verification.json SHA-256 b9d679e02d424c35af87a78f903ecafddba2eeab521363149c4a77d139e3e748.
 
