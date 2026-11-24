@@ -1939,7 +1939,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 91 total, 90 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 96 total, 90 consumed, 0 reserved, 5 generally available, and 1 for the earlier `/health` batch only.**
+
+The operator authorized up to five additional batched local Meteor integration invocations, including retries, for the remaining security-audit work (slots 92–96). Reserve each invocation here before starting the suite and record its outcome afterward.
 
 Slot 91 passed on 2793fd03. Server 1,148 passed, 15 pending; Chromium 1,255 passed, seven pending. No failures or hook failures. Test image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.03y2PuTt/results/native-verification.json SHA-256 1ae53e7ea50e8363374129a91f732e9eb5e3b9c078f9f3aa98a325c9371163b3. The five-run general allowance is exhausted.
 
