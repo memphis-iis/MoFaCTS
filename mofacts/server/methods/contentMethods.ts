@@ -1,12 +1,13 @@
 import { DAILY_LESSON_PACKAGE_LIMIT } from '../../common/fileUploadPolicy';
 import { Meteor } from 'meteor/meteor';
-import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
+import { normalizeTdfIdentity, validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
 import {
   hasUserRole,
   requireAuthenticatedUser,
   requireUserMatchesOrHasRole,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
+import { buildParentRootSelector } from '../lib/tdfLessonFamilyResolver';
 import type { createStorageBoundary } from '../lib/storageBoundary';
 import { requireContentCreatorDisplayName } from '../lib/contentCreatorIdentity';
 import { createContentAssetMaintenanceMethods } from './contentAssetMaintenanceMethods';
@@ -435,6 +436,9 @@ export function createContentMethods(deps: ContentMethodsDeps) {
     setTdfUserSelect: async function(this: MethodContext, tdfId: string, isPublic: boolean) {
       requireAuthenticatedUser(this.userId, 'Must be logged in', 'not-authorized');
 
+      if (!normalizeTdfIdentity(tdfId) || typeof isPublic !== 'boolean') {
+        throw new Meteor.Error(400, 'Expected a lesson ID and a boolean visibility setting');
+      }
       const tdf = await deps.Tdfs.findOneAsync({ _id: tdfId });
       if (!tdf) {
         throw new Meteor.Error('not-found', 'TDF not found');
@@ -449,6 +453,11 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         forbiddenCode: 'not-authorized',
       });
 
+      const parent = buildParentRootSelector([tdfId]);
+      if (parent && await deps.Tdfs.findOneAsync(parent, { fields: { _id: 1 } })) {
+        throw new Meteor.Error('tdf-condition-visibility', 'Change study visibility on the root lesson.');
+      }
+
       const newUserSelect = isPublic ? 'true' : 'false';
       const visibilityLockReason = String(tdf.content?.tdfs?.tutor?.setspec?.aiVisibilityLockReason || '').trim();
       if (isPublic && visibilityLockReason) {
@@ -460,19 +469,20 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
       }
 
-      await deps.Tdfs.updateAsync(
-        { _id: tdfId },
-        { $set: { 'content.tdfs.tutor.setspec.userselect': newUserSelect }, $inc: { tdfRevision: 1 } }
-      );
-
-      const conditionIds = familyValidation.conditionTdfIds;
-      if (conditionIds.length > 0) {
+      const field = 'content.tdfs.tutor.setspec.userselect';
+      if (familyValidation.conditionTdfIds.length > 0) {
+        // Repair conditions made separately visible by the previous switch.
         await deps.Tdfs.updateAsync(
-          { _id: { $in: conditionIds }, ownerId: tdf.ownerId },
-          { $set: { 'content.tdfs.tutor.setspec.userselect': newUserSelect }, $inc: { tdfRevision: 1 } },
+          { _id: { $in: familyValidation.conditionTdfIds }, ownerId: tdf.ownerId, [field]: { $ne: 'false' } },
+          { $set: { [field]: 'false' }, $inc: { tdfRevision: 1 } },
           { multi: true }
         );
       }
+      const changed = await deps.Tdfs.updateAsync(
+        { _id: tdfId, ownerId: tdf.ownerId, tdfRevision: tdf.tdfRevision ?? { $exists: false } },
+        { $set: { [field]: newUserSelect }, $inc: { tdfRevision: 1 } }
+      );
+      if (!changed) throw new Meteor.Error('tdf-changed', 'Lesson changed. Refresh and try again.');
 
       await deps.AuditLog.insertAsync({
         action: 'tdf_userselect_change',

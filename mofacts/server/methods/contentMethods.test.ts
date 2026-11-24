@@ -1,3 +1,6 @@
+import { strict as assert } from 'node:assert';
+import { Mongo } from 'meteor/mongo';
+import { Random } from 'meteor/random';
 import { expect } from 'chai';
 import { createContentMethods } from './contentMethods';
 import { DYNAMIC_ASSET_PUBLICATION_FIELDS } from '../publications';
@@ -112,6 +115,35 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('contentMethods content upload summaries', function() {
+  it('toggles study visibility while keeping locked and previously listed conditions out of the public list', async function() {
+    const tdfs = new Mongo.Collection<any>('visibility' + Random.id());
+    const methods = createContentMethods(createContentDeps({ Tdfs: tdfs }));
+    const toggle = (id: string, value: boolean) => methods.setTdfUserSelect.call({ userId: 'owner' }, id, value);
+    const listed = () => tdfs.find({ 'content.tdfs.tutor.setspec.userselect': 'true' }).mapAsync(doc => doc._id);
+    try {
+      await tdfs.insertAsync({ _id: 'root', ownerId: 'owner', content: { tdfs: { tutor: { setspec: {
+        condition: ['condition.json'], conditionTdfIds: ['child'], userselect: 'false',
+      } } } } });
+      await tdfs.insertAsync({ _id: 'child', ownerId: 'owner', content: { tdfs: { tutor: { unit: [{}],
+        setspec: { userselect: 'true', aiVisibilityLockReason: 'missing attribution' },
+      } } } });
+      await assert.rejects(methods.setTdfUserSelect.call({ userId: 'outsider' }, 'root', true),
+        (error: any) => error.error === 'not-authorized');
+      await toggle('root', true);
+      assert.deepEqual(await listed(), ['root']);
+      await assert.rejects(toggle('child', true), (error: any) => error.error === 'tdf-condition-visibility');
+      const child = await tdfs.findOneAsync('child');
+      assert.equal(child.content.tdfs.tutor.setspec.aiVisibilityLockReason, 'missing attribution');
+      await toggle('root', false);
+      assert.deepEqual(await listed(), []);
+      assert.equal((await tdfs.findOneAsync('child')).tdfRevision, child.tdfRevision);
+      await tdfs.updateAsync('root', { $set: { 'content.tdfs.tutor.setspec.aiVisibilityLockReason': 'private' } });
+      await assert.rejects(toggle('root', true), (error: any) => error.error === 'tdf-public-locked');
+    } finally {
+      await tdfs.rawCollection().drop();
+    }
+  });
+
   it('waits for the stimulus file access decision', async function() {
     const methods = createContentMethods(createContentDeps({
       Tdfs: { findOneAsync: async () => ({ rawStimuliFile: {}, content: { tdfs: { tutor: { setspec: { stimulusfile: 'test.json' } } } } }) },
