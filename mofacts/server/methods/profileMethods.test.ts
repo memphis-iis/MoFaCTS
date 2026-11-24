@@ -1,3 +1,8 @@
+import { strict as assert } from 'node:assert';
+import { Meteor } from 'meteor/meteor';
+import { Random } from 'meteor/random';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
+import { PROFILE_OPERATION_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
 import { expect } from 'chai';
 import { createProfileMethods } from './profileMethods';
 
@@ -35,6 +40,43 @@ function createDeps(
 }
 
 describe('profile methods', function() {
+  it('checks installed personal settings and catalog access at the account boundary', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed personal settings operations');
+    const handlers = (Meteor as any).server.method_handlers;
+    const args = {
+      updateOwnProfile: [{}],
+      updateOwnUiLocale: [{ uiLocale: 'en' }],
+      updateOwnSparcPersona: [''],
+      getOwnOpenRouterSettings: [],
+      updateOwnOpenRouterSettings: [{}],
+      deleteOwnOpenRouterKey: [],
+      testOwnOpenRouterSettings: [{}],
+      getOpenRouterModelCatalog: [],
+    };
+    const participant = Random.id(), owner = Random.id();
+    try {
+      await Meteor.users.insertAsync({ _id: participant, profile: { experiment: true } } as any);
+      await Meteor.users.insertAsync({ _id: owner, username: owner } as any);
+      for (const verification of PROFILE_OPERATION_VERIFICATIONS) {
+        const method = verification.method;
+        const rows: typeof observed.surfaces = observed.surfaces.filter(row => row.name === method);
+        assert.equal(rows.length, 1, method);
+        assert.equal(rows[0]?.verification, verification);
+        await assert.rejects(() => handlers[method].apply({}, args[method]), (e: any) => e.error === 401, method);
+        if (method !== 'getOpenRouterModelCatalog') {
+          await assert.rejects(() => handlers[method].apply({ userId: participant }, args[method]),
+            (e: any) => e.error === 'experiment-account-restricted', method);
+        }
+      }
+      await handlers.updateOwnUiLocale.call({ userId: owner }, { uiLocale: 'fr' });
+      assert.equal((await Meteor.users.findOneAsync(owner))?.profile?.uiLocale, 'fr');
+      assert.equal((await Meteor.users.findOneAsync(participant))?.profile?.uiLocale, undefined);
+    } finally {
+      await Meteor.users.removeAsync({ _id: { $in: [participant, owner] } });
+    }
+  });
+
   it('stores explicit personas only for the authenticated learner without changing other profile fields', async function() {
     const updates: UpdateCall[] = [];
     const methods = createProfileMethods(createDeps(updates));

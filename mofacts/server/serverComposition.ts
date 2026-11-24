@@ -55,7 +55,7 @@ import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
 import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
-import { ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -85,7 +85,7 @@ import { createExperimentMethodRegistration, issueExperimentLoginToken } from '.
 import { createExperimentTargetFamilyResolver } from './lib/experimentTargetFamilyResolver';
 import { createPackageService } from './methods/packageMethods';
 import {
-  createOpenRouterCatalogMethods,
+  createOpenRouterCatalogMethods, modelCatalogPolicy,
   createOpenRouterModelCatalogService,
 } from './methods/openRouterCatalogMethods';
 import { createOpenRouterMethods } from './methods/openRouterMethods';
@@ -95,7 +95,7 @@ import { createSparcFigureLibraryStore, ensureSparcFigureLibraryIndexes,
 import { createSparcFigureBrowseStore, ensureSparcFigureBrowseIndexes } from './lib/sparcFigureBrowseStorage';
 import { consolidateSparcInstructionalLibrary, SparcInstructionalLibrary } from './lib/sparcInstructionalLibraryStorage';
 import { createSparcFigureClusterLabeler } from './lib/sparcFigureClusterLabels';
-import { createProfileMethods } from './methods/profileMethods';
+import { createProfileMethods, profileEditPolicy, personalProviderPolicy } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods, preferencePolicy, audioSavePolicy } from './methods/systemMethods';
 import { createRecoverableWarningRegistration } from './methods/recoverableWarningMethods';
@@ -1171,6 +1171,19 @@ export const asyncMethods: Record<string, unknown> = {
 registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...securityAuditRuntime.methodBindings,
   ...courseReadBindings,
+  ...PROFILE_OPERATION_VERIFICATIONS.map(verification => ({
+    verification, handler: methods[verification.method],
+    ...({
+      updateOwnProfile: { policy: profileEditPolicy, dataEgress: 'save-status' },
+      updateOwnUiLocale: { policy: profileEditPolicy, dataEgress: 'save-status' },
+      updateOwnSparcPersona: { policy: profileEditPolicy, dataEgress: 'save-status' },
+      getOwnOpenRouterSettings: { policy: personalProviderPolicy, dataEgress: 'provider-settings-metadata' },
+      updateOwnOpenRouterSettings: { policy: personalProviderPolicy, dataEgress: 'provider-settings-metadata' },
+      deleteOwnOpenRouterKey: { policy: personalProviderPolicy, dataEgress: 'save-status' },
+      testOwnOpenRouterSettings: { policy: personalProviderPolicy, dataEgress: 'provider-test-result' },
+      getOpenRouterModelCatalog: { policy: modelCatalogPolicy, dataEgress: 'model-catalog' },
+    } as const)[verification.method],
+  })),
   ...ADMIN_OPERATION_VERIFICATIONS.map(verification => ({
     verification, handler: methods[verification.method], policy: { kind: 'role' as const, role: 'admin' as const, authorize: requireAdminUser },
     dataEgress: ({

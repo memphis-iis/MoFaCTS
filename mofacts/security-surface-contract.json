@@ -368,7 +368,8 @@
     },
     {
       "name": "getOpenRouterModelCatalog",
-      "access": "role-checked"
+      "access": "authenticated",
+      "review": "Any signed-in caller can read the shared provider model catalog."
     },
     {
       "name": "getOwnOpenRouterSettings",
