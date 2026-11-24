@@ -471,11 +471,11 @@
     },
     {
       "name": "getUploadQuotaStatus",
-      "access": "role-checked"
+      "access": "authenticated-self"
     },
     {
       "name": "getUserAssetByName",
-      "access": "role-checked"
+      "access": "authenticated-self"
     },
     {
       "name": "getUserPreference",

@@ -144,6 +144,12 @@ function summarizeManualDraftState(state: UnknownRecord, currentStep: number, dr
   };
 }
 
+export const uploadReadPolicy = Object.freeze({
+  kind: 'upload-read', operation: 'self',
+  authorize: (userId: string | null | undefined, code: 401 | 'not-authorized') =>
+    requireAuthenticatedUser(userId, 'Must be logged in', code),
+} as const);
+
 export const manualDraftPolicy = Object.freeze({
   kind: 'manual-draft', operation: 'owner',
   authorize: (userId: string | null | undefined) => requireAuthenticatedUser(userId, 'Must be logged in', 401),
@@ -352,16 +358,14 @@ export function createContentMethods(deps: ContentMethodsDeps) {
     },
 
     getUserAssetByName: async function(this: MethodContext, fileName: string) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
+      const ownerId = uploadReadPolicy.authorize(this.userId, 401);
       if (!fileName || typeof fileName !== 'string') {
         throw new Meteor.Error(400, 'Invalid filename');
       }
 
       const asset = await deps.DynamicAssets.findOneAsync(
         {
-          userId: this.userId,
+          userId: ownerId,
           $or: [
             { name: fileName },
             { fileName },
@@ -382,7 +386,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
     },
 
     getUploadQuotaStatus: async function(this: MethodContext) {
-      const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 'not-authorized');
+      const actingUserId = uploadReadPolicy.authorize(this.userId, 'not-authorized');
       const isTeacherOrAdmin = await hasUserRole(deps.getMethodAuthorizationDeps(), actingUserId, ['admin', 'teacher']);
 
       if (isTeacherOrAdmin) {

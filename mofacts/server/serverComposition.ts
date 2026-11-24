@@ -55,7 +55,7 @@ import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
 import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
-import { MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -70,7 +70,7 @@ import { refreshDashboardHistory } from './lib/dashboardHistoryMongo';
 import { archiveDashboardHistory } from './lib/dashboardHistoryArchive';
 import { writeConditionState } from './lib/conditionAllocationMongo';
 import { createAuthMethods, ssoProfilePolicy } from './methods/authMethods';
-import { createContentMethods, manualDraftPolicy } from './methods/contentMethods';
+import { createContentMethods, manualDraftPolicy, uploadReadPolicy } from './methods/contentMethods';
 import { createCourseService } from './methods/courseMethods';
 import type { CourseAssignmentHistoryContext } from '../common/courseAssignments.contracts';
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
@@ -1170,6 +1170,10 @@ export const asyncMethods: Record<string, unknown> = {
 registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...securityAuditRuntime.methodBindings,
   ...courseReadBindings,
+  ...UPLOAD_READ_VERIFICATIONS.map(verification => ({
+    verification, handler: methods[verification.method], policy: uploadReadPolicy,
+    dataEgress: verification.method === 'getUserAssetByName' ? 'owned-asset-filename' as const : 'own-upload-quota' as const,
+  })),
   ...MANUAL_DRAFT_VERIFICATIONS.map(verification => ({
     verification, handler: methods[verification.method], policy: manualDraftPolicy,
     dataEgress: ({ getManualContentDraft: 'manual-draft', saveManualContentDraft: 'draft-save-receipt', deleteManualContentDraft: 'delete-result' } as const)[verification.method],
