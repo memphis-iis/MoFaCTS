@@ -20,6 +20,7 @@ import {
   type StimulusCrowdStatsCollection,
 } from '../lib/stimulusCrowdStats';
 import { createAnalyticsConditionCountRegistration } from './analyticsConditionCountMethods';
+import { PROGRESS_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
 import { createAnalyticsDownloadRegistration } from './analyticsDownloadMethods';
 import type { LearningHistoryReadOptions } from '../../../learning-components/units/UnitEngineServerMethods';
 import { curSemester } from '../../common/Definitions';
@@ -1445,9 +1446,12 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
 
   async function requireProgressTdfId(context: MethodContext, TDFId: unknown) {
     const lessonId = requireNormalizedTdfId(TDFId);
-    await requireParticipantProgressLesson(context, deps.Tdfs, lessonId);
+    await progressReadPolicy.requireLesson(context, deps.Tdfs, lessonId);
     return lessonId;
   }
+
+  const progressReadPolicy = Object.freeze({ kind: 'progress-read', operation: 'own-study-lessons',
+    authorize: requireSelfScopedUserId, requireLesson: requireParticipantProgressLesson } as const);
 
   const downloads = createAnalyticsDownloadRegistration(deps);
   const conditionCounts = createAnalyticsConditionCountRegistration(deps, { validateExperimentStateMutation });
@@ -1477,7 +1481,7 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
       TDFId: string,
       returnRows: number | null = null
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
       return await getStudentPerformanceByIdAndTDFIdFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), returnRows);
     },
     getStudentPerformanceForUnitFromHistory: async function(
@@ -1487,7 +1491,7 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
       levelUnit: number,
       unitScopedOnly = false
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
       return await getStudentPerformanceForUnitFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit, unitScopedOnly);
     },
     getAssessmentCompletedTrialCountFromHistory: async function(
@@ -1496,7 +1500,7 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
       TDFId: string,
       levelUnit: number
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
       return await getAssessmentCompletedTrialCountFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit);
     },
     getVideoCompletedCheckpointQuestionCountFromHistory: async function(
@@ -1505,7 +1509,7 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
       TDFId: string,
       levelUnit: number
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
       return await getVideoCompletedCheckpointQuestionCountFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit);
     },
     getLearningHistoryForUnit: async function(
@@ -1516,9 +1520,9 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
       unitScopedOnly = false,
       options: LearningHistoryReadOptions = {}
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
       const lessonId = requireNormalizedTdfId(TDFId);
-      const studyLessonIds = await requireParticipantProgressLesson(this, deps.Tdfs, lessonId);
+      const studyLessonIds = await progressReadPolicy.requireLesson(this, deps.Tdfs, lessonId);
       return await getLearningHistoryForUnit(scopedUserId, lessonId, levelUnit, unitScopedOnly, options, studyLessonIds);
     },
     getSparcHistoryForUnit: async function(
@@ -1528,11 +1532,11 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
       levelUnit: number,
       options: Pick<LearningHistoryReadOptions, 'courseAssignment'> & { worksheetPageKey?: string; worksheetCheckpointIndex?: number } = {}
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
       return await getSparcHistoryForUnit(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit, options);
     },
     getHiddenStimulusKCsFromHistory: async function(this: MethodContext, userId: string, TDFId: string) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
       return await getHiddenStimulusKCsFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId));
     },
     getAdaptiveOutcomeRows: async function(this: MethodContext, userId: string, TDFId: string) {
@@ -1572,7 +1576,7 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
       ).fetchAsync();
     },
     getExperimentState: async function(this: MethodContext, userId: string, TDFId: string) {
-      const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only read experiment state for the current user');
+      const scopedUserId = progressReadPolicy.authorize(this, userId, 'Can only read experiment state for the current user');
       const lessonId = await requireProgressTdfId(this, TDFId);
       return await getExperimentState(scopedUserId, lessonId);
     },
@@ -1631,5 +1635,18 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
     ...downloads.methods,
     ...conditionCounts.methods,
   };
-  return { methods, getHistoryByTDFID, methodBindings: Object.freeze([...conditionCounts.methodBindings, ...downloads.methodBindings]) };
+  const progressReadBindings = PROGRESS_READ_VERIFICATIONS.map(verification => ({
+    verification, handler: methods[verification.method], policy: progressReadPolicy,
+    dataEgress: ({
+      getStudentPerformanceByIdAndTDFIdFromHistory: 'performance-history',
+      getStudentPerformanceForUnitFromHistory: 'performance-history',
+      getAssessmentCompletedTrialCountFromHistory: 'completed-trial-count',
+      getVideoCompletedCheckpointQuestionCountFromHistory: 'completed-trial-count',
+      getLearningHistoryForUnit: 'learning-history',
+      getSparcHistoryForUnit: 'sparc-history',
+      getHiddenStimulusKCsFromHistory: 'hidden-stimulus-kcs',
+      getExperimentState: 'experiment-state',
+    } as const)[verification.method],
+  }));
+  return { methods, getHistoryByTDFID, methodBindings: Object.freeze([...conditionCounts.methodBindings, ...downloads.methodBindings, ...progressReadBindings]) };
 }

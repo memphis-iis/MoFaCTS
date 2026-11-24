@@ -308,7 +308,7 @@
     },
     {
       "name": "getAssessmentCompletedTrialCountFromHistory",
-      "access": "role-checked"
+      "access": "authenticated-self"
     },
     {
       "name": "getAuthClientConfig",
@@ -342,7 +342,7 @@
     },
     {
       "name": "getHiddenStimulusKCsFromHistory",
-      "access": "role-checked"
+      "access": "authenticated-self"
     },
     {
       "name": "getLearnerAnalyticsOverview",
@@ -355,7 +355,7 @@
     },
     {
       "name": "getLearningHistoryForUnit",
-      "access": "role-checked",
+      "access": "authenticated-self",
       "notes": "Existing self and course/lesson/unit scope retained. Selects original assessment and adaptive-practice rows and excludes historical assessment copies; provenance remains in the sparse projection."
     },
     {
@@ -409,7 +409,7 @@
     },
     {
       "name": "getSparcHistoryForUnit",
-      "access": "role-checked",
+      "access": "authenticated-self",
       "notes": "Self and course authorization retained. Worksheet reads require page/checkpoint scope, use the worksheet_scoped_history index prefix, and reject more than 10000 records."
     },
     {
@@ -450,12 +450,12 @@
     },
     {
       "name": "getStudentPerformanceByIdAndTDFIdFromHistory",
-      "access": "role-checked",
+      "access": "authenticated-self",
       "notes": "Existing subject/lesson authorization retained; original assessment and adaptive-practice histories share the copy exclusion rule."
     },
     {
       "name": "getStudentPerformanceForUnitFromHistory",
-      "access": "role-checked"
+      "access": "authenticated-self"
     },
     {
       "name": "getTdfAssignmentsByCourseIdMap",
@@ -485,7 +485,7 @@
     },
     {
       "name": "getVideoCompletedCheckpointQuestionCountFromHistory",
-      "access": "role-checked",
+      "access": "authenticated-self",
       "notes": "Retains existing authenticated-self scope and exact lesson/unit query. Completed checkpoints include correct and incorrect ATTEMPT outcomes; no learner records are changed."
     },
     {
@@ -518,7 +518,8 @@
     },
     {
       "name": "insertNewUsers",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Administrator-only account creation from roster CSV. Existing accounts are skipped and keep their passwords and course enrollment. Returns counts and row outcomes."
     },
     {
       "name": "isUserSpeechAPIKeySetup",

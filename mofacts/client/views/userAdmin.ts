@@ -1435,16 +1435,15 @@ async function doFileUpload(fileElementSelector: string, fileDescrip: string, in
       try {
         const result = await MeteorCompat.callAsync('insertNewUsers', name, fileReader.result);
         
-        if (result.length > 0) {
-          instance.importMessageType.set('danger');
-          instance.importMessage.set(userAdminText('admin.userFileNotSaved', { fileDescription: fileDescrip, error: JSON.stringify(result) }));
-        } else {
-          instance.importMessageType.set('success');
-          instance.importMessage.set(userAdminText('admin.userFileSaved', { fileDescription: fileDescrip }));
-          // Now we can clear the selected file
+        const { created, skippedRows, errors } = result;
+        const summary = userAdminText('admin.rosterResult', { created, skipped: skippedRows.length, failed: errors.length });
+        const skipped = skippedRows.length ? userAdminText('admin.rosterSkippedRows', { rows: skippedRows.join(', ') }) : '';
+        const details = errors.map((item: { row: number; error: string }) => `#${item.row} — ${item.error}`);
+        instance.importMessageType.set(errors.length ? 'danger' : 'success');
+        instance.importMessage.set([summary, skipped, ...details].filter(Boolean).join(' '));
+        if (!errors.length) {
           $(fileElementSelector).val('');
           $(fileElementSelector).parent().find('.file-info').html('');
-          // No need to manually refresh - Meteor reactivity handles it automatically!
         }
       } catch (error: unknown) {
         instance.importMessageType.set('danger');

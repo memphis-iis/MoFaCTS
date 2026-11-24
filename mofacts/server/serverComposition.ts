@@ -1207,6 +1207,7 @@ registerMeteorMethods(Meteor, installedMethods, [
       saveAdminApiKeyAlternative: 'provider-settings-metadata',
       deleteAdminApiKeyAlternative: 'provider-settings-metadata',
       userAdminDeleteUser: 'account-deletion-result',
+      insertNewUsers: 'roster-import-result',
     } as const)[verification.method],
   })),
   { verification: ADMIN_ROLE_CHANGE_VERIFICATION, handler: methods.userAdminRoleChange,

@@ -5,6 +5,9 @@ import { WebApp } from 'meteor/webapp';
 import { GlobalExperimentStates, Histories, Tdfs } from '../../common/Collections';
 import { issueExperimentLoginToken } from '../methods/experimentMethods';
 
+import { PROGRESS_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
+
 describe('approved progress-privacy selection on the registered Meteor publication', function() {
   const suffix = Random.id(12), lesson = `synthetic-progress-lesson-${suffix}`;
   const actors = ['learnerA', 'learnerB', 'teacherA', 'teacherB'] as const;
@@ -18,6 +21,23 @@ describe('approved progress-privacy selection on the registered Meteor publicati
     await GlobalExperimentStates.insertAsync({ _id: extraId, userId: users.learnerA, TDFId: lesson + '-other' });
   });
   after(async function() { await GlobalExperimentStates.removeAsync({ _id: { $in: [...ids, extraId] } }); });
+
+  it('binds each progress read to the signed-in learner', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed progress reads');
+    for (const verification of PROGRESS_READ_VERIFICATIONS) {
+      const rows: typeof observed.surfaces = observed.surfaces.filter(row => row.name === verification.method);
+      expect(rows).to.have.length(1);
+      expect(rows[0]?.verification).to.equal(verification);
+      expect(rows[0]?.policy).to.deep.equal({ kind: 'progress-read', operation: 'own-study-lessons' });
+      const handler = (Meteor as any).server.method_handlers[verification.method];
+      for (const [caller, code] of [[null, 401], [users.learnerB, 403]] as const) {
+        let denied;
+        try { await handler.call({ userId: caller }, users.learnerA, lesson, 0); } catch (err) { denied = err; }
+        expect(denied, verification.method).to.include({ error: code });
+      }
+    }
+  });
 
   it('finishes logged-out subscriptions without a progress cursor', function() {
     const handler = (Meteor as any).server.publish_handlers.userExperimentState;
@@ -174,7 +194,10 @@ describe('approved progress-privacy selection on the registered Meteor publicati
         expect((await method(ws, 'getExperimentState', userId, lessonId)).error.error).to.equal(403);
       }
       expect((await method(ws, 'getAssessmentCompletedTrialCountFromHistory', userId, ids.condition, 0)).result).to.equal(0);
-      expect((await method(ws, 'getAssessmentCompletedTrialCountFromHistory', userId, ids.other, 0)).error.error).to.equal(403);
+      for (const verification of PROGRESS_READ_VERIFICATIONS) {
+        const denied = await method(ws, verification.method, userId, ids.other, 0);
+        expect(denied.error, verification.method).to.include({ error: 403 });
+      }
       expect((await method(ws, 'getPracticeDashboardSnapshot')).error.error).to.equal(403);
       expect((await method(ws, 'getLearnerCoursesSnapshot')).error.error).to.equal(403);
       for (const args of [[ids.root, ids.condition], [ids.root, ids.condition, 'saved-revision']]) {

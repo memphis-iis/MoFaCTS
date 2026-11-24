@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { Roles } from 'meteor/alanning:roles';
 import { Random } from 'meteor/random';
 import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
-import { Histories, GlobalExperimentStates } from '../../common/Collections';
+import { Histories, GlobalExperimentStates, SectionUserMap } from '../../common/Collections';
 import { ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
 import { expect } from 'chai';
 import { createAdminMethods } from './adminMethods';
@@ -214,6 +214,7 @@ describe('adminMethods', function() {
       saveAdminApiKeyAlternative: ['openrouter', {}],
       deleteAdminApiKeyAlternative: ['openrouter'],
       userAdminDeleteUser: ['synthetic'],
+      insertNewUsers: ['roster.csv', 'email,password'],
     };
     for (const verification of ADMIN_OPERATION_VERIFICATIONS) {
       const method = verification.method;
@@ -227,6 +228,61 @@ describe('adminMethods', function() {
           (err: any) => [403, 'unauthorized', 'not-authorized'].includes(err.error), method);
       }
     }
+  });
+
+  it('preserves an enrolled account and creates only new accounts through the installed roster import', async function() {
+    const actor = Random.id(), learner = Random.id(), sectionId = Random.id();
+    const email = learner.toLowerCase() + '@example.invalid';
+    const newEmail = Random.id().toLowerCase() + '@example.invalid';
+    const settings = Meteor.settings as any, original = settings.auth;
+    const run = () => (Meteor as any).server.method_handlers.insertNewUsers.call({ userId: actor }, 'roster.csv',
+      ['email,password', email + ',', newEmail + ',' + Random.secret(), newEmail + ','].join('\n'));
+    try {
+      settings.auth = { ...original, requireEmailVerification: false };
+      await Roles.createRoleAsync('admin', { unlessExists: true });
+      await Roles.addUsersToRolesAsync(actor, 'admin');
+      await Meteor.users.insertAsync({ _id: learner, username: email, emails: [{ address: email, verified: true }],
+        services: { password: { bcrypt: 'synthetic-existing-hash' } } } as any);
+      await SectionUserMap.insertAsync({ userId: learner, sectionId });
+      const before = await Meteor.users.findOneAsync(learner);
+      assert.deepEqual(await run(), { created: 1, skippedRows: [2, 4], errors: [] });
+      assert.deepEqual(await run(), { created: 0, skippedRows: [2, 3, 4], errors: [] });
+      assert.deepEqual(await Meteor.users.findOneAsync(learner), before);
+      assert.equal(await SectionUserMap.find({ userId: learner, sectionId }).countAsync(), 1);
+      const created = await Meteor.users.findOneAsync({ username: newEmail });
+      assert.ok(created);
+      assert.equal(await SectionUserMap.find({ userId: created._id }).countAsync(), 0);
+    } finally {
+      if (original === undefined) delete settings.auth; else settings.auth = original;
+      await SectionUserMap.removeAsync({ userId: learner, sectionId });
+      await Meteor.users.removeAsync({ username: { $in: [email, newEmail] } });
+      await Roles.setUserRolesAsync(actor, []);
+    }
+  });
+
+  it('skips existing roster accounts before password validation and reports rows on reimport', async function() {
+    const accounts = new Set(['existing@example.invalid']);
+    const created: string[] = [];
+    const csvRows = [
+      ['email', 'password'], ['EXISTING@example.invalid', ''], ['new@example.invalid', Random.secret()],
+      ['new@example.invalid', ''], [''],
+    ];
+    const deps = {
+      ...createAdminDeps(),
+      csvParser: { parse: () => ({ data: csvRows }) },
+      findNormalAccountUserByCanonicalEmail: async (email: string) => accounts.has(email) ? { _id: email } : null,
+      assertStrongPassword: (password: string) => assert.ok(password),
+      createUserWithRetry: async (email: string) => {
+        accounts.add(email);
+        created.push(email);
+        return email;
+      },
+    };
+    const handler = createAdminMethods(deps).insertNewUsers;
+    const run = () => handler.call({ userId: 'admin' }, 'roster.csv', '');
+    assert.deepEqual(await run(), { created: 1, skippedRows: [2, 4], errors: [] });
+    assert.deepEqual(await run(), { created: 0, skippedRows: [2, 3, 4], errors: [] });
+    assert.deepEqual(created, ['new@example.invalid']);
   });
 
   it('protects configured accounts before cleanup and removes eligible learner progress', async function() {

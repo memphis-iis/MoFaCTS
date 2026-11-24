@@ -1,5 +1,4 @@
 import { Meteor } from 'meteor/meteor';
-import { Accounts } from 'meteor/accounts-base';
 import { check, Match } from 'meteor/check';
 import { Roles } from 'meteor/alanning:roles';
 import {
@@ -350,60 +349,35 @@ async function getUserDeletionBlockingReasons(deps: AdminMethodsDeps, targetUser
   return reasons;
 }
 
-async function upsertManagedUser(
-  deps: AdminMethodsDeps,
-  params: {
-    actingUserId: string | null | undefined;
-    rawUserName: string;
-    password: string;
-    existingUserSource: string;
-    createdUserSource: string;
-    verificationSource: string;
-    bulkSource?: string;
-  }
-) {
-  const normalizedEmail = deps.normalizeCanonicalEmail(params.rawUserName);
-  deps.assertStrongPassword(params.password);
+async function createRosterAccount(deps: AdminMethodsDeps, actor: string, email: string, password: string) {
+  const normalizedEmail = deps.normalizeCanonicalEmail(email);
 
   return await deps.withSignUpLock(normalizedEmail.canonical, async () => {
-    const existingUser = await deps.findNormalAccountUserByCanonicalEmail(normalizedEmail.canonical);
-
-    if (existingUser) {
-      Accounts.setPassword(existingUser._id, params.password);
-      await deps.enforceCanonicalEmailIdentity(existingUser._id, normalizedEmail.original, {
-        actorUserId: params.actingUserId || null,
-        source: params.existingUserSource,
-      });
-      await deps.writeAuditLog('admin.userPasswordReset', params.actingUserId || null, existingUser._id, {
-        username: normalizedEmail.canonical,
-        ...(params.bulkSource ? { source: params.bulkSource } : {}),
-      });
-      return { userExists: true, userId: existingUser._id, passwordUpdated: true };
-    }
-
+    if (await deps.findNormalAccountUserByCanonicalEmail(normalizedEmail.canonical)) return 'skipped';
+    deps.assertStrongPassword(password);
     const createdId = await deps.createUserWithRetry(
       normalizedEmail.canonical,
-      params.password,
-      { experiment: false, createdBy: params.actingUserId, username: normalizedEmail.canonical },
+      password,
+      { experiment: false, createdBy: actor, username: normalizedEmail.canonical },
       {
         emailOriginal: normalizedEmail.original,
         emailCanonical: normalizedEmail.canonical,
       }
     );
     await deps.enforceCanonicalEmailIdentity(createdId, normalizedEmail.original, {
-      actorUserId: params.actingUserId || null,
-      source: params.createdUserSource,
+      actorUserId: actor,
+      source: 'insertNewUsers.createdUser',
     });
     await deps.syncUserAuthState(createdId, 'password');
-    await deps.writeAuditLog('admin.userCreated', params.actingUserId || null, createdId, {
+    await deps.writeAuditLog('admin.userCreated', actor, createdId, {
       username: normalizedEmail.canonical,
-      ...(params.bulkSource ? { source: params.bulkSource } : {}),
+      source: 'insertNewUsers',
     });
     if (deps.isEmailVerificationRequired()) {
-      await deps.sendVerificationEmailForUser(createdId, params.actingUserId || null, params.verificationSource);
+      await deps.sendVerificationEmailForUser(createdId, actor, 'insertNewUsers');
     }
 
-    return { userExists: false, userId: createdId, passwordUpdated: false };
+    return 'created';
   });
 }
 
@@ -742,13 +716,16 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         throw new Meteor.Error('csv-parser-missing', 'Papa parser is not available on server');
       }
 
-      const allErrors: Array<{ username: string; error: string }> = [];
+      const errors: Array<{ row: number; error: string }> = [];
+      const skippedRows: number[] = [];
+      let created = 0;
       let rows = deps.csvParser.parse(filecontents).data;
       deps.serverConsole('insertNewUsers parsed row count:', Array.isArray(rows) ? rows.length : 0);
       rows = rows.slice(1);
 
-      for (const row of rows) {
-        if (!Array.isArray(row)) {
+      for (const [index, row] of rows.entries()) {
+        const rowNumber = index + 2;
+        if (!Array.isArray(row) || row.every(value => value === '')) {
           continue;
         }
 
@@ -756,29 +733,23 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         const password = typeof row[1] === 'string' ? row[1] : '';
 
         try {
-          await upsertManagedUser(deps, {
-            actingUserId: this.userId,
-            rawUserName: username,
-            password,
-            existingUserSource: 'insertNewUsers.existingUser',
-            createdUserSource: 'insertNewUsers.createdUser',
-            verificationSource: 'insertNewUsers',
-            bulkSource: 'insertNewUsers',
-          });
+          const outcome = await createRosterAccount(deps, this.userId!, username, password);
+          if (outcome === 'skipped') skippedRows.push(rowNumber);
+          else created++;
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error);
           deps.serverConsole('Bulk user creation failed for one row');
-          allErrors.push({ username, error: message });
+          errors.push({ row: rowNumber, error: message });
         }
       }
 
-      deps.serverConsole('Bulk user creation error count:', allErrors.length);
+      deps.serverConsole('Bulk user creation error count:', errors.length);
       await deps.writeAuditLog('admin.bulkImportUsers', this.userId || null, null, {
         fileName: filename,
         rowCount: rows.length,
-        errorCount: allErrors.length,
+        created, skipped: skippedRows.length, errorCount: errors.length,
       });
-      return allErrors;
+      return { created, skippedRows, errors };
     },
   };
 }
