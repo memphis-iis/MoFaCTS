@@ -114,7 +114,10 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
 - [x] Slot 90 verified three account-diagnostic methods and fourteen administrator methods. Of 200 registered names, 138 application and four package methods now have verified declarations; 58 remain (54 fewer than the prior 112). Five exit groups remain open. No new manual reporting entry point.
 - [x] Instructor reporting attribution decision: all qualifying practice on a lesson counts for each enrolled learner, including independent and other-course practice. Require that the selected course assigns that lesson. Slot 91 verified the ordinary and progressive assignment cases, including three practice origins, an unenrolled learner and an unassigned lesson.
 - [x] Slot 91 verified 22 methods: one course report, seven personal-account methods, four public account methods, six SPARC lesson methods and four runtime lesson reads. Coverage is now 160 application and four package declarations out of 200 method names, leaving 36 (76 fewer than the original 112). All 21 publications still have declarations; five Phase 3 exit groups remain open.
-- [ ] Batch the remaining 36 across four groups: 13 learner history, dashboard and analytics methods; 12 package, asset and lesson-management methods; seven provider methods; four application configuration, help and stimulus display-map reads. Use the coverage command above for current names.
+- [x] Slot 92 verified the thirteen learner history, dashboard and analytics methods. The account dashboard and history stay account-scoped. Study progress stays limited to the study and its condition lessons. Coverage reached 173 application and four package declarations out of 200; 23 remained.
+- [ ] Decide whether to retire the stimulus display cache. Lesson startup downloads the map and polls its version every 15 seconds. The shipped client only checks for the map's presence. Admin Controls still exposes a rebuild button. The two reads and the prior verified rebuild stay on the inventory until the decision is implemented.
+- [ ] Review package media cleanup before closing `deletePackageFile`. Archive ownership must be checked before deleting lesson data. The separate unused-media cleanup can select by filename alone or by inactive stimulus set, so an archive precheck does not prove correct media deletion.
+- [ ] Verify the remaining twelve package, asset and lesson-management methods, seven provider methods and four configuration/help/display reads. Use the coverage command above for current names.
 
 
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
@@ -1939,11 +1942,13 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 96 total, 90 consumed, 1 reserved, 4 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 96 total, 91 consumed, 1 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
 
 The operator authorized up to five additional batched local Meteor integration invocations, including retries, for the remaining security-audit work (slots 92–96). Reserve each invocation here before starting the suite and record its outcome afterward.
 
-Slot 92 reserved for thirteen dashboard, learner analytics and lesson-progress methods on the isolated local Linux worker.
+Slot 93 reserved for the batched public sign-in/help reads, media deletion, archive owner precheck and lesson visibility checks.
+
+Slot 92 passed on 8c7b29d5. Server 1,149 passed and 15 pending; Chromium 1,255 passed and seven pending. Zero failures or hook failures. Cleanup complete. Receipt /var/tmp/mofacts-integration.GKsHbSWy/results/native-verification.json SHA-256 5c788df3481609ca1b9862cb763250d12e6ed9978d2628030d24286388b27a84.
 
 Slot 91 passed on 2793fd03. Server 1,148 passed, 15 pending; Chromium 1,255 passed, seven pending. No failures or hook failures. Test image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.03y2PuTt/results/native-verification.json SHA-256 1ae53e7ea50e8363374129a91f732e9eb5e3b9c078f9f3aa98a325c9371163b3. The five-run general allowance is exhausted.
 

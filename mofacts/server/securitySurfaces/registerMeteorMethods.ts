@@ -64,6 +64,12 @@ export type MeteorMethodBinding = Readonly<{
     operation: 'own-account-session' | 'instructor-or-admin' | 'section-directory';
     authorize: (...args: never[]) => Promise<string> | string;
   }> | Readonly<{
+    kind: 'content-maintenance'; operation: 'asset-owner-or-admin' | 'lesson-owner';
+    authorize: (...args: never[]) => Promise<unknown>;
+  }> | Readonly<{
+    kind: 'public-read'; operation: 'getAuthClientConfig' | 'getCustomHelpPage';
+    rateLimit: Readonly<{ requests: number; windowMs: number; scope: 'connection' }>;
+  }> | Readonly<{
     kind: 'public-account'; operation: 'requestPasswordReset' | 'resetPasswordWithToken' | 'resendVerificationEmail' | 'signUpUser';
     rateLimit: Readonly<{ requests: number; windowMs: number; scope: 'connection' }>;
     authorize: (...args: never[]) => Promise<unknown>;
@@ -106,7 +112,7 @@ export type MeteorMethodBinding = Readonly<{
     authorize: (...args: never[]) => unknown;
   }>;
   dataEgress: 'audit-report-list' | 'audit-report-summary' | 'audit-download-capability' | 'deployment-diagnostics'
-    | 'backup-configuration' | 'backup-job-metadata' | 'backup-download-capability'
+    | 'public-sign-in-config' | 'published-help-markdown' | 'backup-configuration' | 'backup-job-metadata' | 'backup-download-capability'
     | 'brand-profile-draft' | 'published-brand-profile' | 'redacted-brand-profile-export'
     | 'filename-reference-migration-report' | 'history-download-capability' | 'none'
     | 'error-report-id' | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'
@@ -140,7 +146,7 @@ export function observeMeteorMethodBindings(
     names.add(name);
     const policyMetadata = policy.kind === 'role'
       ? { kind: policy.kind, role: policy.role }
-      : (policy.kind === 'experiment-entry' || policy.kind === 'public-account')
+      : (policy.kind === 'experiment-entry' || policy.kind === 'public-account' || policy.kind === 'public-read')
       ? { kind: policy.kind, operation: policy.operation, rateLimit: policy.rateLimit }
       : policy.kind === 'prolific' && policy.operation === 'researcher'
       ? { kind: policy.kind, operation: policy.operation, roles: policy.roles, rateLimit: policy.rateLimit }

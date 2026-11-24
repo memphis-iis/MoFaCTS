@@ -782,6 +782,21 @@ export const SPARC_LESSON_VERIFICATIONS = Object.freeze(([
   cases: Object.freeze(['requires access to the selected SPARC lesson before library or image operations']),
 })));
 
+export const CONTENT_MAINTENANCE_VERIFICATIONS = Object.freeze(([
+  ['removeAssetById', 'Delete Selected media', 'checks single-file identity before lookup and preserves a file whose owner changes'],
+  ['removeMultipleAssets', 'Delete Selected media', 'checks permissions for the entire selection before deleting anything'],
+  ['setTdfUserSelect', 'contentMethods content upload summaries', 'toggles study visibility while keeping locked and previously listed conditions out of the public list'],
+] as const).map(([method, suite, test]) => Object.freeze({
+  ...middlewareTest, suite, method, surfaceId: `method:${method}` as const,
+  verificationId: `method.content-maintenance.${method}` as const, cases: Object.freeze([test]),
+})));
+
+export const PUBLIC_READ_VERIFICATIONS = Object.freeze((['getAuthClientConfig', 'getCustomHelpPage'] as const).map(method => Object.freeze({
+  ...middlewareTest, suite: 'server auth and session methods', method, surfaceId: `method:${method}` as const,
+  verificationId: `method.public-read.${method}` as const,
+  cases: Object.freeze(['serves only public sign-in configuration and active help with per-connection limits']),
+})));
+
 export const PUBLIC_ACCOUNT_VERIFICATIONS = Object.freeze(([
   ['signUpUser', 'writes auth.signupCompleted for native signup'],
   ['requestPasswordReset', 'does not expose a reset token in requestPasswordReset responses'],
@@ -927,7 +942,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, ...MANUAL_DRAFT_VERIFICATIONS, ...UPLOAD_READ_VERIFICATIONS, ...ADMIN_OPERATION_VERIFICATIONS, ...PROFILE_OPERATION_VERIFICATIONS, ...ACCOUNT_DIAGNOSTIC_VERIFICATIONS, ...ACCOUNT_SELF_VERIFICATIONS, ...PUBLIC_ACCOUNT_VERIFICATIONS, ...SPARC_LESSON_VERIFICATIONS, ...RUNTIME_LESSON_VERIFICATIONS, ...PROGRESS_READ_VERIFICATIONS, ...LEARNER_PROGRESS_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, STIMULUS_FILE_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, CLASS_PERFORMANCE_VERIFICATION, COURSE_DELETE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, ...MANUAL_DRAFT_VERIFICATIONS, ...UPLOAD_READ_VERIFICATIONS, ...ADMIN_OPERATION_VERIFICATIONS, ...PROFILE_OPERATION_VERIFICATIONS, ...ACCOUNT_DIAGNOSTIC_VERIFICATIONS, ...ACCOUNT_SELF_VERIFICATIONS, ...PUBLIC_ACCOUNT_VERIFICATIONS, ...PUBLIC_READ_VERIFICATIONS, ...CONTENT_MAINTENANCE_VERIFICATIONS, ...SPARC_LESSON_VERIFICATIONS, ...RUNTIME_LESSON_VERIFICATIONS, ...PROGRESS_READ_VERIFICATIONS, ...LEARNER_PROGRESS_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, STIMULUS_FILE_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, CLASS_PERFORMANCE_VERIFICATION, COURSE_DELETE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

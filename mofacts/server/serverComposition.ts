@@ -56,9 +56,10 @@ import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers, prepareStimuliSetForRuntime } from './lib/stimulusLookup';
 import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
 import { accountDiagnosticsPolicy } from './lib/participantSession';
-import { PUBLIC_ACCOUNT_REQUESTS_PER_HOUR } from './runtime/ddpRateLimits';
+import { PUBLIC_READ_RATE_LIMIT, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR } from './runtime/ddpRateLimits';
 import { requireAccountProgressSession, requireParticipantProgressLesson } from './lib/participantProgressScope';
-import { LEARNER_PROGRESS_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { requireUserMatchesOrHasRole } from './lib/methodAuthorization';
+import { CONTENT_MAINTENANCE_VERIFICATIONS, PUBLIC_READ_VERIFICATIONS, LEARNER_PROGRESS_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -1173,6 +1174,17 @@ const studyProgressPolicy = { kind: 'learner-progress', operation: 'study-lesson
 registerMeteorMethods(Meteor, installedMethods, [
   ...securityAuditRuntime.methodBindings,
   ...courseReadBindings,
+  ...CONTENT_MAINTENANCE_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: { kind: 'content-maintenance' as const, authorize: requireUserMatchesOrHasRole,
+      operation: verification.method === 'setTdfUserSelect' ? 'lesson-owner' as const : 'asset-owner-or-admin' as const },
+    dataEgress: ({ removeAssetById: 'none', removeMultipleAssets: 'delete-result', setTdfUserSelect: 'save-status' } as const)[verification.method],
+  })),
+  ...PUBLIC_READ_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: { kind: 'public-read' as const, operation: verification.method, rateLimit: PUBLIC_READ_RATE_LIMIT },
+    dataEgress: verification.method === 'getAuthClientConfig' ? 'public-sign-in-config' as const : 'published-help-markdown' as const,
+  })),
   ...PUBLIC_ACCOUNT_VERIFICATIONS.map(verification => ({
     verification, handler: installedMethods[verification.method],
     policy: { kind: 'public-account' as const, operation: verification.method,

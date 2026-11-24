@@ -20,6 +20,7 @@ let rateLimitsRegistered = false;
 export const PUBLIC_ACCOUNT_REQUESTS_PER_HOUR = Object.freeze({
   requestPasswordReset: 3, resetPasswordWithToken: 5, signUpUser: 5, resendVerificationEmail: 3,
 } as const);
+export const PUBLIC_READ_RATE_LIMIT = Object.freeze({ requests: 60, windowMs: 60000, scope: 'connection' } as const);
 export const PUBLIC_DEMO_RATE_LIMIT = Object.freeze({ requests: 10, windowMs: 3600000, scope: 'connection' } as const);
 
 export function isRateLimitedOpenRouterMethod(name: string): boolean {
@@ -56,6 +57,10 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
   };
   const addStudyActivityRule = (...args: Parameters<typeof DDPRateLimiter.addRule>) =>
     studyActivityRules.add(DDPRateLimiter.addRule(...args));
+  for (const name of ['getAuthClientConfig', 'getCustomHelpPage']) {
+    DDPRateLimiter.addRule({ type: 'method', name, connectionId() { return true; } },
+      PUBLIC_READ_RATE_LIMIT.requests, PUBLIC_READ_RATE_LIMIT.windowMs);
+  }
   addStudyActivityRule({ type: 'method', name: 'ingestSimulationResearchBatch',
     connectionId() { return true; } }, 40, 1000);
   addStudyActivityRule({ type: 'method', name(name: string) {

@@ -118,6 +118,19 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('contentMethods content upload summaries', function() {
+  it('checks the archive owner before touching any family data', async function() {
+    const inspected: string[] = [];
+    const methods = createContentMethods(createContentDeps({
+      DynamicAssets: { findOneAsync: async () => ({ _id: 'archive', userId: 'other' }) },
+      Tdfs: { find: () => { inspected.push('family'); throw Error('Unexpected family access'); } },
+      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => false }),
+    }));
+    await assert.rejects(
+      () => methods.deletePackageFile.call({ userId: 'owner' }, 'archive', { wholeFamily: true }),
+      (error: any) => error.error === 403,
+    );
+    assert.deepEqual(inspected, []);
+  });
   it('toggles study visibility while keeping locked and previously listed conditions out of the public list', async function() {
     const tdfs = new Mongo.Collection<any>('visibility' + Random.id());
     const methods = createContentMethods(createContentDeps({ Tdfs: tdfs }));

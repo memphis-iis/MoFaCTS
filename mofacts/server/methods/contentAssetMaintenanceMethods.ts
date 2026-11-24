@@ -136,6 +136,9 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
 
         const isAdmin = await hasUserRole(deps.getMethodAuthorizationDeps(), userId, ['admin']);
         const packageAsset = await deps.DynamicAssets.findOneAsync({ _id: packageAssetId });
+        if (packageAsset && !isAdmin && packageAsset.userId !== userId) {
+          throw new Meteor.Error(403, 'Can only delete your own packages');
+        }
         const packageFileCandidates = new Set<string>();
         const packageExt = typeof packageAsset?.ext === 'string' && packageAsset.ext.trim()
           ? packageAsset.ext.trim()
@@ -254,10 +257,7 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
 
         deps.serverConsole('Removing package asset with ID:', packageAssetId);
         if (packageAsset) {
-          if (!isAdmin && packageAsset.userId !== userId) {
-            throw new Meteor.Error(403, 'Can only delete your own packages');
-          }
-          await deps.DynamicAssets.removeAsync({ _id: packageAsset._id });
+          await deps.DynamicAssets.removeAsync({ _id: packageAsset._id, userId: packageAsset.userId ?? null });
           deps.serverConsole('Package file removed from DynamicAssets');
         } else {
           deps.serverConsole('Package file not found in DynamicAssets (may have been deleted already)');
@@ -288,12 +288,14 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
     },
 
     removeAssetById: async function(this: MethodContext, assetId: string) {
+      const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+      check(assetId, String);
       const asset = await deps.DynamicAssets.findOneAsync({ _id: assetId });
       if (!asset) {
         throw new Meteor.Error(404, 'Asset not found');
       }
       await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
+        actingUserId,
         subjectUserId: asset.userId,
         roles: ['admin'],
         notLoggedInMessage: 'Must be logged in',
@@ -302,7 +304,9 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
         forbiddenCode: 403,
       });
 
-      await deps.DynamicAssets.removeAsync({ _id: assetId });
+      const removed = await deps.DynamicAssets.removeAsync({ _id: assetId, userId: asset.userId ?? null });
+      if (removed === 0) throw new Meteor.Error(409, 'Asset changed before deletion');
+      if (removed !== 1) throw new Meteor.Error(500, 'Storage did not confirm asset deletion');
     },
 
     removeMultipleAssets: async function(this: MethodContext, assetIds: string[]) {

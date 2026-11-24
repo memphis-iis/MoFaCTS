@@ -1,5 +1,6 @@
 import { COURSE_SNAPSHOT_VERSION } from './lib/courseLearnerSnapshotCache';
-import { PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, CLASS_PERFORMANCE_VERIFICATION, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
+import { DDPRateLimiter } from 'meteor/ddp-rate-limiter';
+import { PUBLIC_READ_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, CLASS_PERFORMANCE_VERIFICATION, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './lib/prolificCollections';
 import { CourseLearnerSnapshotCache } from '../common/Collections';
 import { Meteor } from 'meteor/meteor';
@@ -137,6 +138,30 @@ describe('server auth and session methods', function() {
     await clearServerCompositionCollections();
     await Roles.createRoleAsync('admin', { unlessExists: true });
     await Roles.createRoleAsync('teacher', { unlessExists: true });
+  });
+
+  it('serves only public sign-in configuration and active help with per-connection limits', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed public reads');
+    const limiter = DDPRateLimiter as typeof DDPRateLimiter & {
+      findAllMatchingRulesAsync(input: { type: string; name: string; connectionId: string; userId: null }): Promise<unknown[]>;
+    };
+    for (const verification of PUBLIC_READ_VERIFICATIONS) {
+      const row = observed.surfaces.find(item => item.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      expect(row?.policy).to.deep.equal({ kind: 'public-read', operation: verification.method,
+        rateLimit: { requests: 60, windowMs: 60000, scope: 'connection' } });
+      const rules = await limiter.findAllMatchingRulesAsync({
+        type: 'method', name: verification.method, connectionId: Random.id(), userId: null,
+      });
+      expect(rules).to.have.length(1);
+    }
+    const handlers = MeteorAny.server.method_handlers;
+    const config = await handlers.getAuthClientConfig.call({ userId: null });
+    expect(config).to.have.all.keys('allowPublicSignup', 'requireEmailVerification', 'minPasswordLength',
+      'memphisSamlEnabled', 'memphisSamlDisplayName');
+    const help = await handlers.getCustomHelpPage.call({ userId: null });
+    expect(help === null || typeof help === 'string').to.equal(true);
   });
 
   it('acknowledges unknown verification recipients and binds public account limits', async function() {
