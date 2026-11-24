@@ -1405,7 +1405,9 @@ Template.userAdmin.events({
         return { message: userAdminText('admin.userDeleted') };
       },
       {
-        getErrorMessage: (error: unknown) => userAdminText('admin.deleteUserFailed', { error: getErrorMessage(error) }),
+        getErrorMessage: (error: unknown) => (error as { error?: string } | null)?.error === 'delete-user-configured'
+          ? userAdminText('admin.deleteConfiguredUser')
+          : userAdminText('admin.deleteUserFailed', { error: getErrorMessage(error) }),
         onSuccess: () => {
           instance.deleteConfirmationController.complete();
           instance.userListMessageType.set('success');

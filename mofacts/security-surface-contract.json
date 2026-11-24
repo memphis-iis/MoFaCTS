@@ -786,7 +786,8 @@
     },
     {
       "name": "userAdminDeleteUser",
-      "access": "admin-only"
+      "access": "admin-only",
+      "review": "Deletion rejects self, deployment role grants and owned content before removing user data."
     },
     {
       "name": "userAdminNewsEmailRecipients",

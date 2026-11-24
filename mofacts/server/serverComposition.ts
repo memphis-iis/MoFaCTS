@@ -55,7 +55,7 @@ import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
 import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
-import { ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -1171,6 +1171,30 @@ export const asyncMethods: Record<string, unknown> = {
 registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...securityAuditRuntime.methodBindings,
   ...courseReadBindings,
+  ...ADMIN_OPERATION_VERIFICATIONS.map(verification => ({
+    verification, handler: methods[verification.method], policy: { kind: 'role' as const, role: 'admin' as const, authorize: requireAdminUser },
+    dataEgress: ({
+      initializeCustomTheme: 'theme-document',
+      createThemeFromBase: 'theme-document',
+      duplicateTheme: 'theme-document',
+      importThemeFile: 'theme-document',
+      exportThemeFile: 'theme-export',
+      deleteTheme: 'theme-document',
+      renameTheme: 'theme-document',
+      setActiveTheme: 'theme-document',
+      setCustomHelpPage: 'save-status',
+      removeCustomHelpPage: 'save-status',
+      getServerStatus: 'deployment-diagnostics',
+      setVerbosity: 'verbosity-level',
+      setClientVerbosity: 'verbosity-level',
+      getAdminTestSparcCompoundInterestSource: 'evaluation-page',
+      getAdminTestSparcCompoundInterestSources: 'evaluation-page-list',
+      getAdminApiKeyAlternativeMetadata: 'provider-settings-metadata',
+      saveAdminApiKeyAlternative: 'provider-settings-metadata',
+      deleteAdminApiKeyAlternative: 'provider-settings-metadata',
+      userAdminDeleteUser: 'account-deletion-result',
+    } as const)[verification.method],
+  })),
   { verification: ADMIN_ROLE_CHANGE_VERIFICATION, handler: methods.userAdminRoleChange,
     policy: { kind: 'role', role: 'admin', authorize: requireAdminUser }, dataEgress: 'role-change-result' },
   ...UPLOAD_READ_VERIFICATIONS.map(verification => ({

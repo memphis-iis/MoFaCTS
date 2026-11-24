@@ -3,7 +3,8 @@ import { strict as assert } from 'node:assert';
 import { Roles } from 'meteor/alanning:roles';
 import { Random } from 'meteor/random';
 import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
-import { ADMIN_ROLE_CHANGE_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
+import { Histories, GlobalExperimentStates } from '../../common/Collections';
+import { ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
 import { expect } from 'chai';
 import { createAdminMethods } from './adminMethods';
 
@@ -188,6 +189,77 @@ describe('adminMethods', function() {
       pageId: 'compound-page',
       display,
     });
+  });
+
+  it('requires an administrator for installed site management operations', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed administrative operations');
+    const args = {
+      initializeCustomTheme: ['Default'],
+      createThemeFromBase: [{ name: 'Synthetic' }],
+      duplicateTheme: [{ sourceThemeId: 'synthetic', name: 'Copy' }],
+      importThemeFile: [{}],
+      exportThemeFile: ['synthetic'],
+      deleteTheme: ['synthetic'],
+      renameTheme: [{ themeId: 'synthetic', newName: 'Renamed' }],
+      setActiveTheme: ['synthetic'],
+      setCustomHelpPage: ['Synthetic help'],
+      removeCustomHelpPage: [],
+      getServerStatus: [],
+      setVerbosity: [1],
+      setClientVerbosity: [1],
+      getAdminTestSparcCompoundInterestSource: ['synthetic', 'page'],
+      getAdminTestSparcCompoundInterestSources: [],
+      getAdminApiKeyAlternativeMetadata: [],
+      saveAdminApiKeyAlternative: ['openrouter', {}],
+      deleteAdminApiKeyAlternative: ['openrouter'],
+      userAdminDeleteUser: ['synthetic'],
+    };
+    for (const verification of ADMIN_OPERATION_VERIFICATIONS) {
+      const method = verification.method;
+      const rows: typeof observed.surfaces = observed.surfaces.filter(row => row.name === method);
+      assert.equal(rows.length, 1, method);
+      assert.equal(rows[0]?.verification, verification);
+      assert.deepEqual(rows[0]?.policy, { kind: 'role', role: 'admin' });
+      const handler = (Meteor as any).server.method_handlers[method];
+      for (const userId of [null, Random.id()]) {
+        await assert.rejects(() => handler.apply({ userId }, args[method]),
+          (err: any) => [403, 'unauthorized', 'not-authorized'].includes(err.error), method);
+      }
+    }
+  });
+
+  it('protects configured accounts before cleanup and removes eligible learner progress', async function() {
+    const actor = Random.id(), target = Random.id();
+    const email = target.toLowerCase() + '@example.invalid';
+    const settings = Meteor.settings as any, original = settings.initRoles;
+    const remove = () => (Meteor as any).server.method_handlers.userAdminDeleteUser.call({ userId: actor }, target);
+    try {
+      await Meteor.users.insertAsync({ _id: actor, username: actor } as any);
+      await Meteor.users.insertAsync({ _id: target, username: target, emails: [{ address: email, verified: true }] } as any);
+      await Roles.createRoleAsync('admin', { unlessExists: true });
+      await Roles.addUsersToRolesAsync(actor, 'admin');
+      await Histories.insertAsync({ userId: target } as any);
+      await GlobalExperimentStates.insertAsync({ userId: target } as any);
+      for (const key of ['admins', 'teachers']) {
+        settings.initRoles = { [key]: [email] };
+        await assert.rejects(remove, (err: any) => err.error === 'delete-user-configured');
+        assert.ok(await Meteor.users.findOneAsync(target));
+        assert.ok(await Histories.findOneAsync({ userId: target }));
+        assert.ok(await GlobalExperimentStates.findOneAsync({ userId: target }));
+      }
+      settings.initRoles = {};
+      assert.equal((await remove()).RESULT, 'SUCCESS');
+      assert.ok(!await Meteor.users.findOneAsync(target));
+      assert.ok(!await Histories.findOneAsync({ userId: target }));
+      assert.ok(!await GlobalExperimentStates.findOneAsync({ userId: target }));
+    } finally {
+      if (original === undefined) delete settings.initRoles; else settings.initRoles = original;
+      await Roles.setUserRolesAsync(actor, []);
+      await Histories.removeAsync({ userId: target });
+      await GlobalExperimentStates.removeAsync({ userId: target });
+      await Meteor.users.removeAsync({ _id: { $in: [actor, target] } });
+    }
   });
 
   it('protects self and configured roles while permitting ordinary administrator handoff', async function() {

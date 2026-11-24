@@ -704,6 +704,11 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         throw new Meteor.Error('not-found', 'Invalid: could not find that user');
       }
 
+      const settings = Meteor.settings as any;
+      if ((['admin', 'teacher'] as const).some(role =>
+        roleGrantedBySettings(settings.initRoles, role, targetUser, deps.isValidEmailAddress, settings.owner))) {
+        throw new Meteor.Error('delete-user-configured', 'Remove the account from site role settings before deleting it.');
+      }
       const blockingReasons = await getUserDeletionBlockingReasons(deps, normalizedTargetUserId);
       if (blockingReasons.length > 0) {
         throw new Meteor.Error(
