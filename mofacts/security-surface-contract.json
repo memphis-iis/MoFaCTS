@@ -793,7 +793,8 @@
     },
     {
       "name": "userAdminNewsEmailRecipients",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "One current canonical or primary contact per account, deduplicated across accounts for the administrator’s news draft."
     },
     {
       "name": "userAdminRoleChange",

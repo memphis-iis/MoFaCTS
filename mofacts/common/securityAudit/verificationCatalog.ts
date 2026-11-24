@@ -769,6 +769,7 @@ export const ADMIN_OPERATION_VERIFICATIONS = Object.freeze(([
   'deleteAdminApiKeyAlternative',
   'userAdminDeleteUser',
   'insertNewUsers',
+  'userAdminNewsEmailRecipients',
 ] as const).map(method => Object.freeze({
   ...middlewareTest, suite: 'adminMethods', method, surfaceId: `method:${method}` as const,
   verificationId: `method.admin.${method}` as const,
@@ -776,7 +777,9 @@ export const ADMIN_OPERATION_VERIFICATIONS = Object.freeze(([
     ? ['requires an administrator for installed site management operations', 'protects configured accounts before cleanup and removes eligible learner progress']
     : method === 'insertNewUsers'
       ? ['requires an administrator for installed site management operations', 'preserves an enrolled account and creates only new accounts through the installed roster import']
-      : ['requires an administrator for installed site management operations']),
+      : method === 'userAdminNewsEmailRecipients'
+        ? ['requires an administrator for installed site management operations', 'uses one current contact per account for the news draft and deduplicates shared addresses']
+        : ['requires an administrator for installed site management operations']),
 })));
 
 export const ADMIN_ROLE_CHANGE_VERIFICATION = Object.freeze({

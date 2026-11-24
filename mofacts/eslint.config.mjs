@@ -84,7 +84,6 @@ export default [
         webkitAudioContext: 'readonly',
         JSONEditor: 'readonly',
         Email: 'readonly',
-        Papa: 'readonly',
 
         // Test globals
         describe: 'readonly',

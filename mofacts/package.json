@@ -98,6 +98,7 @@
     "jszip": "^3.10.1",
     "marked": "^18.0.2",
     "meteor-node-stubs": "1.2.32",
+    "papaparse": "5.7.1",
     "plyr": "^3.8.4",
     "protobufjs": "^8.7.0",
     "qs": "6.16.0",

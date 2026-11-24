@@ -156,9 +156,6 @@ import { ensurePublicDemoCleanupIndex, purgeExpiredPublicDemoUsers } from './lib
 const MeteorAny = Meteor as any;
 
 const AssetsAny = Assets as unknown as { getTextAsync: (path: string) => Promise<string> };
-const PapaAny = (globalThis as unknown as {
-  Papa?: { parse: (csv: string) => { data: unknown[] } };
-}).Papa;
 
 
 
@@ -775,7 +772,6 @@ export const methods: any = {
     removeSparcFigureUserDecisions: async userId => { await removeSparcFigureUserDecisions(userId); await removeSparcMoveUserRecords(userId); },
     removeSimulationResearchUserRecords,
     serverConsole,
-    csvParser: PapaAny,
     usersCollection: MeteorAny.users,
     Tdfs,
     DynamicAssets,
@@ -1208,6 +1204,7 @@ registerMeteorMethods(Meteor, installedMethods, [
       deleteAdminApiKeyAlternative: 'provider-settings-metadata',
       userAdminDeleteUser: 'account-deletion-result',
       insertNewUsers: 'roster-import-result',
+      userAdminNewsEmailRecipients: 'news-recipient-list',
     } as const)[verification.method],
   })),
   { verification: ADMIN_ROLE_CHANGE_VERIFICATION, handler: methods.userAdminRoleChange,

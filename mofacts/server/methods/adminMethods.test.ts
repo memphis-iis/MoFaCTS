@@ -214,6 +214,7 @@ describe('adminMethods', function() {
       saveAdminApiKeyAlternative: ['openrouter', {}],
       deleteAdminApiKeyAlternative: ['openrouter'],
       userAdminDeleteUser: ['synthetic'],
+      userAdminNewsEmailRecipients: [],
       insertNewUsers: ['roster.csv', 'email,password'],
     };
     for (const verification of ADMIN_OPERATION_VERIFICATIONS) {
@@ -236,7 +237,7 @@ describe('adminMethods', function() {
     const newEmail = Random.id().toLowerCase() + '@example.invalid';
     const settings = Meteor.settings as any, original = settings.auth;
     const run = () => (Meteor as any).server.method_handlers.insertNewUsers.call({ userId: actor }, 'roster.csv',
-      ['email,password', email + ',', newEmail + ',' + Random.secret(), newEmail + ','].join('\n'));
+      ['email,password', email + ',', newEmail + ',"' + Random.secret() + ',quoted"', newEmail + ','].join('\n'));
     try {
       settings.auth = { ...original, requireEmailVerification: false };
       await Roles.createRoleAsync('admin', { unlessExists: true });
@@ -260,6 +261,22 @@ describe('adminMethods', function() {
     }
   });
 
+  it('uses one current contact per account for the news draft and deduplicates shared addresses', async function() {
+    const accounts = [
+      { email_canonical: 'Current@example.invalid', emails: [{ address: 'other@example.invalid' }] },
+      { emails: [{ address: 'CURRENT@example.invalid' }, { address: 'second@example.invalid' }] },
+      { emails: [{ address: 'primary@example.invalid' }] },
+      { username: 'username@example.invalid', email_original: 'old@example.invalid' },
+    ];
+    const deps = createAdminDeps();
+    const methods = createAdminMethods({ ...deps, usersCollection: { ...deps.usersCollection,
+      find: () => ({ fetchAsync: async () => accounts }),
+    } });
+    assert.deepEqual(await methods.userAdminNewsEmailRecipients.call({ userId: 'admin' }), {
+      emails: ['current@example.invalid', 'primary@example.invalid'], count: 2,
+    });
+  });
+
   it('skips existing roster accounts before password validation and reports rows on reimport', async function() {
     const accounts = new Set(['existing@example.invalid']);
     const created: string[] = [];
@@ -269,7 +286,6 @@ describe('adminMethods', function() {
     ];
     const deps = {
       ...createAdminDeps(),
-      csvParser: { parse: () => ({ data: csvRows }) },
       findNormalAccountUserByCanonicalEmail: async (email: string) => accounts.has(email) ? { _id: email } : null,
       assertStrongPassword: (password: string) => assert.ok(password),
       createUserWithRetry: async (email: string) => {
@@ -279,7 +295,7 @@ describe('adminMethods', function() {
       },
     };
     const handler = createAdminMethods(deps).insertNewUsers;
-    const run = () => handler.call({ userId: 'admin' }, 'roster.csv', '');
+    const run = () => handler.call({ userId: 'admin' }, 'roster.csv', csvRows.map(row => row.join(',')).join('\n'));
     assert.deepEqual(await run(), { created: 1, skippedRows: [2, 4], errors: [] });
     assert.deepEqual(await run(), { created: 0, skippedRows: [2, 3, 4], errors: [] });
     assert.deepEqual(created, ['new@example.invalid']);

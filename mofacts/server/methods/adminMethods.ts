@@ -1,3 +1,4 @@
+import Papa from 'papaparse';
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
 import { Roles } from 'meteor/alanning:roles';
@@ -22,9 +23,6 @@ type MethodContext = {
   unblock?: () => void;
   connection?: { id?: string; clientAddress?: string | null } | null;
 };
-type CsvParser = {
-  parse: (csv: string) => { data: unknown[] };
-};
 type CountAndFetchCursor = {
   countAsync: () => Promise<number>;
   fetchAsync: () => Promise<any[]>;
@@ -36,7 +34,6 @@ type FetchCursor = {
 type AdminMethodsDeps = {
   isValidEmailAddress: (value: string) => boolean;
   serverConsole: Logger;
-  csvParser?: CsvParser | undefined;
   usersCollection: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => FetchCursor;
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
@@ -293,34 +290,6 @@ async function writeAdminApiKeySettings(
   throw new Meteor.Error('admin-api-key-settings-unavailable', 'Dynamic settings cannot save API key alternatives');
 }
 
-function addEmailCandidate(emailSet: Map<string, string>, candidate: unknown) {
-  const email = trimString(candidate);
-  if (!email.includes('@')) {
-    return;
-  }
-  const canonical = email.toLowerCase();
-  if (!emailSet.has(canonical)) {
-    emailSet.set(canonical, email);
-  }
-}
-
-function getUserAdminEmailCandidates(user: any) {
-  const candidates: unknown[] = [
-    user?.email_canonical,
-    user?.email_original,
-    user?.username,
-    user?.email,
-  ];
-
-  if (Array.isArray(user?.emails)) {
-    for (const emailEntry of user.emails) {
-      candidates.push(emailEntry?.address);
-    }
-  }
-
-  return candidates;
-}
-
 async function getUserDeletionBlockingReasons(deps: AdminMethodsDeps, targetUserId: string) {
   const reasons: string[] = [];
 
@@ -565,35 +534,16 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
       await deps.requireAdminUser(this.userId, 'Only admins can compose news emails');
 
       const users = await deps.usersCollection.find(
-        {
-          $or: [
-            { email_canonical: { $regex: '@' } },
-            { email_original: { $regex: '@' } },
-            { 'emails.address': { $regex: '@' } },
-            { username: { $regex: '@' } },
-            { email: { $regex: '@' } },
-          ],
-        },
-        {
-          fields: {
-            username: 1,
-            email: 1,
-            email_canonical: 1,
-            email_original: 1,
-            emails: 1,
-          },
-          sort: { email_canonical: 1, username: 1 },
-        }
+        { $or: [{ email_canonical: { $type: 'string' } }, { 'emails.0.address': { $type: 'string' } }] },
+        { fields: { email_canonical: 1, emails: { $slice: 1 }, _id: 0 } },
       ).fetchAsync();
 
-      const emailSet = new Map<string, string>();
+      const recipients = new Set<string>();
       for (const user of users) {
-        for (const candidate of getUserAdminEmailCandidates(user)) {
-          addEmailCandidate(emailSet, candidate);
-        }
+        const address = trimString(user.email_canonical || user.emails?.[0]?.address).toLowerCase();
+        if (deps.isValidEmailAddress(address)) recipients.add(address);
       }
-
-      const emails = Array.from(emailSet.values()).sort((a, b) => a.localeCompare(b));
+      const emails = [...recipients].sort((a, b) => a.localeCompare(b));
       await deps.writeAuditLog('admin.newsEmailComposeRequested', this.userId || null, null, {
         recipientCount: emails.length,
       });
@@ -712,20 +662,22 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
       await deps.requireAdminUser(this.userId, 'Only admins can bulk import users');
       deps.serverConsole('insertNewUsers: ' + filename);
 
-      if (!deps.csvParser || typeof deps.csvParser.parse !== 'function') {
-        throw new Meteor.Error('csv-parser-missing', 'Papa parser is not available on server');
+      check(filename, String);
+      check(filecontents, String);
+      const parsed = Papa.parse(filecontents, { delimiter: ',' });
+      if (parsed.errors.length) {
+        throw new Meteor.Error('invalid-roster-csv', 'The roster contains invalid CSV quoting');
       }
 
       const errors: Array<{ row: number; error: string }> = [];
       const skippedRows: number[] = [];
       let created = 0;
-      let rows = deps.csvParser.parse(filecontents).data;
-      deps.serverConsole('insertNewUsers parsed row count:', Array.isArray(rows) ? rows.length : 0);
-      rows = rows.slice(1);
+      const rows = parsed.data.slice(1);
+      deps.serverConsole('insertNewUsers parsed row count:', rows.length);
 
       for (const [index, row] of rows.entries()) {
         const rowNumber = index + 2;
-        if (!Array.isArray(row) || row.every(value => value === '')) {
+        if (row.every(value => value === '')) {
           continue;
         }
 

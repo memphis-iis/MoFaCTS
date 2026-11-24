@@ -96,7 +96,7 @@ export type MeteorMethodBinding = Readonly<{
     | 'experiment-login-token' | 'participant-session' | 'public-demo-launch'
     | 'delete-result' | 'progressive-lesson-content' | 'join-result' | 'course-id' | 'assignment-editor-snapshot' | 'course-section-list' | 'teacher-display-list' | 'learner-course-snapshot' | 'assignments-by-course' | 'instructor-course-list'
     | 'performance-history' | 'completed-trial-count' | 'learning-history' | 'sparc-history' | 'hidden-stimulus-kcs' | 'experiment-state'
-    | 'model-catalog' | 'provider-test-result' | 'theme-document' | 'theme-export' | 'verbosity-level' | 'evaluation-page' | 'evaluation-page-list' | 'provider-settings-metadata' | 'account-deletion-result' | 'roster-import-result'
+    | 'model-catalog' | 'provider-test-result' | 'theme-document' | 'theme-export' | 'verbosity-level' | 'evaluation-page' | 'evaluation-page-list' | 'provider-settings-metadata' | 'account-deletion-result' | 'roster-import-result' | 'news-recipient-list'
     | 'role-change-result' | 'owned-asset-filename' | 'own-upload-quota' | 'manual-draft' | 'draft-save-receipt' | 'stimulus-file' | 'account-email-or-status' | 'accessor-identities' | 'recipient-lookup-result' | 'statistics-expanded' | 'save-status' | 'saved-wait' | 'owned-lesson-list' | 'transfer-status' | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
 }>;
 
