@@ -150,7 +150,7 @@
     {
       "name": "copyTdf",
       "access": "role-checked",
-      "notes": "Owners, shared accessors and administrators may copy. Only a source-owner copy retains lesson provider keys and source archive references. Returns the new lesson ID and name."
+      "notes": "Owners, shared accessors and administrators may copy. Only a source-owner copy retains lesson provider keys. Copies receive fresh lesson and condition identities and export their own archive. Returns the new lesson ID and name."
     },
     {
       "name": "createExperimentState",
@@ -181,7 +181,7 @@
     {
       "name": "deletePackageFile",
       "access": "role-checked",
-      "notes": "Requires whole-family confirmation and ownership or administrator access. Automatic media removal requires a matching upload target and stimulus-set identity and preserves assets used by surviving lessons."
+      "notes": "Requires whole-family confirmation and ownership or administrator access. A lesson-based selection requires the family to have no archive. Automatic media removal requires a matching upload target and stimulus-set identity and preserves assets used by surviving lessons."
     },
     {
       "name": "deleteTheme",

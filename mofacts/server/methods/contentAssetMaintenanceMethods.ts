@@ -1,5 +1,6 @@
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
+import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
 import { contentMediaStimuliSetId } from '../../common/fileUploadPolicy';
 import {
   hasUserRole,
@@ -106,15 +107,14 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
   return {
     deletePackageFile: async function(
       this: MethodContext,
-      packageAssetIdInput: string,
-      confirmation: { wholeFamily?: boolean } = {},
+      selectedIdInput: string,
+      confirmation: { wholeFamily?: boolean; unpackagedLesson?: boolean } = {},
     ) {
-      deps.serverConsole('Remove package asset:', packageAssetIdInput);
       const userId = this.userId;
       if (!userId) {
         throw new Meteor.Error(401, 'Must be logged in');
       }
-      if (!packageAssetIdInput || typeof packageAssetIdInput !== 'string') {
+      if (!selectedIdInput || typeof selectedIdInput !== 'string') {
         throw new Meteor.Error(400, 'Package id missing');
       }
       if (confirmation?.wholeFamily !== true) {
@@ -123,42 +123,50 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
 
       try {
         let deletedCount = 0;
-        const packageAssetId = deps.normalizeCanonicalId(packageAssetIdInput);
-        if (!packageAssetId) {
+        const selectedId = deps.normalizeCanonicalId(selectedIdInput);
+        if (!selectedId) {
           throw new Meteor.Error(404, 'Package asset id missing');
         }
 
         const isAdmin = await packageDeletionPolicy.authorize(deps.getMethodAuthorizationDeps(), userId, ['admin']);
-        const packageAsset = await deps.DynamicAssets.findOneAsync({ _id: packageAssetId });
+        const unpackaged = confirmation.unpackagedLesson === true;
+        const packageAsset = unpackaged ? null : await deps.DynamicAssets.findOneAsync({ _id: selectedId });
         if (packageAsset && !isAdmin && packageAsset.userId !== userId) {
           throw new Meteor.Error(403, 'Can only delete your own packages');
         }
         if (packageAsset?.meta?.uploadPurpose === 'content-media') {
-          throw new Meteor.Error(400, 'Selected file is lesson media, not a package archive');
+          throw new Meteor.Error(400, 'Select a package archive');
         }
-        const packageFileCandidates = new Set<string>();
-        const packageExt = typeof packageAsset?.ext === 'string' && packageAsset.ext.trim()
-          ? packageAsset.ext.trim()
-          : 'zip';
-        packageFileCandidates.add(`${packageAssetId}.${packageExt}`);
-        packageFileCandidates.add(`${packageAssetId}.${packageExt.toLowerCase()}`);
-
-        const matchingTdfs = await deps.Tdfs.find(
-          {
-            $or: [
-              { packageAssetId },
-              { packageFile: { $in: Array.from(packageFileCandidates) } },
-            ],
-          },
-          { fields: {
-            _id: 1,
-            ownerId: 1,
-            stimuliSetId: 1,
-            'content.tdfs.tutor.setspec.conditionTdfIds': 1,
-          } }
-        ).fetchAsync();
-
-        deps.serverConsole('Found', matchingTdfs.length, 'TDFs for package asset:', packageAssetId);
+        const fields = {
+          _id: 1, ownerId: 1, stimuliSetId: 1,
+          'content.tdfs.tutor.setspec.condition': 1,
+          'content.tdfs.tutor.setspec.conditionTdfIds': 1,
+        };
+        let matchingTdfs;
+        const noArchive = { packageAssetId: { $in: [null, ''] }, packageFile: { $in: [null, ''] } };
+        if (unpackaged) {
+          const lesson = await deps.Tdfs.findOneAsync({ _id: selectedId, ...noArchive });
+          if (!lesson) throw new Meteor.Error(404, 'The selected lesson no longer has this package state');
+          if (!isAdmin && lesson.ownerId !== userId) throw new Meteor.Error(403, 'Can only delete your own packages');
+          const family = validateConditionFamilyTutor(lesson.content?.tdfs?.tutor, { requireCanonicalIds: true });
+          if (family.errors.length > 0) {
+            throw new Meteor.Error('partial-family-deletion-forbidden', 'The selected lesson family requires identity repair.');
+          }
+          matchingTdfs = await deps.Tdfs.find(
+            { _id: { $in: [selectedId, ...family.conditionTdfIds] }, ...noArchive }, { fields },
+          ).fetchAsync();
+          if (!matchingTdfs.some((lesson: PackageLesson) => lesson._id === selectedId)) {
+            throw new Meteor.Error(409, 'The selected lesson changed before deletion');
+          }
+        } else {
+          const packageExt = typeof packageAsset?.ext === 'string' && packageAsset.ext.trim()
+            ? packageAsset.ext.trim()
+            : 'zip';
+          const filenames = [...new Set([`${selectedId}.${packageExt}`, `${selectedId}.${packageExt.toLowerCase()}`])];
+          matchingTdfs = await deps.Tdfs.find({
+            $or: [{ packageAssetId: selectedId }, { packageFile: { $in: filenames } }],
+          }, { fields }).fetchAsync();
+        }
 
         if (!isAdmin && matchingTdfs.some((tdf: { ownerId?: string }) => tdf.ownerId !== userId)) {
           throw new Meteor.Error(403, 'Can only delete your own packages');
@@ -184,18 +192,15 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
 
         for (const lesson of matchingTdfs as PackageLesson[]) {
           await deps.deleteTdfRuntimeData(lesson._id);
-          if (await deps.Tdfs.removeAsync({ _id: lesson._id, ownerId: lesson.ownerId ?? null }) !== 1) {
+          const selector = { _id: lesson._id, ownerId: lesson.ownerId ?? null, ...(unpackaged ? noArchive : {}) };
+          if (await deps.Tdfs.removeAsync(selector) !== 1) {
             throw new Meteor.Error(409, 'Lesson changed before deletion');
           }
           deletedCount++;
         }
 
-        deps.serverConsole('Removing package asset with ID:', packageAssetId);
         if (packageAsset) {
           await deps.DynamicAssets.removeAsync({ _id: packageAsset._id, userId: packageAsset.userId ?? null });
-          deps.serverConsole('Package file removed from DynamicAssets');
-        } else {
-          deps.serverConsole('Package file not found in DynamicAssets (may have been deleted already)');
         }
 
         await removeUnusedPackageMedia(deps, matchingTdfs);

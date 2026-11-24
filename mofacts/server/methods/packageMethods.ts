@@ -2,9 +2,11 @@ import { versionedAssetFileName } from '../../common/lib/versionedAssetFileName'
 import { LESSON_PROVIDER_KEY_FIELDS } from '../../common/lessonProviderKeys';
 import { isTdfOwner } from '../lib/contentAccessPolicy';
 import { createReadStream } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { storePackageFile } from '../lib/packageFileStorage';
 import { getContentUpdateWarnings, type ContentUpdateWarning, type ContentUpdateConfirmation, type ContentUpdateReview } from '../../common/lib/contentUpdateWarnings';
 import { Meteor } from 'meteor/meteor';
+import { MongoInternals } from 'meteor/mongo';
 import { isPublicDemoTutor } from '../../common/publicDemoContract';
 import { check, Match } from 'meteor/check';
 import type { UploadedPackageFile } from '../lib/packageParser';
@@ -23,6 +25,7 @@ import { assertNoH5PContent } from '../../common/lib/unsupportedContent';
 import { requireAuthenticatedUser } from '../lib/methodAuthorization';
 import { requireContentCreatorDisplayName } from '../lib/contentCreatorIdentity';
 import {
+  assertConditionFilenameIdAlignment,
   reconcileConditionCountsByChildId,
   validateConditionFamilyTutor,
 } from '../../common/lib/tdfIdentityContract';
@@ -31,6 +34,15 @@ import { assertValidTdfExpressions } from '../../common/lib/tdfExpressionValidat
 export const packageUploadPolicy = Object.freeze({
   kind: 'package-upload', operation: 'persisted-archive', authorize: requireAuthenticatedUser,
 } as const);
+export const lessonCopyPolicy = Object.freeze({
+  kind: 'content-maintenance', operation: 'lesson-copy-access', authorize: canCopyLesson,
+} as const);
+
+function canCopyLesson(userId: string, lesson: { ownerId?: string; accessors?: unknown }, isAdmin: boolean): boolean {
+  return lesson.ownerId === userId || isAdmin || (Array.isArray(lesson.accessors)
+    && lesson.accessors.some(accessor => accessor?.userId === userId));
+}
+
 export const packageUploadPlanPolicy = Object.freeze({
   kind: 'package-upload', operation: 'owned-confirmation-plan', authorize: requireAuthenticatedUser,
 } as const);
@@ -1073,72 +1085,91 @@ export function createPackageService(deps: PackageMethodsDeps) {
 
   async function copyTdf(this: MethodContext, sourceTdfId: string) {
     check(sourceTdfId, String);
-
-    const userId = this.userId;
-    if (!userId) throw new Meteor.Error('not-authorized', 'Must be logged in to copy TDF');
+    const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to copy TDF', 'not-authorized');
     await requireContentCreatorDisplayName(deps.usersCollection, userId);
-
-    const sourceTdf = await deps.Tdfs.findOneAsync({_id: sourceTdfId});
-    if (!sourceTdf) throw new Meteor.Error('not-found', 'TDF not found');
-
-    const isOwner = sourceTdf.ownerId === userId;
     const isAdmin = await deps.userIsInRoleAsync(userId, ['admin']);
-    const isAccessor = sourceTdf.accessors?.some((a: { userId?: string }) => a.userId === userId);
-    if (!isOwner && !isAdmin && !isAccessor) {
-      throw new Meteor.Error('not-authorized', 'You do not have access to this TDF');
+    const collection = deps.Tdfs.rawCollection();
+    const session = MongoInternals.defaultRemoteCollectionDriver().mongo.client.startSession();
+    try {
+      return await session.withTransaction(async () => {
+        const source = await collection.findOne({ _id: sourceTdfId }, { session });
+        if (!source) throw new Meteor.Error('not-found', 'TDF not found');
+        if (!lessonCopyPolicy.authorize(userId, source, isAdmin)) {
+          throw new Meteor.Error('not-authorized', 'You do not have access to this TDF');
+        }
+
+        const family = validateConditionFamilyTutor(source.content?.tdfs?.tutor, { requireCanonicalIds: true });
+        const children = family.conditionTdfIds.length > 0
+          ? await collection.find({ _id: { $in: family.conditionTdfIds } }, { session }).toArray()
+          : [];
+        const filesById = new Map<string, string>();
+        for (const child of children) {
+          const childValidation = validateConditionFamilyTutor(child.content?.tdfs?.tutor);
+          if (child._id === sourceTdfId || child.ownerId !== source.ownerId || childValidation.isConditionRoot
+            || childValidation.errors.length > 0 || child.tdfAvailability === 'repair-required') {
+            throw new Meteor.Error('tdf-identity-repair-required', 'The lesson family requires an identity repair before copying.');
+          }
+          filesById.set(child._id, child.content?.fileName);
+        }
+        if (source.tdfAvailability === 'repair-required' || family.errors.length
+          || assertConditionFilenameIdAlignment(family.conditionFileNames, family.conditionTdfIds, filesById).length) {
+          throw new Meteor.Error('tdf-identity-repair-required', 'The lesson family requires an identity repair before copying.');
+        }
+        const baseName = source.content?.tdfs?.tutor?.setspec?.lessonname || 'Untitled';
+        const copyPattern = new RegExp(`^${escapeRegex(baseName)} \\((\\d+)\\)$`);
+        const existingCopies = await collection.find(
+          { 'content.tdfs.tutor.setspec.lessonname': copyPattern },
+          { projection: { 'content.tdfs.tutor.setspec.lessonname': 1 }, session },
+        ).toArray();
+        let nextNum = 1;
+        for (const existing of existingCopies) {
+          const match = copyPattern.exec(existing.content.tdfs.tutor.setspec.lessonname);
+          if (match) nextNum = Math.max(nextNum, Number(match[1]) + 1);
+        }
+
+        const newName = `${baseName} (${nextNum})`;
+        const members = [source, ...children];
+        const newIds = new Map<string, string>(members.map(lesson => [lesson._id, `tdf_${randomBytes(12).toString('hex')}`]));
+        const newTdfId = newIds.get(sourceTdfId)!;
+        const ownerMayKeepKeys = source.ownerId === userId;
+        for (const lesson of members) {
+          lesson._id = newIds.get(lesson._id);
+          lesson.ownerId = userId;
+          lesson.accessors = [];
+          lesson.tdfRevision = 1;
+          delete lesson.packageFile;
+          delete lesson.packageAssetId;
+          delete lesson.sourceIdentity;
+          delete lesson.packageWriteJobId;
+          const settings = lesson.content.tdfs.tutor.setspec ??= {};
+          settings.userselect = 'false';
+          delete settings.experimentTarget;
+          if (Array.isArray(settings.tags)) {
+            settings.tags = settings.tags.filter((tag: unknown) => typeof tag !== 'string' || tag.trim().toLowerCase() !== 'public-demo');
+          }
+          if (!ownerMayKeepKeys) {
+            for (const field of LESSON_PROVIDER_KEY_FIELDS) delete settings[field];
+          }
+        }
+
+        const originalFileName = source.content.fileName || 'unknown.xml';
+        const extensionOffset = originalFileName.lastIndexOf('.');
+        const baseFile = extensionOffset >= 0 ? originalFileName.slice(0, extensionOffset) : originalFileName;
+        const extension = extensionOffset >= 0 ? originalFileName.slice(extensionOffset) : '.xml';
+        source.content.fileName = `${baseFile}_copy_${nextNum}${extension}`;
+        source.tdfFileName = source.content.fileName;
+        const rootSettings = source.content.tdfs.tutor.setspec;
+        rootSettings.lessonname = newName;
+        if (family.isConditionRoot) {
+          rootSettings.conditionTdfIds = family.conditionTdfIds.map(id => newIds.get(id)!);
+          source.conditionCounts = family.conditionTdfIds.map(() => 0);
+        }
+        await collection.insertMany(members, { session });
+        return { newTdfId, newName };
+      }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+    } finally {
+      await session.endSession();
     }
-
-    const baseName = sourceTdf.content?.tdfs?.tutor?.setspec?.lessonname || 'Untitled';
-    const copyPattern = new RegExp(`^${escapeRegex(baseName)} \\((\\d+)\\)$`);
-    const existingTdfs = await deps.Tdfs.find(
-      { 'content.tdfs.tutor.setspec.lessonname': copyPattern },
-      { fields: { 'content.tdfs.tutor.setspec.lessonname': 1 } }
-    ).fetchAsync();
-
-    let nextNum = 1;
-    existingTdfs.forEach((tdf: { content?: { tdfs?: { tutor?: { setspec?: { lessonname?: string } } } } }) => {
-      const tdfName = tdf.content?.tdfs?.tutor?.setspec?.lessonname || '';
-      const match = tdfName.match(copyPattern);
-      if (match) {
-        nextNum = Math.max(nextNum, parseInt(match[1] || '0') + 1);
-      }
-    });
-
-    const newName = `${baseName} (${nextNum})`;
-
-    const newTdf = JSON.parse(JSON.stringify(sourceTdf));
-    delete newTdf._id;
-    newTdf.ownerId = userId;
-    newTdf.accessors = [];
-
-    const originalFileName = newTdf.content?.fileName || 'unknown.xml';
-    const fileExt = originalFileName.includes('.') ? originalFileName.slice(originalFileName.lastIndexOf('.')) : '.xml';
-    const fileBase = originalFileName.includes('.') ? originalFileName.slice(0, originalFileName.lastIndexOf('.')) : originalFileName;
-    const newFileName = `${fileBase}_copy_${nextNum}${fileExt}`;
-    if (newTdf.content) {
-      newTdf.content.fileName = newFileName;
-    }
-
-    if (newTdf.content?.tdfs?.tutor?.setspec) {
-      newTdf.content.tdfs.tutor.setspec.lessonname = newName;
-      newTdf.content.tdfs.tutor.setspec.userselect = 'false';
-    }
-    if (!isOwner) {
-      const settings = newTdf.content?.tdfs?.tutor?.setspec;
-      if (settings) {
-        for (const field of LESSON_PROVIDER_KEY_FIELDS) delete settings[field];
-      }
-      // A retained ZIP can contain the source owner's keys. Export the copy from its own content.
-      delete newTdf.packageFile;
-      delete newTdf.packageAssetId;
-    }
-    delete newTdf.sourceIdentity;
-    newTdf.tdfRevision = 1;
-
-    const newId = await deps.Tdfs.insertAsync(newTdf);
-    deps.serverConsole('copyTdf: Created copy', newId, 'of TDF', sourceTdfId, 'with name', newName);
-
-    return { newTdfId: newId, newName };
   }
 
   const generatedContentMethods = createPackageGeneratedContentMethods(deps, {

@@ -60,7 +60,7 @@ import { PUBLIC_READ_RATE_LIMIT, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR } from './runt
 import { requireAccountProgressSession, requireParticipantProgressLesson } from './lib/participantProgressScope';
 import { requireUserMatchesOrHasRole } from './lib/methodAuthorization';
 import { packageDeletionPolicy } from './methods/contentAssetMaintenanceMethods';
-import { PACKAGE_UPLOAD_VERIFICATIONS, PACKAGE_DELETION_VERIFICATION, CONTENT_MAINTENANCE_VERIFICATIONS, PUBLIC_READ_VERIFICATIONS, LEARNER_PROGRESS_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { PACKAGE_DOWNLOAD_VERIFICATION, LESSON_COPY_VERIFICATION, PACKAGE_UPLOAD_VERIFICATIONS, PACKAGE_DELETION_VERIFICATION, CONTENT_MAINTENANCE_VERIFICATIONS, PUBLIC_READ_VERIFICATIONS, LEARNER_PROGRESS_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -75,7 +75,7 @@ import { refreshDashboardHistory } from './lib/dashboardHistoryMongo';
 import { archiveDashboardHistory } from './lib/dashboardHistoryArchive';
 import { writeConditionState } from './lib/conditionAllocationMongo';
 import { createAuthMethods, accountSelfPolicy, ssoProfilePolicy } from './methods/authMethods';
-import { createContentMethods, manualDraftPolicy, uploadReadPolicy } from './methods/contentMethods';
+import { createContentMethods, manualDraftPolicy, uploadReadPolicy, packageDownloadPolicy } from './methods/contentMethods';
 import { createCourseService } from './methods/courseMethods';
 import type { CourseAssignmentHistoryContext } from '../common/courseAssignments.contracts';
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
@@ -88,7 +88,7 @@ import { registerSecurityAuditHttp } from './http/securityAudits';
 import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
 import { createExperimentMethodRegistration, issueExperimentLoginToken } from './methods/experimentMethods';
 import { createExperimentTargetFamilyResolver } from './lib/experimentTargetFamilyResolver';
-import { createPackageService, packageUploadPolicy, packageUploadPlanPolicy } from './methods/packageMethods';
+import { createPackageService, packageUploadPolicy, packageUploadPlanPolicy, lessonCopyPolicy } from './methods/packageMethods';
 import {
   createOpenRouterCatalogMethods, modelCatalogPolicy,
   createOpenRouterModelCatalogService,
@@ -1131,6 +1131,10 @@ registerMeteorMethods(Meteor, installedMethods, [
     policy: verification.method === 'processPackageUpload' ? packageUploadPolicy : packageUploadPlanPolicy,
     dataEgress: verification.method === 'cancelPackageUpload' ? 'package-cancel-status' as const : 'package-upload-result' as const,
   })),
+  { verification: PACKAGE_DOWNLOAD_VERIFICATION, handler: installedMethods.getPackageDownloadLink,
+    policy: packageDownloadPolicy, dataEgress: 'package-download-link' },
+  { verification: LESSON_COPY_VERIFICATION, handler: installedMethods.copyTdf,
+    policy: lessonCopyPolicy, dataEgress: 'lesson-copy-result' },
   { verification: PACKAGE_DELETION_VERIFICATION, handler: installedMethods.deletePackageFile,
     policy: packageDeletionPolicy, dataEgress: 'delete-result' },
   ...CONTENT_MAINTENANCE_VERIFICATIONS.map(verification => ({

@@ -19,8 +19,14 @@ now use the same summary value. The media identifier attribute has been removed.
 An outdated client that submits the wrong type receives `invalid-upload-target`;
 reload the page after deployment.
 
-## Whole-package deletion
+## Private copies and whole-package deletion
 
+**Make private copy** creates fresh lesson IDs. For a condition experiment,
+it copies the complete family and points the new root to the new conditions.
+The copied study starts with fresh condition counts and requires its own
+experiment entry target before it can be launched by study link. The copy
+uses the same referenced media and generates its own ZIP when downloaded.
+Use the trash button on the copy to delete it before or after downloading.
 Deleting a confirmed lesson family can also remove a collaborator's upload
 when the file records a lesson in that family and the exact stimulus-set
 identity matches. A surviving lesson that uses the same stimulus set or refers

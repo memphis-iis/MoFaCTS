@@ -157,6 +157,10 @@ export const manualDraftPolicy = Object.freeze({
   selector: (ownerId: string, draftId: string) => ({ _id: draftId, ownerId, draftType: 'manual-content-creator' }),
 } as const);
 
+export const packageDownloadPolicy = Object.freeze({
+  kind: 'content-maintenance', operation: 'lesson-package-owner-or-admin', authorize: hasUserRole,
+} as const);
+
 export function createContentMethods(deps: ContentMethodsDeps) {
   const assetMaintenanceMethods = createContentAssetMaintenanceMethods(deps);
   return {
@@ -282,7 +286,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         }
       );
 
-      const isAdmin = await deps.getMethodAuthorizationDeps().userIsInRoleAsync(this.userId, ['admin']);
+      const isAdmin = await packageDownloadPolicy.authorize(deps.getMethodAuthorizationDeps(), this.userId, ['admin']);
       if (!tdf || (tdf.ownerId !== this.userId && !isAdmin)) {
         throw new Meteor.Error(404, 'Package unavailable');
       }

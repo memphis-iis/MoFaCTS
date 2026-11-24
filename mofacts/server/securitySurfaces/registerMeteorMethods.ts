@@ -67,8 +67,8 @@ export type MeteorMethodBinding = Readonly<{
     kind: 'package-upload'; operation: 'persisted-archive' | 'owned-confirmation-plan';
     authorize: (userId: string | null | undefined) => string;
   }> | Readonly<{
-    kind: 'content-maintenance'; operation: 'asset-owner-or-admin' | 'lesson-owner' | 'archive-and-family-owner-or-admin';
-    authorize: (...args: never[]) => Promise<unknown>;
+    kind: 'content-maintenance'; operation: 'asset-owner-or-admin' | 'lesson-owner' | 'archive-and-family-owner-or-admin' | 'lesson-copy-access' | 'lesson-package-owner-or-admin';
+    authorize: (...args: never[]) => unknown;
   }> | Readonly<{
     kind: 'public-read'; operation: 'getAuthClientConfig' | 'getCustomHelpPage';
     rateLimit: Readonly<{ requests: number; windowMs: number; scope: 'connection' }>;
@@ -115,7 +115,7 @@ export type MeteorMethodBinding = Readonly<{
     authorize: (...args: never[]) => unknown;
   }>;
   dataEgress: 'audit-report-list' | 'audit-report-summary' | 'audit-download-capability' | 'deployment-diagnostics'
-    | 'public-sign-in-config' | 'published-help-markdown' | 'package-upload-result' | 'package-cancel-status' | 'backup-configuration' | 'backup-job-metadata' | 'backup-download-capability'
+    | 'public-sign-in-config' | 'published-help-markdown' | 'package-upload-result' | 'package-cancel-status' | 'lesson-copy-result' | 'package-download-link' | 'backup-configuration' | 'backup-job-metadata' | 'backup-download-capability'
     | 'brand-profile-draft' | 'published-brand-profile' | 'redacted-brand-profile-export'
     | 'filename-reference-migration-report' | 'history-download-capability' | 'none'
     | 'error-report-id' | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'

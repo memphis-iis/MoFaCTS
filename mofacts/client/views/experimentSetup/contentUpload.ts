@@ -1436,6 +1436,7 @@ Template.contentUpload.events({
       const fileName = event.currentTarget.getAttribute('data-filename') || 'this package';
       const row = $(event.currentTarget).closest('tr');
       const tdfId = row.find('#content-edit-btn').attr('value') || packageAssetId;
+      const unpackagedLesson = !packageAssetId && !packageFile;
 
       const confirmed = await requestContentConfirmation(template, {
         placement: assetActionPlacement(String(tdfId || '')),
@@ -1461,7 +1462,9 @@ Template.contentUpload.events({
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
       await template.commandRegistry.run(`asset:${tdfId}`, async () => {
         try {
-          await MeteorAny.callAsync('deletePackageFile', packageAssetId, { wholeFamily: true });
+          await MeteorAny.callAsync('deletePackageFile', unpackagedLesson ? tdfId : packageAssetId, {
+            wholeFamily: true, unpackagedLesson,
+          });
           
           // Invalidate cache and trigger reactive refresh
           assetsHelperCachedResult = [];
