@@ -240,10 +240,14 @@ export async function getAccessibleTdfApiKey(
 
   const normalizedUserId = normalizeString(params.userId);
   const isOwner = normalizeString(tdf.ownerId) === normalizedUserId;
-  const isAdminOrTeacher = await deps.userIsInRoleAsync(normalizedUserId, ['admin', 'teacher']);
+  const isAudio = params.kind !== 'openrouter';
+  const hasStaffAccess = await deps.userIsInRoleAsync(normalizedUserId, isAudio ? ['admin'] : ['admin', 'teacher']);
   const isUserSelectTdf = normalizeString(tdf.content?.tdfs?.tutor?.setspec?.userselect).toLowerCase() === 'true';
-  const hasHistory = Boolean(await deps.hasHistoryWithTdf(normalizedUserId, params.tdfId));
-  const hasDirectKeyAccess = isOwner || isAdminOrTeacher || isUserSelectTdf || hasHistory;
+  let hasDirectKeyAccess = isOwner || hasStaffAccess || isUserSelectTdf;
+  if (!hasDirectKeyAccess && await deps.hasHistoryWithTdf(normalizedUserId, params.tdfId)) {
+    // Historical practice can retain participant access. Teachers need the current lesson grant.
+    hasDirectKeyAccess = !isAudio || !await deps.userIsInRoleAsync(normalizedUserId, ['teacher']);
+  }
   if (deps.authorizeTdfExecution) {
     await deps.authorizeTdfExecution(normalizedUserId, params.tdfId, hasDirectKeyAccess);
   }

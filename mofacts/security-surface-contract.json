@@ -529,12 +529,12 @@
     {
       "name": "makeGoogleSpeechAPICall",
       "access": "role-checked",
-      "notes": "Authenticated caller with canonical lesson execution access, including experiment access before any learner history. Provider credentials remain on the server; unrelated private lessons remain denied."
+      "notes": "Teacher role and prior practice alone do not grant audio use for a private lesson. Shared lesson access, administrator testing and participant execution remain supported. Provider credentials stay on the server."
     },
     {
       "name": "makeGoogleTTSApiCall",
       "access": "role-checked",
-      "notes": "Authenticated caller with canonical lesson execution access, including experiment access before any learner history. Provider credentials remain on the server; unrelated private lessons remain denied."
+      "notes": "Teacher role and prior practice alone do not grant audio use for a private lesson. Shared lesson access, administrator testing and participant execution remain supported. Provider credentials stay on the server."
     },
     {
       "name": "migrateFilenameTdfReferences",

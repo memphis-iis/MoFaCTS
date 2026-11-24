@@ -1,6 +1,6 @@
 import { COURSE_SNAPSHOT_VERSION } from './lib/courseLearnerSnapshotCache';
 import { DDPRateLimiter } from 'meteor/ddp-rate-limiter';
-import { LESSON_EDIT_VERIFICATIONS, PUBLIC_READ_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, CLASS_PERFORMANCE_VERIFICATION, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
+import { AUDIO_PROVIDER_VERIFICATIONS, LESSON_EDIT_VERIFICATIONS, PUBLIC_READ_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, CLASS_PERFORMANCE_VERIFICATION, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './lib/prolificCollections';
 import { CourseLearnerSnapshotCache } from '../common/Collections';
 import { Meteor } from 'meteor/meteor';
@@ -1162,6 +1162,57 @@ describe('public TDF and stimulus method authorization', function() {
     try { await methods.provisionExperimentUser.call({}, 'progress-other', 'AUDIT-BOUND-RETURN'); expect.fail('Expected target mismatch'); }
     catch (error: any) { expect(error.error).to.equal('experiment-target-mismatch'); }
     expect((await MeteorUsersAny.findOneAsync({ _id: userId })).profile.experimentTarget).to.equal('progress-original');
+  });
+
+  it('requires lesson access for teacher audio while retaining administrator testing', async function() {
+    const teacher = Random.id(), admin = Random.id(), lessonId = Random.id();
+    await Roles.createRoleAsync('teacher', { unlessExists: true });
+    await Roles.createRoleAsync('admin', { unlessExists: true });
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    await TdfsAny.insertAsync({
+      _id: lessonId, ownerId: 'different-owner', tdfAvailability: 'available',
+      content: { tdfs: { tutor: { setspec: {
+        userselect: 'false', speechAPIKey: encryptData('synthetic-lesson-speech'),
+        textToSpeechAPIKey: encryptData('synthetic-lesson-tts'),
+      } } } },
+    });
+    await HistoriesAny.insertAsync({ userId: teacher, TDFId: lessonId });
+    const provider = sinon.stub(globalThis, 'fetch').callsFake(async () => new Response(JSON.stringify({
+      audioContent: 'synthetic-audio', results: [{ alternatives: [{ transcript: 'cat' }] }],
+    }), { status: 200 }));
+    try {
+      const observed = registeredMeteorMethodSurfaces();
+      if (observed.state !== 'observed') throw Error(observed.reason);
+      const inputs = {
+        makeGoogleSpeechAPICall: [lessonId, null, { config: { languageCode: 'en-US' }, audio: { content: 'synthetic' } }, ['cat']],
+        makeGoogleTTSApiCall: [lessonId, 'cat', 1, 0, 'en-US-Standard-A', 'en-US'],
+      };
+      for (const verification of AUDIO_PROVIDER_VERIFICATIONS) {
+        const row: typeof observed.surfaces[number] | undefined = observed.surfaces.find(entry => entry.name === verification.method);
+        expect(row?.verification).to.equal(verification);
+        const handler = MeteorAny.server.method_handlers[verification.method];
+        try {
+          await handler.call({ userId: teacher }, ...inputs[verification.method]);
+          expect.fail('Teacher role and prior history must not authorize this private lesson');
+        } catch (error: any) {
+          expect(error.error).to.equal(403);
+        }
+      }
+      expect(provider.callCount).to.equal(0);
+      await TdfsAny.updateAsync({ _id: lessonId }, { $set: { accessors: [{ userId: teacher }] } });
+      for (const userId of [teacher, admin]) {
+        for (const verification of AUDIO_PROVIDER_VERIFICATIONS) {
+          const result = await MeteorAny.server.method_handlers[verification.method].call({ userId }, ...inputs[verification.method]);
+          expect(result).to.exist;
+        }
+      }
+      expect(provider.callCount).to.equal(4);
+    } finally {
+      provider.restore();
+      await Roles.removeUsersFromRolesAsync(teacher, 'teacher');
+      await Roles.removeUsersFromRolesAsync(admin, 'admin');
+    }
   });
 
   it('resolves shared audio keys for a new experiment participant before any history or profile audio setup', async function() {

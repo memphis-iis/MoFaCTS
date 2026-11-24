@@ -64,6 +64,9 @@ export type MeteorMethodBinding = Readonly<{
     operation: 'own-account-session' | 'instructor-or-admin' | 'section-directory';
     authorize: (...args: never[]) => Promise<string> | string;
   }> | Readonly<{
+    kind: 'audio-provider'; operation: 'lesson-or-personal-audio';
+    authorize: (...args: never[]) => Promise<unknown>;
+  }> | Readonly<{
     kind: 'provider-access'; operation: 'creator' | 'lesson';
     authorize: (userId: string | null | undefined) => string;
   }> | Readonly<{
@@ -118,7 +121,7 @@ export type MeteorMethodBinding = Readonly<{
     authorize: (...args: never[]) => unknown;
   }>;
   dataEgress: 'audit-report-list' | 'audit-report-summary' | 'audit-download-capability' | 'deployment-diagnostics'
-    | 'public-sign-in-config' | 'published-help-markdown' | 'package-upload-result' | 'package-cancel-status' | 'lesson-copy-result' | 'package-download-link' | 'lesson-edit-result' | 'provider-capability' | 'provider-result' | 'embedding-vectors' | 'backup-configuration' | 'backup-job-metadata' | 'backup-download-capability'
+    | 'public-sign-in-config' | 'published-help-markdown' | 'package-upload-result' | 'package-cancel-status' | 'lesson-copy-result' | 'package-download-link' | 'lesson-edit-result' | 'provider-capability' | 'provider-result' | 'embedding-vectors' | 'audio-synthesis' | 'speech-transcription' | 'backup-configuration' | 'backup-job-metadata' | 'backup-download-capability'
     | 'brand-profile-draft' | 'published-brand-profile' | 'redacted-brand-profile-export'
     | 'filename-reference-migration-report' | 'history-download-capability' | 'none'
     | 'error-report-id' | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'

@@ -118,9 +118,10 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
 - [x] Slot 93 verified public sign-in configuration and active help, single and bulk media removal and owner-only lesson visibility. Coverage reached 178 application and four package declarations out of 200, leaving 18.
 - [x] Operator approved retiring the unused stimulus display cache and its admin control. Source changes remove startup polling, both public reads, the admin rebuild and all refreshes during ingestion and editing. Slot 94 verified absence of all three installed Meteor methods. Coverage is now 177 application plus four package declarations across 197 method names. All 21 publications still have declarations.
 - [x] Slot 95 verified confirmed package deletion, persisted archive processing, and ownership checks for upload confirmation and cancellation. Automatic collaborator-media removal requires a matching lesson target and stimulus-set identity. Shared media, matching names in unrelated uploads, and incomplete upload metadata were covered.
-- [ ] Verify the approved independent private-copy behavior. Slot 96 passed the copied-family and media-preservation case, but the standalone fixture deleted the first copy before checking later copy names. The corrected fixture retains all copies until naming checks finish. Slot 97 combines the retry with the remaining lesson-editor, generated-package, and OpenRouter method checks.
-- [ ] Resolve teacher access for lesson audio methods. The current audio key resolver treats the teacher role alone as sufficient for private lesson keys. The decision is whether to require the same lesson access used for ordinary content, with administrator testing and participant access covered separately.
-- [ ] Verify the remaining **12 methods**: five package/lesson-management methods and seven provider methods. The source inventory has 181 application and four package declarations across 197 method names. All 21 publications have declarations. The five Phase 3 exit groups remain open.
+- [x] Slot 97 verified private-copy isolation, separate on-demand ZIP export, and deletion before or after export. The copied condition family and its referenced media survived original-package deletion. The same run verified three lesson editor/generated-package methods and five OpenRouter methods.
+- [x] Operator approved requiring teachers to have lesson access when using lesson audio keys. Source implementation also checks current lesson access for a teacher with prior practice, while retaining administrator testing and participant access.
+- [ ] Verify the approved audio rule through both installed Google methods in slot 98.
+- [ ] Verify the remaining two Google audio methods. Slot 97 brought verified coverage to 191 application and four package declarations across 197 method names. All 21 publications have declarations. The five Phase 3 exit groups remain open.
 
 
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
@@ -1945,11 +1946,13 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 101 total, 95 consumed, 1 reserved, 4 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 101 total, 96 consumed, 1 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
 
 The operator authorized up to five additional batched local Meteor integration invocations, including retries, for the remaining security-audit work (slots 92–96). Reserve each invocation here before starting the suite and record its outcome afterward.
 
-The operator authorized up to five additional local batched Meteor invocations on 2026-11-24 (slots 97–101), including retries. Slot 97 is reserved for the combined private-copy retry, editor writes, generated-package authorization, and OpenRouter method checks.
+The operator authorized up to five additional local batched Meteor invocations on 2026-11-24 (slots 97–101), including retries. Slot 98 is reserved for teacher, administrator and participant audio verification.
+
+Slot 97 passed on f3aaf7f7. Server 1,158 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. The corrected copy regression and all targeted method tests passed, and cleanup completed. Receipt /var/tmp/mofacts-integration.s7uyz1Ak/results/native-verification.json SHA-256 937e6c18b815a1bab9c119fb11ab87bb6ff7293e062d00ebbbf4be631bd27bb1.
 
 Slot 96 ran on b515f33b. Server 1,154 passed, one failed and 15 pending. Chromium 1,255 passed and seven pending, zero hook failures. The copied condition family and its shared media survived original-package deletion. The standalone fixture omitted the first copy from later name checks because it deleted that copy inside the loop. Worker cleanup completed. Retained result /var/tmp/mofacts-integration.IvC66HSw/results/meteor-run.json SHA-256 877c85e61538d6aeafcab134675c6890f6f44257296cab74af37c6067f94ac49.
 
