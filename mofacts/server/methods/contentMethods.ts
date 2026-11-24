@@ -144,21 +144,11 @@ function summarizeManualDraftState(state: UnknownRecord, currentStep: number, dr
   };
 }
 
-async function getOwnedManualContentDraft(
-  deps: ContentMethodsDeps,
-  userId: string,
-  draftId: string,
-  fields: UnknownRecord = {}
-) {
-  return await deps.ManualContentDrafts.findOneAsync(
-    {
-      _id: draftId,
-      ownerId: userId,
-      draftType: 'manual-content-creator',
-    },
-    Object.keys(fields).length > 0 ? { fields } : undefined
-  );
-}
+export const manualDraftPolicy = Object.freeze({
+  kind: 'manual-draft', operation: 'owner',
+  authorize: (userId: string | null | undefined) => requireAuthenticatedUser(userId, 'Must be logged in', 401),
+  selector: (ownerId: string, draftId: string) => ({ _id: draftId, ownerId, draftType: 'manual-content-creator' }),
+} as const);
 
 export function createContentMethods(deps: ContentMethodsDeps) {
   const assetMaintenanceMethods = createContentAssetMaintenanceMethods(deps);
@@ -166,21 +156,19 @@ export function createContentMethods(deps: ContentMethodsDeps) {
     ...assetMaintenanceMethods,
 
     getManualContentDraft: async function(this: MethodContext, draftId: string) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
+      const ownerId = manualDraftPolicy.authorize(this.userId);
       if (!draftId || typeof draftId !== 'string') {
         throw new Meteor.Error(400, 'Draft id required');
       }
 
-      const draft = await getOwnedManualContentDraft(deps, this.userId, draftId, {
+      const draft = await deps.ManualContentDrafts.findOneAsync(manualDraftPolicy.selector(ownerId, draftId), { fields: {
         lessonName: 1,
         currentStep: 1,
         state: 1,
         draftLessons: 1,
         updatedAt: 1,
         createdAt: 1,
-      });
+      } });
       if (!draft) {
         throw new Meteor.Error(404, 'Draft not found');
       }
@@ -197,9 +185,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
     },
 
     saveManualContentDraft: async function(this: MethodContext, payload: UnknownRecord = {}) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
+      const ownerId = manualDraftPolicy.authorize(this.userId);
       if (!deps.isPlainRecord(payload)) {
         throw new Meteor.Error(400, 'Invalid draft payload');
       }
@@ -213,16 +199,8 @@ export function createContentMethods(deps: ContentMethodsDeps) {
       const now = new Date();
 
       if (draftId) {
-        const existingDraft = await getOwnedManualContentDraft(deps, this.userId, draftId, {
-          _id: 1,
-          createdAt: 1,
-        });
-        if (!existingDraft) {
-          throw new Meteor.Error(404, 'Draft not found');
-        }
-
-        await deps.ManualContentDrafts.updateAsync(
-          { _id: draftId },
+        const updated = await deps.ManualContentDrafts.updateAsync(
+          manualDraftPolicy.selector(ownerId, draftId),
           {
             $set: {
               lessonName,
@@ -235,6 +213,8 @@ export function createContentMethods(deps: ContentMethodsDeps) {
           }
         );
 
+        if (!updated) throw new Meteor.Error(404, 'Draft not found');
+
         return {
           draftId,
           lessonName,
@@ -242,9 +222,9 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         };
       }
 
-      await requireContentCreatorDisplayName(deps.usersCollection, this.userId);
+      await requireContentCreatorDisplayName(deps.usersCollection, ownerId);
       const insertedId = await deps.ManualContentDrafts.insertAsync({
-        ownerId: this.userId,
+        ownerId,
         draftType: 'manual-content-creator',
         lessonName,
         currentStep,
@@ -263,19 +243,13 @@ export function createContentMethods(deps: ContentMethodsDeps) {
     },
 
     deleteManualContentDraft: async function(this: MethodContext, draftId: string) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
+      const ownerId = manualDraftPolicy.authorize(this.userId);
       if (!draftId || typeof draftId !== 'string') {
         throw new Meteor.Error(400, 'Draft id required');
       }
 
-      const draft = await getOwnedManualContentDraft(deps, this.userId, draftId, { _id: 1 });
-      if (!draft) {
-        throw new Meteor.Error(404, 'Draft not found');
-      }
-
-      await deps.ManualContentDrafts.removeAsync({ _id: draftId });
+      const removed = await deps.ManualContentDrafts.removeAsync(manualDraftPolicy.selector(ownerId, draftId));
+      if (!removed) throw new Meteor.Error(404, 'Draft not found');
       return { deleted: true };
     },
 

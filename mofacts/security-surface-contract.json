@@ -172,7 +172,7 @@
     },
     {
       "name": "deleteManualContentDraft",
-      "access": "role-checked"
+      "access": "authenticated-self"
     },
     {
       "name": "deleteOwnOpenRouterKey",
@@ -360,7 +360,7 @@
     },
     {
       "name": "getManualContentDraft",
-      "access": "role-checked"
+      "access": "authenticated-self"
     },
     {
       "name": "getOpenRouterCapability",
@@ -672,7 +672,7 @@
     },
     {
       "name": "saveManualContentDraft",
-      "access": "role-checked"
+      "access": "authenticated-self"
     },
     {
       "name": "saveTdfContent",

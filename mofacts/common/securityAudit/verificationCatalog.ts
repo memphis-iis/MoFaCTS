@@ -718,6 +718,12 @@ export const LESSON_ACCESS_VERIFICATIONS = Object.freeze({
     verificationId: 'method.lesson-access.transfer', cases: Object.freeze(['lists only owned lessons and transfers ownership only for the owner']) } as const),
 });
 
+export const MANUAL_DRAFT_VERIFICATIONS = Object.freeze((['getManualContentDraft', 'saveManualContentDraft', 'deleteManualContentDraft'] as const).map(method => Object.freeze({
+  ...middlewareTest, suite: 'contentMethods content upload summaries', method, surfaceId: `method:${method}` as const,
+  verificationId: `method.manual-draft.${method}` as const,
+  cases: Object.freeze(['updates and removes only an existing manual draft owned by the caller']),
+})));
+
 export const STIMULUS_FILE_VERIFICATION = Object.freeze({
   ...middlewareTest, suite: 'content helper authorization', method: 'getStimuliFileForTdf', surfaceId: 'method:getStimuliFileForTdf',
   verificationId: 'method.lesson-file.stimulus', cases: Object.freeze(['returns stimulus files only to the lesson owner and explicit accessors']),
@@ -751,7 +757,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, COURSE_DELETE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, ...MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, COURSE_DELETE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

@@ -1,4 +1,7 @@
 import { strict as assert } from 'node:assert';
+import { Meteor } from 'meteor/meteor';
+import { MANUAL_DRAFT_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
 import { Mongo } from 'meteor/mongo';
 import { Random } from 'meteor/random';
 import { expect } from 'chai';
@@ -141,6 +144,50 @@ describe('contentMethods content upload summaries', function() {
       await assert.rejects(toggle('root', true), (error: any) => error.error === 'tdf-public-locked');
     } finally {
       await tdfs.rawCollection().drop();
+    }
+  });
+
+  it('updates and removes only an existing manual draft owned by the caller', async function() {
+    const drafts = (globalThis as any).ManualContentDrafts as Mongo.Collection<any>;
+    const methods = (Meteor as any).server.method_handlers;
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed draft methods');
+    for (const verification of MANUAL_DRAFT_VERIFICATIONS) {
+      const rows: typeof observed.surfaces = observed.surfaces.filter(row => row.name === verification.method);
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0]?.verification, verification);
+      assert.deepEqual(rows[0]?.policy, { kind: 'manual-draft', operation: 'owner' });
+    }
+    const owner = { userId: Random.id() };
+    const other = { userId: Random.id() };
+    let draftId: string | undefined;
+    const state = { lessonName: 'Revised' };
+    const missing = (err: any) => err.error === 404;
+    try {
+      await Meteor.users.insertAsync({ _id: owner.userId, profile: { displayName: 'Synthetic author' } } as any);
+      const created = await methods.saveManualContentDraft.call(owner, { state, ownerId: other.userId });
+      assert.equal(typeof created.draftId, 'string');
+      draftId = created.draftId as string;
+      const payload = { draftId, state };
+      for (const [name, arg] of [['getManualContentDraft', draftId], ['saveManualContentDraft', payload], ['deleteManualContentDraft', draftId]] as const) {
+        await assert.rejects(methods[name].call({}, arg), (err: any) => err.error === 401);
+      }
+      assert.equal((await drafts.findOneAsync(draftId)).ownerId, owner.userId);
+      await assert.rejects(methods.getManualContentDraft.call(other, draftId), missing);
+      await assert.rejects(methods.saveManualContentDraft.call(other, payload), missing);
+      await assert.rejects(methods.deleteManualContentDraft.call(other, draftId), missing);
+      await methods.saveManualContentDraft.call(owner, payload);
+      assert.equal((await methods.getManualContentDraft.call(owner, draftId)).lessonName, 'Revised');
+      await drafts.updateAsync(draftId, { $set: { draftType: 'other-kind' } });
+      await assert.rejects(methods.saveManualContentDraft.call(owner, payload), missing);
+      await assert.rejects(methods.deleteManualContentDraft.call(owner, draftId), missing);
+      await drafts.updateAsync(draftId, { $set: { draftType: 'manual-content-creator' } });
+      assert.deepEqual(await methods.deleteManualContentDraft.call(owner, draftId), { deleted: true });
+      await assert.rejects(methods.deleteManualContentDraft.call(owner, draftId), missing);
+      await assert.rejects(methods.saveManualContentDraft.call(owner, payload), missing);
+    } finally {
+      if (draftId) await drafts.removeAsync({ _id: draftId });
+      await Meteor.users.removeAsync({ _id: owner.userId });
     }
   });
 
