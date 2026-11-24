@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
-import { componentRegistrationReferences, directMeteorRegistrationReferences, packageRegistrationReferences } from './checkApplicationMeteorRegistration.mjs';
+import { componentRegistrationReferences, directFrameworkRegistrationReferences, packageRegistrationReferences } from './checkApplicationMeteorRegistration.mjs';
 import { uploadMethodNames } from '../../packages/ostrio-files/upload-policy.js';
 
 const toolAppRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1')), '..', '..');
@@ -74,10 +74,10 @@ async function checkedApplicationSource(file, packageOwner) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const bypasses = file.endsWith('.svelte') ? componentRegistrationReferences(file, text) :
     packageOwner !== undefined ? packageRegistrationReferences(source, packageOwner) :
-      directMeteorRegistrationReferences(source);
+      directFrameworkRegistrationReferences(source);
   if (bypasses.length) {
     throw new Error(bypasses.map(({ member, line }) =>
-      path.relative(sourceRepoRoot, file) + ':' + line + ' references Meteor.' + member + ' outside the application adapter.'
+      path.relative(sourceRepoRoot, file) + ':' + line + ' references ' + (member.startsWith('WebApp.') ? member : 'Meteor.' + member) + ' outside its registration owner.'
     ).join('\n'));
   }
   return source;

@@ -1,9 +1,10 @@
 import { compile, parse } from 'svelte/compiler';
 import ts from 'typescript';
 
-// Application adapters register on their injected server. A direct reference
-// to either framework function bypasses those adapters, even if called later.
-export function directMeteorRegistrationReferences(source, acceptsRegistration = () => false) {
+const HTTP_STACKS = new Set(['connectHandlers', 'rawConnectHandlers', 'handlers']);
+
+// A reference to a registration function can be retained and called later.
+export function directFrameworkRegistrationReferences(source, acceptsRegistration = () => false) {
   let checker;
   function declarationOf(identifier) {
     if (!checker) {
@@ -15,9 +16,9 @@ export function directMeteorRegistrationReferences(source, acceptsRegistration =
     }
     return checker.getSymbolAtLocation(identifier)?.declarations?.[0];
   }
-  function meteorImport(node) {
+  function frameworkImport(node, moduleName) {
     while (node && !ts.isImportDeclaration(node)) node = node.parent;
-    return node?.moduleSpecifier.text === 'meteor/meteor' && !node.importClause?.isTypeOnly;
+    return node?.moduleSpecifier.text === moduleName && !node.importClause?.isTypeOnly;
   }
   function unwrap(node) {
     while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) ||
@@ -29,44 +30,73 @@ export function directMeteorRegistrationReferences(source, acceptsRegistration =
     if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) return node.argumentExpression.text;
     return undefined;
   }
-  function isMeteor(node, visited = new Set()) {
+  function frameworkModule(name) {
+    if (name === 'Meteor') return 'meteor/meteor';
+    if (name === 'WebApp') return 'meteor/webapp';
+    return undefined;
+  }
+  function bindingName(element) {
+    const name = element.propertyName ?? element.name;
+    if (!ts.isComputedPropertyName(name)) return name.text;
+    return ts.isStringLiteralLike(name.expression) ? name.expression.text : '[unresolved property]';
+  }
+  function registrationOwner(node, visited = new Set()) {
     node = unwrap(node);
     if (ts.isIdentifier(node)) {
       const decl = declarationOf(node);
-      if (!decl) return node.text === 'Meteor';
-      if (ts.isImportSpecifier(decl)) {
-        return !decl.isTypeOnly && (decl.propertyName ?? decl.name).text === 'Meteor' && meteorImport(decl);
+      if (!decl) return frameworkModule(node.text) ? node.text : undefined;
+      if (visited.has(decl)) return undefined;
+      visited.add(decl);
+      if (ts.isImportSpecifier(decl) && !decl.isTypeOnly) {
+        const name = (decl.propertyName ?? decl.name).text;
+        return frameworkModule(name) && frameworkImport(decl, frameworkModule(name)) ? name : undefined;
       }
-      if (ts.isVariableDeclaration(decl) && decl.initializer && !visited.has(decl)) {
-        visited.add(decl);
-        return isMeteor(decl.initializer, visited);
+      if (ts.isVariableDeclaration(decl) && decl.initializer) return registrationOwner(decl.initializer, visited);
+      if (ts.isBindingElement(decl) && ts.isVariableDeclaration(decl.parent.parent)) {
+        const initializer = decl.parent.parent.initializer;
+        const member = bindingName(decl);
+        if (initializer && HTTP_STACKS.has(member) && registrationOwner(initializer, visited) === 'WebApp') return member;
       }
-      return false;
+      return undefined;
     }
-    if (property(node) !== 'Meteor') return false;
+    const name = property(node);
+    if (!name) return undefined;
     const receiver = unwrap(node.expression);
+    if (HTTP_STACKS.has(name) && registrationOwner(receiver, visited) === 'WebApp') return name;
     const decl = ts.isIdentifier(receiver) && declarationOf(receiver);
-    return decl && ts.isNamespaceImport(decl) && meteorImport(decl);
+    if (decl && ts.isNamespaceImport(decl) && frameworkModule(name) && frameworkImport(decl, frameworkModule(name))) return name;
+    return undefined;
+  }
+  function registrationMember(owner, member) {
+    if (owner === 'Meteor' && (member === 'methods' || member === 'publish' || member === '[unresolved property]')) return member;
+    if (owner === 'WebApp' && member === '[unresolved property]') return 'WebApp.[unresolved property]';
+    if (HTTP_STACKS.has(owner) && (member === 'use' || member === '[unresolved property]')) return 'WebApp.' + owner + '.' + member;
+    return undefined;
   }
   const findings = [];
-  function visit(node) {
-    const member = property(node);
-    if (ts.isElementAccessExpression(node) && member === undefined && isMeteor(node.expression)) {
-      findings.push({ member: '[unresolved property]', line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 });
-    }
-    if ((member === 'methods' || member === 'publish') && isMeteor(node.expression) && !acceptsRegistration(node)) {
-      findings.push({ member, line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 });
-    }
-    if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && isMeteor(node.initializer)) {
-      for (const element of node.name.elements) {
-        const name = element.propertyName ?? element.name;
-        const member = ts.isComputedPropertyName(name)
-          ? (ts.isStringLiteralLike(name.expression) ? name.expression.text : '[unresolved property]')
-          : name.text;
-        if (member === 'methods' || member === 'publish' || member === '[unresolved property]') {
-          findings.push({ member, line: source.getLineAndCharacterOfPosition(element.getStart(source)).line + 1 });
-        }
+  function addFinding(node, member) {
+    findings.push({ member, line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 });
+  }
+  function checkBindings(pattern, owner) {
+    for (const element of pattern.elements) {
+      const member = element.dotDotDotToken ? '[unresolved property]' : bindingName(element);
+      const finding = registrationMember(owner, member);
+      if (finding) addFinding(element, finding);
+      if (owner === 'WebApp' && HTTP_STACKS.has(member) && ts.isObjectBindingPattern(element.name)) {
+        checkBindings(element.name, member);
       }
+    }
+  }
+  function visit(node) {
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      const name = property(node);
+      if (name === 'methods' || name === 'publish' || name === 'use' || name === undefined) {
+        const member = registrationMember(registrationOwner(node.expression), name ?? '[unresolved property]');
+        if (member && !acceptsRegistration(node, member)) addFinding(node, member);
+      }
+    }
+    if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer) {
+      checkBindings(node.name, registrationOwner(node.initializer));
     }
     ts.forEachChild(node, visit);
   }
@@ -87,7 +117,7 @@ export function componentRegistrationReferences(filename, text) {
       ? text.slice(ast.module.content.start, ast.module.content.end) + '\n{\n' : '';
     const prefixLines = outer.split('\n').length - 1;
     const source = ts.createSourceFile(filename + '.ts', outer + body + (outer ? '\n}' : ''), ts.ScriptTarget.Latest, true);
-    for (const row of directMeteorRegistrationReferences(source)) {
+    for (const row of directFrameworkRegistrationReferences(source)) {
       if (row.line > prefixLines) findings.push({ ...row, line: row.line - prefixLines + offset });
     }
   }
@@ -95,23 +125,34 @@ export function componentRegistrationReferences(filename, text) {
   // Compilation resolves template expressions and references across script scopes.
   const { js } = compile(text, { filename, generate: 'client' });
   const emitted = ts.createSourceFile(filename + '.js', js.code, ts.ScriptTarget.Latest, true);
-  return directMeteorRegistrationReferences(emitted).map(row => ({ ...row, line: 'generated line ' + row.line }));
+  return directFrameworkRegistrationReferences(emitted).map(row => ({ ...row, line: 'generated line ' + row.line }));
 }
 
 export function packageRegistrationReferences(source, isUploadOwner) {
-  let accepted = 0;
-  const findings = directMeteorRegistrationReferences(source, node => {
+  let methodCalls = 0;
+  let httpCalls = 0;
+  const findings = directFrameworkRegistrationReferences(source, (node, member) => {
     const call = node.parent;
     const statement = call.parent;
     const body = statement.parent;
-    if (!isUploadOwner || !ts.isPropertyAccessExpression(node) || node.name.text !== 'methods' ||
+    if (!isUploadOwner || !ts.isPropertyAccessExpression(node) ||
         !ts.isCallExpression(call) || call.expression !== node || call.arguments.length !== 1 ||
-        !ts.isIdentifier(call.arguments[0]) || call.arguments[0].text !== '_methods' ||
-        !ts.isExpressionStatement(statement) || !ts.isBlock(body) || !ts.isConstructorDeclaration(body.parent) ||
+        !ts.isExpressionStatement(statement) || !ts.isBlock(body) ||
         body.parent.parent.name?.text !== 'FilesCollection') return false;
-    accepted++;
-    return true;
+    if (member === 'methods' && ts.isConstructorDeclaration(body.parent) &&
+        ts.isIdentifier(call.arguments[0]) && call.arguments[0].text === '_methods') {
+      methodCalls++;
+      return true;
+    }
+    if (member === 'WebApp.connectHandlers.use' && ts.isMethodDeclaration(body.parent) &&
+        body.parent.name.getText(source) === '_registerHttpHandlers' &&
+        ts.isArrowFunction(call.arguments[0])) {
+      httpCalls++;
+      return true;
+    }
+    return false;
   });
-  if (isUploadOwner && accepted !== 1) throw new Error('Expected exactly one FilesCollection constructor upload registration');
+  if (isUploadOwner && methodCalls !== 1) throw new Error('Expected exactly one FilesCollection constructor upload registration');
+  if (isUploadOwner && httpCalls !== 1) throw new Error('Expected exactly one FilesCollection HTTP registration in its owner method');
   return findings;
 }

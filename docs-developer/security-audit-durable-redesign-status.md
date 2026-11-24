@@ -120,8 +120,8 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
 - [x] Slot 95 verified confirmed package deletion, persisted archive processing, and ownership checks for upload confirmation and cancellation. Automatic collaborator-media removal requires a matching lesson target and stimulus-set identity. Shared media, matching names in unrelated uploads, and incomplete upload metadata were covered.
 - [x] Slot 97 verified private-copy isolation, separate on-demand ZIP export, and deletion before or after export. The copied condition family and its referenced media survived original-package deletion. The same run verified three lesson editor/generated-package methods and five OpenRouter methods.
 - [x] Operator approved requiring teachers to have lesson access when using lesson audio keys. Source implementation also checks current lesson access for a teacher with prior practice, while retaining administrator testing and participant access.
-- [ ] Verify the approved audio rule through both installed Google methods in slot 98.
-- [ ] Verify the remaining two Google audio methods. Slot 97 brought verified coverage to 191 application and four package declarations across 197 method names. All 21 publications have declarations. The five Phase 3 exit groups remain open.
+- [x] Slot 98 verified both installed Google audio methods. A teacher with prior practice and no remaining lesson grant was denied before any provider request. Sharing the lesson allowed both operations. Administrator testing and a new experiment participant's audio also passed with stubbed provider responses.
+- [x] Close method-name reconciliation. The source inventory matches all 197 method names to verification declarations, including 193 application methods and four package methods. All 21 publication names match. The five broader Phase 3 exit groups remain open, including the complete startup inventory and exact staging2 qualification.
 
 
 - [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
@@ -242,7 +242,8 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   - [x] Check direct references to Meteor.methods and Meteor.publish in application server JavaScript and TypeScript, including renamed imports, aliases, literal property access and destructuring. Shadowed unrelated names are covered by a source regression. Other roots, dynamically computed dispatch, HTTP and package ownership still need their own checks.
   - [x] Extend direct Meteor registration checks to JavaScript and TypeScript in client, common and learning-components. Computed Meteor access that cannot be resolved is now reported. Checked 218 server, 380 client, 107 common and 163 learning-component files. Package owners and other registration APIs have separate acceptance checks.
   - [x] Check direct Meteor method/publication registration across 61 tracked Svelte components. Cover authored typed scripts, module/instance scope, template event expressions and unrelated shadowed names. The full source check still finds 306 declared surfaces.
-  - [x] Extend direct method/publication registration checks to local Meteor packages with package manifests. Require exactly one registration of the upload handler table in the maintained FilesCollection constructor. Reject additional calls and deferred references there and direct registrations in other package sources. Full lint and Linux source-security regressions passed. Framework and HTTP coverage and retiring the old checker remain open.
+  - [x] Extend direct method/publication registration checks to local Meteor packages with package manifests. Require exactly one registration of the upload handler table in the maintained FilesCollection constructor. Reject additional calls and deferred references there and direct registrations in other package sources. Full lint and Linux source-security regressions passed.
+  - [x] Extend the static adapter check to WebApp HTTP stack registrations across the same source roots. Cover renamed and namespace imports, stack aliases, destructuring, unresolved computed properties and unrelated local routers. The maintained FilesCollection HTTP registration is permitted only in its existing owner method. Six focused checker tests, repository lint and the full Linux source-security suite passed. OAuth and account hook ownership and retirement of the old checker are still open.
 - [ ] Qualify the complete matched image and scanner on staging2, including login, ordinary learner behavior and enabled providers. The earlier condition-index cutover covered that specific change only.
 
 ## Phase 3 HTTP characterization started (2026-11-18)
@@ -1946,11 +1947,13 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 101 total, 96 consumed, 1 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 101 total, 97 consumed, 0 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
 
 The operator authorized up to five additional batched local Meteor integration invocations, including retries, for the remaining security-audit work (slots 92–96). Reserve each invocation here before starting the suite and record its outcome afterward.
 
-The operator authorized up to five additional local batched Meteor invocations on 2026-11-24 (slots 97–101), including retries. Slot 98 is reserved for teacher, administrator and participant audio verification.
+The operator authorized up to five additional local batched Meteor invocations on 2026-11-24 (slots 97–101), including retries. Slots 99–101 remain available.
+
+Slot 98 passed on 6be07c80. Server 1,159 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. Both audio authorization cases passed with stubbed provider responses. The worker reused its image and completed cleanup. Receipt /var/tmp/mofacts-integration.7y8QyG4q/results/native-verification.json SHA-256 5b00d16293eed2878d3eeb820b146a3a98580c81213521641f276df7d032f9c8. An earlier preparation attempt hit a Docker Hub TLS timeout while acquiring MongoDB and cleaned up before invoking Meteor. It did not consume another slot.
 
 Slot 97 passed on f3aaf7f7. Server 1,158 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. The corrected copy regression and all targeted method tests passed, and cleanup completed. Receipt /var/tmp/mofacts-integration.s7uyz1Ak/results/native-verification.json SHA-256 937e6c18b815a1bab9c119fb11ab87bb6ff7293e062d00ebbbf4be631bd27bb1.
 
