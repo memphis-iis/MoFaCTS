@@ -1,4 +1,9 @@
 import { Meteor } from 'meteor/meteor';
+import { strict as assert } from 'node:assert';
+import { Roles } from 'meteor/alanning:roles';
+import { Random } from 'meteor/random';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
+import { ADMIN_ROLE_CHANGE_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
 import { expect } from 'chai';
 import { createAdminMethods } from './adminMethods';
 
@@ -12,6 +17,7 @@ function createAdminDeps(
 ) {
   let dynamicSettingsDoc: any = null;
   return {
+    isValidEmailAddress: (value: string) => value.includes('@'),
     serverConsole: () => undefined,
     usersCollection: {
       find: () => ({ fetchAsync: async () => [] }),
@@ -182,6 +188,51 @@ describe('adminMethods', function() {
       pageId: 'compound-page',
       display,
     });
+  });
+
+  it('protects self and configured roles while permitting ordinary administrator handoff', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed admin role change');
+    const rows = observed.surfaces.filter(row => row.name === 'userAdminRoleChange');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]?.verification, ADMIN_ROLE_CHANGE_VERIFICATION);
+    const handler = (Meteor as any).server.method_handlers.userAdminRoleChange;
+    const admin = Random.id(), successor = Random.id();
+    const email = successor.toLowerCase() + '@example.invalid';
+    const alias = admin.toLowerCase() + '@example.invalid';
+    const settings = Meteor.settings as any;
+    const initRoles = settings.initRoles;
+    const change = (actor: string, target: string, action: string, role: string) =>
+      handler.call({ userId: actor }, target, action, role);
+    try {
+      await Meteor.users.insertAsync({ _id: admin, username: admin } as any);
+      await Meteor.users.insertAsync({ _id: successor, username: successor, emails: [
+        { address: email, verified: true }, { address: alias, verified: true },
+      ] } as any);
+      for (const role of ['admin', 'teacher']) await Roles.createRoleAsync(role, { unlessExists: true });
+      await Roles.addUsersToRolesAsync(admin, 'admin');
+      await assert.rejects(change(successor, admin, 'remove', 'admin'), (e: any) => e.error === 'not-authorized');
+      await assert.rejects(change(admin, admin, 'remove', 'admin'), (e: any) => e.error === 'admin-self-demotion');
+      await change(admin, successor, 'add', 'admin');
+      await change(admin, successor, 'add', 'teacher');
+      settings.initRoles = { admins: [email.toUpperCase()], teachers: [alias] };
+      for (const role of ['admin', 'teacher']) {
+        await assert.rejects(change(admin, successor, 'remove', role), (e: any) => e.error === 'role-granted-by-settings');
+        assert.equal(await Roles.userIsInRoleAsync(successor, role), true);
+      }
+      settings.initRoles = { admins: [email], teachers: [] };
+      await change(admin, successor, 'remove', 'teacher');
+      assert.equal(await Roles.userIsInRoleAsync(successor, 'teacher'), false);
+      await change(successor, admin, 'remove', 'admin');
+      assert.equal(await Roles.userIsInRoleAsync(admin, 'admin'), false);
+    } finally {
+      if (initRoles === undefined) delete settings.initRoles;
+      else settings.initRoles = initRoles;
+      for (const id of [admin, successor]) {
+        await Roles.setUserRolesAsync(id, []);
+        await Meteor.users.removeAsync(id);
+      }
+    }
   });
 
   it('does not let a non-admin caller grant roles', async function() {

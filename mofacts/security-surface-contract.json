@@ -794,7 +794,8 @@
     },
     {
       "name": "userAdminRoleChange",
-      "access": "admin-only"
+      "access": "admin-only",
+      "review": "Administrator-only role management protects the caller from self-demotion and preserves deployment-managed grants."
     },
     {
       "name": "completeProlificParticipation",

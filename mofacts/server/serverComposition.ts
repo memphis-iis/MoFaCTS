@@ -55,7 +55,7 @@ import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
 import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
-import { UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -771,6 +771,7 @@ export const methods: any = {
   }),
 
   ...createAdminMethods({
+    isValidEmailAddress,
     removeSparcFigureUserDecisions: async userId => { await removeSparcFigureUserDecisions(userId); await removeSparcMoveUserRecords(userId); },
     removeSimulationResearchUserRecords,
     serverConsole,
@@ -1170,6 +1171,8 @@ export const asyncMethods: Record<string, unknown> = {
 registerMeteorMethods(Meteor, {...methods, ...asyncMethods}, [
   ...securityAuditRuntime.methodBindings,
   ...courseReadBindings,
+  { verification: ADMIN_ROLE_CHANGE_VERIFICATION, handler: methods.userAdminRoleChange,
+    policy: { kind: 'role', role: 'admin', authorize: requireAdminUser }, dataEgress: 'role-change-result' },
   ...UPLOAD_READ_VERIFICATIONS.map(verification => ({
     verification, handler: methods[verification.method], policy: uploadReadPolicy,
     dataEgress: verification.method === 'getUserAssetByName' ? 'owned-asset-filename' as const : 'own-upload-quota' as const,

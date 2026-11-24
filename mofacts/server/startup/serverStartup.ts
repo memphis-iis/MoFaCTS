@@ -1,4 +1,5 @@
 import { PARTICIPANT_TOKEN_PREFIX, studyOnlyAccount } from '../../common/participantPrivacy';
+import { configuredRoleNames, configuredLoginIdentity, startupRoleIdentifier } from '../lib/configuredRoles';
 import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import { Roles } from 'meteor/alanning:roles';
@@ -266,22 +267,8 @@ async function findUserByName(deps: RunServerStartupDeps, username: string) {
   if (!username || username.length < 1) {
     return null;
   }
-  const normalizedUsername = username.trim();
-  const lookupSelector = deps.isValidEmailAddress(normalizedUsername)
-    ? {
-        $or: [
-          { username: normalizedUsername.toLowerCase() },
-          { email_canonical: normalizedUsername.toLowerCase() },
-          { 'emails.address': normalizedUsername.toLowerCase() },
-        ],
-      }
-    : {
-        $or: [
-          { username: normalizedUsername },
-          { email_canonical: normalizedUsername },
-          { 'emails.address': normalizedUsername },
-        ],
-      };
+  const identity = startupRoleIdentifier(username, deps.isValidEmailAddress);
+  const lookupSelector = { $or: [{ username: identity }, { email_canonical: identity }, { 'emails.address': identity }] };
   return await deps.usersCollection.findOneAsync(lookupSelector);
 }
 
@@ -505,7 +492,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     }
 
     const userId = loginInfo.user._id;
-    const userEmail = loginInfo.user.emails?.[0]?.address || loginInfo.user.email || loginInfo.user.username;
+    const userEmail = configuredLoginIdentity(loginInfo.user);
     const normalizedUserEmail = typeof userEmail === 'string' ? userEmail.trim().toLowerCase() : '';
     const isOAuthLogin = loginInfo.type === 'google' || loginInfo.type === 'microsoft' || loginInfo.type === 'memphisSaml';
 
@@ -521,8 +508,8 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
 
     const initRoles = (Meteor.settings as any)?.initRoles;
     if (initRoles && normalizedUserEmail && userId) {
-      const admins = (initRoles?.admins || []).map((value: unknown) => String(value).trim().toLowerCase()).filter(Boolean);
-      const teachers = (initRoles?.teachers || []).map((value: unknown) => String(value).trim().toLowerCase()).filter(Boolean);
+      const admins = configuredRoleNames(initRoles, 'admin').map(name => name.toLowerCase());
+      const teachers = configuredRoleNames(initRoles, 'teacher').map(name => name.toLowerCase());
       if (admins.includes(normalizedUserEmail)) {
         deps.serverConsole('[ACCOUNTS.ONLOGIN] Matching initRoles.admins entry found; assigning admin role');
         try {
@@ -728,8 +715,8 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   }
 
   const roleSettings = ((Meteor.settings as any)?.initRoles || {}) as { admins?: unknown[]; teachers?: unknown[] };
-  const roleAdd = async (memberName: 'admins' | 'teachers', roleName: 'admin' | 'teacher') => {
-    const requested = Array.isArray(roleSettings[memberName]) ? roleSettings[memberName] as unknown[] : [];
+  const roleAdd = async (roleName: 'admin' | 'teacher') => {
+    const requested = configuredRoleNames(roleSettings, roleName);
     deps.serverConsole('Role', roleName, '- found', requested.length);
     for (const username of requested) {
       const user = await findUserByName(deps, String(username || ''));
@@ -742,8 +729,8 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       deps.serverConsole('Configured role assignment completed:', { role: roleName });
     }
   };
-  await roleAdd('admins', 'admin');
-  await roleAdd('teachers', 'teacher');
+  await roleAdd('admin');
+  await roleAdd('teacher');
 
   if (await deps.Tdfs.find().countAsync() === 0) {
     await bootstrapPrivateRepoContentIfNeeded({

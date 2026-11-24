@@ -13,6 +13,7 @@ import {
   type AdminApiKeyProvider,
   type AdminApiKeySettingsDoc,
 } from '../lib/apiKeyResolution';
+import { roleGrantedBySettings } from '../lib/configuredRoles';
 import { removeUserOwnedData } from '../lib/userDeletion';
 
 type UnknownRecord = Record<string, unknown>;
@@ -34,6 +35,7 @@ type FetchCursor = {
 };
 
 type AdminMethodsDeps = {
+  isValidEmailAddress: (value: string) => boolean;
   serverConsole: Logger;
   csvParser?: CsvParser | undefined;
   usersCollection: {
@@ -651,6 +653,16 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         throw new Meteor.Error('not-found', 'Invalid: could not find that user');
       }
 
+      if (normalizedRoleAction === 'remove') {
+        if (normalizedRoleName === 'admin' && normalizedTargetUserId === this.userId) {
+          throw new Meteor.Error('admin-self-demotion', 'Another administrator must remove your admin role.');
+        }
+        const settings = Meteor.settings as any;
+        if (roleGrantedBySettings(settings.initRoles, normalizedRoleName as 'admin' | 'teacher', targetUser,
+          deps.isValidEmailAddress, settings.owner)) {
+          throw new Meteor.Error('role-granted-by-settings', 'Site settings grant this role. Remove the setting before removing the role in User Admin.');
+        }
+      }
       const targetUsername = targetUser?.username;
 
       if (normalizedRoleAction === 'add') {

@@ -1354,7 +1354,12 @@ Template.userAdmin.events({
         applyConfirmedRoleState(instance, result as UserAdminRoleChangeResult);
         return { message: userAdminText('admin.updatedRoleForUser', { role: roleName }) };
       },
-      { getErrorMessage: (error: unknown) => userAdminText('admin.requestFailed', { error: getErrorMessage(error) }) },
+      { getErrorMessage: (error: unknown) => {
+        const code = (error as { error?: string } | null)?.error;
+        if (code === 'admin-self-demotion') return userAdminText('admin.selfDemotion');
+        if (code === 'role-granted-by-settings') return userAdminText('admin.configuredRole');
+        return userAdminText('admin.requestFailed', { error: getErrorMessage(error) });
+      } },
     );
   },
 
