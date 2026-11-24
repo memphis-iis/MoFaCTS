@@ -1,5 +1,6 @@
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
+import { contentMediaStimuliSetId } from '../../common/fileUploadPolicy';
 import {
   hasUserRole,
   requireAuthenticatedUser,
@@ -11,34 +12,26 @@ type MethodContext = {
   userId?: string | null;
 };
 
-type DynamicAssetDoc = {
-  _id?: string;
+export const packageDeletionPolicy = Object.freeze({
+  kind: 'content-maintenance', operation: 'archive-and-family-owner-or-admin', authorize: hasUserRole,
+} as const);
+
+type PackageMediaAsset = {
+  _id: string;
   userId?: string;
   name?: string;
   fileName?: string;
-  size?: unknown;
-  type?: unknown;
-  uploadedAt?: unknown;
-  ext?: unknown;
-  meta?: { public?: boolean; stimuliSetId?: unknown; storageBackend?: unknown; storageKey?: unknown };
+  meta: { tdfId: string; stimuliSetId: string | number };
 };
 
-type TdfLike = {
-  _id?: string;
-  ownerId?: string;
-  accessors?: Array<{ userId?: string }>;
-  packageFile?: string | null;
-  packageAssetId?: unknown;
-  stimuliSetId?: unknown;
-  stimuli?: Array<Record<string, unknown>>;
-  content?: {
-    fileName?: string;
-  };
-};
+type PackageLesson = { _id: string; ownerId?: string; stimuliSetId?: unknown };
 
 type ContentAssetMaintenanceDeps = {
   Tdfs: {
-    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]>; countAsync?: () => Promise<number> };
+    find: (selector: UnknownRecord, options?: UnknownRecord) => {
+      fetchAsync: () => Promise<any[]>;
+      forEachAsync: (visit: (lesson: UnknownRecord) => void) => Promise<void>;
+    };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
@@ -49,59 +42,64 @@ type ContentAssetMaintenanceDeps = {
   };
   serverConsole: (...args: unknown[]) => void;
   normalizeCanonicalId: (value: unknown) => string | null;
-  getStimuliSetIdCandidates: (stimuliSetId: string | number | null | undefined) => Array<string | number>;
   deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
   getMethodAuthorizationDeps: () => any;
 };
 
-function hasNonEmptyValue(value: unknown): boolean {
-  return value !== null && value !== undefined && String(value).trim() !== '';
-}
-
-function stimuliSetCandidates(deps: ContentAssetMaintenanceDeps, stimuliSetId: unknown): Array<string | number> {
-  if (!hasNonEmptyValue(stimuliSetId)) {
-    return [];
+function retainReferencedMedia(value: unknown, candidates: Map<string, string[]>): void {
+  if (typeof value === 'string') {
+    const text = value.toLowerCase();
+    for (const [id, tokens] of candidates) {
+      if (tokens.some(token => text.includes(token))) candidates.delete(id);
+    }
+    return;
   }
-  return deps.getStimuliSetIdCandidates(stimuliSetId as string | number);
-}
-
-function stimuliSetKey(value: unknown): string {
-  return `${typeof value}:${String(value)}`;
-}
-
-async function removeAssetsForInactiveStimuliSets(deps: ContentAssetMaintenanceDeps, stimuliSetIds: unknown[]): Promise<number> {
-  let removedCount = 0;
-  const seen = new Set<string>();
-  for (const stimuliSetId of stimuliSetIds) {
-    const candidates = stimuliSetCandidates(deps, stimuliSetId);
-    const key = candidates.map(stimuliSetKey).sort().join('|');
-    if (!key || seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-
-    const remainingTdfs = await deps.Tdfs.find(
-      { stimuliSetId: { $in: candidates } },
-      { fields: { _id: 1 } }
-    ).fetchAsync();
-    if (remainingTdfs.length > 0) {
-      continue;
-    }
-
-    const assets = await deps.DynamicAssets.find(
-      { 'meta.stimuliSetId': { $in: candidates } },
-      { fields: { _id: 1, name: 1 } }
-    ).fetchAsync();
-    for (const asset of assets as DynamicAssetDoc[]) {
-      if (!asset?._id) {
-        continue;
-      }
-      await deps.DynamicAssets.removeAsync({ _id: asset._id });
-      removedCount += 1;
-      deps.serverConsole('Removed orphaned DynamicAsset for deleted stimuli set:', asset._id, asset.name || '', stimuliSetId);
-    }
+  if (!value || typeof value !== 'object') return;
+  for (const child of Object.values(value)) {
+    if (candidates.size === 0) break;
+    retainReferencedMedia(child, candidates);
   }
-  return removedCount;
+}
+
+async function removeUnusedPackageMedia(deps: ContentAssetMaintenanceDeps, family: PackageLesson[]) {
+  if (family.length === 0) return;
+  const scopes = new Map(family.map(lesson => [lesson._id, contentMediaStimuliSetId(lesson)]));
+  const stimulusSetIds = [...new Set(scopes.values())].filter(scope => scope !== null);
+  if (stimulusSetIds.length === 0) return;
+  const assets: PackageMediaAsset[] = await deps.DynamicAssets.find({
+    'meta.stimuliSetId': { $in: stimulusSetIds },
+    'meta.uploadPurpose': 'content-media',
+    'meta.tdfId': { $in: [...scopes.keys()] },
+  }, { fields: { _id: 1, userId: 1, name: 1, fileName: 1, meta: 1 } }).fetchAsync();
+  const candidates = new Map<string, string[]>();
+  const assetsByStimulusSet = new Map<string, string[]>();
+  for (const asset of assets) {
+    const scope = scopes.get(asset.meta.tdfId);
+    if (scope == null || asset.meta.stimuliSetId !== scope) continue;
+    const scopeKey = String(scope);
+    const scopedAssets = assetsByStimulusSet.get(scopeKey) ?? [];
+    scopedAssets.push(asset._id);
+    assetsByStimulusSet.set(scopeKey, scopedAssets);
+    const names = [asset.name, asset.fileName].filter((name): name is string => Boolean(name));
+    candidates.set(asset._id, [asset._id, ...names, ...names.map(encodeURIComponent)].map(token => token.toLowerCase()));
+  }
+  if (candidates.size === 0) return;
+
+  // Lesson media can appear in formatted stimuli, source stimuli, or nested tutor content.
+  // A bare name is ambiguous, so a surviving match preserves the asset.
+  await deps.Tdfs.find({}, {
+    fields: { stimuliSetId: 1, stimuli: 1, rawStimuliFile: 1, content: 1 }, batchSize: 100,
+  }).forEachAsync(lesson => {
+    for (const id of assetsByStimulusSet.get(String(lesson.stimuliSetId)) ?? []) candidates.delete(id);
+    if (candidates.size > 0) retainReferencedMedia(lesson, candidates);
+  });
+  for (const asset of assets) {
+    if (!candidates.has(asset._id)) continue;
+    await deps.DynamicAssets.removeAsync({
+      _id: asset._id, userId: asset.userId ?? null, name: asset.name ?? null, fileName: asset.fileName ?? null,
+      'meta.uploadPurpose': 'content-media', 'meta.tdfId': asset.meta.tdfId, 'meta.stimuliSetId': asset.meta.stimuliSetId,
+    });
+  }
 }
 
 export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenanceDeps) {
@@ -125,16 +123,18 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
 
       try {
         let deletedCount = 0;
-        const touchedStimuliSetIds = new Set();
         const packageAssetId = deps.normalizeCanonicalId(packageAssetIdInput);
         if (!packageAssetId) {
           throw new Meteor.Error(404, 'Package asset id missing');
         }
 
-        const isAdmin = await hasUserRole(deps.getMethodAuthorizationDeps(), userId, ['admin']);
+        const isAdmin = await packageDeletionPolicy.authorize(deps.getMethodAuthorizationDeps(), userId, ['admin']);
         const packageAsset = await deps.DynamicAssets.findOneAsync({ _id: packageAssetId });
         if (packageAsset && !isAdmin && packageAsset.userId !== userId) {
           throw new Meteor.Error(403, 'Can only delete your own packages');
+        }
+        if (packageAsset?.meta?.uploadPurpose === 'content-media') {
+          throw new Meteor.Error(400, 'Selected file is lesson media, not a package archive');
         }
         const packageFileCandidates = new Set<string>();
         const packageExt = typeof packageAsset?.ext === 'string' && packageAsset.ext.trim()
@@ -154,7 +154,6 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
             _id: 1,
             ownerId: 1,
             stimuliSetId: 1,
-            stimuli: 1,
             'content.tdfs.tutor.setspec.conditionTdfIds': 1,
           } }
         ).fetchAsync();
@@ -165,7 +164,7 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
           throw new Meteor.Error(403, 'Can only delete your own packages');
         }
 
-        const familyIds = matchingTdfs.map((tdf: TdfLike) => String(tdf._id || '')).filter(Boolean);
+        const familyIds = matchingTdfs.map((tdf: PackageLesson) => tdf._id);
         const externalParents = familyIds.length > 0
           ? await deps.Tdfs.find(
               {
@@ -183,73 +182,12 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
           throw new Meteor.Error('partial-family-deletion-forbidden', 'The selected package is not a complete, isolated lesson family.');
         }
 
-        const assetsToCheck = new Set();
-        for (const TDF of matchingTdfs as Array<TdfLike>) {
-          if (TDF && (isAdmin || TDF.ownerId === userId)) {
-            const tdfId = TDF._id;
-            if (TDF.stimuliSetId !== undefined && TDF.stimuliSetId !== null) {
-              touchedStimuliSetIds.add(TDF.stimuliSetId);
-            }
-            if (Array.isArray(TDF.stimuli)) {
-              for (const stim of TDF.stimuli) {
-                if (stim?.stimuliSetId !== undefined && stim?.stimuliSetId !== null) {
-                  touchedStimuliSetIds.add(stim.stimuliSetId);
-                }
-              }
-            }
-            if (tdfId) {
-              await deps.deleteTdfRuntimeData(tdfId);
-              await deps.Tdfs.removeAsync({ _id: tdfId });
-              deletedCount++;
-              deps.serverConsole('Deleted TDF:', tdfId);
-            }
-
-            if (TDF.stimuli) {
-              for (const stim of TDF.stimuli) {
-                const asset = stim.imageStimulus || stim.audioStimulus || stim.videoStimulus || false;
-                if (asset) {
-                  assetsToCheck.add(asset);
-                }
-              }
-            }
+        for (const lesson of matchingTdfs as PackageLesson[]) {
+          await deps.deleteTdfRuntimeData(lesson._id);
+          if (await deps.Tdfs.removeAsync({ _id: lesson._id, ownerId: lesson.ownerId ?? null }) !== 1) {
+            throw new Meteor.Error(409, 'Lesson changed before deletion');
           }
-        }
-
-        if (assetsToCheck.size > 0) {
-          deps.serverConsole('Checking', assetsToCheck.size, 'assets for potential deletion');
-
-          const assetNames = Array.from(assetsToCheck);
-          const tdfsStillUsingAssets = await deps.Tdfs.find({
-            $or: [
-              { 'stimuli.imageStimulus': { $in: assetNames } },
-              { 'stimuli.audioStimulus': { $in: assetNames } },
-              { 'stimuli.videoStimulus': { $in: assetNames } },
-            ],
-          }, { fields: { stimuli: 1 } }).fetchAsync();
-
-          const stillUsedAssets = new Set();
-          for (const tdf of tdfsStillUsingAssets as Array<{ stimuli?: Array<{ imageStimulus?: string; audioStimulus?: string; videoStimulus?: string }> }>) {
-            if (tdf.stimuli) {
-              for (const stim of tdf.stimuli) {
-                if (stim.imageStimulus) stillUsedAssets.add(stim.imageStimulus);
-                if (stim.audioStimulus) stillUsedAssets.add(stim.audioStimulus);
-                if (stim.videoStimulus) stillUsedAssets.add(stim.videoStimulus);
-              }
-            }
-          }
-
-          for (const assetName of assetsToCheck) {
-            if (!stillUsedAssets.has(assetName)) {
-              try {
-                await deps.DynamicAssets.removeAsync({ name: assetName });
-                deps.serverConsole('Asset removed (not used by other TDFs):', assetName);
-              } catch (err: unknown) {
-                deps.serverConsole('Error removing asset:', err);
-              }
-            } else {
-              deps.serverConsole('Asset kept (still used by other TDFs):', assetName);
-            }
-          }
+          deletedCount++;
         }
 
         deps.serverConsole('Removing package asset with ID:', packageAssetId);
@@ -260,10 +198,7 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
           deps.serverConsole('Package file not found in DynamicAssets (may have been deleted already)');
         }
 
-        const orphanedAssetsRemoved = await removeAssetsForInactiveStimuliSets(deps, Array.from(touchedStimuliSetIds));
-        if (orphanedAssetsRemoved > 0) {
-          deps.serverConsole('Removed orphaned assets for deleted package:', orphanedAssetsRemoved);
-        }
+        await removeUnusedPackageMedia(deps, matchingTdfs);
 
         return { deletedCount };
       } catch (e: unknown) {

@@ -19,6 +19,14 @@ now use the same summary value. The media identifier attribute has been removed.
 An outdated client that submits the wrong type receives `invalid-upload-target`;
 reload the page after deployment.
 
+## Whole-package deletion
+
+Deleting a confirmed lesson family can also remove a collaborator's upload
+when the file records a lesson in that family and the exact stimulus-set
+identity matches. A surviving lesson that uses the same stimulus set or refers
+to the file keeps it. Files with missing or conflicting upload information
+remain available for individual review.
+
 ## Existing uploads
 
 Normal application startup invokes `repairContentMediaIdentity` after interrupted

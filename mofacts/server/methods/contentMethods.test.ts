@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { Meteor } from 'meteor/meteor';
-import { MANUAL_DRAFT_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { MANUAL_DRAFT_VERIFICATIONS, PACKAGE_DELETION_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
 import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
 import { Mongo } from 'meteor/mongo';
 import { Random } from 'meteor/random';
@@ -254,77 +254,60 @@ describe('contentMethods content upload summaries', function() {
     }
   });
 
-  it('removes scoped DynamicAssets when deleting the last TDF for a package stimuli set', async function() {
-    const tdfs = [
-      { _id: 'tdf-delete', ownerId: 'owner', stimuliSetId: 88, packageAssetId: 'package-delete', stimuli: [] },
-    ];
-    const assets = [
-      { _id: 'package-delete', name: 'package-delete.zip', ext: 'zip', userId: 'owner', meta: {} },
-      { _id: 'media-delete', name: 'lesson.jpg', ext: 'jpg', meta: { stimuliSetId: 88 } },
-      { _id: 'media-keep', name: 'other.jpg', ext: 'jpg', meta: { stimuliSetId: 99 } },
-    ];
-    const removed: string[] = [];
-    const deps = createContentDeps({
-      Tdfs: {
-        find: (selector: any) => ({
-          fetchAsync: async () => {
-            if (selector?._id?.$nin) {
-              return [];
-            }
-            if (selector?.$or) {
-              return tdfs.filter((tdf) => tdf.packageAssetId === 'package-delete');
-            }
-            if (selector?.stimuliSetId?.$in) {
-              return tdfs.filter((tdf) => selector.stimuliSetId.$in.includes(tdf.stimuliSetId));
-            }
-            return tdfs;
-          },
-          countAsync: async () => tdfs.length
-        }),
-        findOneAsync: async () => null,
-        updateAsync: async () => undefined,
-        removeAsync: async (selector: any) => {
-          const index = tdfs.findIndex((tdf) => tdf._id === selector._id);
-          if (index >= 0) {
-            tdfs.splice(index, 1);
-          }
-        }
-      },
-      DynamicAssets: {
-        find: (selector: any) => ({
-          fetchAsync: async () => {
-            if (selector?.['meta.stimuliSetId']?.$in) {
-              return assets.filter((asset) => selector['meta.stimuliSetId'].$in.includes(asset.meta?.stimuliSetId));
-            }
-            return assets;
-          },
-          countAsync: async () => assets.length
-        }),
-        findOneAsync: async (selector: any) => assets.find((asset) => asset._id === selector._id) || null,
-        removeAsync: async (selector: any) => {
-          removed.push(selector._id);
-          const index = assets.findIndex((asset) => asset._id === selector._id);
-          if (index >= 0) {
-            assets.splice(index, 1);
-          }
-        },
-        collection: {
-          rawCollection: () => ({ aggregate: () => ({ toArray: async () => [] }) }),
-          updateAsync: async () => undefined
-        }
-      },
-      getStimuliSetIdCandidates: (value: unknown) => {
-        const text = String(value);
-        const numberValue = Number(text);
-        return Number.isFinite(numberValue) ? [text, numberValue] : [text];
-      },
-      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => true })
+  it('deletes only package-bound media with no surviving lesson reference', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw Error(observed.reason);
+    const binding = observed.surfaces.find(({ name }) => name === 'deletePackageFile');
+    assert.equal(binding?.verification, PACKAGE_DELETION_VERIFICATION);
+    const tdfs = new Mongo.Collection<any>('packageDeletionLessons' + Random.id());
+    const assets = new Mongo.Collection<any>('packageDeletionAssets' + Random.id());
+    const makeMedia = (id: string, name: string, target = 'lesson', setId: string | number = 88) => ({
+      _id: id, name, userId: 'collaborator',
+      meta: { uploadPurpose: 'content-media', tdfId: target, stimuliSetId: setId },
     });
-    const methods = createContentMethods(deps);
+    const methods = createContentMethods(createContentDeps({
+      Tdfs: tdfs, DynamicAssets: assets,
+      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => false }),
+    }));
 
-    await methods.deletePackageFile.call({ userId: 'admin-user' }, 'package-delete', { wholeFamily: true });
+    try {
+      await tdfs.insertAsync({ _id: 'lesson', ownerId: 'owner', stimuliSetId: 88, packageAssetId: 'archive' });
+      await tdfs.insertAsync({ _id: 'condition', ownerId: 'owner', stimuliSetId: 89, packageAssetId: 'archive' });
+      await tdfs.insertAsync({ _id: 'neighbor-scope', ownerId: 'other', stimuliSetId: '89' });
+      await tdfs.insertAsync({
+        _id: 'other', ownerId: 'other', stimuliSetId: 98,
+        content: { tdfs: { tutor: { setspec: { lessonHelp: '<img src="/dynamic-assets/shared-id/photo.png">' } } } },
+        rawStimuliFile: { setspec: { clusters: [{ stims: [{ audioStimulus: 'same name.wav' }] }] } },
+      });
+      for (const asset of [
+        { _id: 'archive', userId: 'owner', ext: 'zip', meta: { uploadPurpose: 'package' } },
+        makeMedia('delete-me', 'other.png'),
+        makeMedia('shared-id', 'photo.png'),
+        makeMedia('same-name', 'same name.wav'),
+        makeMedia('sibling-scope', 'condition.png', 'condition', 89),
+        makeMedia('unrelated-id', 'other.png', 'other', 98),
+        makeMedia('mismatched-scope', 'scope.png', 'lesson', '88'),
+        { _id: 'legacy-scope-only', name: 'other.png', meta: { stimuliSetId: 88 } },
+      ]) await assets.insertAsync(asset);
 
-    expect(removed).to.deep.equal(['package-delete', 'media-delete']);
-    expect(assets.map((asset) => asset._id)).to.deep.equal(['media-keep']);
+      await assert.rejects(
+        methods.deletePackageFile.call({ userId: 'owner' }, 'archive'),
+        (error: any) => error.error === 'whole-family-confirmation-required',
+      );
+      await assert.rejects(
+        methods.deletePackageFile.call({ userId: 'collaborator' }, 'archive', { wholeFamily: true }),
+        (error: any) => error.error === 403,
+      );
+      assert.equal(await tdfs.find({ packageAssetId: 'archive' }).countAsync(), 2);
+      assert.deepEqual(await methods.deletePackageFile.call({ userId: 'owner' }, 'archive', { wholeFamily: true }),
+        { deletedCount: 2 });
+      assert.equal(await tdfs.find({ packageAssetId: 'archive' }).countAsync(), 0);
+      assert.deepEqual((await assets.find({}).mapAsync(asset => asset._id)).sort(), [
+        'legacy-scope-only', 'mismatched-scope', 'same-name', 'shared-id', 'sibling-scope', 'unrelated-id',
+      ]);
+    } finally {
+      await tdfs.removeAsync({});
+      await assets.removeAsync({});
+    }
   });
 });

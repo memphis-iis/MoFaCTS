@@ -20,6 +20,7 @@ import { createPackageGeneratedContentMethods, prepareAiGeneratedPackage } from 
 import type { ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 import { validateAndEncryptUploadedApiKey } from '../lib/uploadedApiKeyValidation';
 import { assertNoH5PContent } from '../../common/lib/unsupportedContent';
+import { requireAuthenticatedUser } from '../lib/methodAuthorization';
 import { requireContentCreatorDisplayName } from '../lib/contentCreatorIdentity';
 import {
   reconcileConditionCountsByChildId,
@@ -27,22 +28,18 @@ import {
 } from '../../common/lib/tdfIdentityContract';
 import { assertValidTdfExpressions } from '../../common/lib/tdfExpressionValidation';
 
+export const packageUploadPolicy = Object.freeze({
+  kind: 'package-upload', operation: 'persisted-archive', authorize: requireAuthenticatedUser,
+} as const);
+export const packageUploadPlanPolicy = Object.freeze({
+  kind: 'package-upload', operation: 'owned-confirmation-plan', authorize: requireAuthenticatedUser,
+} as const);
+
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
   userId?: string | null;
   unblock?: () => void;
   connection?: { id?: string; clientAddress?: string | null } | null;
-};
-
-type DynamicAssetLike = {
-  _id: string;
-  path: string;
-  userId?: string;
-  ext?: string;
-  name?: string;
-  fileName?: string;
-  type?: string;
-  size?: number;
 };
 
 type _SaveContentResult = {
@@ -260,24 +257,23 @@ export function createPackageService(deps: PackageMethodsDeps) {
 
   async function processPackageUpload(
     this: MethodContext,
-    fileObjOrId: string | DynamicAssetLike,
+    fileObjOrId: string | { _id: string },
     _owner: string,
     _zipLink: string,
     emailToggle: boolean,
     integrity?: PackageUploadIntegrity,
     identityMode: 'preserve' | 'copy' = 'preserve'
   ){
-    const actingUserId = deps.normalizeCanonicalId(this.userId);
-    if (!actingUserId) {
-      throw new Meteor.Error(401, 'Must be logged in');
-    }
+    const actingUserId = packageUploadPolicy.authorize(this.userId);
     await requireContentCreatorDisplayName(deps.usersCollection, actingUserId);
     if (identityMode !== 'preserve' && identityMode !== 'copy') {
       throw new Meteor.Error('invalid-package-identity-mode', 'Package identity mode must be preserve or copy.');
     }
+    const assetId = deps.normalizeCanonicalId(typeof fileObjOrId === 'string' ? fileObjOrId : fileObjOrId?._id);
+    if (!assetId) throw new Meteor.Error(404, 'Package asset not found');
     return processPackageUploadWorkflow(
       this,
-      fileObjOrId,
+      assetId,
       actingUserId,
       emailToggle,
       getPackageUploadDeps(),
@@ -292,8 +288,7 @@ export function createPackageService(deps: PackageMethodsDeps) {
     emailToggle: boolean = false,
     integrity?: PackageUploadIntegrity
   ) {
-    const actingUserId = deps.normalizeCanonicalId(this.userId);
-    if (!actingUserId) throw new Meteor.Error(401, 'Must be logged in');
+    const actingUserId = packageUploadPlanPolicy.authorize(this.userId);
     check(uploadPlanId, String);
     const job = await deps.TdfMutationJobs.findOneAsync({ _id: uploadPlanId, kind: 'package-upload' });
     if (!job || job.actorUserId !== actingUserId) {
@@ -353,8 +348,7 @@ export function createPackageService(deps: PackageMethodsDeps) {
   }
 
   async function cancelPackageUpload(this: MethodContext, uploadPlanId: string) {
-    const actingUserId = deps.normalizeCanonicalId(this.userId);
-    if (!actingUserId) throw new Meteor.Error(401, 'Must be logged in');
+    const actingUserId = packageUploadPlanPolicy.authorize(this.userId);
     check(uploadPlanId, String);
     const job = await deps.TdfMutationJobs.findOneAsync({
       _id: uploadPlanId,

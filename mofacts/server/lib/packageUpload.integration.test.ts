@@ -1,4 +1,8 @@
 import { strict as assert } from 'node:assert';
+import { Meteor } from 'meteor/meteor';
+import { TdfMutationJobs } from '../../common/Collections';
+import { PACKAGE_UPLOAD_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -187,6 +191,38 @@ describe('package upload identity confirmation integration', function() {
     zipPath = '';
   });
 
+  it('binds package upload and confirmation to stored archives and owned plans', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw Error(observed.reason);
+    const handlers = (Meteor as any).server.method_handlers;
+    const owner = Random.id();
+    const other = Random.id();
+    const completed = Random.id();
+    const pending = Random.id();
+    const terminalResult = { status: 'complete' };
+    try {
+      await Meteor.users.insertAsync({ _id: owner, profile: { displayName: 'Synthetic creator' } });
+      await TdfMutationJobs.insertAsync({ _id: completed, actorUserId: owner, kind: 'package-upload', status: 'complete', terminalResult });
+      await TdfMutationJobs.insertAsync({ _id: pending, actorUserId: owner, kind: 'package-upload', status: 'awaiting-confirmation' });
+      for (const verification of PACKAGE_UPLOAD_VERIFICATIONS) {
+        const row: typeof observed.surfaces[number] | undefined = observed.surfaces.find(entry => entry.name === verification.method);
+        assert.equal(row?.verification, verification);
+        await assert.rejects(handlers[verification.method].call({ userId: null }, Random.id()),
+          (error: any) => error.error === 401);
+      }
+      await assert.rejects(handlers.processPackageUpload.call({ userId: owner }, Random.id(), owner, '', false),
+        (error: any) => error.error === 404);
+      await assert.rejects(handlers.confirmPackageUpload.call({ userId: other }, completed), (error: any) => error.error === 404);
+      await assert.rejects(handlers.cancelPackageUpload.call({ userId: other }, pending), (error: any) => error.error === 404);
+      assert.equal((await TdfMutationJobs.findOneAsync(pending))?.status, 'awaiting-confirmation');
+      assert.deepEqual(await handlers.confirmPackageUpload.call({ userId: owner }, completed), terminalResult);
+      assert.deepEqual(await handlers.cancelPackageUpload.call({ userId: owner }, pending), { status: 'cancelled' });
+    } finally {
+      await TdfMutationJobs.removeAsync({ _id: { $in: [completed, pending] } });
+      await Meteor.users.removeAsync(owner);
+    }
+  });
+
   for (const rootVisibility of ['true', 'false']) {
     for (const childFirst of [false, true]) {
       it(`keeps a ${rootVisibility === 'true' ? 'public' : 'private'} root and guards its condition write with the ${childFirst ? 'child' : 'root'} first`, async function() {
@@ -210,12 +246,13 @@ describe('package upload identity confirmation integration', function() {
         } as unknown as Parameters<typeof createPackageService>[0]);
         const asset = { _id: 'asset-visibility', path: zipPath, userId: 'owner-1', ext: 'zip',
           name: 'condition-package.zip', size: fs.statSync(zipPath).size };
+        deps.DynamicAssets.collection.findOneAsync = async selector => selector._id === asset._id ? asset : null;
         const conditionIds = 'content.tdfs.tutor.setspec.conditionTdfIds';
         await tdfs.rawCollection().createIndex({ [conditionIds]: 1 }, {
           unique: true, partialFilterExpression: { [`${conditionIds}.0`]: { $exists: true } },
         });
         try {
-          const result = await methods.processPackageUpload.call({ userId: 'owner-1' }, asset, 'owner-1', '', false);
+          const result = await methods.processPackageUpload.call({ userId: 'owner-1' }, { _id: asset._id }, 'owner-1', '', false);
           assert.equal(result?.status, 'complete');
           const storedRoot = await tdfs.findOneAsync({ tdfFileName: 'root.json' });
           const storedChild = await tdfs.findOneAsync({ tdfFileName: 'child.json' });

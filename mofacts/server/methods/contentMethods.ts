@@ -54,7 +54,11 @@ type ContentMethodsDeps = {
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
   Tdfs: {
-    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]>; countAsync?: () => Promise<number> };
+    find: (selector: UnknownRecord, options?: UnknownRecord) => {
+      fetchAsync: () => Promise<any[]>;
+      countAsync?: () => Promise<number>;
+      forEachAsync: (visit: (lesson: UnknownRecord) => void) => Promise<void>;
+    };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;

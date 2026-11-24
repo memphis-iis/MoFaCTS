@@ -194,7 +194,7 @@ export function createPackageGeneratedContentMethods(
       }
       const assetOwnerId = typeof packageAsset.userId === 'string' ? packageAsset.userId.trim() : '';
       const isAdmin = await deps.userIsInRoleAsync(actingUserId, ['admin']);
-      if (assetOwnerId && assetOwnerId !== actingUserId && !isAdmin) {
+      if (assetOwnerId !== actingUserId && !isAdmin) {
         throw new Meteor.Error(403, 'Can only save generated packages you uploaded');
       }
       if (packageAsset.meta?.uploadPurpose !== 'package') {

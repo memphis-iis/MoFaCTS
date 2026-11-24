@@ -207,7 +207,7 @@ export async function processPackageUploadWorkflow(
 
   const actingUserIsAdmin = await deps.userIsInRoleAsync(context.userId, ['admin']);
   const assetOwnerId = typeof fileObj.userId === 'string' ? fileObj.userId.trim() : '';
-  if (assetOwnerId && assetOwnerId !== context.userId && !actingUserIsAdmin) {
+  if (assetOwnerId !== context.userId && !actingUserIsAdmin) {
     throw new Meteor.Error(403, 'Can only process package assets you uploaded');
   }
   const uploadPurpose = typeof fileObj.meta?.uploadPurpose === 'string' ? fileObj.meta.uploadPurpose : '';
