@@ -51,9 +51,6 @@ type ContentAssetMaintenanceDeps = {
   normalizeCanonicalId: (value: unknown) => string | null;
   getStimuliSetIdCandidates: (stimuliSetId: string | number | null | undefined) => Array<string | number>;
   deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
-  updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
-  rebuildStimDisplayTypeMapSnapshot: (deps: any) => Promise<unknown>;
-  getStimDisplayTypeMapDeps: () => any;
   getMethodAuthorizationDeps: () => any;
 };
 
@@ -266,14 +263,6 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
         const orphanedAssetsRemoved = await removeAssetsForInactiveStimuliSets(deps, Array.from(touchedStimuliSetIds));
         if (orphanedAssetsRemoved > 0) {
           deps.serverConsole('Removed orphaned assets for deleted package:', orphanedAssetsRemoved);
-        }
-
-        if (deletedCount > 0) {
-          if (touchedStimuliSetIds.size > 0) {
-            await deps.updateStimDisplayTypeMap(Array.from(touchedStimuliSetIds));
-          } else {
-            await deps.rebuildStimDisplayTypeMapSnapshot(deps.getStimDisplayTypeMapDeps());
-          }
         }
 
         return { deletedCount };

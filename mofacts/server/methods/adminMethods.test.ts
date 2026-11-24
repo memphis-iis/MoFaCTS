@@ -224,7 +224,6 @@ describe('adminMethods', function() {
       prepareSparcVideoCatalogTarget: ['synthetic', 'target'],
       saveSparcVideoCatalogPassages: ['synthetic', 'target', []],
       deleteSparcInstructionalComponent: ['synthetic'],
-      updateStimDisplayTypeMap: [],
       getSparcLibraryClusters: [],
       listSparcInstructionalComponents: [{}],
       replaceSparcLibraryImage: [{}],

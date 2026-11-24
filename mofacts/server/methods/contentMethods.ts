@@ -98,9 +98,6 @@ type ContentMethodsDeps = {
   getStimuliSetIdCandidates: (stimuliSetId: string | number | null | undefined) => Array<string | number>;
   findDynamicAssetsScopedBatch: (params: any) => Promise<unknown>;
   deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
-  updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
-  rebuildStimDisplayTypeMapSnapshot: (deps: any) => Promise<unknown>;
-  getStimDisplayTypeMapDeps: () => any;
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
 };
 

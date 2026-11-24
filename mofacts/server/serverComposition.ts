@@ -136,14 +136,7 @@ import {
   type ApiKeyResolutionDeps,
 } from './lib/apiKeyResolution';
 import {
-  getStimDisplayTypeMap as getStimDisplayTypeMapSnapshot,
-  getStimDisplayTypeMapVersion as getStimDisplayTypeMapSnapshotVersion,
-  rebuildStimDisplayTypeMapSnapshot,
-  updateStimDisplayTypeMap as refreshStimDisplayTypeMap,
-} from './lib/stimDisplayTypeMap';
-import {
   requireAuthenticatedUser,
-  requireUserWithRoles,
   getUserRoleFlags,
   type MethodAuthorizationDeps,
 } from './lib/methodAuthorization';
@@ -380,18 +373,8 @@ const {
   sendEmailAsync,
 } = serverUtilities;
 
-const stimulusLookupHelpers = createStimulusLookupHelpers({
-  Tdfs,
-  serverConsole,
-  refreshStimDisplayTypeMap,
-  getStimDisplayTypeMapSnapshot,
-  getStimDisplayTypeMapSnapshotVersion,
-});
+const stimulusLookupHelpers = createStimulusLookupHelpers({ Tdfs });
 const {
-  getStimDisplayTypeMapDeps,
-  updateStimDisplayTypeMap,
-  getStimDisplayTypeMap,
-  getStimDisplayTypeMapVersion,
   getStimuliSetById,
   getStimuliSetIdByFilename,
 } = stimulusLookupHelpers;
@@ -509,9 +492,6 @@ const packageService = createPackageService({
   legacyTrim,
   encryptData,
   getApiKeyResolutionDeps,
-  updateStimDisplayTypeMap,
-  rebuildStimDisplayTypeMapSnapshot,
-  getStimDisplayTypeMapDeps,
   getMimeTypeForAssetName,
   parseLocalMediaReference,
   findDynamicAssetScoped,
@@ -861,9 +841,6 @@ export const methods: any = {
     getStimuliSetIdCandidates,
     findDynamicAssetsScopedBatch,
     deleteTdfRuntimeData,
-    updateStimDisplayTypeMap,
-    rebuildStimDisplayTypeMapSnapshot,
-    getStimDisplayTypeMapDeps,
     getMethodAuthorizationDeps,
   }),
 
@@ -1038,29 +1015,6 @@ async function getResponseKCMapForTdfPublic(
   return await getResponseKCMapForTdf(tdfId);
 }
 
-async function updateStimDisplayTypeMapPublic(this: MethodContext, stimuliSetIds: unknown[] | null = null) {
-  await requireUserWithRoles(getMethodAuthorizationDeps(), {
-    userId: this.userId,
-    roles: ['admin'],
-    notLoggedInMessage: 'Must be logged in',
-    notLoggedInCode: 401,
-    forbiddenMessage: 'Admin access required to update stimulus display map',
-    forbiddenCode: 403,
-  });
-  if (!Array.isArray(stimuliSetIds) || stimuliSetIds.length === 0) {
-    return await rebuildStimDisplayTypeMapSnapshot(getStimDisplayTypeMapDeps());
-  }
-  return await updateStimDisplayTypeMap(stimuliSetIds);
-}
-
-async function getStimDisplayTypeMapPublic() {
-  return await getStimDisplayTypeMap();
-}
-
-async function getStimDisplayTypeMapVersionPublic() {
-  return await getStimDisplayTypeMapVersion();
-}
-
 const sparcDemoAccess = createSparcDemoAccess({
   readUser: userId => MeteorAny.users.findOneAsync({ _id: userId }, { fields: { createdAt: 1, 'profile.createdBy': 1, 'profile.experimentTarget': 1, 'profile.demoExpiresAt': 1 } }),
   async readDemoTutor(target) {
@@ -1105,10 +1059,7 @@ export const asyncMethods: Record<string, unknown> = {
   ...analyticsRegistration.methods,
   ...publicCourseMethods,
 
-  getStimDisplayTypeMap: getStimDisplayTypeMapPublic,
-  getStimDisplayTypeMapVersion: getStimDisplayTypeMapVersionPublic,
   getStimuliSetById: getStimuliSetByIdPublic,
-  updateStimDisplayTypeMap: updateStimDisplayTypeMapPublic,
 
   saveAiGeneratedPackageContent,
 
@@ -1294,7 +1245,6 @@ registerMeteorMethods(Meteor, installedMethods, [
       prepareSparcVideoCatalogTarget: 'video-catalog-preparation',
       saveSparcVideoCatalogPassages: 'video-catalog-passages',
       deleteSparcInstructionalComponent: 'none',
-      updateStimDisplayTypeMap: 'stimulus-display-map-version',
       getSparcLibraryClusters: 'instructional-clusters',
       listSparcInstructionalComponents: 'instructional-component-page',
       replaceSparcLibraryImage: 'image-metadata',
@@ -1418,7 +1368,6 @@ Meteor.startup(async function() {
     updateActiveThemeDocument,
     upsertStimFile,
     importPrivateRepoTdfBatch,
-    updateStimDisplayTypeMap,
     sendErrorReportSummaries,
     sendEmail,
     getDiskUsageInfo,

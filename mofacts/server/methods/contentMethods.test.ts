@@ -108,9 +108,6 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
     getStimuliSetIdCandidates: () => [],
     findDynamicAssetsScopedBatch: async () => [],
     deleteTdfRuntimeData: async () => undefined,
-    updateStimDisplayTypeMap: async () => undefined,
-    rebuildStimDisplayTypeMapSnapshot: async () => undefined,
-    getStimDisplayTypeMapDeps: () => ({}),
     getMethodAuthorizationDeps: () => ({})
   };
 

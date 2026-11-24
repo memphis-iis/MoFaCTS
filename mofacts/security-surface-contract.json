@@ -429,14 +429,6 @@
       "notes": "Explicit administrator raster upload only; bounded PNG/JPEG/WebP validation, expected-current conflict check and idempotent immutable assets. A Mongo transaction publishes version history and the library current pointer together after durable file storage; no provider call or AI replacement primitive. Saved decisions are unchanged."
     },
     {
-      "name": "getStimDisplayTypeMap",
-      "access": "role-checked"
-    },
-    {
-      "name": "getStimDisplayTypeMapVersion",
-      "access": "role-checked"
-    },
-    {
       "name": "getStimuliFileForTdf",
       "access": "role-checked",
       "notes": "Requires the lesson owner or an explicit accessor before returning its named stimulus file."
@@ -783,10 +775,6 @@
     {
       "name": "updateOwnUiLocale",
       "access": "authenticated-self"
-    },
-    {
-      "name": "updateStimDisplayTypeMap",
-      "access": "admin-only"
     },
     {
       "name": "updateTdfConditionCounts",

@@ -218,10 +218,6 @@ export async function processParsedPackageTdfs(args: {
       errorTextPrefix: 'package upload failed: ',
       logPrefix: '1'
     });
-  } finally {
-    if (touchedStimuliSetIds.size > 0) {
-      await deps.updateStimDisplayTypeMap(Array.from(touchedStimuliSetIds));
-    }
   }
 
   const firstResult = results.length > 0 ? results[0] : undefined;

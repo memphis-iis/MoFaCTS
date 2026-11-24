@@ -42,7 +42,6 @@ type PackageGeneratedContentDeps = {
   normalizeCanonicalId: (value: unknown) => string | null;
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
   legacyTrim: (value: unknown) => string;
-  updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
 };
 
 type PackageGeneratedContentCallbacks = {

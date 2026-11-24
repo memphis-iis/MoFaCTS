@@ -875,7 +875,6 @@ export const ADMIN_OPERATION_VERIFICATIONS = Object.freeze(([
   'prepareSparcVideoCatalogTarget',
   'saveSparcVideoCatalogPassages',
   'deleteSparcInstructionalComponent',
-  'updateStimDisplayTypeMap',
   'getSparcLibraryClusters',
   'listSparcInstructionalComponents',
   'replaceSparcLibraryImage',

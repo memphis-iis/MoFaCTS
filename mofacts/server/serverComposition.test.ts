@@ -1234,9 +1234,10 @@ describe('public TDF and stimulus method authorization', function() {
     }
   });
 
-  it('keeps stimulus display map reads callable for the client sync path', async function() {
-    expect(asyncMethods.getStimDisplayTypeMap).to.be.a('function');
-    expect(asyncMethods.getStimDisplayTypeMapVersion).to.be.a('function');
+  it('removes the retired stimulus display cache methods from Meteor', function() {
+    for (const name of ['getStimDisplayTypeMap', 'getStimDisplayTypeMapVersion', 'updateStimDisplayTypeMap']) {
+      expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);
+    }
   });
 
   it('does not expose helper-only content and analytics methods publicly', function() {

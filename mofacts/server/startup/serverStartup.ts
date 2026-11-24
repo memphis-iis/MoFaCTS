@@ -130,7 +130,6 @@ type RunServerStartupDeps = {
   updateActiveThemeDocument: (userId: string | null | undefined, mutator: (theme: any) => any) => Promise<unknown>;
   upsertStimFile: (filename: string, json: unknown, ownerId: string) => Promise<string | number | null | undefined>;
   importPrivateRepoTdfBatch: (records: any[], ownerId: string) => Promise<Array<{ tdfId: string; stimuliSetId?: number | string | null }>>;
-  updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
   sendErrorReportSummaries: () => Promise<unknown>;
   sendEmail: (to: string, from: string, subject: string, text: string) => void;
   getDiskUsageInfo: (path?: string) => { free: number; total: number } | null;
@@ -741,7 +740,6 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       AssetsAny: deps.AssetsAny,
       upsertStimFile: deps.upsertStimFile,
       importPrivateRepoTdfBatch: deps.importPrivateRepoTdfBatch,
-      updateStimDisplayTypeMap: deps.updateStimDisplayTypeMap,
     });
   }
 

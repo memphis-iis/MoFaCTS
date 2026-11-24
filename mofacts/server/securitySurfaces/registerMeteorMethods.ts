@@ -121,7 +121,7 @@ export type MeteorMethodBinding = Readonly<{
     | 'account-creation-result' | 'runtime-lesson' | 'experiment-entry-lesson' | 'runtime-stimuli' | 'response-kc-map' | 'removed-component-ids' | 'instructional-figure-response' | 'instructional-image' | 'role-flags' | 'key-configured' | 'class-performance' | 'learner-dashboard' | 'dashboard-cache-status' | 'progress-reset-result' | 'learner-analytics-overview' | 'learner-analytics-source' | 'learner-history-page' | 'learner-lesson-config' | 'adaptive-outcomes' | 'stimulus-crowd-stats' | 'history-save-result'
     | 'performance-history' | 'completed-trial-count' | 'learning-history' | 'sparc-history' | 'hidden-stimulus-kcs' | 'experiment-state'
     | 'model-catalog' | 'provider-test-result' | 'theme-document' | 'theme-export' | 'verbosity-level' | 'evaluation-page' | 'evaluation-page-list' | 'provider-settings-metadata' | 'account-deletion-result' | 'roster-import-result' | 'news-recipient-list'
-    | 'usage-cache-results' | 'video-catalog-targets' | 'video-catalog-preparation' | 'video-catalog-passages' | 'stimulus-display-map-version'
+    | 'usage-cache-results' | 'video-catalog-targets' | 'video-catalog-preparation' | 'video-catalog-passages'
     | 'instructional-clusters' | 'instructional-component-page' | 'image-metadata' | 'instructional-component'
     | 'role-change-result' | 'owned-asset-filename' | 'own-upload-quota' | 'manual-draft' | 'draft-save-receipt' | 'stimulus-file' | 'account-email-or-status' | 'accessor-identities' | 'recipient-lookup-result' | 'statistics-expanded' | 'save-status' | 'saved-wait' | 'owned-lesson-list' | 'transfer-status' | 'prolific-participant-entry' | 'prolific-completion' | 'prolific-researcher-result';
 }>;

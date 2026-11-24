@@ -136,9 +136,6 @@ type PackageMethodsDeps = {
   legacyTrim: (value: unknown) => string;
   encryptData: (value: string) => string;
   getApiKeyResolutionDeps: () => ApiKeyResolutionDeps;
-  updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
-  rebuildStimDisplayTypeMapSnapshot: (deps: any) => Promise<unknown>;
-  getStimDisplayTypeMapDeps: () => any;
   getMimeTypeForAssetName: (fileName: string, fallback?: string) => string;
   parseLocalMediaReference: (src: string) => { assetId?: string; [key: string]: unknown };
   findDynamicAssetScoped: (params: {
@@ -241,7 +238,6 @@ export function createPackageService(deps: PackageMethodsDeps) {
       getApiKeyResolutionDeps: deps.getApiKeyResolutionDeps,
       legacyTrim: deps.legacyTrim,
       upsertPackage,
-      updateStimDisplayTypeMap: deps.updateStimDisplayTypeMap,
       getStimuliSetIdByFilename: async (stimFileName) =>
         (await deps.getStimuliSetIdByFilename(stimFileName)) ?? undefined,
       saveMediaFile,
@@ -946,7 +942,6 @@ export function createPackageService(deps: PackageMethodsDeps) {
     });
     if (updated !== 1) throw new Meteor.Error('tdf-revision-conflict', 'This lesson changed during saving. Reload it and review your update again.');
 
-    await deps.updateStimDisplayTypeMap([stimuliSetId]);
     deps.serverConsole('saveTdfStimuli: Updated TDF', tdfId, 'with', stimuliToSave.length, 'stimuli');
 
     return { success: true, stimuliCount: stimuliToSave.length };

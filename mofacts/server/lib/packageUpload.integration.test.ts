@@ -118,7 +118,6 @@ function createWorkflowDeps(state: IntegrationState): ProcessPackageUploadDeps {
       };
       return { res: 'upserted', stimuliSetId: 17, tdfId: record.tdfId };
     },
-    async updateStimDisplayTypeMap() {},
     async getStimuliSetIdByFilename() {
       return undefined;
     },

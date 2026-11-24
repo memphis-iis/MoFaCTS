@@ -22,43 +22,12 @@ export function prepareStimuliSetForRuntime(tdf: any): StimulusRecord[] {
 
 type StimulusLookupDeps = {
   Tdfs: {
-    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     rawCollection: () => { aggregate: (pipeline: unknown[]) => { toArray: () => Promise<any[]> } };
   };
-  serverConsole: (...args: unknown[]) => void;
-  refreshStimDisplayTypeMap: (deps: any, stimuliSetIds: unknown[] | null) => Promise<unknown>;
-  getStimDisplayTypeMapSnapshot: (deps: any) => Promise<unknown>;
-  getStimDisplayTypeMapSnapshotVersion: (deps: any) => Promise<unknown>;
 };
 
 export function createStimulusLookupHelpers(deps: StimulusLookupDeps) {
-  function getStimDisplayTypeMapDeps() {
-    return {
-      serverConsole: deps.serverConsole,
-      findAllTdfStimuliDocs: async () => await deps.Tdfs.find(
-        {},
-        { fields: { stimuliSetId: 1, stimuli: 1 } }
-      ).fetchAsync(),
-      findTdfStimuliDocsByStimuliSetIds: async (stimuliSetIds: Array<string | number>) => await deps.Tdfs.find(
-        { stimuliSetId: { $in: stimuliSetIds } },
-        { fields: { stimuliSetId: 1, stimuli: 1 } }
-      ).fetchAsync(),
-    };
-  }
-
-  async function updateStimDisplayTypeMap(stimuliSetIds: unknown[] | null = null) {
-    return await deps.refreshStimDisplayTypeMap(getStimDisplayTypeMapDeps(), stimuliSetIds);
-  }
-
-  async function getStimDisplayTypeMap() {
-    return await deps.getStimDisplayTypeMapSnapshot(getStimDisplayTypeMapDeps());
-  }
-
-  async function getStimDisplayTypeMapVersion() {
-    return await deps.getStimDisplayTypeMapSnapshotVersion(getStimDisplayTypeMapDeps());
-  }
-
   async function getStimuliSetById(stimuliSetId: string | number): Promise<StimulusRecord[]> {
     const tdf = await deps.Tdfs.findOneAsync(
       { stimuliSetId: stimuliSetId },
@@ -87,10 +56,6 @@ export function createStimulusLookupHelpers(deps: StimulusLookupDeps) {
   }
 
   return {
-    getStimDisplayTypeMapDeps,
-    updateStimDisplayTypeMap,
-    getStimDisplayTypeMap,
-    getStimDisplayTypeMapVersion,
     getStimuliSetById,
     getStimuliSetByFileName,
     getStimuliSetIdByFilename,

@@ -26,7 +26,6 @@ function setup() {
     canonicalizeStimDisplayMediaRefs: async () => {},
     canonicalizeFlatStimuliMediaRefs: async () => {},
     processAudioFilesForTDF: async () => {},
-    updateStimDisplayTypeMap: async () => {},
     serverConsole: () => {},
   } as unknown as Parameters<typeof createPackageService>[0]);
   return { doc, writes, methods, deny: () => { authorized = false; }, race: () => { race = true; } };

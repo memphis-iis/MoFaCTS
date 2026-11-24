@@ -117,7 +117,6 @@ function packageDeps(params: {
     async upsertPackage() {
       return {};
     },
-    async updateStimDisplayTypeMap() {},
     async getStimuliSetIdByFilename() {
       return undefined;
     },

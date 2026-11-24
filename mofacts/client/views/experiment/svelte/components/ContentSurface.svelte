@@ -18,7 +18,6 @@
   import { clearPracticeLaunchMode } from '../../../../lib/practiceLaunchMode';
   import { clearBlocksPracticeGame } from '../services/blocksPracticeRunState';
   import { currentUserHasRole } from '../../../../lib/roleUtils';
-  import { stopStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTypeMapSync';
   import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
   import { clientConsole } from '../../../../lib/clientLogger';
   import {
@@ -1122,7 +1121,6 @@
       return surface ? getContentSurfaceAdapter(surface).runtimeOwner === 'shared-machine' : false;
     },
     startDisplayTimeoutClock: displayTimeoutController.startClock,
-    stopStimDisplayTypeMapVersionSync,
     testMode: () => testMode,
     testPerformance: () => testPerformance,
     testSnapshot: () => testSnapshot,
