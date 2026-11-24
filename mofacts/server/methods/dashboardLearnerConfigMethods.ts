@@ -10,6 +10,7 @@ import {
 } from './dashboardCacheShared';
 
 type DashboardLearnerConfigDeps = {
+  requireSessionLesson: (context: { userId?: string }, tdfId: string) => Promise<unknown>;
   Meteor: any;
   UserDashboardCache: any;
   getAccessibleTdf: (userId: string, tdfId: string, options: any) => Promise<any>;
@@ -97,6 +98,7 @@ export function createDashboardLearnerConfigMethods(deps: DashboardLearnerConfig
     getLearnerTdfConfig: async function(this: any, tdfId: string) {
       if (!this.userId) throw new deps.Meteor.Error('not-authorized', 'Must be logged in');
       if (typeof tdfId !== 'string' || !tdfId.trim()) throw new deps.Meteor.Error('invalid-args', 'TDF ID is required');
+      await deps.requireSessionLesson(this, tdfId.trim());
       // Only the caller's settings are read; neither histories nor other users'
       // preferences are published. Lesson access is enforced on load/save.
       const cache = await deps.UserDashboardCache.findOneAsync(
@@ -113,6 +115,8 @@ export function createDashboardLearnerConfigMethods(deps: DashboardLearnerConfig
         throw new deps.Meteor.Error('invalid-args', 'Select at least one setting to save');
       }
 
+      if (typeof tdfId !== 'string' || !tdfId.trim()) throw new deps.Meteor.Error('invalid-args', 'TDF ID is required');
+      await deps.requireSessionLesson(this, tdfId.trim());
       const tdf = await getConfigurableTdfForUser(deps, this.userId, tdfId, options);
       const tdfSource = getTdfConfigSource(tdf);
       const config = buildLearnerTdfConfig(tdfSource, tdf._id, configPatch);

@@ -11,6 +11,7 @@ describe('learner settings access', function() {
     let saved: any;
     const reads: any[] = [];
     const methods = createDashboardLearnerConfigMethods({
+      requireSessionLesson: async () => undefined,
       Meteor: { Error: class extends Error { constructor(code: string, reason: string) { super(`${code}: ${reason}`); } } },
       getAccessibleTdf: async (userId, tdfId, options) => {
         expect(userId).to.equal('enrolled-learner');

@@ -8,7 +8,7 @@ import { curSemester } from '../../common/Definitions';
 import type { DashboardHistoryRefreshResult } from '../lib/dashboardHistoryRefresh';
 import { createDashboardLearnerConfigMethods } from './dashboardLearnerConfigMethods';
 import { createDashboardPracticeSnapshotMethods } from './dashboardPracticeSnapshotMethods';
-import { requireAccountProgressSession } from '../lib/participantProgressScope';
+import { requireAccountProgressSession, requireParticipantProgressLesson } from '../lib/participantProgressScope';
 import {
   createLessonFamilyResolver,
   getLessonFamilySetspec,
@@ -442,6 +442,7 @@ export function createDashboardCacheMethods({
     ...(decryptData ? { decryptData } : {})
   });
   const learnerConfigMethods = createDashboardLearnerConfigMethods({
+    requireSessionLesson: (context, tdfId) => requireParticipantProgressLesson(context, Tdfs, tdfId),
     getAccessibleTdf,
     Meteor,
     UserDashboardCache,

@@ -21,6 +21,9 @@ export type MeteorMethodBinding = Readonly<{
     operation: 'owner-assignment' | 'owner-read' | 'family-owner-transfer';
     authorize: (...args: never[]) => boolean;
   }> | Readonly<{
+    kind: 'learner-progress'; operation: 'account-session' | 'study-lesson';
+    authorize: (...args: never[]) => unknown;
+  }> | Readonly<{
     kind: 'progress-read';
     operation: 'own-study-lessons';
     authorize: (...args: never[]) => string;
@@ -109,7 +112,8 @@ export type MeteorMethodBinding = Readonly<{
     | 'error-report-id' | 'warning-report-status' | 'warning-page' | 'simulation-attempt-id' | 'simulation-batch-status' | 'simulation-trace-page'
     | 'experiment-login-token' | 'participant-session' | 'public-demo-launch'
     | 'delete-result' | 'progressive-lesson-content' | 'join-result' | 'course-id' | 'assignment-editor-snapshot' | 'course-section-list' | 'teacher-display-list' | 'learner-course-snapshot' | 'assignments-by-course' | 'instructor-course-list'
-    | 'account-creation-result' | 'runtime-lesson' | 'experiment-entry-lesson' | 'runtime-stimuli' | 'response-kc-map' | 'removed-component-ids' | 'instructional-figure-response' | 'instructional-image' | 'role-flags' | 'key-configured' | 'class-performance' | 'performance-history' | 'completed-trial-count' | 'learning-history' | 'sparc-history' | 'hidden-stimulus-kcs' | 'experiment-state'
+    | 'account-creation-result' | 'runtime-lesson' | 'experiment-entry-lesson' | 'runtime-stimuli' | 'response-kc-map' | 'removed-component-ids' | 'instructional-figure-response' | 'instructional-image' | 'role-flags' | 'key-configured' | 'class-performance' | 'learner-dashboard' | 'dashboard-cache-status' | 'progress-reset-result' | 'learner-analytics-overview' | 'learner-analytics-source' | 'learner-history-page' | 'learner-lesson-config' | 'adaptive-outcomes' | 'stimulus-crowd-stats' | 'history-save-result'
+    | 'performance-history' | 'completed-trial-count' | 'learning-history' | 'sparc-history' | 'hidden-stimulus-kcs' | 'experiment-state'
     | 'model-catalog' | 'provider-test-result' | 'theme-document' | 'theme-export' | 'verbosity-level' | 'evaluation-page' | 'evaluation-page-list' | 'provider-settings-metadata' | 'account-deletion-result' | 'roster-import-result' | 'news-recipient-list'
     | 'usage-cache-results' | 'video-catalog-targets' | 'video-catalog-preparation' | 'video-catalog-passages' | 'stimulus-display-map-version'
     | 'instructional-clusters' | 'instructional-component-page' | 'image-metadata' | 'instructional-component'

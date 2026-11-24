@@ -660,6 +660,7 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
     if (!tdfId) {
       throw new Meteor.Error(400, 'History record requires a TDFId');
     }
+    if (!authorizedScope) await requireParticipantProgressLesson(context, deps.Tdfs, tdfId);
     try {
       assertCanonicalHistoryEnvelope(decompressedRecord);
     } catch (error: unknown) {
@@ -792,6 +793,7 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
     if (!normalizedTdfId) {
       throw new Meteor.Error(400, 'Invalid TDFId');
     }
+    await requireParticipantProgressLesson(this, deps.Tdfs, normalizedTdfId);
     if (!Array.isArray(stimulusIdentities)) {
       throw new Meteor.Error(400, 'stimulusIdentities must be an array');
     }
@@ -1619,6 +1621,7 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
         throw new Meteor.Error(400, 'updateExperimentState requires a canonical root TDF context');
       }
       const conditionTdfId = deps.normalizeCanonicalId((curExperimentState as any)?.conditionTdfId);
+      await requireParticipantProgressLesson(this, deps.Tdfs, rootTdfId);
       await validateExperimentStateMutation(this.userId, rootTdfId, curExperimentState, 'methods.updateExperimentState');
       deps.serverConsole('updateExperimentState', {
         userId: this.userId || null,

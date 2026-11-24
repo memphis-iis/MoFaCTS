@@ -57,7 +57,8 @@ import { createStimulusLookupHelpers, prepareStimuliSetForRuntime } from './lib/
 import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
 import { accountDiagnosticsPolicy } from './lib/participantSession';
 import { PUBLIC_ACCOUNT_REQUESTS_PER_HOUR } from './runtime/ddpRateLimits';
-import { PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { requireAccountProgressSession, requireParticipantProgressLesson } from './lib/participantProgressScope';
+import { LEARNER_PROGRESS_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -1167,6 +1168,8 @@ export const asyncMethods: Record<string, unknown> = {
 
 // Server-side startup logic
 const installedMethods = { ...methods, ...asyncMethods };
+const accountProgressPolicy = { kind: 'learner-progress', operation: 'account-session', authorize: requireAccountProgressSession } as const;
+const studyProgressPolicy = { kind: 'learner-progress', operation: 'study-lesson', authorize: requireParticipantProgressLesson } as const;
 registerMeteorMethods(Meteor, installedMethods, [
   ...securityAuditRuntime.methodBindings,
   ...courseReadBindings,
@@ -1197,6 +1200,24 @@ registerMeteorMethods(Meteor, installedMethods, [
       publishSparcPrimitive: 'instructional-component',
       generateSparcPromptImage: 'instructional-figure-response',
       resolveSparcVisualSupport: 'instructional-figure-response',
+    } as const)[verification.method],
+  })),
+  ...LEARNER_PROGRESS_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    ...({
+      getPracticeDashboardSnapshot: { policy: accountProgressPolicy, dataEgress: 'learner-dashboard' },
+      ensureDashboardCacheCurrent: { policy: accountProgressPolicy, dataEgress: 'dashboard-cache-status' },
+      resetOwnLessonProgress: { policy: accountProgressPolicy, dataEgress: 'progress-reset-result' },
+      getLearnerAnalyticsOverview: { policy: accountProgressPolicy, dataEgress: 'learner-analytics-overview' },
+      getLearnerLessonAnalyticsSource: { policy: accountProgressPolicy, dataEgress: 'learner-analytics-source' },
+      getLearnerLessonAnalyticsHistoryPage: { policy: accountProgressPolicy, dataEgress: 'learner-history-page' },
+      getLearnerTdfConfig: { policy: studyProgressPolicy, dataEgress: 'learner-lesson-config' },
+      saveLearnerTdfConfig: { policy: studyProgressPolicy, dataEgress: 'learner-lesson-config' },
+      getAdaptiveOutcomeRows: { policy: studyProgressPolicy, dataEgress: 'adaptive-outcomes' },
+      getStimulusCrowdStatsForDeck: { policy: studyProgressPolicy, dataEgress: 'stimulus-crowd-stats' },
+      createExperimentState: { policy: studyProgressPolicy, dataEgress: 'experiment-state' },
+      updateExperimentState: { policy: studyProgressPolicy, dataEgress: 'experiment-state' },
+      insertHistory: { policy: studyProgressPolicy, dataEgress: 'history-save-result' },
     } as const)[verification.method],
   })),
   ...ACCOUNT_SELF_VERIFICATIONS.map(verification => ({

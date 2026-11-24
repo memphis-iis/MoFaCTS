@@ -5,7 +5,7 @@ import { WebApp } from 'meteor/webapp';
 import { GlobalExperimentStates, Histories, Tdfs } from '../../common/Collections';
 import { issueExperimentLoginToken } from '../methods/experimentMethods';
 
-import { PROGRESS_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { LEARNER_PROGRESS_VERIFICATIONS, PROGRESS_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
 import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
 
 describe('approved progress-privacy selection on the registered Meteor publication', function() {
@@ -21,6 +21,17 @@ describe('approved progress-privacy selection on the registered Meteor publicati
     await GlobalExperimentStates.insertAsync({ _id: extraId, userId: users.learnerA, TDFId: lesson + '-other' });
   });
   after(async function() { await GlobalExperimentStates.removeAsync({ _id: { $in: [...ids, extraId] } }); });
+
+  it('observes the installed dashboard and study-specific progress handlers', function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed learner progress methods');
+    for (const verification of LEARNER_PROGRESS_VERIFICATIONS) {
+      const rows = observed.surfaces.filter(row => row.name === verification.method);
+      expect(rows).to.have.length(1);
+      expect(rows[0]?.verification).to.equal(verification);
+      expect(rows[0]?.policy.kind).to.equal('learner-progress');
+    }
+  });
 
   it('binds each progress read to the signed-in learner', async function() {
     const observed = registeredMeteorMethodSurfaces();
@@ -198,7 +209,20 @@ describe('approved progress-privacy selection on the registered Meteor publicati
         const denied = await method(ws, verification.method, userId, ids.other, 0);
         expect(denied.error, verification.method).to.include({ error: 403 });
       }
-      expect((await method(ws, 'getPracticeDashboardSnapshot')).error.error).to.equal(403);
+      const progressRequests = {
+        getPracticeDashboardSnapshot: [], ensureDashboardCacheCurrent: [], resetOwnLessonProgress: [ids.root],
+        getLearnerAnalyticsOverview: [], getLearnerLessonAnalyticsSource: [{ rootTdfId: ids.root }],
+        getLearnerLessonAnalyticsHistoryPage: [{ rootTdfId: ids.root }],
+        getLearnerTdfConfig: [ids.other], saveLearnerTdfConfig: [ids.other, { setspec: { drill: 1000 } }],
+        getAdaptiveOutcomeRows: [userId, ids.other], getStimulusCrowdStatsForDeck: [ids.other, []],
+        createExperimentState: [{ currentRootTdfId: ids.other }], updateExperimentState: [{ currentRootTdfId: ids.other }],
+        insertHistory: [{ TDFId: ids.other, userId }],
+      };
+      for (const verification of LEARNER_PROGRESS_VERIFICATIONS) {
+        const reply = await method(ws, verification.method, ...progressRequests[verification.method]);
+        expect(reply.error, verification.method).to.include({ error: 403 });
+      }
+      expect((await method(ws, 'getLearnerTdfConfig', ids.condition)).error).to.equal(undefined);
       expect((await method(ws, 'getLearnerCoursesSnapshot')).error.error).to.equal(403);
       for (const args of [[ids.root, ids.condition], [ids.root, ids.condition, 'saved-revision']]) {
         const reply = await method(ws, 'getProgressiveAssignmentLaunch', ...args);

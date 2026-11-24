@@ -387,7 +387,8 @@
     },
     {
       "name": "getLearnerTdfConfig",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "A study session is restricted to its bound lesson family."
     },
     {
       "name": "getPracticeDashboardSnapshot",
@@ -447,7 +448,8 @@
     },
     {
       "name": "getStimulusCrowdStatsForDeck",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "A study session is restricted to its bound lesson family."
     },
     {
       "name": "getStudentPerformanceByIdAndTDFIdFromHistory",
@@ -673,7 +675,8 @@
     },
     {
       "name": "saveLearnerTdfConfig",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "A study session is restricted to its bound lesson family."
     },
     {
       "name": "saveManualContentDraft",
