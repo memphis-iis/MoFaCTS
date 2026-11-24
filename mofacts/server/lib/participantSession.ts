@@ -35,6 +35,13 @@ export function participantRootForConnection(connectionId: string | undefined, u
   return scope && scope.userId === userId && scope.tokenHash === (Accounts as any)._getLoginToken(connectionId) ? scope.rootId : null;
 }
 
+export const accountDiagnosticsPolicy = Object.freeze({
+  kind: 'diagnostic-telemetry', operation: 'non-private-account',
+  async authorize(context: Parameters<typeof participantConnectionRoot>[0]) {
+    return !!context.userId && !await privateParticipantActivity(context);
+  },
+} as const);
+
 export async function privateParticipantActivity(context: Parameters<typeof participantConnectionRoot>[0]) {
   if (participantConnectionRoot(context)) return true;
   if (!context.userId) return false;

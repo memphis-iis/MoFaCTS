@@ -215,6 +215,20 @@ describe('adminMethods', function() {
       deleteAdminApiKeyAlternative: ['openrouter'],
       userAdminDeleteUser: ['synthetic'],
       userAdminNewsEmailRecipients: [],
+      getAdminTestOpenRouterCapability: [],
+      callAdminTestResolvedOpenRouterJson: [{}],
+      callAdminTestOpenRouterRequest: [{}],
+      setCustomThemeProperty: ['themeName', 'Test'],
+      refreshUserAdminUsageCaches: [[]],
+      getSparcVideoCatalogTargets: ['synthetic'],
+      prepareSparcVideoCatalogTarget: ['synthetic', 'target'],
+      saveSparcVideoCatalogPassages: ['synthetic', 'target', []],
+      deleteSparcInstructionalComponent: ['synthetic'],
+      updateStimDisplayTypeMap: [],
+      getSparcLibraryClusters: [],
+      listSparcInstructionalComponents: [{}],
+      replaceSparcLibraryImage: [{}],
+      reviseSparcPrimitive: ['synthetic', {}],
       insertNewUsers: ['roster.csv', 'email,password'],
     };
     for (const verification of ADMIN_OPERATION_VERIFICATIONS) {
@@ -226,7 +240,7 @@ describe('adminMethods', function() {
       const handler = (Meteor as any).server.method_handlers[method];
       for (const userId of [null, Random.id()]) {
         await assert.rejects(() => handler.apply({ userId }, args[method]),
-          (err: any) => [403, 'unauthorized', 'not-authorized'].includes(err.error), method);
+          (err: any) => (userId ? [403, 'unauthorized', 'not-authorized'] : [401, 403, 'not-logged-in', 'unauthorized', 'not-authorized']).includes(err.error), method);
       }
     }
   });

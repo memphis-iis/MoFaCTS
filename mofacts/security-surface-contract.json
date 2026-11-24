@@ -527,7 +527,8 @@
     },
     {
       "name": "logUserAgentAndLoginTime",
-      "access": "role-checked"
+      "access": "authenticated-self",
+      "notes": "Authenticated account diagnostics. Study-only accounts and private study sessions suppress the write."
     },
     {
       "name": "makeGoogleSpeechAPICall",
@@ -697,7 +698,8 @@
     },
     {
       "name": "sendUserErrorReport",
-      "access": "role-checked"
+      "access": "authenticated-self",
+      "notes": "Authenticated account diagnostics. Study-only accounts and private study sessions suppress the write."
     },
     {
       "name": "setActiveTheme",
@@ -713,7 +715,7 @@
     },
     {
       "name": "setCustomThemeProperty",
-      "access": "role-checked"
+      "access": "admin-only"
     },
     {
       "name": "setLockoutTimeStamp",
@@ -779,7 +781,7 @@
     },
     {
       "name": "updateStimDisplayTypeMap",
-      "access": "role-checked"
+      "access": "admin-only"
     },
     {
       "name": "updateTdfConditionCounts",

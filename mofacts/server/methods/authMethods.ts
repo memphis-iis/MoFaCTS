@@ -1,4 +1,4 @@
-import { privateParticipantActivity, participantConnectionRoot } from '../lib/participantSession';
+import { accountDiagnosticsPolicy, privateParticipantActivity, participantConnectionRoot } from '../lib/participantSession';
 import { Meteor } from 'meteor/meteor';
 import { ensurePublishedDeploymentBrandProfile } from '../lib/deploymentBrandProfileRegistry';
 import { Accounts } from 'meteor/accounts-base';
@@ -440,7 +440,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     },
 
     setUserSessionId: async function(this: MethodContext, sessionId: string, sessionIdTimestamp: number) {
-      if (await privateParticipantActivity(this)) return;
+      if (!await accountDiagnosticsPolicy.authorize(this)) return;
       deps.serverConsole('setUserSessionId request received');
       const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
       if (!userId) {

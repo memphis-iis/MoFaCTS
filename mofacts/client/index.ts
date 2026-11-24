@@ -18,7 +18,6 @@ import {
   setEnterKeyLock,
 } from './views/experiment/svelte/services/trialReadinessState';
 import { setDisplayFeedback } from './views/experiment/svelte/services/feedbackRuntimeState';
-import { ExperimentStateStore } from './lib/state/experimentStateStore';
 import {instructContinue} from './views/experiment/instructions';
 import { shouldSuppressAuthenticatedChrome } from './lib/authenticatedChromePolicy';
 import {routeToSignin} from './lib/router';
@@ -55,7 +54,6 @@ import {currentUserHasRole, hasRoleFromAuthFlags} from './lib/roleUtils';
 import { managementRoutePresentation } from './lib/adminUi/routePresentationState';
 import './views/shared/adminUi/adminUi';
 import { getErrorMessage } from './lib/errorUtils';
-import { hideBootstrapModal } from './lib/bootstrapModal';
 import './index.html';
 import { getPracticeLaunchMode } from './lib/practiceLaunchMode';
 import { isLessonRoutePath } from './lib/lessonRoute';
@@ -386,7 +384,6 @@ import { legacyDisplay } from '../common/underscoreCompat';
 
 export { meteorCallAsync };
 const MeteorAny = Meteor as any;
-const SessionAny = Session as any;
 const windowAny = window as any;
 
 // Make clientConsole globally available for Meteor packages
@@ -682,14 +679,6 @@ Template.DefaultLayout.onRendered(function(this: any) {
     };
     document.addEventListener('click', instance._appShellDocumentClickHandler);
   }
-  instance._errorReportingModalHiddenHandler = () => {
-    clientConsole(2, 'error reporting modal hidden');
-  };
-  document.getElementById('errorReportingModal')?.addEventListener(
-    'hidden.bs.modal',
-    instance._errorReportingModalHiddenHandler,
-  );
-
   instance._startupDiagnosticInterval = Meteor.setInterval(() => {
     Session.set('startupDiagnosticTick', Date.now());
   }, 1000);
@@ -732,12 +721,6 @@ Template.DefaultLayout.onDestroyed(function(this: any) {
   this._stopClientSettings?.();
   if (this._appShellDocumentClickHandler) {
     document.removeEventListener('click', this._appShellDocumentClickHandler);
-  }
-  if (this._errorReportingModalHiddenHandler) {
-    document.getElementById('errorReportingModal')?.removeEventListener(
-      'hidden.bs.modal',
-      this._errorReportingModalHiddenHandler,
-    );
   }
   if (this._helpModalHiddenHandler) {
     document.getElementById('helpModal')?.removeEventListener(
@@ -785,55 +768,14 @@ Template.DefaultLayout.events({
   'click #helpButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     incrementPausedLocks();
-    Session.set('errorReportStart', new Date());
     audioManager.pauseCurrentAudio();
   },
-  'click #helpCloseButton': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    hideBootstrapModal('errorReportingModal');
-  },
-
-  'click #errorReportButton': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    if (participantActivity()) return;
-    incrementPausedLocks();
-    Session.set('errorReportStart', new Date());
-    //set the modalTemplate session variable to the reportError template
-    const templateObject = {
-      template: 'errorReportModal',
-      title: translatePlatformString(getActiveUiLocale(), 'common.reportAnError'),
-    }
-    Session.set('modalTemplate', templateObject);
-    clientConsole(2, 'modalTemplate:', Session.get('modalTemplate'));
-  },
-
   'click #resetFeedbackSettingsButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     incrementPausedLocks();
     setDisplayFeedback(true);
     Session.set('resetFeedbackSettingsFromIndex', true);
   }, 
-  'click #errorReportingSaveButton': function(event: JQuery.TriggeredEvent) {
-    event.preventDefault();
-    if (participantActivity()) return;
-    clientConsole(2, 'save error reporting button pressed');
-    const errorDescription = $('#errorDescription').val();
-    //if error description is empty, alert the user to enter a description
-    if (errorDescription === '') {
-      alert(translatePlatformString(getActiveUiLocale(), 'errorReport.descriptionRequired'));
-      return;
-    }
-    const curUser = Meteor.userId();
-    const curPage = document.location.pathname;
-    const sessionVars = SessionAny.all();
-    const userAgent = navigator.userAgent;
-    const logs = (console as any).logs;
-    const currentExperimentState = ExperimentStateStore.get();
-    MeteorAny.callAsync('sendUserErrorReport', curUser, errorDescription, curPage, sessionVars,
-        userAgent, logs, currentExperimentState);
-    hideBootstrapModal('errorReportingModal');
-    $('#errorDescription').val('');
-  },
 
 });
 

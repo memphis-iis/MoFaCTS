@@ -1,5 +1,5 @@
 import { COURSE_SNAPSHOT_VERSION } from './lib/courseLearnerSnapshotCache';
-import { COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
+import { ACCOUNT_DIAGNOSTIC_VERIFICATIONS, COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './lib/prolificCollections';
 import { CourseLearnerSnapshotCache } from '../common/Collections';
 import { Meteor } from 'meteor/meteor';
@@ -1980,6 +1980,46 @@ describe('system method authorization', function() {
       expect.fail('Expected verbosity changes to require admin access');
     } catch (error: any) {
       expect(error.error).to.equal('not-authorized');
+    }
+  });
+
+  it('records ordinary account diagnostics and suppresses private study writes', async function() {
+    const current = Random.id(), study = Random.id();
+    const reports = (globalThis as any).ErrorReports;
+    const handlers = MeteorAny.server.method_handlers;
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed diagnostic methods');
+    for (const verification of ACCOUNT_DIAGNOSTIC_VERIFICATIONS) {
+      const row = observed.surfaces.find(item => item.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      expect(row?.policy).to.deep.equal({ kind: 'diagnostic-telemetry', operation: 'non-private-account' });
+    }
+    const record = async (id: string) => {
+      const context = { userId: id };
+      await handlers.sendUserErrorReport.call(context, id, 'Invalid timestamps', '/content', { unit: 1 },
+        'test-agent', ['trial start'], { currentUnitNumber: 1 });
+      await handlers.logUserAgentAndLoginTime.call(context, id, 'test-agent');
+      await handlers.setUserSessionId.call(context, 'practice-session', 12);
+    };
+    try {
+      await MeteorUsersAny.insertAsync({ _id: current, username: current });
+      await MeteorUsersAny.insertAsync({ _id: study, username: study, profile: { experiment: true } });
+      await record(current);
+      await record(study);
+      const ordinary = await MeteorUsersAny.findOneAsync(current);
+      expect(ordinary.status.userAgent).to.equal('test-agent');
+      expect(ordinary.lastSessionId).to.equal('practice-session');
+      const report = await reports.findOneAsync({ user: current });
+      expect(report.logs).to.deep.equal(['trial start']);
+      expect(report.currentExperimentState).to.deep.equal({ currentUnitNumber: 1 });
+      expect(report.sessionVars).to.deep.equal({ unit: 1 });
+      const participant = await MeteorUsersAny.findOneAsync(study);
+      expect(participant.status).to.equal(undefined);
+      expect(participant.lastSessionId).to.equal(undefined);
+      expect(await reports.find({ user: study }).countAsync()).to.equal(0);
+    } finally {
+      await reports.removeAsync({ user: { $in: [current, study] } });
+      await MeteorUsersAny.removeAsync({ _id: { $in: [current, study] } });
     }
   });
 

@@ -733,6 +733,14 @@ export const PROGRESS_READ_VERIFICATIONS = Object.freeze(([
   cases: Object.freeze(['binds each progress read to the signed-in learner', 'resumes a passwordless study session and scopes progress on its real DDP connection']),
 })));
 
+export const ACCOUNT_DIAGNOSTIC_VERIFICATIONS = Object.freeze(([
+  'sendUserErrorReport', 'logUserAgentAndLoginTime', 'setUserSessionId',
+] as const).map(method => Object.freeze({
+  ...middlewareTest, suite: 'system method authorization', method, surfaceId: `method:${method}` as const,
+  verificationId: `method.account-diagnostics.${method}` as const,
+  cases: Object.freeze(['records ordinary account diagnostics and suppresses private study writes']),
+})));
+
 export const PROFILE_OPERATION_VERIFICATIONS = Object.freeze(([
   'updateOwnProfile',
   'updateOwnUiLocale',
@@ -770,6 +778,20 @@ export const ADMIN_OPERATION_VERIFICATIONS = Object.freeze(([
   'userAdminDeleteUser',
   'insertNewUsers',
   'userAdminNewsEmailRecipients',
+  'getAdminTestOpenRouterCapability',
+  'callAdminTestResolvedOpenRouterJson',
+  'callAdminTestOpenRouterRequest',
+  'setCustomThemeProperty',
+  'refreshUserAdminUsageCaches',
+  'getSparcVideoCatalogTargets',
+  'prepareSparcVideoCatalogTarget',
+  'saveSparcVideoCatalogPassages',
+  'deleteSparcInstructionalComponent',
+  'updateStimDisplayTypeMap',
+  'getSparcLibraryClusters',
+  'listSparcInstructionalComponents',
+  'replaceSparcLibraryImage',
+  'reviseSparcPrimitive',
 ] as const).map(method => Object.freeze({
   ...middlewareTest, suite: 'adminMethods', method, surfaceId: `method:${method}` as const,
   verificationId: `method.admin.${method}` as const,
@@ -832,7 +854,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
-  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, ...MANUAL_DRAFT_VERIFICATIONS, ...UPLOAD_READ_VERIFICATIONS, ...ADMIN_OPERATION_VERIFICATIONS, ...PROFILE_OPERATION_VERIFICATIONS, ...PROGRESS_READ_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, STIMULUS_FILE_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, COURSE_DELETE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
+  ...Object.values(EXPERIMENT_ENTRY_VERIFICATIONS), ...Object.values(PROLIFIC_METHOD_VERIFICATIONS), LESSON_SHARING_VERIFICATION, ...ACCESSOR_READ_VERIFICATIONS, ...MANUAL_DRAFT_VERIFICATIONS, ...UPLOAD_READ_VERIFICATIONS, ...ADMIN_OPERATION_VERIFICATIONS, ...PROFILE_OPERATION_VERIFICATIONS, ...ACCOUNT_DIAGNOSTIC_VERIFICATIONS, ...PROGRESS_READ_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, STIMULUS_FILE_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION, ...Object.values(LESSON_ACCESS_VERIFICATIONS), STUDY_WAIT_VERIFICATION, ...PREFERENCE_VERIFICATIONS, AUDIO_SAVE_VERIFICATION, SSO_PROFILE_VERIFICATION, COURSE_DELETE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, ...Object.values(COURSE_EXCEPTION_VERIFICATIONS), COURSE_ASSIGNMENT_SAVE_VERIFICATION, ...Object.values(COURSE_READ_VERIFICATIONS)]);
 if (new Set(AUDIT_VERIFICATIONS.map(entry => entry.verificationId)).size !== AUDIT_VERIFICATIONS.length) {
   throw new Error('Duplicate audit verification ID');
 }

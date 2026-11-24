@@ -135,8 +135,6 @@ export const PLATFORM_STRING_KEYS = [
   'common.loadingTakingLonger',
   'common.loadingContent',
   'common.loadingInstructions',
-  'common.reportAnError',
-  'errorReport.descriptionRequired',
   'route.classJoinFailed',
   'route.experimentNotFound',
   'route.classLinkMissingInfo',
@@ -20701,8 +20699,6 @@ const ADDED_PLATFORM_RESOURCE_VALUES = {
   en: {
     'common.loadingContent': 'Loading content...',
     'common.loadingInstructions': 'Loading instructions...',
-    'common.reportAnError': 'Report an Error',
-    'errorReport.descriptionRequired': 'Please enter a description of the error.',
     'route.classJoinFailed': 'Could not join that class. Please ask your instructor for a fresh class link.',
     'route.experimentNotFound': 'The experiment you are trying to access does not exist.',
     'route.classLinkMissingInfo': 'That class link is missing required information.',
@@ -20735,8 +20731,6 @@ const ADDED_PLATFORM_RESOURCE_VALUES = {
   'zh-Hans': {
     'common.loadingContent': '正在加载内容...',
     'common.loadingInstructions': '正在加载说明...',
-    'common.reportAnError': '报告错误',
-    'errorReport.descriptionRequired': '请输入错误描述。',
     'route.classJoinFailed': '无法加入该班级。请向教师索取新的班级链接。',
     'route.experimentNotFound': '您尝试访问的实验不存在。',
     'route.classLinkMissingInfo': '该班级链接缺少必需信息。',
@@ -20769,8 +20763,6 @@ const ADDED_PLATFORM_RESOURCE_VALUES = {
   hi: {
     'common.loadingContent': 'सामग्री लोड हो रही है...',
     'common.loadingInstructions': 'निर्देश लोड हो रहे हैं...',
-    'common.reportAnError': 'त्रुटि रिपोर्ट करें',
-    'errorReport.descriptionRequired': 'कृपया त्रुटि का विवरण दर्ज करें।',
     'route.classJoinFailed': 'उस कक्षा में शामिल नहीं हो सके। कृपया अपने प्रशिक्षक से नया कक्षा लिंक मांगें।',
     'route.experimentNotFound': 'जिस प्रयोग तक आप पहुंचने की कोशिश कर रहे हैं वह मौजूद नहीं है।',
     'route.classLinkMissingInfo': 'उस कक्षा लिंक में आवश्यक जानकारी नहीं है।',
@@ -20803,8 +20795,6 @@ const ADDED_PLATFORM_RESOURCE_VALUES = {
   es: {
     'common.loadingContent': 'Cargando contenido...',
     'common.loadingInstructions': 'Cargando instrucciones...',
-    'common.reportAnError': 'Informar un error',
-    'errorReport.descriptionRequired': 'Ingresa una descripción del error.',
     'route.classJoinFailed': 'No se pudo unir a esa clase. Pide a tu instructor un enlace de clase nuevo.',
     'route.experimentNotFound': 'El experimento al que intentas acceder no existe.',
     'route.classLinkMissingInfo': 'A ese enlace de clase le falta información requerida.',
@@ -20837,8 +20827,6 @@ const ADDED_PLATFORM_RESOURCE_VALUES = {
   ar: {
     'common.loadingContent': 'جارٍ تحميل المحتوى...',
     'common.loadingInstructions': 'جارٍ تحميل التعليمات...',
-    'common.reportAnError': 'الإبلاغ عن خطأ',
-    'errorReport.descriptionRequired': 'يرجى إدخال وصف للخطأ.',
     'route.classJoinFailed': 'تعذر الانضمام إلى هذا الصف. يرجى طلب رابط صف جديد من المدرس.',
     'route.experimentNotFound': 'التجربة التي تحاول الوصول إليها غير موجودة.',
     'route.classLinkMissingInfo': 'رابط الصف هذا يفتقد معلومات مطلوبة.',
@@ -20871,8 +20859,6 @@ const ADDED_PLATFORM_RESOURCE_VALUES = {
   fr: {
     'common.loadingContent': 'Chargement du contenu...',
     'common.loadingInstructions': 'Chargement des instructions...',
-    'common.reportAnError': 'Signaler une erreur',
-    'errorReport.descriptionRequired': 'Veuillez saisir une description de l’erreur.',
     'route.classJoinFailed': 'Impossible de rejoindre cette classe. Demandez à votre enseignant un nouveau lien de classe.',
     'route.experimentNotFound': 'L’expérience à laquelle vous essayez d’accéder n’existe pas.',
     'route.classLinkMissingInfo': 'Ce lien de classe ne contient pas toutes les informations requises.',
@@ -20905,8 +20891,6 @@ const ADDED_PLATFORM_RESOURCE_VALUES = {
   bn: {
     'common.loadingContent': 'বিষয়বস্তু লোড হচ্ছে...',
     'common.loadingInstructions': 'নির্দেশনা লোড হচ্ছে...',
-    'common.reportAnError': 'ত্রুটি রিপোর্ট করুন',
-    'errorReport.descriptionRequired': 'অনুগ্রহ করে ত্রুটির বিবরণ লিখুন।',
     'route.classJoinFailed': 'ওই ক্লাসে যোগ দেওয়া যায়নি। অনুগ্রহ করে আপনার প্রশিক্ষকের কাছে নতুন ক্লাস লিংক চান।',
     'route.experimentNotFound': 'আপনি যে পরীক্ষায় প্রবেশ করতে চাইছেন তা নেই।',
     'route.classLinkMissingInfo': 'ওই ক্লাস লিংকে প্রয়োজনীয় তথ্য নেই।',
@@ -20939,8 +20923,6 @@ const ADDED_PLATFORM_RESOURCE_VALUES = {
   pt: {
     'common.loadingContent': 'Carregando conteúdo...',
     'common.loadingInstructions': 'Carregando instruções...',
-    'common.reportAnError': 'Relatar um erro',
-    'errorReport.descriptionRequired': 'Digite uma descrição do erro.',
     'route.classJoinFailed': 'Não foi possível entrar nessa turma. Peça ao instrutor um novo link da turma.',
     'route.experimentNotFound': 'O experimento que você está tentando acessar não existe.',
     'route.classLinkMissingInfo': 'Esse link da turma não contém as informações obrigatórias.',
@@ -20973,8 +20955,6 @@ const ADDED_PLATFORM_RESOURCE_VALUES = {
   id: {
     'common.loadingContent': 'Memuat konten...',
     'common.loadingInstructions': 'Memuat instruksi...',
-    'common.reportAnError': 'Laporkan kesalahan',
-    'errorReport.descriptionRequired': 'Masukkan deskripsi kesalahan.',
     'route.classJoinFailed': 'Tidak dapat bergabung ke kelas itu. Minta tautan kelas baru kepada instruktur Anda.',
     'route.experimentNotFound': 'Eksperimen yang Anda coba akses tidak ada.',
     'route.classLinkMissingInfo': 'Tautan kelas itu tidak memiliki informasi yang diperlukan.',
@@ -21007,8 +20987,6 @@ const ADDED_PLATFORM_RESOURCE_VALUES = {
   ur: {
     'common.loadingContent': 'مواد لوڈ ہو رہا ہے...',
     'common.loadingInstructions': 'ہدایات لوڈ ہو رہی ہیں...',
-    'common.reportAnError': 'خرابی رپورٹ کریں',
-    'errorReport.descriptionRequired': 'براہ کرم خرابی کی تفصیل درج کریں۔',
     'route.classJoinFailed': 'اس کلاس میں شامل نہیں ہو سکے۔ براہ کرم اپنے انسٹرکٹر سے نیا کلاس لنک مانگیں۔',
     'route.experimentNotFound': 'جس تجربے تک آپ رسائی حاصل کرنے کی کوشش کر رہے ہیں وہ موجود نہیں ہے۔',
     'route.classLinkMissingInfo': 'اس کلاس لنک میں مطلوبہ معلومات موجود نہیں ہیں۔',

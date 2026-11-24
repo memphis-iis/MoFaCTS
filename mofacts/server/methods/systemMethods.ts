@@ -1,5 +1,5 @@
 import { validPersonalAudioSetting } from '../../common/personalAudioSettings';
-import { privateParticipantActivity } from '../lib/participantSession';
+import { accountDiagnosticsPolicy } from '../lib/participantSession';
 import { Meteor } from 'meteor/meteor';
 import { PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY } from '../../common/practiceStatisticsPreference';
 import {
@@ -183,7 +183,7 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
       if (userID && userID !== actingUserId) {
         throw new Meteor.Error(403, 'Can only submit error reports for the current user');
       }
-      if (await privateParticipantActivity(this)) return;
+      if (!await accountDiagnosticsPolicy.authorize(this)) return;
       assertJsonSize(sessionVars, MAX_ERROR_REPORT_JSON_LENGTH, 'Session snapshot');
       assertJsonSize(currentExperimentState, MAX_ERROR_REPORT_JSON_LENGTH, 'Experiment state snapshot');
       const errorReport = {
@@ -207,7 +207,7 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
       if (userID !== this.userId) {
         throw new Meteor.Error(403, 'Can only update your own login status');
       }
-      if (await privateParticipantActivity(this)) return;
+      if (!await accountDiagnosticsPolicy.authorize(this)) return;
       const loginTime = new Date();
       return await deps.usersCollection.updateAsync({ _id: userID }, { $set: { status: { lastLogin: loginTime, userAgent } } });
     },
