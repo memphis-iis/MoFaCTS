@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { Meteor } from 'meteor/meteor';
+import { Random } from 'meteor/random';
+import { Roles } from 'meteor/alanning:roles';
 import { auditDigest } from '../../common/securityAudit/canonicalReport';
 import { readStartupSurfaceInventory } from './startupSurfaceInventory';
 import { createSurfaceInventorySeal, type StartupProfile, type StartupSurface } from './surfaceInventorySeal';
@@ -48,10 +51,29 @@ describe('startup surface inventory', () => {
     assert.equal(await auditDigest(observed.inventory.profile), observed.profileSha256);
     const rows = observed.inventory.surfaces;
     assert.equal(new Set(rows.map(row => row.surfaceId)).size, rows.length);
-    assert.equal(rows.filter(row => row.owner === 'application-method').length, 193);
-    assert.equal(rows.filter(row => row.owner === 'named-publication').length, 21);
+    assert.equal(rows.filter(row => row.owner === 'application-method').length, 194);
+    assert.equal(rows.filter(row => row.owner === 'named-publication').length, 19);
+    assert.equal(rows.filter(row => row.owner === 'default-publication').length, 2);
     assert.ok(rows.some(row => row.surfaceId === 'framework:accounts-base:on-create-user'));
     assert.ok(rows.some(row => row.surfaceId === 'framework:webapp:external-runtime-config'));
     assert.ok(rows.some(row => row.surfaceId === 'middleware:cdn-public-assets'));
+  });
+
+  it('allows only administrators to observe the bounded registry and proof state', async () => {
+    const admin = Random.id();
+    await Roles.createRoleAsync('admin', { unlessExists: true });
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    try {
+      const read = (Meteor as any).server.method_handlers['admin.securityAudits.surfaceInventory'];
+      await assert.rejects(read.call({ userId: null }), { error: 403 });
+      await assert.rejects(read.call({ userId: Random.id() }), { error: 403 });
+      const result = await read.call({ userId: admin });
+      assert.deepEqual(Object.keys(result).sort(), ['buildIdentity', 'registry', 'verificationBundle']);
+      assert.equal(result.registry.state, 'sealed');
+      assert.equal(await auditDigest(result.registry.inventory), result.registry.inventorySha256);
+      assert.deepEqual(result.verificationBundle, { state: 'unavailable', reason: 'not-embedded' });
+    } finally {
+      await Roles.removeUsersFromRolesAsync(admin, 'admin');
+    }
   });
 });

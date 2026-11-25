@@ -238,15 +238,17 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   - [x] Verify immediate asset sharing on the corrected source in a full native Meteor run (slot 60). Each new subscription resolves independent permissions afresh. Staging2 qualification remains a separate open item.
 - [x] Slot 99 verified the installed Accounts lifecycle hooks, native login/logout owner and Google, Microsoft and Memphis SAML account service registrations. The source checker distinguishes browser account notifications from server hooks. Real provider sign-ins remain a staging2 acceptance requirement.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
-  - [ ] Verify the startup coordinator and in-memory inventory/digests in slot 100. Account registration, application startup and static module ownership are checked together. The admin read, build identity and embedded proof still need their release-facing composition.
+  - [ ] Verify the startup seal, profile/inventory digests and bounded administrator read in slot 101. Slot 100 reached the seal and recomputed both digests, then its assertion counted 21 total publications as named. The correction checks 19 named plus two distinct defaults. The new read separately reports build identity and embedded proof observations.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
+  - [x] Verify the shared VerificationBundleV1 schema, canonical digest, exact matching of required passing source IDs, and bounded installed proof reader with synthetic source tests. The parser refuses fixture bundles as release source evidence. Build-time proof generation and embedding from actual test execution remain open.
 - [ ] Verify static bypass detection across active source roots and retire the old manifest and inference checker after parity.
   - [x] Check direct references to Meteor.methods and Meteor.publish in application server JavaScript and TypeScript, including renamed imports, aliases, literal property access and destructuring. Shadowed unrelated names are covered by a source regression. Other roots, dynamically computed dispatch, HTTP and package ownership still need their own checks.
   - [x] Extend direct Meteor registration checks to JavaScript and TypeScript in client, common and learning-components. Computed Meteor access that cannot be resolved is now reported. Checked 218 server, 380 client, 107 common and 163 learning-component files. Package owners and other registration APIs have separate acceptance checks.
   - [x] Check direct Meteor method/publication registration across 61 tracked Svelte components. Cover authored typed scripts, module/instance scope, template event expressions and unrelated shadowed names. The full source check still finds 306 declared surfaces.
   - [x] Extend direct method/publication registration checks to local Meteor packages with package manifests. Require exactly one registration of the upload handler table in the maintained FilesCollection constructor. Reject additional calls and deferred references there and direct registrations in other package sources. Full lint and Linux source-security regressions passed.
   - [x] Extend the static adapter check to WebApp HTTP stack registrations across the same source roots. Cover renamed and namespace imports, stack aliases, destructuring, unresolved computed properties and unrelated local routers. The maintained FilesCollection HTTP registration is permitted only in its existing owner method. Six focused checker tests, repository lint and the full Linux source-security suite passed. Retirement of the old checker is still open.
-  - [x] Extend the static adapter check to app-owned Accounts hooks and OAuth services. Pin and check both Microsoft package registration owners and the Accounts/OAuth package versions. Verify alias, namespace, shadowing, and stray-registration cases in source tests.
+  - [x] Extend the static adapter check to app-owned Accounts hooks and OAuth services. Pin and check both Microsoft package registration owners and the Accounts/OAuth package versions. Verify alias, namespace, shadowing, browser notification scope, and stray-registration cases in source tests.
+  - [x] Check direct allow/deny calls on Meteor users, locally constructed Mongo collections, and imports from the app collection owner. Test aliases, namespace imports, destructuring, and unrelated methods.
 - [ ] Qualify the complete matched image and scanner on staging2, including login, ordinary learner behavior and enabled providers. The earlier condition-index cutover covered that specific change only.
 
 ## Phase 3 HTTP characterization started (2026-11-18)
@@ -1950,11 +1952,13 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 101 total, 98 consumed, 1 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 101 total, 99 consumed, 1 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
 
 The operator authorized up to five additional batched local Meteor integration invocations, including retries, for the remaining security-audit work (slots 92–96). Reserve each invocation here before starting the suite and record its outcome afterward.
 
-The operator authorized up to five additional local batched Meteor invocations on 2026-11-24 (slots 97–101), including retries. Slot 100 reserved for local startup inventory and digest verification after static and asynchronous startup completion. Slot 101 remains available.
+The operator authorized up to five additional local batched Meteor invocations on 2026-11-24 (slots 97–101), including retries. Slot 101 reserved for the corrected publication count and bounded administrator inventory read.
+
+Slot 100 ran on ea33327c. Server 1,162 passed, one failed and 15 pending. Chromium 1,255 passed and seven pending. The startup coordinator returned a sealed inventory and matching digests. The test compared 19 named publications to the total of 21, which includes two defaults. Worker cleanup completed. Retained result /var/tmp/mofacts-integration.KwfKPo5Y/results/meteor-run.json SHA-256 88dbbaf4eb8783afff69f40477a76f1d0633aa9ad827c455ae3283f3b0e0a5ba.
 
 Slot 99 passed on f99a5d12. Server 1,160 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. The native Accounts ownership test ran and passed. Tool image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.uzmvSJfk/results/native-verification.json SHA-256 4442205c45cb4891ec463e79d3f6bc3d16e0ba8180d775d76de426dca381f17a.
 

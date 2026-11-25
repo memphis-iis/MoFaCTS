@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { compile, parse } from 'svelte/compiler';
 import ts from 'typescript';
 
@@ -6,7 +7,7 @@ const ACCOUNT_HOOKS = new Set(['onLogin', 'onLoginFailure', 'onLogout', 'onCreat
 const HTTP_STACKS = new Set(['connectHandlers', 'rawConnectHandlers', 'handlers']);
 
 // A reference to a registration function can be retained and called later.
-export function directFrameworkRegistrationReferences(source, acceptsRegistration = () => false, { clientOnly = false } = {}) {
+export function directFrameworkRegistrationReferences(source, acceptsRegistration = () => false, { clientOnly = false, collectionModule } = {}) {
   let checker;
   function declarationOf(identifier) {
     if (!checker) {
@@ -37,6 +38,7 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
     if (name === 'WebApp') return 'meteor/webapp';
     if (name === 'Accounts') return 'meteor/accounts-base';
     if (name === 'OAuth') return 'meteor/oauth';
+    if (name === 'Mongo') return 'meteor/mongo';
     return undefined;
   }
   function bindingName(element) {
@@ -44,14 +46,25 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
     if (!ts.isComputedPropertyName(name)) return name.text;
     return ts.isStringLiteralLike(name.expression) ? name.expression.text : '[unresolved property]';
   }
+  function importsApplicationCollections(node) {
+    if (!collectionModule) return false;
+    while (node && !ts.isImportDeclaration(node)) node = node.parent;
+    if (!node || node.importClause?.isTypeOnly || !node.moduleSpecifier.text.startsWith('.')) return false;
+    const target = path.resolve(path.dirname(source.fileName), node.moduleSpecifier.text).replace(/\.ts$/, '');
+    return target === collectionModule.replace(/\.ts$/, '');
+  }
   function registrationOwner(node, visited = new Set()) {
     node = unwrap(node);
+    if (ts.isNewExpression(node)) {
+      return registrationOwner(node.expression, visited) === 'Mongo.Collection' ? 'collection' : undefined;
+    }
     if (ts.isIdentifier(node)) {
       const decl = declarationOf(node);
       if (!decl) return frameworkModule(node.text) ? node.text : undefined;
       if (visited.has(decl)) return undefined;
       visited.add(decl);
       if (ts.isImportSpecifier(decl) && !decl.isTypeOnly) {
+        if (importsApplicationCollections(decl)) return 'collection';
         const name = (decl.propertyName ?? decl.name).text;
         return frameworkModule(name) && frameworkImport(decl, frameworkModule(name)) ? name : undefined;
       }
@@ -63,6 +76,8 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
         const owner = registrationOwner(initializer, visited);
         if (HTTP_STACKS.has(member) && owner === 'WebApp') return member;
         if (member === 'oauth' && owner === 'Accounts') return 'Accounts.oauth';
+        if (member === 'Collection' && owner === 'Mongo') return 'Mongo.Collection';
+        if (member === 'users' && owner === 'Meteor') return 'collection';
       }
       return undefined;
     }
@@ -71,7 +86,10 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
     const receiver = unwrap(node.expression);
     if (HTTP_STACKS.has(name) && registrationOwner(receiver, visited) === 'WebApp') return name;
     if (name === 'oauth' && registrationOwner(receiver, visited) === 'Accounts') return 'Accounts.oauth';
+    if (name === 'Collection' && registrationOwner(receiver, visited) === 'Mongo') return 'Mongo.Collection';
+    if (name === 'users' && registrationOwner(receiver, visited) === 'Meteor') return 'collection';
     const decl = ts.isIdentifier(receiver) && declarationOf(receiver);
+    if (decl && ts.isNamespaceImport(decl) && importsApplicationCollections(decl)) return 'collection';
     if (decl && ts.isNamespaceImport(decl) && frameworkModule(name) && frameworkImport(decl, frameworkModule(name))) return name;
     return undefined;
   }
@@ -82,6 +100,7 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
     // Client notification hooks coordinate presentation and cannot admit or create accounts.
     if (owner === 'Accounts' && clientOnly && CLIENT_ACCOUNT_NOTIFICATIONS.has(member)) return undefined;
     if (owner === 'Accounts' && (ACCOUNT_HOOKS.has(member) || member === '[unresolved property]')) return 'Accounts.' + member;
+    if (owner === 'collection' && (member === 'allow' || member === 'deny' || member === '[unresolved property]')) return 'Mongo.Collection.' + member;
     if ((owner === 'OAuth' || owner === 'Accounts.oauth') && (member === 'registerService' || member === '[unresolved property]')) return owner + '.' + member;
     return undefined;
   }
@@ -100,13 +119,16 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
       if (owner === 'Accounts' && member === 'oauth' && ts.isObjectBindingPattern(element.name)) {
         checkBindings(element.name, 'Accounts.oauth');
       }
+      if (owner === 'Meteor' && member === 'users' && ts.isObjectBindingPattern(element.name)) {
+        checkBindings(element.name, 'collection');
+      }
     }
   }
   function visit(node) {
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       const name = property(node);
       if (name === 'methods' || name === 'publish' || name === 'use' || name === 'registerService' ||
-          ACCOUNT_HOOKS.has(name) || name === undefined) {
+          name === 'allow' || name === 'deny' || ACCOUNT_HOOKS.has(name) || name === undefined) {
         const member = registrationMember(registrationOwner(node.expression), name ?? '[unresolved property]');
         if (member && !acceptsRegistration(node, member)) addFinding(node, member);
       }

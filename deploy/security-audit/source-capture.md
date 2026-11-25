@@ -302,6 +302,16 @@ disposal remains responsible for interrupted job lifetime, not the local watcher
 - The helper exports only the declared copied roots and recipe metadata, not the config repo or a broad `COPY .`. Docker filtering is not secret detection: verify that included source roots contain no private runtime material before authorizing capture. This prototype must not be used to export production data/settings.
 - Cleanup validates the exact owned temporary root and rejects links before recursive removal. It does not remove the live checkout, arbitrary directories, images, builders, volumes or containers. Successful captures persist until explicit cleanup. A stopped native client does not prove remote BuildKit work was cancelled; interrupted Docker cleanup belongs to the authorized runtime check.
 
+## Runtime inventory observation
+
+The administrator-only `admin.securityAudits.surfaceInventory` method reports
+the startup registry and its profile and inventory digests. It separately
+reports the embedded build identity and verification bundle. A source build
+can report a sealed registry while its build metadata or bundle is unavailable.
+The receiver returns a bounded observation. The qualification lane must
+compare it with the expected source identity, executed evidence, and exact
+image before recording acceptance.
+
 ## Verification and remaining work
 
 ### External CI image observation

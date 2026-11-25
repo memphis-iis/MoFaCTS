@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { VerificationProfile } from '../../common/securityAudit/verificationBundle.ts';
 import { canonicalAuditJson } from '../../common/securityAudit/canonicalReport.ts';
 
 export type StartupSurface = Readonly<{
@@ -9,7 +10,7 @@ export type StartupSurface = Readonly<{
   verificationIds: readonly string[];
   transport?: Readonly<Record<string, unknown>>;
 }>;
-export type StartupProfile = Readonly<{ mode: 'test' | 'development' | 'production'; meteorRelease: string }>;
+export type StartupProfile = Readonly<VerificationProfile>;
 type Snapshot = { schema: 'StartupSurfaceInventoryV1'; profile: StartupProfile; surfaces: readonly StartupSurface[] };
 type Result = { state: 'unavailable'; reason: string } |
   { state: 'sealed'; inventorySha256: string; profileSha256: string; inventory: Snapshot };

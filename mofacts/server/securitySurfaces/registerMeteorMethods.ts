@@ -120,7 +120,7 @@ export type MeteorMethodBinding = Readonly<{
     rateLimit: Readonly<{ ipLimit: number; identifierLimit: number; windowMs: number }>;
     authorize: (...args: never[]) => unknown;
   }>;
-  dataEgress: 'audit-report-list' | 'audit-report-summary' | 'audit-download-capability' | 'deployment-diagnostics'
+  dataEgress: 'bounded-surface-inventory' | 'audit-report-list' | 'audit-report-summary' | 'audit-download-capability' | 'deployment-diagnostics'
     | 'public-sign-in-config' | 'published-help-markdown' | 'package-upload-result' | 'package-cancel-status' | 'lesson-copy-result' | 'package-download-link' | 'lesson-edit-result' | 'provider-capability' | 'provider-result' | 'embedding-vectors' | 'audio-synthesis' | 'speech-transcription' | 'backup-configuration' | 'backup-job-metadata' | 'backup-download-capability'
     | 'brand-profile-draft' | 'published-brand-profile' | 'redacted-brand-profile-export'
     | 'filename-reference-migration-report' | 'history-download-capability' | 'none'

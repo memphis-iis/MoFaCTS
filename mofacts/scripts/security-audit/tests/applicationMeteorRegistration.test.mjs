@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { FRAMEWORK_AUTH_PACKAGE_PINS } from '../../../common/securityAudit/frameworkAuthPackages.ts';
 import ts from 'typescript';
 import { componentRegistrationReferences, directFrameworkRegistrationReferences, packageRegistrationReferences } from '../checkApplicationMeteorRegistration.mjs';
@@ -69,6 +70,17 @@ test('distinguishes client account notifications from account admission hooks', 
     ['Accounts.validateLoginAttempt']);
   assert.deepEqual(directFrameworkRegistrationReferences(source).map(row => row.member),
     ['Accounts.onLogin', 'Accounts.onLogout', 'Accounts.validateLoginAttempt']);
+});
+
+test('detects direct rules on Meteor users, Mongo collections and imported application collections', () => {
+  const check = text => directFrameworkRegistrationReferences(
+    ts.createSourceFile('server/app.ts', text, ts.ScriptTarget.Latest, true), undefined,
+    { collectionModule: path.resolve('common/Collections.ts') },
+  ).map(row => row.member);
+  assert.deepEqual(check("import { Mongo as Db } from 'meteor/mongo'; const { Collection } = Db; const items = new Collection('items'); const alias = items; alias['allow'](rules);"), ['Mongo.Collection.allow']);
+  assert.deepEqual(check("const { users: { deny: addRule } } = Meteor;"), ['Mongo.Collection.deny']);
+  assert.deepEqual(check("import * as collections from '../common/Collections'; const logs = collections.Histories; logs.deny(rules);"), ['Mongo.Collection.deny']);
+  assert.deepEqual(check("function unrelated(Meteor) { Meteor.users.allow(); } const policy = { deny() {} }; policy.deny();"), []);
 });
 
 test('checks both selected Microsoft owners without trusting other calls in the files', () => {

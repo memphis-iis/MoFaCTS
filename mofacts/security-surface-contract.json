@@ -112,6 +112,11 @@
       "notes": "The V2 audit receiver checks administrator access before listing bounded report summaries."
     },
     {
+      "name": "admin.securityAudits.surfaceInventory",
+      "access": "admin-only",
+      "notes": "Returns the bounded startup surface inventory and image build/proof observations after the administrator check."
+    },
+    {
       "name": "assignAccessors",
       "access": "role-checked",
       "notes": "Only the owner may edit sharing. Each new recipient must match an account inside the transaction. Stale existing entries can be retained or revoked."

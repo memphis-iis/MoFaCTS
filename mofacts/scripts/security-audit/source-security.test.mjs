@@ -1,6 +1,7 @@
 import './tests/applicationMeteorRegistration.test.mjs';
 import './tests/uploadBoundary.test.mjs';
 import './tests/catalogRegistry.test.mjs';
+import './tests/verificationBundle.test.mjs';
 import './tests/assemblyV2.test.mjs';
 import './tests/reportV2.test.mjs';
 import './tests/ingestionV2.test.mjs';

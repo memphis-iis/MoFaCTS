@@ -122,6 +122,7 @@ import { registerNamedPublication } from './securitySurfaces/registerNamedPublic
 import { DEFAULT_PUBLICATION_VERIFICATIONS, NAMED_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
 import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
 import { bindAssetUploadSurfaceOwner } from './securitySurfaces/bindAssetUploadSurfaces.ts';
+import { createSecurityAuditInventoryRegistration } from './securitySurfaces/securityAuditSurfaceInventoryMethod';
 import { completeStartupSurfaceRegistration } from './securitySurfaces/startupSurfaceInventory';
 import { registerMeteorMethods } from './securitySurfaces/registerMeteorMethods.ts';
 import { createSparcDemoAccess } from './lib/sparcDemoAccess';
@@ -278,6 +279,7 @@ const securityAuditRuntime = createSecurityAuditRuntimeV2({
   now: () => new Date(),
 });
 registerSecurityAuditHttp(securityAuditRuntime);
+const securityAuditInventory = createSecurityAuditInventoryRegistration(authSupport.requireAdminUser);
 const {
   minPasswordLength,
   experimentUsernameRegex,
@@ -1119,6 +1121,7 @@ export const asyncMethods: Record<string, unknown> = {
   ...backupRegistration.methods,
 
   ...securityAuditRuntime.methods,
+  ...securityAuditInventory.methods,
 }
 
 // Server-side startup logic
@@ -1127,6 +1130,7 @@ const accountProgressPolicy = { kind: 'learner-progress', operation: 'account-se
 const studyProgressPolicy = { kind: 'learner-progress', operation: 'study-lesson', authorize: requireParticipantProgressLesson } as const;
 registerMeteorMethods(Meteor, installedMethods, [
   ...securityAuditRuntime.methodBindings,
+  securityAuditInventory.binding,
   ...courseReadBindings,
   ...PACKAGE_UPLOAD_VERIFICATIONS.map(verification => ({
     verification, handler: installedMethods[verification.method],

@@ -72,7 +72,10 @@ function regexMatches(text, pattern, mapper) {
 async function checkedApplicationSource(file, packageOwner, microsoftOwner) {
   const text = await fs.readFile(file, 'utf8');
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
-  const options = { clientOnly: file.startsWith(path.join(appRoot, 'client') + path.sep) };
+  const options = {
+    clientOnly: file.startsWith(path.join(appRoot, 'client') + path.sep),
+    collectionModule: path.join(appRoot, 'common', 'Collections.ts'),
+  };
   const bypasses = file.endsWith('.svelte') ? componentRegistrationReferences(file, text, options) :
     packageOwner !== undefined ? packageRegistrationReferences(source, packageOwner, microsoftOwner) :
       directFrameworkRegistrationReferences(source, undefined, options);

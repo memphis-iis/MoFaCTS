@@ -457,6 +457,13 @@ function auditAdminMethodVerification<N extends string>(operation: N) {
   });
 }
 
+export const AUDIT_SURFACE_INVENTORY_VERIFICATION = Object.freeze({
+  ...middlewareTest, suite: 'startup surface inventory',
+  method: 'admin.securityAudits.surfaceInventory', surfaceId: 'method:admin.securityAudits.surfaceInventory',
+  verificationId: 'method.audit.surface-inventory',
+  cases: Object.freeze(['allows only administrators to observe the bounded registry and proof state']),
+} as const);
+
 export const AUDIT_ADMIN_METHOD_VERIFICATIONS = Object.freeze({
   'admin.securityAudits.list': auditAdminMethodVerification('list'),
   'admin.securityAudits.get': auditAdminMethodVerification('get'),
@@ -1017,7 +1024,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...Object.values(DIRECT_WRITE_VERIFICATIONS), ...Object.values(FRAMEWORK_AUTH_VERIFICATIONS), HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION, ...Object.values(DEFAULT_PUBLICATION_VERIFICATIONS),
   ...Object.values(NAMED_PUBLICATION_VERIFICATIONS),
   ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat(), ...Object.values(FILES_DDP_VERIFICATIONS),
-  ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS), DEPLOYMENT_READINESS_VERIFICATION, ...Object.values(BACKUP_METHOD_VERIFICATIONS),
+  ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS), AUDIT_SURFACE_INVENTORY_VERIFICATION, DEPLOYMENT_READINESS_VERIFICATION, ...Object.values(BACKUP_METHOD_VERIFICATIONS),
   ...Object.values(BRAND_PROFILE_METHOD_VERIFICATIONS), FILENAME_TDF_MIGRATION_VERIFICATION,
   ...Object.values(CONDITION_COUNT_VERIFICATIONS), ...Object.values(HISTORY_DOWNLOAD_METHOD_VERIFICATIONS),
   ...Object.values(WARNING_METHOD_VERIFICATIONS), ...Object.values(SIMULATION_METHOD_VERIFICATIONS),
