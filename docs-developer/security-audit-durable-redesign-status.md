@@ -304,6 +304,7 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   - [x] Prepare the three-record fixture for ordinary passwordless return under the current browser account-creation policy. Earlier preparation stopped before creating an account or data. Independently cleared each temporary fixture window. The operator helper now supports an explicitly selected participant, assigned lesson and saved progress scope. Full lint and all 14 focused fixture and authentication contract tests passed. Live control results require their own receipt.
   - [x] Verify normal passwordless return on `e9d14a25`. Chrome established the existing synthetic participant's study session from saved progress, received its assigned lesson, retained its target and recovered the same progress after reload. The five disclosure channels passed for the issued token. The three-record helper at `b8c9c82a` supplied the owned fixture. Logout, namespace absence, lock removal and unchanged release identity were verified. Checked off seven controls in the [control register](security-audit-staging2-control-evidence.md).
   - [x] Verify all five bounded authentication disclosure channels for the ordinary learner sign-in as well as passwordless return. Bound the ordinary sign-in to the confirmed synthetic learner and fresh session credential, and verified logout and release identity. The [control register](security-audit-staging2-control-evidence.md) has 47 passes, four findings and 19 controls requiring evidence. No additional Meteor invocation.
+  - [x] Scan both compiled browser bundles in the exact `e9d14a25` staging2 image with the approved synthetic server-only CI encryption value. Verified 498 files and zero matches. The non-root scanner ran with a read-only filesystem and networking disabled. Operator fix `1b64b274` preserves scanner readability under a restrictive umask, with all 18 focused Linux tests and full lint passing. Verified unchanged deployment identity and removal of the temporary container, runtime and workspaces. The [control register](security-audit-staging2-control-evidence.md) now has 48 passes, four findings and 18 controls requiring evidence.
   - [ ] Qualify the live Full report. Supply the protected writer JSON for all 70 catalog v2 controls and its stored report ID. Match scanner and application revisions to `e9d14a25b21eaece8cea377c787052e7896d0bfe`, the independently observed Linux/amd64 platform image above, and a start at or after `2026-11-25T18:08:10.948Z`. Keep the actual findings and require zero execution errors. In Security Audits, download JSON from the Recent 90-day history row with the matching report digest for the independent readback. Verify the writer and receiver copies and the saved encrypted archive before closing Phase 3.
 
 ## Phase 3 HTTP characterization started (2026-11-18)
@@ -4015,9 +4016,10 @@ its individual image-bridge implementation box, not operational acceptance.
   app/shared TypeScript and dependencies are unchanged. No real Docker, live
   npm audit/Gitleaks/Trivy, Meteor, provider, staging2 or production operation,
   publication, release qualification or deployment occurred.
-- [ ] Perform a separately approved real-image canary run to establish actual
-  isolation/resource fit/cleanup and image observations. No such permission is
-  inferred from source-work continuation or prior consumed Meteor authorizations.
+- [x] Perform the separately approved real-image canary run. The exact
+  `e9d14a25` staging2 platform image passed both browser inventories with 498
+  files and zero matches. Verified isolation, resource limits and cleanup.
+  See the [control register](security-audit-staging2-control-evidence.md).
 - [ ] Compose the repository artifact and whole pipeline/workflow from these
   individual acquisition boundaries; finish remaining typed authentication work
   only after the pending sequencing choice. Complete registered-runtime,

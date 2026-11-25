@@ -10,8 +10,8 @@ The report gate uses the deployment start `2026-11-25T18:08:10.948Z`.
 | External | 8 | 0 | 4 |
 | Authentication | 9 | 0 | 13 |
 | Host | 10 | 0 | 1 |
-| Repository and image | 20 | 4 | 1 |
-| **Total** | **47** | **4** | **19** |
+| Repository and image | 21 | 4 | 0 |
+| **Total** | **48** | **4** | **18** |
 
 The existing Phase III gate still requires one matched catalog v2 Full report,
 independent receiver readback and saved archive verification. These individual
@@ -106,7 +106,7 @@ qualification and synthetic integration results retain their original scope.
 | [x] Pass | `repository.source-security-tests` | The approved paired verifier matched all 478 required cases on the same commit and pinned runtime. The unfiltered Linux transcript recorded 474 passes. The Windows transcript passed exactly the four matched Windows-only cases. |
 | [ ] Finding | `repository.runtime-image-vulnerabilities.high` | The pinned Trivy scan of the verified Linux/amd64 release manifest reported four high-severity findings. |
 | [x] Pass | `repository.runtime-image-vulnerabilities.critical` | The same pinned Trivy scan reported zero critical findings on the verified Linux/amd64 release manifest. |
-| [ ] Needs evidence | `repository.client-bundle-canaries` | The workflow references a canary file without preparing it, and the retained release evidence contains no approved input list. The exact deployed image still needs a scan of both compiled browser bundles using designated synthetic server-only values. |
+| [x] Pass | `repository.client-bundle-canaries` | The exact staging2 platform image had 498 files across `web.browser` and `web.browser.legacy`. None contained the approved synthetic server-only encryption value from `mofacts/settings.ci.json`. |
 
 ## Retained evidence
 
@@ -139,6 +139,19 @@ password and fresh session credential. The second observation used the app's
 session-storage contract after the first observer looked in local storage.
 Verified logout and the same deployed image before and after the accepted run.
 Password reset retains its separate controls and evidence requirements.
+
+The `browser-bundle-canaries.json` receipt records 498 inspected files and zero
+matches for the approved CI test value. The scan verified the selected image's
+configuration digest against the accepted release, ran as a non-root user in a
+read-only container without networking, and confirmed its container and
+temporary files were removed. The staging2 release remained healthy and retained
+its identity. The first setup failed while launching the image's Alpine Node
+executable on the host. The existing pinned Linux Node runtime resolved that
+setup issue. The next attempt exposed the private umask's effect on the scanner file.
+The committed operator fix `1b64b274` sets the file mode explicitly inside the
+private workspace and was the only tooling change layered over the deployed
+source for the passing observation. The hosted workflow still needs canary input
+preparation before its repository step can repeat the scan.
 
 The exact catalog v2 policy set was unavailable at the installed host path.
 The review used temporary root-private copies of the exact source policies and
