@@ -60,11 +60,10 @@ export async function carryImageVerificationBundle({ sourceFile, releaseFile, in
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [sourceFile, releaseFile, inputFile, outputDirectory, expectedHash] = process.argv.slice(2);
-  try {
-    if (process.argv.length !== 7 || !sourceFile || !releaseFile || !inputFile || !outputDirectory) throw Error();
-    await carryImageVerificationBundle({ sourceFile, releaseFile, inputFile, outputDirectory, expectedHash });
-  } catch {
+  const valid = process.argv.length === 7 && sourceFile && releaseFile && inputFile && outputDirectory;
+  const action = valid ? carryImageVerificationBundle({ sourceFile, releaseFile, inputFile, outputDirectory, expectedHash }) : Promise.reject();
+  action.catch(() => {
     process.stderr.write('Verification bundle embedding failed; no qualification was issued.\n');
     process.exitCode = 1;
-  }
+  });
 }

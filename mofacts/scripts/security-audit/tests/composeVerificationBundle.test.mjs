@@ -11,6 +11,7 @@ import { composeNativeVerificationBundle, writeCapturedVerificationBundle } from
 import { digestVerificationCatalog } from '../qualification/verificationCatalogProof.mjs';
 import { bindNativeCaseEvidence } from '../qualification/nativeCaseEvidence.mjs';
 import { carryImageVerificationBundle, validateBuildVerificationBundle } from '../qualification/imageVerificationBundle.mjs';
+import { compareRuntimeVerification } from '../qualification/compareRuntimeVerification.mjs';
 
 const hash = data => createHash('sha256').update(data).digest('hex');
 const bytes = value => Buffer.from(JSON.stringify(value));
@@ -142,4 +143,60 @@ test('writes the proof once from retained inputs and the separately declared reg
   assert.equal(result.state, 'source-proof-prepared-unqualified');
   assert.equal(result.bundleDigestSha256, hash(await fs.readFile(result.bundleFile)));
   await assert.rejects(writeCapturedVerificationBundle(options), { code: 'EEXIST' });
+});
+
+async function runtimeObservation(amendInventory = () => {}) {
+  const inventory = {
+    schema: 'StartupSurfaceInventoryV1', profile: expectedRegistry.profile,
+    surfaces: declared.map(({ surfaceId, verificationId }) => ({
+      surfaceId, owner: 'fixture-owner', policy: 'fixture-policy', dataEgress: 'none', verificationIds: [verificationId],
+    })),
+  };
+  // Give intentionally grouped fixture cases a single transport owner.
+  const rows = new Map();
+  for (const row of inventory.surfaces) {
+    const owned = rows.get(row.surfaceId);
+    if (owned) owned.verificationIds.push(...row.verificationIds);
+    else rows.set(row.surfaceId, row);
+  }
+  inventory.surfaces = [...rows.values()];
+  amendInventory(inventory);
+  const profileSha256 = await auditDigest(inventory.profile);
+  const inventorySha256 = await auditDigest(inventory);
+  const bundle = await composeNativeVerificationBundle({ ...fixture(),
+    expectedRegistry: { ...expectedRegistry, inventorySha256 } });
+  const bundleDigestSha256 = await auditDigest(bundle);
+  const observation = {
+    buildIdentity: { state: 'observed', identity: structuredClone(buildIdentity) },
+    registry: { state: 'sealed', inventory, inventorySha256, profileSha256 },
+    verificationBundle: { state: 'observed', bundle, digestSha256: bundleDigestSha256 },
+  };
+  return { observation, expected: { buildIdentity, profile: expectedRegistry.profile, inventorySha256, bundleDigestSha256 } };
+}
+
+test('matches the runtime response to the independent proof and recomputes all hashes', async () => {
+  const { observation, expected } = await runtimeObservation();
+  const result = await compareRuntimeVerification(observation, expected);
+  assert.equal(result.state, 'runtime-proof-matched-unqualified');
+  assert.equal(result.verificationCount, declared.length);
+  for (const [update, reason] of [
+    [value => { value.buildIdentity.identity.baseCommit = '0'.repeat(40); }, /identity differs/],
+    [value => { value.registry.inventory.profile = { ...value.registry.inventory.profile, mode: 'test' }; }, /registry or profile/],
+    [value => { value.registry.inventory.surfaces.reverse(); }, /registry or profile/],
+    [value => { value.verificationBundle.bundle.executions[0].resultEvidenceSha256 = '0'.repeat(64); }, /bundle differs/],
+  ]) {
+    const changed = structuredClone(observation);
+    update(changed);
+    await assert.rejects(compareRuntimeVerification(changed, expected), reason);
+  }
+});
+
+test('rejects a registry with missing or repeated verification IDs even when its bytes match the expectation', async () => {
+  for (const update of [
+    inventory => { inventory.surfaces.pop(); },
+    inventory => { inventory.surfaces[0].verificationIds.push(inventory.surfaces[1].verificationIds[0]); },
+  ]) {
+    const { observation, expected } = await runtimeObservation(update);
+    await assert.rejects(compareRuntimeVerification(observation, expected), /missing required verification|repeated ID/);
+  }
 });

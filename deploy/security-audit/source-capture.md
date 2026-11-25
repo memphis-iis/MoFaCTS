@@ -70,6 +70,8 @@ The capture helper's `compose-proof` action accepts the existing `--builder` and
 
 The existing `build` action accepts `--verification-bundle` pointing to that file. The helper uses a build-only Docker file mount and a separate digest argument to keep the proof outside the source snapshot. The build checks canonical bytes, the digest, the catalog, the captured source and the pinned production profile before writing the image's proof file. The temporary Compose override and file copy are removed after success or failure. The exact-image smoke and running registry comparison are required separately.
 
+`node scripts/security-audit/qualification/compareRuntimeVerification.mjs <runtime-observation> <expected-proof>` compares the administrator observation with the independently retained expectation containing `buildIdentity`, `profile`, `inventorySha256` and `bundleDigestSha256`. It recomputes the digests and checks the exact case set. The output is one bounded match record for the image and release verification steps.
+
 The hosted combined job still needs fresh authorization if it invokes Meteor
 again. A build-only retry through the capture helper can reuse the same retained
 proof while its verified inputs and expected profile match. Keep raw source,

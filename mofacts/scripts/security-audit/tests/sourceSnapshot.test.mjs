@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { SNAPSHOT_LIMITS, extractSnapshot, inspectSnapshotTree, snapshotPath, snapshotDigest, sha256 } from '../qualification/sourceSnapshot.mjs';
@@ -227,6 +228,12 @@ test('Compose integration changes only the absolute build context, not image, ar
   assert.throws(() => assertContextOnlyChange(base, next, candidate), /validation failed/);
   assert.throws(() => contextOverride('relative'), /validation failed/);
 });
+test('the worker read-only probe can synchronously load the capture seal', () => {
+  const require = createRequire(import.meta.url);
+  const { summarizeMountState } = require('../qualification/sealCapture.mjs');
+  assert.equal(typeof summarizeMountState, 'function');
+});
+
 test('CLI rejects incomplete/unknown options and broad cleanup targets without Docker', async () => {
   for (const args of [[], ['prepare'], ['prepare', '--builder', 'x', '--builder', 'y'], ['deploy'], ['cleanup', '--workspace', os.tmpdir()]]) {
     await assert.rejects(main(args));
