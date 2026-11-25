@@ -12,6 +12,8 @@ import { captureRoots, contextOverride, assertContextOnlyChange, assertCapturedE
   verifyCapturedTestInputs, prepareCapturedTestInputs, capturedSourceDifferences } from '../qualification/captureBuildSource.mjs';
 import { TEST_INPUTS } from '../qualification/testInputs.mjs';
 import { sealCapture, unsealCapture } from '../qualification/sealCapture.mjs';
+import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
+import { digestVerificationCatalog, requiredMeteorVerificationIds } from '../qualification/verificationCatalogProof.mjs';
 
 test('bounds changed-source diagnostics to validated relative paths without contents or digests', () => {
   const entry = (name, digest = 'private-content-digest') => [name, 'file', 0o644, digest];
@@ -231,7 +233,7 @@ test('CLI rejects incomplete/unknown options and broad cleanup targets without D
   }
 });
 
-async function syntheticCapture(t, change = () => {}) {
+async function syntheticCapture(t, change = () => {}, dirty = true) {
   const repositoryRoot = await directory(t);
   await fs.mkdir(path.join(repositoryRoot, 'deploy'));
   await fs.writeFile(path.join(repositoryRoot, 'Dockerfile'), recipe);
@@ -242,6 +244,8 @@ async function syntheticCapture(t, change = () => {}) {
     { name: 'deploy/docker/', type: '5', mode: 0o755 },
     { name: 'mofacts/', type: '5', mode: 0o755 },
     { name: 'mofacts/source.ts', content: 'synthetic dirty source\r\n' },
+    { name: 'mofacts/.meteor/', type: '5', mode: 0o755 },
+    { name: 'mofacts/.meteor/release', content: 'METEOR@3.5.4\n' },
     { name: 'learning-components/', type: '5', mode: 0o755 },
     { name: 'packages/', type: '5', mode: 0o755 },
     { name: 'Dockerfile', content: recipe },
@@ -264,11 +268,19 @@ async function syntheticCapture(t, change = () => {}) {
         config.services.mofacts.build.context = capturedBuild.context;
         Object.assign(config.services.mofacts.build.args, capturedBuild.args);
       }
+      const proofOverride = args.find(arg => path.basename(arg) === 'compose.json');
+      if (proofOverride) {
+        const carrier = JSON.parse(await fs.readFile(proofOverride));
+        config.secrets = carrier.secrets;
+        const build = config.services.mofacts.build;
+        build.secrets = carrier.services.mofacts.build.secrets;
+        Object.assign(build.args, carrier.services.mofacts.build.args);
+      }
       return JSON.stringify(config);
     }
     return options.consume(Readable.from([]));
   } };
-  const captured = await prepareCapture('synthetic-builder', 'a'.repeat(40), true, dependencies);
+  const captured = await prepareCapture('synthetic-builder', 'a'.repeat(40), dirty, dependencies);
   t.after(async () => {
     const exists = await fs.lstat(captured.workspace).then(() => true, (error) => {
       if (error.code !== 'ENOENT') throw error;
@@ -294,6 +306,34 @@ test('synthetic prepare/verify/build uses captured source and preserves Compose 
   assert.deepEqual(build.slice(-5), ['build', '--builder', 'synthetic-builder', '--no-cache', 'mofacts']);
   assert.equal(calls.some((args) => args.includes('push') || args.includes('up') || args.includes('test:ci')), false);
   assert.equal((await fs.readdir(captured.workspace)).some((name) => name.startsWith('round-trip-')), false);
+});
+
+test('Compose build carries only a digest-bound proof and cleans it after a failed build', async t => {
+  let fail = false;
+  const { captured, calls, dependencies, repositoryRoot } = await syntheticCapture(t, state => {
+    if (fail && state.phase === 'build') throw Error('Synthetic proof build failed');
+  }, false);
+  const profile = { mode: 'production', meteorRelease: 'METEOR@3.5.4' };
+  const input = path.join(repositoryRoot, 'proof.json');
+  const proof = canonicalAuditJson({
+    schema: 'VerificationBundleV1', variant: 'source-evidence', buildIdentity: captured.identity,
+    profile, profileSha256: await auditDigest(profile), expectedRegistrySha256: 'b'.repeat(64),
+    verificationCatalogSha256: await digestVerificationCatalog(),
+    executions: [...requiredMeteorVerificationIds].sort().map(verificationId => ({
+      verificationId, outcome: 'PASS', lane: 'isolated-meteor', runEvidenceSha256: 'c'.repeat(64), resultEvidenceSha256: 'd'.repeat(64),
+    })),
+  });
+  await fs.writeFile(input, proof);
+  const build = () => buildCapturedSource(captured.workspace, 'synthetic-builder', 'synthetic.env', dependencies, input);
+  const result = await build();
+  assert.equal(result.state, 'built-unqualified');
+  assert.equal(result.bundleDigestSha256, sha256(proof));
+  assert.ok(calls.at(-1).some(arg => path.basename(arg) === 'compose.json'));
+  assert.equal((await fs.readdir(captured.workspace)).some(name => name.startsWith('verification-')), false);
+  fail = true;
+  await assert.rejects(build(), /Synthetic proof build failed/);
+  assert.equal((await fs.readdir(captured.workspace)).some(name => name.startsWith('verification-')), false);
+  assert.equal(await fs.readFile(input, 'utf8'), proof);
 });
 
 test('synthetic capture rejects local tampering before attempting Docker verification', async (t) => {

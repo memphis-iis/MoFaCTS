@@ -64,10 +64,16 @@ Protection begins before application dependencies/tests run and preserves native
 source bytes and modes. It prevents ordinary same-user file writes, chmod and
 path replacement through the protected tree. It does not protect against a
 privileged process remounting the files or authenticate a compromised runner.
-Complete test discovery/outcome authentication remains a separate qualification
-gate. An image-build retry normally repeats the combined suite and requires fresh
-single-use Meteor authorization. Only bounded observation metadata is uploaded;
-raw captured source, test workspaces and build profiles remain private/ephemeral.
+### Opt-in source proof for a captured build
+
+The capture helper's `compose-proof` action accepts the existing `--builder` and `--workspace`, plus `--native-results` (the isolated worker's retained results directory), `--native-receipt-sha256` (the independently recorded receipt digest) and `--registry` (a JSON file containing `profile` and `inventorySha256`). It re-verifies the exact capture and test inputs before writing `verification-bundle.json` once in that workspace. The expected registry is declared separately from the Meteor test profile. A successful composition records source evidence only.
+
+The existing `build` action accepts `--verification-bundle` pointing to that file. The helper uses a build-only Docker file mount and a separate digest argument to keep the proof outside the source snapshot. The build checks canonical bytes, the digest, the catalog, the captured source and the pinned production profile before writing the image's proof file. The temporary Compose override and file copy are removed after success or failure. The exact-image smoke and running registry comparison are required separately.
+
+The hosted combined job still needs fresh authorization if it invokes Meteor
+again. A build-only retry through the capture helper can reuse the same retained
+proof while its verified inputs and expected profile match. Keep raw source,
+receipts and test workspaces in the local evidence store.
 
 `qualification/ciComposeProfile.mjs` owns a short-lived build-only env profile,
 marker and generated replica-set keyfile outside the checkout. Existing public
@@ -184,6 +190,9 @@ verification. Docker owns this filtering for both builds and CI round trips.
 | `mofacts/scripts/security-audit/qualification/ciComposeProfile.mjs` | Temporary synthetic CI build-only interpolation profile and fixed-child cleanup; not a source capture or protected release record |
 | `mofacts/scripts/security-audit/qualification/sealCapture.mjs` | Linux CI mount/probe lifecycle for retained inputs, partial-failure teardown and explicit unseal before cleanup; no release qualification or privileged-runner attestation |
 | `mofacts/scripts/security-audit/qualification/testInputs.mjs` | Reviewed supplemental test readers, bounded collection and rejection of conflicting build-file bytes or modes |
+| `mofacts/scripts/security-audit/qualification/nativeCaseEvidence.mjs` | Matches the retained native receipt and raw passing cases to verified test inputs, the discovered test modules and the independently recorded receipt digest |
+| `mofacts/scripts/security-audit/qualification/composeVerificationBundle.mjs` | Composes a canonical source proof from the matched cases and a separately declared registry expectation; rejects a different source snapshot or incomplete coverage |
+| `mofacts/scripts/security-audit/qualification/imageVerificationBundle.mjs` | Validates and embeds the canonical proof against the captured identity and pinned Meteor release; leaves an ordinary build without a proof file |
 | `mofacts/common/securityAudit/buildIdentity.ts` | Existing shared source identity contract; not a second release record |
 
 `capture.json` is private temporary acquisition state, not a production release receipt. Its Docker-observed source digest uses exact file bytes, native archive modes and directory entries. Its separate local-tree digest detects local changes; Windows filesystem modes are not substituted for Linux/Docker modes. Verification requires a fresh Docker re-export to match the original source digest.
