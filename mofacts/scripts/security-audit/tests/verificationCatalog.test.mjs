@@ -48,7 +48,6 @@ test('audit method observation requires identity in both the submitted and insta
     dataEgress: 'audit-report-summary',
   }));
   const submitted = Object.fromEntries(bindings.map(({ verification, handler }) => [verification.method, handler]));
-  submitted.unrelatedMethod = function() {};
   let installed;
   const calls = [];
   const server = { methods(handlers) { calls.push([this, handlers]); installed = { ...handlers }; } };
@@ -63,6 +62,8 @@ test('audit method observation requires identity in both the submitted and insta
     assert.ok(manifest.methods.some(method => method.name === surface.name && method.access === 'admin-only'));
   }
 
+  assert.deepEqual(observeMeteorMethodBindings(bindings, { ...submitted, unrelatedMethod() {} }, installed),
+    { state: 'unavailable', reason: 'application-method-descriptor-coverage' });
   assert.equal(observeMeteorMethodBindings(bindings, submitted, undefined).state, 'unavailable');
   assert.equal(observeMeteorMethodBindings([...bindings, bindings[0]], submitted, installed).state, 'unavailable');
   const { method } = bindings[0].verification;

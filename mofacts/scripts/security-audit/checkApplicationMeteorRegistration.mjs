@@ -11,8 +11,8 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
   let checker;
   function declarationOf(identifier) {
     if (!checker) {
-      // Bind local symbols without loading dependencies or the application's type graph.
-      const options = { noLib: true, noResolve: true, allowJs: true };
+      // Bind this source's local symbols without searching for ambient package types.
+      const options = { noLib: true, noResolve: true, allowJs: true, types: [] };
       const host = ts.createCompilerHost(options);
       host.getSourceFile = file => file.replaceAll('\\', '/') === source.fileName.replaceAll('\\', '/') ? source : undefined;
       checker = ts.createProgram([source.fileName], options, host).getTypeChecker();
