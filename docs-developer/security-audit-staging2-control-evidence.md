@@ -8,10 +8,10 @@ The report gate uses the deployment start `2026-11-25T18:08:10.948Z`.
 | Section | Passed | Findings | Needs evidence |
 | --- | ---: | ---: | ---: |
 | External | 8 | 0 | 4 |
-| Authentication | 1 | 0 | 21 |
+| Authentication | 9 | 0 | 13 |
 | Host | 10 | 0 | 1 |
 | Repository and image | 20 | 4 | 1 |
-| **Total** | **39** | **4** | **27** |
+| **Total** | **47** | **4** | **19** |
 
 The existing Phase III gate still requires one matched catalog v2 Full report,
 independent receiver readback and saved archive verification. These individual
@@ -46,20 +46,20 @@ qualification and synthetic integration results retain their original scope.
 | [ ] Needs evidence | `authentication.reset-token.replay-rejected` | Needs evidence of used-token rejection with a successful first use in the same qualified fixture window. |
 | [ ] Needs evidence | `authentication.session-revocation` | Ordinary logout cleared the synthetic learner’s browser session. The control still needs server-side invalidation evidence for old sessions after both logout and password reset. |
 | [x] Pass | `authentication.session-lifetime` | A fresh session for the confirmed synthetic learner had an observed lifetime within 30 days. The account signed out successfully. |
-| [ ] Needs evidence | `authentication.material-leakage` | Needs complete bounded observations of page content, URLs, cookies, console and outgoing requests for the current authentication flows. |
+| [x] Pass | `authentication.material-leakage` | Page content, URLs, cookies, console and outgoing requests passed the bounded disclosure checks for the ordinary learner sign-in and passwordless return. The observer checked the synthetic password and issued session credentials in their applicable flows. |
 | [ ] Needs evidence | `authentication.authorization` | Needs the complete live allow-and-deny case vector across methods, publications, management routes and downloads with the required actor and resource baselines. |
-| [ ] Needs evidence | `authentication.passwordless.resume-token-issued` | Needs a fresh owned sealed experiment fixture and observation that normal resume issues the participant credential. |
-| [ ] Needs evidence | `authentication.passwordless.token-login` | Needs a successful participant session from that newly issued credential on this release. |
-| [ ] Needs evidence | `authentication.passwordless.participant-identity` | Needs observation that the new study session identifies the expected fixture participant. |
-| [ ] Needs evidence | `authentication.passwordless.experiment-eligibility` | Needs the live fixture’s experiment marker or verified owned progress for its resolved participant. |
-| [ ] Needs evidence | `authentication.passwordless.sealed-target-binding` | Needs confirmation that the authenticated fixture session is tied to its assigned sealed target. |
+| [x] Pass | `authentication.passwordless.resume-token-issued` | The sealed study link issued a resume credential for the existing synthetic participant with saved progress. |
+| [x] Pass | `authentication.passwordless.token-login` | The newly issued credential established the participant session in a fresh Chrome context. |
+| [x] Pass | `authentication.passwordless.participant-identity` | The authenticated account and session matched the synthetic participant. |
+| [x] Pass | `authentication.passwordless.experiment-eligibility` | The participant started with saved progress and no experiment flag or password. The session recovered the same owned progress before and after reload. |
+| [x] Pass | `authentication.passwordless.sealed-target-binding` | The authenticated participant was bound to the assigned sealed study target. |
 | [ ] Needs evidence | `authentication.passwordless.modified-target-rejected` | Needs the changed-target outcome from the live fixture with the valid login and alternate-target baselines required by the catalog. |
 | [ ] Needs evidence | `authentication.passwordless.admin-denied` | Needs the matching passwordless denial and successful administrator baseline on the same release. |
 | [ ] Needs evidence | `authentication.passwordless.ordinary-account-denied` | Needs the study-session restriction outcome alongside the positive ordinary-account baseline. |
-| [ ] Needs evidence | `authentication.passwordless.assigned-experiment-allowed` | Needs normal access to the assigned experiment using the scoped fixture session. |
+| [x] Pass | `authentication.passwordless.assigned-experiment-allowed` | The study session received the full assigned lesson, including its unit list. |
 | [ ] Needs evidence | `authentication.passwordless.cross-user-method-denied` | Needs the approved live fixture’s cross-user method restriction with its authorized positive baseline. |
 | [ ] Needs evidence | `authentication.passwordless.cross-user-publication-contained` | Needs the live fixture’s bounded publication result against a known other-user synthetic record and its positive baseline. |
-| [ ] Needs evidence | `authentication.passwordless.token-not-leaked` | Needs bounded normal passwordless-flow observations for unintended token disclosure in the required browser channels. |
+| [x] Pass | `authentication.passwordless.token-not-leaked` | All five bounded browser channels completed with zero matches outside the expected own-session handoff. |
 | [ ] Needs evidence | `authentication.throttling` | Needs the three distinct connection, identifier and IP throttle outcomes with successful login baselines and scope attribution. |
 
 ## Host controls
@@ -106,7 +106,7 @@ qualification and synthetic integration results retain their original scope.
 | [x] Pass | `repository.source-security-tests` | The approved paired verifier matched all 478 required cases on the same commit and pinned runtime. The unfiltered Linux transcript recorded 474 passes. The Windows transcript passed exactly the four matched Windows-only cases. |
 | [ ] Finding | `repository.runtime-image-vulnerabilities.high` | The pinned Trivy scan of the verified Linux/amd64 release manifest reported four high-severity findings. |
 | [x] Pass | `repository.runtime-image-vulnerabilities.critical` | The same pinned Trivy scan reported zero critical findings on the verified Linux/amd64 release manifest. |
-| [ ] Needs evidence | `repository.client-bundle-canaries` | Needs the approved synthetic canary inputs and their completed scan of the actual deployed image’s compiled browser bundle. |
+| [ ] Needs evidence | `repository.client-bundle-canaries` | The workflow references a canary file without preparing it, and the retained release evidence contains no approved input list. The exact deployed image still needs a scan of both compiled browser bundles using designated synthetic server-only values. |
 
 ## Retained evidence
 
@@ -121,6 +121,24 @@ TLS handshakes and the private Redis health checks to the accepted staging2
 source and platform manifest. The checks retained protocol outcomes, booleans
 and the published-port count. The Redis check used only `PING` and ordinary
 authentication within the private service network.
+
+The retained `passwordless-positive-3e731f3f7af5.json` receipt records seven
+passing controls on the same `e9d14a25` application. Fixture preparation used
+the committed three-record helper at `b8c9c82a`. Browser acquisition and the
+control evaluator used the exact deployed source. The fixture contained only
+the synthetic participant, its assigned lesson and its saved progress. Verified
+the same owned progress after reload, signed out the browser sessions and
+independently confirmed namespace and lock removal. The deployed image remained
+healthy and matched its original identity. Earlier setup attempts stopped before
+creating any fixture account or data. Their recovery receipts show empty
+namespaces and released locks.
+
+The separate `ordinary-login-disclosure.json` receipt adds the verified learner
+sign-in to the same five browser channels. All five passed against the synthetic
+password and fresh session credential. The second observation used the app's
+session-storage contract after the first observer looked in local storage.
+Verified logout and the same deployed image before and after the accepted run.
+Password reset retains its separate controls and evidence requirements.
 
 The exact catalog v2 policy set was unavailable at the installed host path.
 The review used temporary root-private copies of the exact source policies and
