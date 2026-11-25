@@ -96,15 +96,18 @@ export async function verifySavedAuditArchiveV2({ encryptedPath, expectedEncrypt
 // Network acquisition/authentication remains with the existing receiver reader.
 // This owner validates its independently acquired bounded report bytes. Neither
 // HTTP 201 nor an upload receipt can substitute for this separate observation.
-export async function verifyAuditReportReadbackV2({ reportPath, readbackPath, env = process.env }) {
+export async function readMatchedAuditReportV2({ reportPath, readbackPath, env = process.env }) {
   if (path.resolve(reportPath) === path.resolve(readbackPath)) throw new Error('V2 report readback must be independently acquired');
   const source = await readReport(reportPath, env), observed = await readReport(readbackPath, env);
   const left = await fs.stat(reportPath, { bigint: true }), right = await fs.stat(readbackPath, { bigint: true });
   if (left.dev === right.dev && left.ino === right.ino
     || canonicalAuditJson(source.report) !== canonicalAuditJson(observed.report)) throw new Error('V2 ingested report readback does not match');
-  return { reportId: source.report.reportId, catalogId: source.report.catalogId,
-    catalogVersion: source.report.catalogVersion, catalogDigestSha256: source.report.catalogDigestSha256,
-    digestSha256: source.report.digestSha256, ingestedReportMatched: true };
+  return source.report;
+}
+
+export async function verifyAuditReportReadbackV2(options) {
+  const { reportId, catalogId, catalogVersion, catalogDigestSha256, digestSha256 } = await readMatchedAuditReportV2(options);
+  return { reportId, catalogId, catalogVersion, catalogDigestSha256, digestSha256, ingestedReportMatched: true };
 }
 
 // The run owner retains the encryption receipt privately and acquires receiver

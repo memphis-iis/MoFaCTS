@@ -76,6 +76,15 @@ On staging2, `node scripts/security-audit/qualification/observeStaging2Registry.
 
 After the existing staged acceptance transaction, `node scripts/security-audit/qualification/bindStaging2ReleaseRegistry.mjs <protected-evidence-directory> <accepted-release-record> <result-file>` joins those results for later environment verification. The evidence directory holds the browser acceptance, embedded bundle, publication mapping, running-image observation and retained host receipt. This command reads only those artifacts and writes a new compact binding.
 
+For a coordinated catalog v2 rehearsal, add `--report-readback` after the same
+three arguments. The protected evidence directory also holds `report.json`
+from the writer and `receiver-readback.json` from an independent authenticated
+read. The verifier joins the exact matching report to the accepted release
+record, running platform manifest, scanner revision and embedded registry
+proof. A report with execution errors records `executionComplete: false`.
+Keep the binding in protected evidence with the separate fixture, enabled
+provider and encrypted archive results.
+
 The hosted combined job still needs fresh authorization if it invokes Meteor
 again. A build-only retry through the capture helper can reuse the same retained
 proof while its verified inputs and expected profile match. Keep raw source,

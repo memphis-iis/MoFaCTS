@@ -7,6 +7,8 @@ import path from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { AUDIT_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
+import { AUDIT_SECTION_IDS, AUTHENTICATION_QUALIFICATION_CATALOG, profileControls } from '../../../common/securityAudit/catalogRegistry.ts';
+import { finalizeAuditReport } from '../../../common/securityAudit/reportV2.ts';
 import { requireMatchingSourceVerification } from '../../../common/securityAudit/verificationBundle.ts';
 import { composeNativeVerificationBundle, writeCapturedVerificationBundle } from '../qualification/composeVerificationBundle.mjs';
 import { digestVerificationCatalog } from '../qualification/verificationCatalogProof.mjs';
@@ -15,8 +17,10 @@ import { carryImageVerificationBundle, validateBuildVerificationBundle } from '.
 import { compareRuntimeVerification } from '../qualification/compareRuntimeVerification.mjs';
 import { projectExpectedRegistry } from '../qualification/registryProjection.mjs';
 import { observeStaging2Registry } from '../qualification/observeStaging2Registry.mjs';
-import { bindStaging2ReleaseRegistry } from '../qualification/bindStaging2ReleaseRegistry.mjs';
+import { bindStaging2ReleaseRegistry, bindStaging2ReportReadback } from '../qualification/bindStaging2ReleaseRegistry.mjs';
 import { projectReleaseReceiptV2 } from '../qualification/releaseRecordStore.mjs';
+import { writeAuditFileV2 } from '../core/producerFilesV2.mjs';
+import { envelope } from './fixtures/v2Fixtures.mjs';
 
 const hash = data => createHash('sha256').update(data).digest('hex');
 const bytes = value => Buffer.from(JSON.stringify(value));
@@ -229,11 +233,11 @@ test('matches the runtime response to the independent proof and recomputes all h
   }
 });
 
-test('binds the verified registry to the staged image and exact workstation receipt', async () => {
+test('binds the verified registry and report readback to the staged image and exact workstation receipt', async t => {
   const { observation, expected } = await runtimeObservation();
   const registry = await compareRuntimeVerification(observation, expected);
-  const publication = { kind: 'manifest', digest: 'sha256:' + 'a'.repeat(64),
-    configDigest: 'sha256:' + 'b'.repeat(64), platform: 'linux/amd64' };
+  const publication = { kind: 'index', digest: 'sha256:' + 'a'.repeat(64),
+    configDigest: 'sha256:' + 'b'.repeat(64), platformManifestDigest: 'sha256:' + 'c'.repeat(64), platform: 'linux/amd64' };
   const tag = 'fixture-phase3';
   const authorityBytes = Buffer.from(JSON.stringify({
     deployedAtUtc: '2026-11-24T10:00:00.000Z', baseCommit: buildIdentity.baseCommit,
@@ -259,6 +263,44 @@ test('binds the verified registry to the staged image and exact workstation rece
   await assert.rejects(bindStaging2ReleaseRegistry({ ...input, acceptance: { ...input.acceptance, sessionCleanupVerified: false } }), /incomplete/);
   await assert.rejects(bindStaging2ReleaseRegistry({ ...input, acceptance: { ...input.acceptance,
     registry: { ...registry, inventorySha256: 'f'.repeat(64) } } }), /does not match/);
+
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-report-release-binding-'));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const catalog = AUTHENTICATION_QUALIFICATION_CATALOG;
+  const controls = profileControls(catalog, 'full');
+  const sections = Object.fromEntries(AUDIT_SECTION_IDS.map(sectionId => [sectionId, {
+    sectionId, status: 'ERROR', controls: controls.filter(row => row.sectionId === sectionId)
+      .map(({ controlId, title, failureSeverity }) => ({ controlId, title, failureSeverity, status: 'ERROR',
+        evidence: { category: 'synthetic-contract-qualification', summary: 'Synthetic report binding test.' } })),
+  }]));
+  const platformImage = 'ppavlikmemphis/mofacts-staging2@' + publication.platformManifestDigest;
+  const payload = { ...envelope, target: binding.target, schema: 'SecurityAuditReportV2',
+    catalogId: catalog.catalogId, catalogVersion: catalog.catalogVersion, catalogDigestSha256: await auditDigest(catalog),
+    scannerSourceRevision: buildIdentity.baseCommit, deployedApplicationRevision: { state: 'observed', value: buildIdentity.baseCommit },
+    deployedImageDigest: { state: 'observed', value: platformImage }, sections,
+    executionErrors: ['synthetic-contract-qualification'] };
+  async function pair(name, writer, receiver = writer) {
+    const reportPath = path.join(directory, name + '-report.json');
+    const readbackPath = path.join(directory, name + '-receiver.json');
+    await writeAuditFileV2(reportPath, await finalizeAuditReport(writer));
+    await writeAuditFileV2(readbackPath, await finalizeAuditReport(receiver));
+    return { releaseEvidence: input, reportPath, readbackPath };
+  }
+  const reportBinding = await bindStaging2ReportReadback(await pair('matched', payload));
+  assert.equal(reportBinding.platformImage, platformImage);
+  assert.equal(reportBinding.recordDigestSha256, binding.recordDigestSha256);
+  assert.equal(reportBinding.inventorySha256, registry.inventorySha256);
+  assert.equal(reportBinding.executionComplete, false);
+  await assert.rejects(bindStaging2ReportReadback(await pair('different-readback', payload,
+    { ...payload, reportId: 'synthetic-different-report' })), /readback does not match/);
+  for (const [name, change] of [
+    ['scanner', { scannerSourceRevision: '0'.repeat(40) }],
+    ['application', { deployedApplicationRevision: { state: 'observed', value: '0'.repeat(40) } }],
+    ['config-digest', { deployedImageDigest: { state: 'observed', value: 'ppavlikmemphis/mofacts-staging2@' + publication.configDigest } }],
+    ['index-digest', { deployedImageDigest: { state: 'observed', value: 'ppavlikmemphis/mofacts-staging2@' + publication.digest } }],
+  ]) {
+    await assert.rejects(bindStaging2ReportReadback(await pair(name, { ...payload, ...change })), /release identity do not match/);
+  }
 });
 
 test('reads the installed staging2 registry through the bound administrator and returns only hashes', async () => {

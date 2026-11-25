@@ -1,24 +1,28 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
-import { canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
+import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
+import { AUTHENTICATION_QUALIFICATION_CATALOG } from '../../../common/securityAudit/catalogRegistry.ts';
 import { parseBuildIdentity } from '../../../common/securityAudit/buildIdentity.ts';
 import { proofRecord } from '../../../common/securityAudit/proofFields.ts';
 import { compareReleaseReceiptV2, parseReleaseReceiptV2 } from '../../../common/securityAudit/releaseReceipt.mjs';
 import { parseRunningImageObservation } from '../../../common/securityAudit/releaseQualification.ts';
 import { MAX_VERIFICATION_BUNDLE_BYTES, parseVerificationBundle } from '../../../common/securityAudit/verificationBundle.ts';
+import { readMatchedAuditReportV2 } from '../core/reportFilesV2.mjs';
 import { readCiFile, realDirectory, writeNew } from './collectCiEvidence.mjs';
 import { parseCiEvidenceJson } from './ciEvidence.mjs';
 import { projectReleaseReceiptV2, readReleaseBytes } from './releaseRecordStore.mjs';
 import { validateBuildVerificationBundle, verificationBundleHash } from './imageVerificationBundle.mjs';
 import { requiredMeteorVerificationIds } from './verificationCatalogProof.mjs';
 
+const staging2ImageRepository = 'ppavlikmemphis/mofacts-staging2';
+
 // The registry observer verifies the installed surface inventory. The host
 // observer verifies the running image independently. Match both to the same
 // retained workstation authority before using them in an environment run.
 export async function bindStaging2ReleaseRegistry({ authorityBytes, publication, runningImage, hostReceipt, bundleBytes, acceptance }) {
   const expectedReceipt = projectReleaseReceiptV2(authorityBytes, publication);
-  if (!expectedReceipt.image.startsWith('ppavlikmemphis/mofacts-staging2:')
+  if (!expectedReceipt.image.startsWith(staging2ImageRepository + ':')
       || expectedReceipt.publishedImage.platform !== 'linux/amd64') throw Error('Expected an accepted staging2 Linux/amd64 release');
   const running = parseRunningImageObservation(runningImage);
   const host = proofRecord(hostReceipt, ['state', 'result', 'receipt']);
@@ -57,21 +61,51 @@ export async function bindStaging2ReleaseRegistry({ authorityBytes, publication,
   };
 }
 
+// Verify previously collected evidence for the coordinated cutover. The operator
+// supplies the independently acquired receiver copy in the protected workspace.
+export async function bindStaging2ReportReadback({ releaseEvidence, reportPath, readbackPath }) {
+  const binding = await bindStaging2ReleaseRegistry(releaseEvidence);
+  const report = await readMatchedAuditReportV2({ reportPath, readbackPath, env: { AUDIT_TARGET: binding.target } });
+  const { buildIdentity } = binding;
+  const { publishedImage } = binding;
+  const platformDigest = publishedImage.kind === 'index' ? publishedImage.platformManifestDigest : publishedImage.digest;
+  const platformImage = `${staging2ImageRepository}@${platformDigest}`;
+  if (buildIdentity.includedUncommittedLocalChanges || report.reportType !== 'full'
+    || report.catalogDigestSha256 !== await auditDigest(AUTHENTICATION_QUALIFICATION_CATALOG)
+    || report.scannerSourceRevision !== buildIdentity.baseCommit
+    || report.deployedApplicationRevision.state !== 'observed' || report.deployedApplicationRevision.value !== buildIdentity.baseCommit
+    || report.deployedImageDigest.state !== 'observed' || report.deployedImageDigest.value !== platformImage) {
+    throw new Error('Full report and staging2 release identity do not match');
+  }
+  return {
+    schema: 'Staging2ReportReleaseBindingV1', reportId: report.reportId, reportDigestSha256: report.digestSha256,
+    catalogDigestSha256: report.catalogDigestSha256, scannerSourceRevision: report.scannerSourceRevision,
+    platformImage, recordDigestSha256: binding.recordDigestSha256, inventorySha256: binding.inventorySha256,
+    bundleDigestSha256: binding.bundleDigestSha256,
+    executionComplete: report.counts.error === 0 && report.executionErrors.length === 0,
+  };
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [evidenceDirectory, authorityFile, outputFile] = process.argv.slice(2);
+  const [evidenceDirectory, authorityFile, outputFile, mode, ...extra] = process.argv.slice(2);
   try {
-    if (process.argv.length !== 5 || !evidenceDirectory || !authorityFile || !outputFile) throw Error();
+    if (!evidenceDirectory || !authorityFile || !outputFile || extra.length
+      || (mode !== undefined && mode !== '--report-readback')) throw Error();
     const root = await realDirectory(evidenceDirectory);
     const json = async name => parseCiEvidenceJson(await readCiFile(path.join(root, name), 16384), 16384);
-    const result = await bindStaging2ReleaseRegistry({
+    const releaseEvidence = {
       authorityBytes: await readReleaseBytes(path.resolve(authorityFile)),
       publication: await json('publication.json'), runningImage: await json('running-image.json'),
       hostReceipt: await json('host-receipt.json'), acceptance: await json('accepted.json'),
       bundleBytes: await readCiFile(path.join(root, 'verification-bundle.json'), MAX_VERIFICATION_BUNDLE_BYTES),
-    });
+    };
+    const result = mode === '--report-readback'
+      ? await bindStaging2ReportReadback({ releaseEvidence, reportPath: path.join(root, 'report.json'),
+        readbackPath: path.join(root, 'receiver-readback.json') })
+      : await bindStaging2ReleaseRegistry(releaseEvidence);
     await writeNew(outputFile, Buffer.from(canonicalAuditJson(result) + '\n'));
   } catch {
-    process.stderr.write('Staging2 registry and release evidence did not match.\n');
+    process.stderr.write('Staging2 qualification evidence did not match.\n');
     process.exitCode = 1;
   }
 }
