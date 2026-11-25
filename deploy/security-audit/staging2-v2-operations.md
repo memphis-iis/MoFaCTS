@@ -106,7 +106,18 @@ external UDP results were inconclusive; the scanner does not treat silence as
 closure even with safe host measurements. This establishes neither an exposure
 finding nor complete UDP clearance. Keep that limitation visible.
 
-The 29-case selected authorization run is complete. The remaining authentication
-protocol scenarios, repository/image qualification and a complete four-section
-run remain distinct. Production still uses its pinned V1 scanner/receiver; this
-procedure grants no production deployment or audit permission.
+The separate Phase 2 run completed all 22 authentication controls. The hosted
+workflow still acquires only selected authorization. For the coordinated Phase 3
+rehearsal, the protected operator driver can call
+`assembleIntegratedStaging2AuditV2` with the independently observed revision
+and platform image, the full report envelope, and the existing scoped phase
+executors. The function takes its authentication evidence directly from those
+executors in the same process. Leave the authentication slot in the producer
+directory empty. The active producer catalog must match catalog v2 before the
+function starts a phase.
+
+Keep the accepted staging2 release in service while preparing the complete
+producer and protected driver. Rehearse the catalog switch with the complete
+four-section report, independent image and registry observations, signed storage
+and readback in one qualification window. Production still uses its pinned V1
+scanner and receiver. Its cutover has a separate approval and release record.

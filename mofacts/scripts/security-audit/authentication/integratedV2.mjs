@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
-import { AUDIT_CATALOG_V1, readAuditCatalog } from '../../../common/securityAudit/catalogRegistry.ts';
-import { canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
+import { ACTIVE_AUDIT_CATALOG, AUDIT_CATALOG_V1, AUTHENTICATION_QUALIFICATION_CATALOG, readAuditCatalog } from '../../../common/securityAudit/catalogRegistry.ts';
+import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
 import { imageDigest, proofRecord, sourceCommit } from '../../../common/securityAudit/proofFields.ts';
-import { AUDIT_MAX_DURATION_MS } from '../../../common/securityAudit/reportV2.ts';
+import { AUDIT_MAX_DURATION_MS, auditReportId, auditTimestamp } from '../../../common/securityAudit/reportV2.ts';
+import { parseAuditIdentity } from '../../../common/securityAudit/reportIdentity.ts';
+import { assembleAuditReportFilesV2 } from '../core/producerFilesV2.mjs';
 import { fixtureNamespaceV2 } from './stagingFixturesV2.mjs';
 import { assembleAuthenticationQualificationV2 } from './qualificationV2.mjs';
 
@@ -51,4 +53,30 @@ export async function runIntegratedAuthenticationV2({ observeRuntime, captureMai
     throttles,
   });
   return { namespace, runtime, startedAt, completedAt: new Date().toISOString(), catalog, artifact };
+}
+
+// The operator passes the independently prepared report identity and the scoped
+// executors in one process. Saved qualification artifacts are not inputs here.
+export async function assembleIntegratedStaging2AuditV2({ artifactDirectory, outputPath, envelope, env, executors }) {
+  if (env?.AUDIT_TARGET !== 'https://staging2.optimallearning.org' || envelope.reportType !== 'full'
+    || await auditDigest(AUTHENTICATION_QUALIFICATION_CATALOG) !== ACTIVE_AUDIT_CATALOG.catalogDigestSha256) {
+    throw new Error('Integrated staging2 audit requires the active authentication qualification catalog');
+  }
+  auditReportId(envelope.reportId);
+  sourceCommit(envelope.scannerSourceRevision);
+  const elapsed = Date.now() - Date.parse(auditTimestamp(envelope.startedAt));
+  const revision = parseAuditIdentity(envelope.deployedApplicationRevision, 'revision');
+  const image = parseAuditIdentity(envelope.deployedImageDigest, 'platform-image');
+  if (elapsed < 0 || elapsed > AUDIT_MAX_DURATION_MS || revision.state !== 'observed' || image.state !== 'observed') {
+    throw new Error('Integrated staging2 audit requires a current run and independently observed image');
+  }
+  const integratedAuthentication = await runIntegratedAuthenticationV2({ ...executors, observeRuntime: async () => {
+    const runtime = parseRuntime(await executors.observeRuntime());
+    if (runtime.applicationRevision !== revision.value || runtime.platformImageDigest !== image.value.split('@')[1]) {
+      throw new Error('Observed staging2 identity differs from the planned report');
+    }
+    return runtime;
+  } });
+  return assembleAuditReportFilesV2({ artifactDirectory, outputPath, env, integratedAuthentication,
+    envelope: { ...envelope, completedAt: new Date().toISOString() } });
 }
