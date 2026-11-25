@@ -8,6 +8,7 @@ import { AUDIT_ADMIN_METHOD_VERIFICATIONS, HTTP_AUDIT_VERIFICATIONS } from '../.
 import { registeredHttpSurfaces } from '../securitySurfaces/registerHttpRoutes.ts';
 import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods.ts';
 import { auditDigest } from '../../common/securityAudit/canonicalReport.ts';
+import { ACTIVE_AUDIT_CATALOG } from '../../common/securityAudit/catalogRegistry.ts';
 import { errorReport, ingestionContext } from '../../scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
 import { SecurityAuditReportsV2 } from './securityAuditCollectionsV2.ts';
 import { createAuditReportStoreV2 } from './securityAuditReportStoreV2.ts';
@@ -97,7 +98,7 @@ describe('activated V2 audit application boundaries', function() {
       const { digestSha256: _old, ...payload } = report; void _old;
       report.digestSha256 = await auditDigest(payload);
       const unavailable = { state: 'unavailable', reason: 'not-provided' } as const;
-      await createAuditReportStoreV2(SecurityAuditReportsV2, () => new Date()).store(report,
+      await createAuditReportStoreV2(SecurityAuditReportsV2, () => new Date(), ACTIVE_AUDIT_CATALOG).store(report,
         `synthetic-activated-nonce-${suffix}`, { ...ingestionContext, purpose: 'ingestion',
           receiverRevision: unavailable, receiverImage: unavailable });
       const handlers = (Meteor as any).server.method_handlers;

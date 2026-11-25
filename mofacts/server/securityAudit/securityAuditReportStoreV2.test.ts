@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import crypto from 'node:crypto';
 import { Mongo } from 'meteor/mongo';
 import { auditDigest } from '../../common/securityAudit/canonicalReport.ts';
-import { AUDIT_SECTION_IDS } from '../../common/securityAudit/catalogRegistry.ts';
+import { ACTIVE_AUDIT_CATALOG, AUDIT_SECTION_IDS } from '../../common/securityAudit/catalogRegistry.ts';
 import type { SecurityAuditReportV2 } from '../../common/securityAudit/reportV2.ts';
 import { hostUnavailableObservations } from '../../common/securityAudit/hostAuditPolicy.ts';
 import { canonicalJson, parseSecurityAuditReport } from '../../common/securityAuditReport';
@@ -13,7 +13,7 @@ import { createAuditReportStoreV2 } from './securityAuditReportStoreV2.ts';
 // Fresh test-owned namespace, no application collection or learner records.
 const namespace = `mofactsV2AuditContract${crypto.randomBytes(6).toString('hex')}`;
 const reports = new Mongo.Collection<Record<string, unknown>>(namespace);
-const store = createAuditReportStoreV2(reports, () => new Date());
+const store = createAuditReportStoreV2(reports, () => new Date(), ACTIVE_AUDIT_CATALOG);
 const fixtureIds: string[] = [];
 const missing = { state: 'unavailable', reason: 'not-provided' } as const;
 const context = { ...ingestionContext, purpose: 'ingestion' as const, receiverRevision: missing, receiverImage: missing };

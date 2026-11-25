@@ -1,6 +1,7 @@
 import { collectionMongoName } from '../../common/collectionOwnership.ts';
 import { parseAuditIdentity, type AuditIdentityObservation } from '../../common/securityAudit/reportIdentity.ts';
 import type { BuildIdentityObservation } from '../../common/securityAudit/buildIdentity.ts';
+import type { AuditCatalogCoordinates } from '../../common/securityAudit/catalogRegistry.ts';
 import { parseSecurityAuditReportV2 } from '../../common/securityAudit/reportV2.ts';
 import { AuditV2RequestError, verifyAuditRequestV2 } from './securityAuditIngestionV2.ts';
 import { createAuditReportStoreV2, type AuditReportCollectionV2 } from './securityAuditReportStoreV2.ts';
@@ -24,6 +25,7 @@ export class AuditReceiverRequestError extends Error {
 // The platform observation is a required independently owned adapter, never a
 // request/report value or a guessed tag/config ID.
 export function createSecurityAuditReceiverV2(deps: {
+  catalog: AuditCatalogCoordinates;
   createReports: (mongoName: string) => AuditReportCollectionV2;
   requireAdminUser: (userId: UserId, message?: string, code?: string | number) => Promise<void>;
   platformIdentity: () => Promise<AuditIdentityObservation>;
@@ -32,7 +34,8 @@ export function createSecurityAuditReceiverV2(deps: {
   now: () => Date;
   loadBuildIdentity?: () => Promise<BuildIdentityObservation>;
 }) {
-  const store = createAuditReportStoreV2(deps.createReports(collectionMongoName('SecurityAuditReportsV2')), deps.now);
+  const catalog = Object.freeze({ ...deps.catalog });
+  const store = createAuditReportStoreV2(deps.createReports(collectionMongoName('SecurityAuditReportsV2')), deps.now, catalog);
   const loadBuildIdentity = deps.loadBuildIdentity ?? createAuditReceiverIdentityLoader();
   async function requireAdmin(userId: UserId): Promise<string> {
     await deps.requireAdminUser(userId, 'Only admins can view security audits', 'not-authorized');
@@ -51,7 +54,7 @@ export function createSecurityAuditReceiverV2(deps: {
       const context = { ...receiver, purpose: 'ingestion' as const,
         authenticatedAt: verified.authenticatedAt, uploadedAt: verified.uploadedAt };
       let report;
-      try { report = await parseSecurityAuditReportV2(verified.value, context); }
+      try { report = await parseSecurityAuditReportV2(verified.value, context, catalog); }
       catch { throw new AuditV2RequestError('report', 'Audit V2 report is invalid'); }
       await store.store(report, verified.nonce, context);
     },

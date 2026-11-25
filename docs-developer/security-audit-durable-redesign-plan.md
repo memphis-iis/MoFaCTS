@@ -1508,6 +1508,14 @@ Original staging remains frozen. Under Section 0, decision 5, staging2 is the de
 
 ### 14.1 Report-contract harness
 
+For Phase 3, Phil approved testing the catalog v2 receiver first in the existing
+isolated Meteor integration worker. The test composes the receiver with catalog
+v2 using a private loopback listener, a temporary MongoDB collection, and signed
+synthetic reports. Verify v2 ingestion and selection as the latest report, along
+with unchanged readback of stored v2-format reports that used catalog v1. Normal
+application startup and the scanner continue to use the active catalog. The full
+matched staging2 audit in Section 14.3 remains the Phase 3 exit gate.
+
 Add a protected, manual-only staging report-contract harness rather than copying the full production scanner. It uses:
 
 - A staging-only GitHub environment and HMAC secret.

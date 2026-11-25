@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import { collectionMongoName } from '../../../common/collectionOwnership.ts';
+import { AUDIT_CATALOG_V1, AUDIT_CATALOG_V2 } from '../../../common/securityAudit/catalogRegistry.ts';
 import { signAuditRequestV2 } from '../../../server/securityAudit/securityAuditIngestionV2.ts';
 import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
-import { errorReport } from './fixtures/v2Fixtures.mjs';
+import { errorReport, fullReportFixture } from './fixtures/v2Fixtures.mjs';
 
 import { receiverFixture as fixture, receiverClock as clock, receiverSecret as secret } from './helpers/receiverFixture.mjs';
 
@@ -27,6 +28,31 @@ test('V2 receiver accepts signed complete ERROR reports with unavailable identit
   await assert.rejects(upload(value, report), error => error.code === 11000);
   assert.equal(value.rows.length, 1);
   assert.equal(value.rows[0].expiresAt - value.rows[0].ingestedAt, 90 * 86400000);
+});
+test('the catalog v2 receiver stores and serves its own catalog while retaining catalog v1 readback', async () => {
+  const previous = fixture({ catalog: AUDIT_CATALOG_V1 });
+  const older = await fullReportFixture(AUDIT_CATALOG_V1, 'synthetic-catalog-1-retained', clock);
+  const candidate = await fullReportFixture(AUDIT_CATALOG_V2, 'synthetic-catalog-2-full', clock);
+  await upload(previous, older);
+  await assert.rejects(upload(previous, candidate), { category: 'report' });
+
+  const current = fixture({ catalog: AUDIT_CATALOG_V2 });
+  current.rows.push(...structuredClone(previous.rows));
+  const userId = 'synthetic-admin';
+  assert.equal((await current.receiver.list(userId)).latestFull, null);
+  const oldCatalogUpload = await fullReportFixture(AUDIT_CATALOG_V1, 'synthetic-catalog-1-upload', clock);
+  await assert.rejects(upload(current, oldCatalogUpload), { category: 'report' });
+  await upload(current, candidate, 'synthetic-runtime-nonce-0002');
+  assert.equal(current.rows.length, 2);
+  assert.equal((await current.receiver.list(userId)).latestFull.reportId, candidate.reportId);
+  for (const report of [older, candidate]) {
+    const summary = await current.receiver.getSummary(userId, report.reportId);
+    assert.equal(summary.catalogVersion, report.catalogVersion);
+    assert.equal(summary.digestSha256, report.digestSha256);
+    const issued = await current.receiver.issueDownload(userId, report.reportId, 'json');
+    const parts = issued.url.split('/');
+    assert.deepEqual(JSON.parse((await current.receiver.download(parts.at(-2), parts.at(-1))).body), report);
+  }
 });
 test('V2 receiver authenticates before storing and rejects wrong signatures, targets and V1', async () => {
   const value = fixture(), report = await errorReport();

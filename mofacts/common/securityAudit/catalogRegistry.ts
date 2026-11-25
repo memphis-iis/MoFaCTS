@@ -79,8 +79,9 @@ export function parseAuditCatalog(value: unknown): AuditCatalog {
     controls: Object.freeze(controls), profiles: Object.freeze(profiles) });
 }
 
-// Keep released bytes and validators available for retained reports. The
-// qualification candidate stays inactive until its producer is ready.
+// Keep released bytes and validators available for retained reports. Producers
+// use ACTIVE_AUDIT_CATALOG. The receiver can select a registered catalog at
+// composition time for isolated report storage qualification.
 export const AUTHENTICATION_QUALIFICATION_CATALOG = parseAuditCatalog(catalogV2);
 const retained = Object.freeze([Object.freeze({
   catalog: parseAuditCatalog(catalogV1),
@@ -93,16 +94,22 @@ export const AUDIT_CATALOG_V1: AuditCatalogCoordinates = Object.freeze({
   catalogId: 'mofacts-security-audit-controls', catalogVersion: 1,
   catalogDigestSha256: retained[0]!.digest,
 });
+export const AUDIT_CATALOG_V2: AuditCatalogCoordinates = Object.freeze({
+  catalogId: AUTHENTICATION_QUALIFICATION_CATALOG.catalogId,
+  catalogVersion: AUTHENTICATION_QUALIFICATION_CATALOG.catalogVersion,
+  catalogDigestSha256: retained[1]!.digest,
+});
 export const ACTIVE_AUDIT_CATALOG = AUDIT_CATALOG_V1;
 
-export async function readAuditCatalog(value: unknown, purpose: 'ingestion' | 'retained'): Promise<AuditCatalog> {
+export async function readAuditCatalog(value: unknown, purpose: 'ingestion' | 'retained',
+  acceptedCatalog: AuditCatalogCoordinates = ACTIVE_AUDIT_CATALOG): Promise<AuditCatalog> {
   const record = proofRecord(value, ['catalogId', 'catalogVersion', 'catalogDigestSha256']);
   const digest = contentDigest(record.catalogDigestSha256);
   if (purpose !== 'ingestion' && purpose !== 'retained') reject();
   const entry = retained.find(item => item.catalog.catalogId === record.catalogId
     && item.catalog.catalogVersion === record.catalogVersion && item.digest === digest);
-  if (!entry || (purpose === 'ingestion' && (record.catalogId !== ACTIVE_AUDIT_CATALOG.catalogId
-    || record.catalogVersion !== ACTIVE_AUDIT_CATALOG.catalogVersion || digest !== ACTIVE_AUDIT_CATALOG.catalogDigestSha256))
+  if (!entry || (purpose === 'ingestion' && (record.catalogId !== acceptedCatalog.catalogId
+    || record.catalogVersion !== acceptedCatalog.catalogVersion || digest !== acceptedCatalog.catalogDigestSha256))
     || await auditDigest(entry.catalog) !== entry.digest) reject();
   return entry.catalog;
 }

@@ -1,8 +1,9 @@
+import { ACTIVE_AUDIT_CATALOG } from '../../../../common/securityAudit/catalogRegistry.ts';
 import { createProtectedSecurityAuditReceiverV2, createSecurityAuditReceiverV2 } from '../../../../server/securityAudit/securityAuditReceiverV2.ts';
 export const receiverClock = new Date('2026-11-05T12:02:00.000Z');
 export const receiverSecret = 'synthetic-inert-receiver-signing-material';
 const absent = { state: 'unavailable', reason: 'not-provided' };
-export function receiverFixture({ build = absent, image = absent, protectedMetadata = false } = {}) {
+export function receiverFixture({ build = absent, image = absent, catalog = ACTIVE_AUDIT_CATALOG, protectedMetadata = false } = {}) {
   const rows = [], calls = [], names = [];
   const db = {
     find(selector, options) { calls.push({ kind: 'find', selector, options }); return { fetchAsync: async () => select(selector, options) }; },
@@ -33,6 +34,7 @@ export function receiverFixture({ build = absent, image = absent, protectedMetad
   }
   let isAdmin = true, identityCalls = 0;
   const deps = {
+    catalog,
     createReports(name) { names.push(name); return db; },
     async requireAdminUser(userId) {
       if (userId !== 'synthetic-admin' || !isAdmin) throw Object.assign(new Error('Synthetic admin denial'), { error: 'not-authorized' });
