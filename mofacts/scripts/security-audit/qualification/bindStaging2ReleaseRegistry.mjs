@@ -81,6 +81,11 @@ export async function bindStaging2ReportReadback({ releaseEvidence, reportPath, 
     || report.deployedImageDigest.state !== 'observed' || report.deployedImageDigest.value !== platformImage) {
     throw new Error('Full report and staging2 release identity do not match');
   }
+  // The verified host receipt identifies this deployment even when the same image is redeployed.
+  const deployedAt = Date.parse(releaseEvidence.hostReceipt.receipt.deployedAtUtc);
+  if (!(Date.parse(report.startedAt) >= deployedAt)) {
+    throw new Error('Full report started before the accepted staging2 deployment');
+  }
   const reportBinding = {
     schema: 'Staging2ReportReleaseBindingV1', reportId: report.reportId, reportDigestSha256: report.digestSha256,
     catalogDigestSha256: report.catalogDigestSha256, scannerSourceRevision: report.scannerSourceRevision,

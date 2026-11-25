@@ -81,7 +81,9 @@ three arguments. The protected evidence directory also holds `report.json`
 from the writer and `receiver-readback.json` from an independent authenticated
 read. The verifier joins the exact matching report to the accepted release
 record, running platform manifest, scanner revision and embedded registry
-proof. A report with execution errors records `executionComplete: false`.
+proof. The report must have started at or after the accepted deployment time.
+This also applies when the same image is deployed again. A report with
+execution errors records `executionComplete: false`.
 Keep the binding in protected evidence with the separate fixture and enabled
 provider results.
 

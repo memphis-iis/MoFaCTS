@@ -278,6 +278,7 @@ test('binds the verified registry and report readback to the staged image and ex
   }]));
   const platformImage = 'ppavlikmemphis/mofacts-staging2@' + publication.platformManifestDigest;
   const payload = { ...envelope, target: binding.target, schema: 'SecurityAuditReportV2',
+    startedAt: '2026-11-24T10:00:00.000Z', completedAt: '2026-11-24T10:01:00.000Z',
     catalogId: catalog.catalogId, catalogVersion: catalog.catalogVersion, catalogDigestSha256: await auditDigest(catalog),
     scannerSourceRevision: buildIdentity.baseCommit, deployedApplicationRevision: { state: 'observed', value: buildIdentity.baseCommit },
     deployedImageDigest: { state: 'observed', value: platformImage }, sections,
@@ -298,6 +299,13 @@ test('binds the verified registry and report readback to the staged image and ex
   assert.equal(Object.hasOwn(reportBinding, 'archive'), false);
   await assert.rejects(bindStaging2ReportReadback(await pair('different-readback', payload,
     { ...payload, reportId: 'synthetic-different-report' })), /readback does not match/);
+  for (const [name, completedAt] of [
+    ['earlier-deployment', '2026-11-24T09:59:59.000Z'],
+    ['crosses-deployment', '2026-11-24T10:01:00.000Z'],
+  ]) {
+    const files = await pair(name, { ...payload, startedAt: '2026-11-24T09:59:00.000Z', completedAt });
+    await assert.rejects(bindStaging2ReportReadback(files), /started before the accepted staging2 deployment/);
+  }
   for (const [name, change] of [
     ['scanner', { scannerSourceRevision: '0'.repeat(40) }],
     ['application', { deployedApplicationRevision: { state: 'observed', value: '0'.repeat(40) } }],
