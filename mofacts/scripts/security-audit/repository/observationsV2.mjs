@@ -1,5 +1,4 @@
 import { profileControls } from '../../../common/securityAudit/catalogRegistry.ts';
-import path from 'node:path';
 import { parseAuditEvidence } from '../../../common/securityAudit/evidenceContracts.ts';
 import { parseAuditIdentity } from '../../../common/securityAudit/reportIdentity.ts';
 import { proofRecord } from '../../../common/securityAudit/proofFields.ts';
@@ -101,44 +100,7 @@ export function parseTrivyRepositoryObservationV2(result, runtimeImage) {
   } catch { return unavailable('producer-malformed'); }
 }
 
-// The source-security suite is explicitly a flat Node test plan. Missing plans,
-// skipped/cancelled/TODO cases, crashes and filtered runs never prove coverage.
-// Only completed assertion failures establish FAIL; runner/import errors stay ERROR.
-export function parseNodeSourceTestObservationV2(result, sourceFile) {
-  try {
-    if (typeof sourceFile !== 'string' || !path.isAbsolute(sourceFile)) return unavailable('configuration');
-    const requiredArgs = ['--test', '--test-reporter=tap', sourceFile];
-    if (!Array.isArray(result?.args) || result.args.length !== requiredArgs.length
-      || result.args.some((argument, index) => argument !== requiredArgs[index])
-      || result.NODE_OPTIONS !== '') return unavailable('configuration');
-    if (!result || ![0, 1].includes(result.exitCode)) invalid();
-    const bytes = typeof result.stdout === 'string' ? Buffer.from(result.stdout) : result.stdout;
-    if (!(bytes instanceof Uint8Array) || bytes.length > 8 * 1024 * 1024) invalid();
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    if ((text.match(/^TAP version 13$/gm) || []).length !== 1) invalid();
-    const one = expression => {
-      const matches = [...text.matchAll(expression)]; if (matches.length !== 1) invalid(); return Number(matches[0][1]);
-    };
-    const planned = one(/^1\.\.(\d+)$/gm), counts = Object.fromEntries(['tests', 'suites', 'pass', 'fail', 'cancelled', 'skipped', 'todo']
-      .map(name => [name, one(new RegExp(`^# ${name} (\\d+)$`, 'gm'))]));
-    const rows = [...text.matchAll(/^(not ok|ok) (\d+)(?: -([^\n]*))?$/gm)];
-    if (planned < 1 || planned > 10000 || planned !== counts.tests || counts.suites !== 0 || rows.length !== planned
-      || rows.some((row, index) => Number(row[2]) !== index + 1)
-      || counts.pass + counts.fail + counts.cancelled + counts.skipped + counts.todo !== planned) invalid();
-    // Node can report an empty test file itself as one passing case. That is
-    // process completion, not a registered security-contract test.
-    if (rows.some(row => path.normalize((row[3] || '').trim()) === path.normalize(sourceFile))) return unavailable('evidence-incomplete');
-    if (counts.cancelled || counts.skipped || counts.todo) return unavailable('evidence-incomplete');
-    if (rows.filter(row => row[1] === 'ok').length !== counts.pass
-      || rows.filter(row => row[1] === 'not ok').length !== counts.fail || (result.exitCode === 0) !== (counts.fail === 0)) invalid();
-    for (let index = 0; index < rows.length; index++) if (rows[index][1] === 'not ok') {
-      const diagnostic = text.slice(rows[index].index, rows[index + 1]?.index ?? text.length);
-      if (!/^\s+code: ['"]ERR_ASSERTION['"]\s*$/m.test(diagnostic)) return unavailable('evidence-incomplete');
-    }
-    return observed({ expectedCaseCount: planned, completedCaseCount: planned, matchedCaseCount: counts.pass,
-      domainRejectionCount: 0, transportErrorCount: 0, inconclusiveCaseCount: 0 });
-  } catch { return unavailable('producer-malformed'); }
-}
+export { parseNodeSourceTestObservationV2 } from './sourceSuiteV2.mjs';
 
 export function repositoryImageAvailabilityV2(context) {
   let revision, deployed;

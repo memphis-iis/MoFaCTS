@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { WINDOWS_SOURCE_TEST_CASES_V2, windowsSourceTestArgsV2 } from '../repository/sourceSuiteV2.mjs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import test from 'node:test';
@@ -192,4 +193,32 @@ test('V2 repository artifact assembles and passes the independent signed-report 
     deployedApplicationRevision: revision, deployedImageDigest: platformImage });
   assert.equal(report.counts.pass, 25); assert.equal(report.counts.error, 45);
   await parseSecurityAuditReportV2(report, { ...ingestionContext, receiverRevision: revision, receiverImage: platformImage });
+});
+
+test('V2 source coverage pairs only the complete matching Windows supplement with the unfiltered source run', async t => {
+  const args = windowsSourceTestArgsV2();
+  const names = WINDOWS_SOURCE_TEST_CASES_V2;
+  const declarations = (ids, skip = false) => ids.map(name =>
+    'test' + (skip ? '.skip' : '') + '(' + JSON.stringify(name) + ', () => {});').join('\n');
+  const linux = await nodeRun(t, declarations(['one']) + '\n' + declarations(names, true));
+  const windows = await nodeRun(t, declarations(names));
+  const sourceRevision = 'a'.repeat(40), nodeVersion = process.versions.node;
+  const windowsEvidence = { schema: 'WindowsSourceSecuritySupplementV2', sourceRevision, nodeVersion,
+    args, NODE_OPTIONS: '', exitCode: 0, stdout: windows.result.stdout.toString('utf8') };
+  const pair = { sourceRevision, nodeVersion, windowsEvidence };
+  const check = (input = pair, result = linux.result) =>
+    parseNodeSourceTestObservationV2(result, linux.sourceFile, input);
+  assert.deepEqual(check(), observed({ expectedCaseCount: 5, completedCaseCount: 5, matchedCaseCount: 5,
+    domainRejectionCount: 0, transportErrorCount: 0, inconclusiveCaseCount: 0 }));
+  for (const invalidPair of [
+    { ...pair, sourceRevision: 'b'.repeat(40) },
+    { ...pair, nodeVersion: '0.0.0' },
+    { ...pair, windowsEvidence: { ...windowsEvidence, args: [...args.slice(0, -1)] } },
+    { ...pair, windowsEvidence: { ...windowsEvidence, stdout: windowsEvidence.stdout.replace('ok 1 - ' + names[0], 'ok 1 - ' + names[1]) } },
+    { ...pair, windowsEvidence: { ...windowsEvidence, stdout: windowsEvidence.stdout.replace('# pass 4', '# pass 3') } },
+  ]) assert.equal(check(invalidPair).state, 'unavailable');
+  assert.equal(check(pair, { ...linux.result, stdout: linux.result.stdout.toString('utf8')
+    .replace('ok 2 - ' + names[0], 'ok 2 - unrelated skipped case') }).state, 'unavailable');
+  assert.equal(check(pair, { ...linux.result, stdout: linux.result.stdout.toString('utf8')
+    .replace('ok 1 - one\n', 'ok 1 - ' + names[0] + '\n') }).state, 'unavailable');
 });

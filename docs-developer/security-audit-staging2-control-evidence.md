@@ -10,8 +10,8 @@ The report gate uses the deployment start `2026-11-25T18:08:10.948Z`.
 | External | 7 | 0 | 5 |
 | Authentication | 1 | 0 | 21 |
 | Host | 9 | 0 | 2 |
-| Repository and image | 17 | 3 | 5 |
-| **Total** | **34** | **3** | **33** |
+| Repository and image | 20 | 4 | 1 |
+| **Total** | **37** | **4** | **29** |
 
 The existing Phase III gate still requires one matched catalog v2 Full report,
 independent receiver readback and saved archive verification. These individual
@@ -82,7 +82,7 @@ qualification and synthetic integration results retain their original scope.
 
 | Status | Catalog ID | Observation or evidence still required |
 | --- | --- | --- |
-| [ ] Needs evidence | `repository.git-history-secrets` | Needs a redacted Gitleaks result on the complete history for this source. The pinned tool was absent from the existing executors. |
+| [x] Pass | `repository.git-history-secrets` | Gitleaks found zero findings in 1,139 commits reachable from the exact clean source revision. The redacted scanner used the repository-pinned release. |
 | [ ] Finding | `repository.dependencies-application-runtime.low` | The application runtime audit found 2 affected low-severity package records. |
 | [ ] Finding | `repository.dependencies-application-runtime.medium` | The application runtime audit found 2 affected moderate-severity package records. |
 | [x] Pass | `repository.dependencies-application-runtime.high` | The application runtime audit found zero affected high-severity package records. |
@@ -103,9 +103,9 @@ qualification and synthetic integration results retain their original scope.
 | [x] Pass | `repository.dependencies-sidecar-mongo-development.critical` | Mongo sidecar lockfile comparison showed zero confirmed critical-severity build exposures. |
 | [x] Pass | `repository.security-surface-contract` | Reused the accepted image and runtime registry binding. The clean exact checkout passed the ownership checker, and all 248 required installed cases matched. |
 | [x] Pass | `repository.sensitive-logging` | The registered source classifier found zero flagged files across 223 server source files. |
-| [ ] Needs evidence | `repository.source-security-tests` | The exact Linux suite had 474 passes, zero failures and 4 Windows-only skips. The current evaluator requires a complete run with zero skips, so it still needs qualifying source-suite evidence. |
-| [ ] Needs evidence | `repository.runtime-image-vulnerabilities.high` | Needs a Trivy high-severity inventory bound to the exact deployed Linux/amd64 manifest. The pinned tool was absent from the existing executors. |
-| [ ] Needs evidence | `repository.runtime-image-vulnerabilities.critical` | Needs a Trivy critical-severity inventory bound to the exact deployed Linux/amd64 manifest. The pinned tool was absent from the existing executors. |
+| [x] Pass | `repository.source-security-tests` | The approved paired verifier matched all 478 required cases on the same commit and pinned runtime. The unfiltered Linux transcript recorded 474 passes. The Windows transcript passed exactly the four matched Windows-only cases. |
+| [ ] Finding | `repository.runtime-image-vulnerabilities.high` | The pinned Trivy scan of the verified Linux/amd64 release manifest reported four high-severity findings. |
+| [x] Pass | `repository.runtime-image-vulnerabilities.critical` | The same pinned Trivy scan reported zero critical findings on the verified Linux/amd64 release manifest. |
 | [ ] Needs evidence | `repository.client-bundle-canaries` | Needs the approved synthetic canary inputs and their completed scan of the actual deployed image’s compiled browser bundle. |
 
 ## Retained evidence
@@ -125,7 +125,16 @@ contained counts and policy measurements.
 
 The first source-suite invocation inherited restrictive fixture permissions.
 Running with the documented fixture permissions resolved the seven execution
-failures. The four Windows-only skips remain visible. Slot 108 and the prior
-accepted release binding supplied the installed registry evidence.
+failures. The approved verifier used the retained Linux transcript and the
+separate same-commit Windows transcript. Both recorded zero failures. The
+verifier matched the exact Windows case names to the Linux skips and accounted
+for all 478 cases. Slot 108 and the prior accepted release binding supplied the
+installed registry evidence.
+
+The redacted history receipt and exact-image inventory are retained alongside
+that paired result. Both scanner executables were obtained in temporary storage
+and verified against their pinned archives. The temporary tools and cache were
+removed after inspection. [Gitleaks release assets](https://github.com/gitleaks/gitleaks/releases/expanded_assets/v8.30.1) ·
+[Trivy release assets](https://github.com/aquasecurity/trivy/releases/expanded_assets/v0.69.3)
 
 [Canonical audit status](security-audit-durable-redesign-status.md#phase-3-remaining-work-reconciled-2026-11-21)

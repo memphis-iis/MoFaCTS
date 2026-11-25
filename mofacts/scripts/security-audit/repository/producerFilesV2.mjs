@@ -43,7 +43,7 @@ async function requireAbsent(file) {
 // It never loads complete auth fixtures, signs/uploads reports or qualifies a
 // release. Image-context provenance remains independently owned by its caller.
 export async function writeRepositoryProducerFileV2({ profile, artifactDirectory, repositoryDirectory,
-  environment, imageContext, canaries, registryEvidence, target }, dependencies = {
+  environment, imageContext, canaries, registryEvidence, target, windowsSourceTestEvidence }, dependencies = {
   tools: acquireRepositoryToolObservationsV2, source: acquireRepositorySourceObservationsV2, image: observeImageCanariesV2,
 }) {
   proofRecord(dependencies, ['tools', 'source', 'image']);
@@ -72,7 +72,8 @@ export async function writeRepositoryProducerFileV2({ profile, artifactDirectory
   // when a buggy component emits a globally valid repository control name.
   const tools = proofRecord(await dependencies.tools({ repositoryDirectory: root, environment: env, runtimeImage,
     developmentExposurePolicy: policy }), toolSlots);
-  const source = proofRecord(await dependencies.source({ repositoryDirectory: root, environment: env, imageContext: context, registryEvidence, target }), sourceSlots);
+  const source = proofRecord(await dependencies.source({ repositoryDirectory: root, environment: env, imageContext: context, registryEvidence, target,
+    windowsSourceTestEvidence }), sourceSlots);
   const image = imageError ? unavailable(imageError) : !selectedCanaries ? unavailable('configuration')
     : await dependencies.image({ runtimeImage, canaries: selectedCanaries, environment: env });
   // Cleanup-incomplete exceptions intentionally propagate from acquisition before

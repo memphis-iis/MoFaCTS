@@ -41,6 +41,14 @@ export function parseSurfaceCoverageObservationV2({ revision, changes, check, bi
   } catch { return unavailable('producer-malformed'); }
 }
 
+function verifiedCleanRevision(revision, changes) {
+  try {
+    if (processError(revision) || processError(changes) || revision?.exitCode !== 0 || changes?.exitCode !== 0
+      || changes.stdout.length !== 0) return undefined;
+    return sourceCommit(new TextDecoder('utf-8', { fatal: true }).decode(revision.stdout).trim());
+  } catch { return undefined; }
+}
+
 // Same source selection and sensitive-statement classifier as V1. Count files
 // with findings rather than exposing statements or inventing a statement total.
 export async function observeSensitiveLoggingV2(serverDirectory) {
@@ -82,7 +90,8 @@ export async function observeSensitiveLoggingV2(serverDirectory) {
 // The caller supplies its selected source checkout and narrow test environment.
 // Running the full source suite can create owned temporary synthetic fixtures;
 // it does not invoke Meteor. Source/release authenticity remains independently owned.
-export async function acquireRepositorySourceObservationsV2({ repositoryDirectory, environment, imageContext, registryEvidence, target },
+export async function acquireRepositorySourceObservationsV2({ repositoryDirectory, environment, imageContext, registryEvidence, target,
+  windowsSourceTestEvidence },
   { run: execute = runRepositoryCommandV2, bindRegistry = bindStaging2ReleaseRegistry } = {}) {
   const toolEnvironment = auditToolEnvironmentV2(environment);
   const root = await realDirectory(repositoryDirectory), app = await realDirectory(path.join(root, 'mofacts'));
@@ -91,12 +100,13 @@ export async function acquireRepositorySourceObservationsV2({ repositoryDirector
       timeoutMs: 15 * 60 * 1000, maximum: 8 * 1024 * 1024 }); }
     catch { return { exitCode: -1, stdout: Buffer.alloc(0), failure: 'command-unavailable' }; }
   };
+  let revision, changes;
   let surface = unavailable('evidence-incomplete');
   if (registryEvidence !== undefined) {
     try {
       const binding = await bindRegistry(registryEvidence);
-      const revision = await run('git', ['rev-parse', '--verify', 'HEAD']);
-      const changes = await run('git', ['status', '--porcelain', '--untracked-files=normal']);
+      revision = await run('git', ['rev-parse', '--verify', 'HEAD']);
+      changes = await run('git', ['status', '--porcelain', '--untracked-files=normal']);
       const checker = path.join(app, 'scripts', 'security-audit', 'checkRegistrationBypasses.mjs');
       const check = await run(process.execPath, [checker]);
       surface = parseSurfaceCoverageObservationV2({ revision, changes, check, binding, imageContext, target });
@@ -105,7 +115,20 @@ export async function acquireRepositorySourceObservationsV2({ repositoryDirector
   const observations = { [REPOSITORY_SOURCE_CONTROLS_V2.surface]: surface,
     [REPOSITORY_SOURCE_CONTROLS_V2.logging]: await observeSensitiveLoggingV2(path.join(app, 'server')) };
   const source = path.join(app, 'scripts', 'security-audit', 'source-security-v2.test.mjs');
+  if (windowsSourceTestEvidence !== undefined) {
+    revision ??= await run('git', ['rev-parse', '--verify', 'HEAD']);
+    changes ??= await run('git', ['status', '--porcelain', '--untracked-files=normal']);
+  }
+  const before = windowsSourceTestEvidence === undefined ? undefined : verifiedCleanRevision(revision, changes);
   const tests = await run(process.execPath, ['--test', '--test-reporter=tap', source]);
-  observations[REPOSITORY_SOURCE_CONTROLS_V2.tests] = processError(tests) || parseNodeSourceTestObservationV2(tests, source);
+  let pair;
+  if (before && !processError(tests)) {
+    const finalRevision = await run('git', ['rev-parse', '--verify', 'HEAD']);
+    const finalChanges = await run('git', ['status', '--porcelain', '--untracked-files=normal']);
+    if (verifiedCleanRevision(finalRevision, finalChanges) === before) {
+      pair = { sourceRevision: before, nodeVersion: process.versions.node, windowsEvidence: windowsSourceTestEvidence };
+    }
+  }
+  observations[REPOSITORY_SOURCE_CONTROLS_V2.tests] = processError(tests) || parseNodeSourceTestObservationV2(tests, source, pair);
   return observations;
 }
