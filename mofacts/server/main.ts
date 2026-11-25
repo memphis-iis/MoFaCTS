@@ -18,3 +18,8 @@ import "./http/backupArchives";
 import "./http/ownHistoryDownload";
 import "./http/ownedHistoryDownload";
 import "./migrations/convert_delivery_settings";
+import { completeStartupSurfaceRegistration } from './securitySurfaces/startupSurfaceInventory';
+
+// Static security owners have registered by this point. The async application
+// startup owner reports separately after its configuration and hooks finish.
+completeStartupSurfaceRegistration('entrypoint-modules');

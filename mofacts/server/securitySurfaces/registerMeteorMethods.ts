@@ -162,6 +162,9 @@ export function observeMeteorMethodBindings(
       : { kind: policy.kind, operation: policy.operation };
     surfaces.push(Object.freeze({ name, surfaceId, verification, policy: Object.freeze(policyMetadata), dataEgress }));
   }
+  if (Object.keys(submitted).length !== names.size) {
+    return { state: 'unavailable', reason: 'application-method-descriptor-coverage' } as const;
+  }
   return Object.freeze({ state: 'observed', surfaces: Object.freeze(surfaces) } as const);
 }
 

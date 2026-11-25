@@ -122,6 +122,7 @@ import { registerNamedPublication } from './securitySurfaces/registerNamedPublic
 import { DEFAULT_PUBLICATION_VERIFICATIONS, NAMED_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
 import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
 import { bindAssetUploadSurfaceOwner } from './securitySurfaces/bindAssetUploadSurfaces.ts';
+import { completeStartupSurfaceRegistration } from './securitySurfaces/startupSurfaceInventory';
 import { registerMeteorMethods } from './securitySurfaces/registerMeteorMethods.ts';
 import { createSparcDemoAccess } from './lib/sparcDemoAccess';
 import { createSparcLessonAuthorizer, requireSparcLessonAccess } from './lib/sparcLessonAccess';
@@ -1439,6 +1440,7 @@ Meteor.startup(async function() {
   if (!serverVerbosityObserverHandle || typeof serverVerbosityObserverHandle.stop !== 'function') {
     throw new Error('Server verbosity Change Streams observer did not provide a stop handle');
   }
+  completeStartupSurfaceRegistration('application-startup');
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

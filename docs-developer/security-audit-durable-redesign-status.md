@@ -236,8 +236,9 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   - [x] Remove course-list grants from login and ignore old account lists when authorizing lesson, dashboard and asset reads. Course-only asset metadata is delivered as a snapshot from current released assignments. No learner-history or account migration.
   - [x] Verify assignment removal and reassignment, independent lesson sharing, the current course-only asset snapshot and passwordless return in native Meteor on 18fae3b1. Slot 59 had a separate asset failure.
   - [x] Verify immediate asset sharing on the corrected source in a full native Meteor run (slot 60). Each new subscription resolves independent permissions afresh. Staging2 qualification remains a separate open item.
-- [ ] Verify the Accounts lifecycle, native login/logout and provider registration observations in slot 99. This covers installed ownership and leaves live provider sign-in acceptance with staging2.
+- [x] Slot 99 verified the installed Accounts lifecycle hooks, native login/logout owner and Google, Microsoft and Memphis SAML account service registrations. The source checker distinguishes browser account notifications from server hooks. Real provider sign-ins remain a staging2 acceptance requirement.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
+  - [ ] Verify the startup coordinator and in-memory inventory/digests in slot 100. Account registration, application startup and static module ownership are checked together. The admin read, build identity and embedded proof still need their release-facing composition.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
 - [ ] Verify static bypass detection across active source roots and retire the old manifest and inference checker after parity.
   - [x] Check direct references to Meteor.methods and Meteor.publish in application server JavaScript and TypeScript, including renamed imports, aliases, literal property access and destructuring. Shadowed unrelated names are covered by a source regression. Other roots, dynamically computed dispatch, HTTP and package ownership still need their own checks.
@@ -1949,11 +1950,13 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 101 total, 97 consumed, 1 reserved, 2 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 101 total, 98 consumed, 1 reserved, 1 generally available, and 1 for the earlier `/health` batch only.**
 
 The operator authorized up to five additional batched local Meteor integration invocations, including retries, for the remaining security-audit work (slots 92–96). Reserve each invocation here before starting the suite and record its outcome afterward.
 
-The operator authorized up to five additional local batched Meteor invocations on 2026-11-24 (slots 97–101), including retries. Slot 99 reserved for installed Accounts lifecycle hooks, native method ownership, and observed provider service membership. Slots 100–101 remain available.
+The operator authorized up to five additional local batched Meteor invocations on 2026-11-24 (slots 97–101), including retries. Slot 100 reserved for local startup inventory and digest verification after static and asynchronous startup completion. Slot 101 remains available.
+
+Slot 99 passed on f99a5d12. Server 1,160 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. The native Accounts ownership test ran and passed. Tool image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.uzmvSJfk/results/native-verification.json SHA-256 4442205c45cb4891ec463e79d3f6bc3d16e0ba8180d775d76de426dca381f17a.
 
 Slot 98 passed on 6be07c80. Server 1,159 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. Both audio authorization cases passed with stubbed provider responses. The worker reused its image and completed cleanup. Receipt /var/tmp/mofacts-integration.7y8QyG4q/results/native-verification.json SHA-256 5b00d16293eed2878d3eeb820b146a3a98580c81213521641f276df7d032f9c8. An earlier preparation attempt hit a Docker Hub TLS timeout while acquiring MongoDB and cleaned up before invoking Meteor. It did not consume another slot.
 
