@@ -141,7 +141,14 @@ export async function observeImageCanariesV2({ runtimeImage, canaries, environme
     identity = await fs.lstat(temporary, { bigint: true });
     probe.scanner = path.join(temporary, 'clientBundleCanariesV2.mjs');
     const source = await readCiFile(fileURLToPath(new URL('./clientBundleCanariesV2.mjs', import.meta.url)), 65536);
-    await fs.writeFile(probe.scanner, source, { flag: 'wx', mode: 0o444 });
+    const scanner = await fs.open(probe.scanner, 'wx', 0o400);
+    try {
+      await scanner.writeFile(source);
+      // Set the final mode explicitly so a private operator umask does not block the non-root bind reader.
+      await scanner.chmod(0o444);
+    } finally {
+      await scanner.close();
+    }
     if (probe.scanner.includes(',')) invalid();
     attempted = true;
     const created = await execute(['container', 'create', '--name', probe.name, '--label', `${ownerLabel}=${probe.owner}`,
