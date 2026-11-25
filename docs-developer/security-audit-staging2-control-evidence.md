@@ -74,7 +74,7 @@ qualification and synthetic integration results retain their original scope.
 | [x] Pass | `internal.docker-ports` | All three core containers matched publication and network policy. The expected application loopback publication was present. |
 | [x] Pass | `internal.firewall` | The active policy defaulted to inbound deny, allowed public web access and scoped management SSH. The classifier found no unexpected allow rules. |
 | [x] Pass | `internal.reverse-proxy-routes` | Apache was active and passed its syntax test. The configured host and all four upstream entries matched the loopback route policy. |
-| [ ] Needs evidence | `internal.mongodb-auth.unauthenticated-access` | Needs the catalog’s direct unauthenticated data-access rejection observation. Authenticated scope and connectivity were verified separately. |
+| [ ] Needs evidence | `internal.mongodb-auth.unauthenticated-access` | The running private MongoDB service had `--auth` and a keyfile configured. The catalog still requires direct evidence that the service rejected a credential-free data-access command. |
 | [x] Pass | `internal.mongodb-auth.scoped-roles` | Authenticated connectivity, replica set, app grants, read-concern role and the expected sidecar account state all matched. |
 | [x] Pass | `internal.redis-auth` | Redis returned `NOAUTH` for a credential-free health ping. The host-auditor and application credentials both returned `PONG`. Docker published zero Redis ports, and both containers retained their identity throughout the check. |
 
@@ -152,6 +152,28 @@ The committed operator fix `1b64b274` sets the file mode explicitly inside the
 private workspace and was the only tooling change layered over the deployed
 source for the passing observation. The hosted workflow still needs canary input
 preparation before its repository step can repeat the scan.
+
+The `mongodb-startup-configuration.json` receipt confirms that the running,
+private MongoDB service used `--auth` and a replica-set keyfile on this release.
+Operator change `4d3bf555` bounds the collector's read check to a filter that
+matches no records. All 16 focused Linux tests and full lint passed. Automatic
+approval review blocked the live check because it issues a database read
+without credentials. The configuration receipt leaves the direct denial
+observation open.
+
+The `full-report-and-provider-readiness.json` receipt records four recent
+report rows and one historical Full report. It found zero Full reports for the
+active catalog and exact deployment. The public application configuration
+reported Memphis SAML disabled. `provider-preparation.json` verifies Google
+prepared its expected staging2 callback. The browser intercepted provider
+requests before they left staging2. Microsoft showed a configuration error
+after the browser's configuration subscription was ready. The separately
+retained `microsoft-startup-flags.json` confirms the application's missing
+Microsoft settings marker. The staging credential labels, deployment notes and
+audit records reviewed identify no designated provider test identities. Live
+Google sign-in evidence requires an approved test identity. Microsoft also
+requires a provider registration that permits the staging2 callback and a
+protected runtime configuration for that registration.
 
 The exact catalog v2 policy set was unavailable at the installed host path.
 The review used temporary root-private copies of the exact source policies and
