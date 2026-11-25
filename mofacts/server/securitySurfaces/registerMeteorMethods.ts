@@ -68,7 +68,7 @@ export type MeteorMethodBinding = Readonly<{
     authorize: (...args: never[]) => Promise<unknown>;
   }> | Readonly<{
     kind: 'provider-access'; operation: 'creator' | 'lesson';
-    authorize: (userId: string | null | undefined) => string;
+    authorize: (...args: never[]) => unknown;
   }> | Readonly<{
     kind: 'package-upload'; operation: 'persisted-archive' | 'owned-confirmation-plan' | 'generated-archive';
     authorize: (userId: string | null | undefined) => string;

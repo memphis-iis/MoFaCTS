@@ -61,7 +61,7 @@ import { PUBLIC_READ_RATE_LIMIT, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR } from './runt
 import { requireAccountProgressSession, requireParticipantProgressLesson } from './lib/participantProgressScope';
 import { requireUserMatchesOrHasRole } from './lib/methodAuthorization';
 import { packageDeletionPolicy } from './methods/contentAssetMaintenanceMethods';
-import { AUDIO_PROVIDER_VERIFICATIONS, OPENROUTER_CALL_VERIFICATIONS, GENERATED_PACKAGE_VERIFICATION, LESSON_EDIT_VERIFICATIONS, PACKAGE_DOWNLOAD_VERIFICATION, LESSON_COPY_VERIFICATION, PACKAGE_UPLOAD_VERIFICATIONS, PACKAGE_DELETION_VERIFICATION, CONTENT_MAINTENANCE_VERIFICATIONS, PUBLIC_READ_VERIFICATIONS, LEARNER_PROGRESS_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { AUDIO_PROVIDER_VERIFICATIONS, GENERATED_PACKAGE_VERIFICATION, LESSON_EDIT_VERIFICATIONS, PACKAGE_DOWNLOAD_VERIFICATION, LESSON_COPY_VERIFICATION, PACKAGE_UPLOAD_VERIFICATIONS, PACKAGE_DELETION_VERIFICATION, CONTENT_MAINTENANCE_VERIFICATIONS, PUBLIC_READ_VERIFICATIONS, LEARNER_PROGRESS_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
 import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
@@ -95,7 +95,7 @@ import {
   createOpenRouterCatalogMethods, modelCatalogPolicy,
   createOpenRouterModelCatalogService,
 } from './methods/openRouterCatalogMethods';
-import { createOpenRouterMethods } from './methods/openRouterMethods';
+import { createOpenRouterRegistration } from './methods/openRouterMethods';
 import { createSparcPromptImageMethods } from './methods/sparcPromptImageMethods';
 import { createSparcFigureLibraryStore, ensureSparcFigureLibraryIndexes,
   removeSparcFigureUserDecisions, withSparcFigureLibraryLock } from './lib/sparcFigureLibraryStorage';
@@ -1058,6 +1058,13 @@ const simulationTelemetry = createSimulationTelemetryRegistration({
   writeHistory: (userId, record) => analyticsRegistration.methods.insertHistory.call({ userId }, record),
   loadLesson: id => Tdfs.findOneAsync({ _id: id }, { fields: { 'rawStimuliFile.setspec.sparcPages': 1 } }),
 });
+const openRouterRegistration = createOpenRouterRegistration({
+  serverConsole,
+  getApiKeyResolutionDeps: getSparcApiKeyResolutionDeps,
+  getMethodAuthorizationDeps,
+  openRouterModelCatalogService,
+  assertPublicDemoAiQuota,
+});
 export const asyncMethods: Record<string, unknown> = {
   ...tdfIdentityMigration.methods,
   getTdfByExperimentTarget: getTdfByExperimentTargetPublic,
@@ -1104,13 +1111,7 @@ export const asyncMethods: Record<string, unknown> = {
     isRemoved: isSparcAdministrativeRemoval,
     figureLibrary: createSparcFigureLibraryStore() }),
 
-  ...createOpenRouterMethods({
-    serverConsole,
-    getApiKeyResolutionDeps: getSparcApiKeyResolutionDeps,
-    getMethodAuthorizationDeps,
-    openRouterModelCatalogService,
-    assertPublicDemoAiQuota,
-  }),
+  ...openRouterRegistration.methods,
 
   ...createOpenRouterCatalogMethods(openRouterModelCatalogService),
 
@@ -1149,13 +1150,7 @@ registerMeteorMethods(Meteor, installedMethods, [
     verification, handler: installedMethods[verification.method], policy: audioProviderPolicy,
     dataEgress: verification.method === 'makeGoogleSpeechAPICall' ? 'speech-transcription' as const : 'audio-synthesis' as const,
   })),
-  ...OPENROUTER_CALL_VERIFICATIONS.map(verification => ({
-    verification, handler: installedMethods[verification.method],
-    policy: { kind: 'provider-access' as const, operation: verification.method.includes('AiContent') ? 'creator' as const : 'lesson' as const,
-      authorize: requireAuthenticatedUser },
-    dataEgress: verification.method.endsWith('Capability') ? 'provider-capability' as const
-      : verification.method === 'callResolvedOpenRouterEmbeddings' ? 'embedding-vectors' as const : 'provider-result' as const,
-  })),
+  ...openRouterRegistration.methodBindings,
   { verification: PACKAGE_DOWNLOAD_VERIFICATION, handler: installedMethods.getPackageDownloadLink,
     policy: packageDownloadPolicy, dataEgress: 'package-download-link' },
   { verification: LESSON_COPY_VERIFICATION, handler: installedMethods.copyTdf,

@@ -38,7 +38,7 @@ const {createSparcDemoAccess}=require('../server/lib/sparcDemoAccess.ts');
 const {createTdfLookupHelpers}=require('../server/lib/tdfLookup.ts');
 const contentAccess=require('../server/lib/contentAccessPolicy.ts');
 const {resolvePreferredApiKey,getAccessibleTdfApiKey}=require('../server/lib/apiKeyResolution.ts');
-const {createOpenRouterMethods}=require('../server/methods/openRouterMethods.ts');
+const {createOpenRouterRegistration}=require('../server/methods/openRouterMethods.ts');
 const {createSparcPromptImageMethods}=require('../server/methods/sparcPromptImageMethods.ts');
 const {createSparcMoveLibraryMethods}=require('../server/methods/sparcMoveLibraryMethods.ts');
 const {createSparcLibraryCurationMethods}=require('../server/methods/sparcLibraryCurationMethods.ts');
@@ -106,7 +106,9 @@ test('both dynamic provider paths accept members, deny outsiders before provider
  const f=fixture();let calls=0;const oldFetch=globalThis.fetch;
  globalThis.fetch=async()=>{calls++;return new Response(JSON.stringify({choices:[{message:{content:'{"ok":true}'},finish_reason:'stop'}]}),{status:200});};
  try{
-  const methods=createOpenRouterMethods({serverConsole(){},getMethodAuthorizationDeps:()=>f.auth,getApiKeyResolutionDeps:()=>({...f.keyDeps,authorizeTdfExecution:async(id,tdf)=>{await requireSparcLessonAccess(f.auth,id,tdf);}}),assertPublicDemoAiQuota:f.demos.assertAiQuota,openRouterModelCatalogService:{getCatalog:async()=>[{id:'fixture/model',reasoning:{mandatory:false,supportedLevels:null,defaultLevel:'none'}}]}});
+  const {methods, methodBindings}=createOpenRouterRegistration({serverConsole(){},getMethodAuthorizationDeps:()=>f.auth,getApiKeyResolutionDeps:()=>({...f.keyDeps,authorizeTdfExecution:async(id,tdf)=>{await requireSparcLessonAccess(f.auth,id,tdf);}}),assertPublicDemoAiQuota:f.demos.assertAiQuota,openRouterModelCatalogService:{getCatalog:async()=>[{id:'fixture/model',reasoning:{mandatory:false,supportedLevels:null,defaultLevel:'none'}}]}});
+  assert.equal(methodBindings.length,5);
+  for(const binding of methodBindings) assert.equal(binding.handler,methods[binding.verification.method]);
   for(const [tdfId,policyId] of [['agent','dynamic-instruction-agent-v2'],['student-policy','dynamic-instruction-student-v2'],['progressive','progressive-scaffolding-v1'],['demo','dynamic-instruction-agent-v2']]){
    const params={tdfId,policyId,messages:[{role:'user',content:'Synthetic fixture only.'}],intent:{title:'Fixture'}};
    await assert.rejects(methods.callResolvedOpenRouterJson.call({userId:'intruder'},params),/Not authorized|Access denied/);
@@ -126,8 +128,8 @@ test('runtime vector publication needs lesson membership; administrative browsin
  await assert.rejects(publication.call(ctx,{kind:'feedback',readingLevel:'unbiased',responseFormat:'text'},'agent'),/Not authorized/);assert.equal(vectorReads,0);
  assert.deepEqual(publicationStorageCalls,[]);assert.equal(readyCalls,0);assert.equal(stopPublication,undefined);
  await publication.call({...ctx,userId:'student'},{kind:'feedback',readingLevel:'unbiased',responseFormat:'text'},'agent');assert.equal(vectorReads,1);
- assert.deepEqual(publicationStorageCalls,['catalog','initialize-user:student','moves:student','visuals:student','entries']);
- assert.equal(readyCalls,1);stopPublication();await new Promise(resolve=>setImmediate(resolve));assert.equal(stoppedObservers,3);
+ assert.deepEqual(publicationStorageCalls,['entries']);
+ assert.equal(readyCalls,1);stopPublication();await new Promise(resolve=>setImmediate(resolve));assert.equal(stoppedObservers,1);
  const methods=createSparcMoveLibraryMethods({store:{},getMethodAuthorizationDeps:()=>f.auth,verifyFigure:async()=>{}});
  await assert.rejects(methods.reviseSparcPrimitive.call({userId:'student'}),/Permission denied/);
  const curation=createSparcLibraryCurationMethods({getMethodAuthorizationDeps:()=>f.auth,remove:async()=>{throw new Error('Must not delete');},removed:async()=>['removed']});

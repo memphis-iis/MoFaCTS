@@ -3,8 +3,10 @@ import { Meteor } from 'meteor/meteor';
 import { OPENROUTER_CALL_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
 import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
 import sinon from 'sinon';
-import { createOpenRouterMethods } from './openRouterMethods';
+import { createOpenRouterRegistration } from './openRouterMethods';
 import { openRouterSessionCorrelationId } from '../lib/openRouterPrefixCaching';
+
+const createOpenRouterMethods = (...args: Parameters<typeof createOpenRouterRegistration>) => createOpenRouterRegistration(...args).methods;
 
 function adminDeps(isAdmin = true, openRouterPrefixCachingEnabled?: boolean) {
   return {
