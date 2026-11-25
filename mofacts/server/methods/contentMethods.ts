@@ -161,6 +161,19 @@ export const packageDownloadPolicy = Object.freeze({
   kind: 'content-maintenance', operation: 'lesson-package-owner-or-admin', authorize: hasUserRole,
 } as const);
 
+export const lessonVisibilityPolicy = Object.freeze({
+  kind: 'content-maintenance', operation: 'lesson-owner',
+  authorize: (deps: MethodAuthorizationDeps, actingUserId: string | null | undefined, ownerId: string | undefined) =>
+    requireUserMatchesOrHasRole(deps, {
+      actingUserId,
+      subjectUserId: ownerId,
+      notLoggedInMessage: 'Must be logged in',
+      notLoggedInCode: 'not-authorized',
+      forbiddenMessage: 'Only owner can change public/private setting',
+      forbiddenCode: 'not-authorized',
+    }),
+} as const);
+
 export function createContentMethods(deps: ContentMethodsDeps) {
   const assetMaintenanceMethods = createContentAssetMaintenanceMethods(deps);
   return {
@@ -427,14 +440,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         throw new Meteor.Error('not-found', 'TDF not found');
       }
 
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
-        subjectUserId: tdf.ownerId,
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 'not-authorized',
-        forbiddenMessage: 'Only owner can change public/private setting',
-        forbiddenCode: 'not-authorized',
-      });
+      await lessonVisibilityPolicy.authorize(deps.getMethodAuthorizationDeps(), this.userId, tdf.ownerId);
 
       const parent = buildParentRootSelector([tdfId]);
       if (parent && await deps.Tdfs.findOneAsync(parent, { fields: { _id: 1 } })) {

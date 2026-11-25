@@ -57,10 +57,9 @@ import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers, prepareStimuliSetForRuntime } from './lib/stimulusLookup';
 import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
 import { accountDiagnosticsPolicy } from './lib/participantSession';
-import { PUBLIC_READ_RATE_LIMIT, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR } from './runtime/ddpRateLimits';
+import { PUBLIC_READ_RATE_LIMIT, PUBLIC_ACCOUNT_RATE_LIMITS } from './runtime/ddpRateLimits';
 import { requireAccountProgressSession, requireParticipantProgressLesson } from './lib/participantProgressScope';
-import { requireUserMatchesOrHasRole } from './lib/methodAuthorization';
-import { packageDeletionPolicy } from './methods/contentAssetMaintenanceMethods';
+import { assetDeletionPolicy, packageDeletionPolicy } from './methods/contentAssetMaintenanceMethods';
 import { AUDIO_PROVIDER_VERIFICATIONS, GENERATED_PACKAGE_VERIFICATION, LESSON_EDIT_VERIFICATIONS, PACKAGE_DOWNLOAD_VERIFICATION, LESSON_COPY_VERIFICATION, PACKAGE_UPLOAD_VERIFICATIONS, PACKAGE_DELETION_VERIFICATION, CONTENT_MAINTENANCE_VERIFICATIONS, PUBLIC_READ_VERIFICATIONS, LEARNER_PROGRESS_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
 import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
 import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
@@ -76,7 +75,7 @@ import { refreshDashboardHistory } from './lib/dashboardHistoryMongo';
 import { archiveDashboardHistory } from './lib/dashboardHistoryArchive';
 import { writeConditionState } from './lib/conditionAllocationMongo';
 import { createAuthMethods, accountSelfPolicy, ssoProfilePolicy } from './methods/authMethods';
-import { createContentMethods, manualDraftPolicy, uploadReadPolicy, packageDownloadPolicy } from './methods/contentMethods';
+import { createContentMethods, manualDraftPolicy, uploadReadPolicy, packageDownloadPolicy, lessonVisibilityPolicy } from './methods/contentMethods';
 import { createCourseService } from './methods/courseMethods';
 import type { CourseAssignmentHistoryContext } from '../common/courseAssignments.contracts';
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
@@ -1159,8 +1158,7 @@ registerMeteorMethods(Meteor, installedMethods, [
     policy: packageDeletionPolicy, dataEgress: 'delete-result' },
   ...CONTENT_MAINTENANCE_VERIFICATIONS.map(verification => ({
     verification, handler: installedMethods[verification.method],
-    policy: { kind: 'content-maintenance' as const, authorize: requireUserMatchesOrHasRole,
-      operation: verification.method === 'setTdfUserSelect' ? 'lesson-owner' as const : 'asset-owner-or-admin' as const },
+    policy: verification.method === 'setTdfUserSelect' ? lessonVisibilityPolicy : assetDeletionPolicy,
     dataEgress: ({ removeAssetById: 'none', removeMultipleAssets: 'delete-result', setTdfUserSelect: 'save-status' } as const)[verification.method],
   })),
   ...PUBLIC_READ_VERIFICATIONS.map(verification => ({
@@ -1171,7 +1169,7 @@ registerMeteorMethods(Meteor, installedMethods, [
   ...PUBLIC_ACCOUNT_VERIFICATIONS.map(verification => ({
     verification, handler: installedMethods[verification.method],
     policy: { kind: 'public-account' as const, operation: verification.method,
-      rateLimit: { requests: PUBLIC_ACCOUNT_REQUESTS_PER_HOUR[verification.method], windowMs: 3600000, scope: 'connection' as const },
+      rateLimit: PUBLIC_ACCOUNT_RATE_LIMITS[verification.method],
       authorize: applyMethodRateLimit },
     dataEgress: verification.method === 'signUpUser' ? 'account-creation-result' as const : 'save-status' as const,
   })),

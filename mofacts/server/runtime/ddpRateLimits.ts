@@ -17,9 +17,14 @@ type DdpRateLimitDeps = {
 const DDPRateLimiterWithErrorMessage = DDPRateLimiter as DdpRateLimiterLike;
 
 let rateLimitsRegistered = false;
-export const PUBLIC_ACCOUNT_REQUESTS_PER_HOUR = Object.freeze({
-  requestPasswordReset: 3, resetPasswordWithToken: 5, signUpUser: 5, resendVerificationEmail: 3,
-} as const);
+const publicAccountConnectionLimit = (requests: number) =>
+  Object.freeze({ requests, windowMs: 3600000, scope: 'connection' } as const);
+export const PUBLIC_ACCOUNT_RATE_LIMITS = Object.freeze({
+  requestPasswordReset: publicAccountConnectionLimit(3),
+  resetPasswordWithToken: publicAccountConnectionLimit(5),
+  resendVerificationEmail: publicAccountConnectionLimit(3),
+  signUpUser: publicAccountConnectionLimit(5),
+});
 export const PUBLIC_READ_RATE_LIMIT = Object.freeze({ requests: 60, windowMs: 60000, scope: 'connection' } as const);
 export const PUBLIC_DEMO_RATE_LIMIT = Object.freeze({ requests: 10, windowMs: 3600000, scope: 'connection' } as const);
 
@@ -86,35 +91,16 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     userId() { return true; }
   }, 30, 60000);
 
-  DDPRateLimiter.addRule({
-    type: 'method',
-    name: 'requestPasswordReset',
-    connectionId() { return true; }
-  }, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR.requestPasswordReset, 3600000);
-
-  DDPRateLimiter.addRule({
-    type: 'method',
-    name: 'resetPasswordWithToken',
-    connectionId() { return true; }
-  }, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR.resetPasswordWithToken, 3600000);
-
-  DDPRateLimiter.addRule({
-    type: 'method',
-    name: 'resendVerificationEmail',
-    connectionId() { return true; }
-  }, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR.resendVerificationEmail, 3600000);
+  for (const [name, rateLimit] of Object.entries(PUBLIC_ACCOUNT_RATE_LIMITS)) {
+    DDPRateLimiter.addRule({ type: 'method', name, connectionId() { return true; } },
+      rateLimit.requests, rateLimit.windowMs);
+  }
 
   DDPRateLimiter.addRule({
     type: 'method',
     name: 'login',
     connectionId() { return true; }
   }, 10, 300000);
-
-  DDPRateLimiter.addRule({
-    type: 'method',
-    name: 'signUpUser',
-    connectionId() { return true; }
-  }, PUBLIC_ACCOUNT_REQUESTS_PER_HOUR.signUpUser, 3600000);
 
   DDPRateLimiter.addRule({
     type: 'method',

@@ -130,7 +130,10 @@ describe('contentMethods content upload summaries', function() {
   });
   it('toggles study visibility while keeping locked and previously listed conditions out of the public list', async function() {
     const tdfs = new Mongo.Collection<any>('visibility' + Random.id());
-    const methods = createContentMethods(createContentDeps({ Tdfs: tdfs }));
+    const methods = createContentMethods(createContentDeps({
+      Tdfs: tdfs,
+      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async (userId: string) => userId === 'admin' }),
+    }));
     const toggle = (id: string, value: boolean) => methods.setTdfUserSelect.call({ userId: 'owner' }, id, value);
     const listed = () => tdfs.find({ 'content.tdfs.tutor.setspec.userselect': 'true' }).mapAsync(doc => doc._id);
     try {
@@ -140,8 +143,10 @@ describe('contentMethods content upload summaries', function() {
       await tdfs.insertAsync({ _id: 'child', ownerId: 'owner', content: { tdfs: { tutor: { unit: [{}],
         setspec: { userselect: 'true', aiVisibilityLockReason: 'missing attribution' },
       } } } });
-      await assert.rejects(methods.setTdfUserSelect.call({ userId: 'outsider' }, 'root', true),
-        (error: any) => error.error === 'not-authorized');
+      for (const userId of ['outsider', 'admin']) {
+        await assert.rejects(methods.setTdfUserSelect.call({ userId }, 'root', true),
+          (error: any) => error.error === 'not-authorized');
+      }
       await toggle('root', true);
       assert.deepEqual(await listed(), ['root']);
       await assert.rejects(toggle('child', true), (error: any) => error.error === 'tdf-condition-visibility');

@@ -6,6 +6,7 @@ import {
   hasUserRole,
   requireAuthenticatedUser,
   requireUserMatchesOrHasRole,
+  type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
 
 type UnknownRecord = Record<string, unknown>;
@@ -15,6 +16,20 @@ type MethodContext = {
 
 export const packageDeletionPolicy = Object.freeze({
   kind: 'content-maintenance', operation: 'archive-and-family-owner-or-admin', authorize: hasUserRole,
+} as const);
+
+export const assetDeletionPolicy = Object.freeze({
+  kind: 'content-maintenance', operation: 'asset-owner-or-admin',
+  authorize: (deps: MethodAuthorizationDeps, actingUserId: string, ownerId: string | undefined) =>
+    requireUserMatchesOrHasRole(deps, {
+      actingUserId,
+      subjectUserId: ownerId,
+      roles: ['admin'],
+      notLoggedInMessage: 'Must be logged in',
+      notLoggedInCode: 401,
+      forbiddenMessage: 'Can only delete your own assets',
+      forbiddenCode: 403,
+    }),
 } as const);
 
 type PackageMediaAsset = {
@@ -44,7 +59,7 @@ type ContentAssetMaintenanceDeps = {
   serverConsole: (...args: unknown[]) => void;
   normalizeCanonicalId: (value: unknown) => string | null;
   deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
-  getMethodAuthorizationDeps: () => any;
+  getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
 };
 
 function retainReferencedMedia(value: unknown, candidates: Map<string, string[]>): void {
@@ -223,15 +238,7 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
       if (!asset) {
         throw new Meteor.Error(404, 'Asset not found');
       }
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId,
-        subjectUserId: asset.userId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Can only delete your own assets',
-        forbiddenCode: 403,
-      });
+      await assetDeletionPolicy.authorize(deps.getMethodAuthorizationDeps(), actingUserId, asset.userId);
 
       const removed = await deps.DynamicAssets.removeAsync({ _id: assetId, userId: asset.userId ?? null });
       if (removed === 0) throw new Meteor.Error(409, 'Asset changed before deletion');
@@ -255,13 +262,7 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
         { _id: { $in: ids } }, { fields: { _id: 1, userId: 1 } },
       ).fetchAsync();
       for (const asset of assets) {
-        await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-          actingUserId,
-          subjectUserId: asset.userId,
-          roles: ['admin'],
-          forbiddenMessage: 'Can only delete your own assets',
-          forbiddenCode: 403,
-        });
+        await assetDeletionPolicy.authorize(deps.getMethodAuthorizationDeps(), actingUserId, asset.userId);
       }
 
       if (assets.length !== ids.length) return { deleted: 0, selectionChanged: true };

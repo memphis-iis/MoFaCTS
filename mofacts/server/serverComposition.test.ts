@@ -180,12 +180,19 @@ describe('server auth and session methods', function() {
   it('acknowledges unknown verification recipients and binds public account limits', async function() {
     const observed = registeredMeteorMethodSurfaces();
     if (observed.state !== 'observed') throw new Error('Expected installed public account methods');
+    const limiter = DDPRateLimiter as typeof DDPRateLimiter & {
+      findAllMatchingRulesAsync(input: { type: string; name: string; connectionId: string; userId: null }): Promise<unknown[]>;
+    };
     for (const verification of PUBLIC_ACCOUNT_VERIFICATIONS) {
       const row = observed.surfaces.find(item => item.name === verification.method);
       expect(row?.verification).to.equal(verification);
       const requests = ['requestPasswordReset', 'resendVerificationEmail'].includes(verification.method) ? 3 : 5;
       expect(row?.policy).to.deep.equal({ kind: 'public-account', operation: verification.method,
         rateLimit: { requests, windowMs: 3600000, scope: 'connection' } });
+      const rules = await limiter.findAllMatchingRulesAsync({
+        type: 'method', name: verification.method, connectionId: Random.id(), userId: null,
+      });
+      expect(rules).to.have.length(1);
     }
     const result = await MeteorAny.server.method_handlers.resendVerificationEmail.call({ userId: null }, Random.id() + '@example.invalid');
     expect(result).to.deep.equal({ success: true });
