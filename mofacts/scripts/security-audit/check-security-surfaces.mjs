@@ -69,15 +69,16 @@ function regexMatches(text, pattern, mapper) {
   return [...text.matchAll(pattern)].map(mapper);
 }
 
-async function checkedApplicationSource(file, packageOwner) {
+async function checkedApplicationSource(file, packageOwner, microsoftOwner) {
   const text = await fs.readFile(file, 'utf8');
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
-  const bypasses = file.endsWith('.svelte') ? componentRegistrationReferences(file, text) :
-    packageOwner !== undefined ? packageRegistrationReferences(source, packageOwner) :
-      directFrameworkRegistrationReferences(source);
+  const options = { clientOnly: file.startsWith(path.join(appRoot, 'client') + path.sep) };
+  const bypasses = file.endsWith('.svelte') ? componentRegistrationReferences(file, text, options) :
+    packageOwner !== undefined ? packageRegistrationReferences(source, packageOwner, microsoftOwner) :
+      directFrameworkRegistrationReferences(source, undefined, options);
   if (bypasses.length) {
     throw new Error(bypasses.map(({ member, line }) =>
-      path.relative(sourceRepoRoot, file) + ':' + line + ' references ' + (member.startsWith('WebApp.') ? member : 'Meteor.' + member) + ' outside its registration owner.'
+      path.relative(sourceRepoRoot, file) + ':' + line + ' references ' + (member.includes('.') ? member : 'Meteor.' + member) + ' outside its registration owner.'
     ).join('\n'));
   }
   return source;
@@ -89,6 +90,10 @@ export async function discoverSecuritySurfaces() {
   }
   const pkgRoot = path.join(appRoot, 'packages');
   const uploadOwner = path.join(pkgRoot, 'ostrio-files', 'server.js');
+  const microsoftOwners = new Map([
+    [path.join(pkgRoot, 'mofacts-accounts-microsoft', 'server', 'microsoft.js'), 'accounts'],
+    [path.join(pkgRoot, 'mofacts-microsoft-oauth', 'server', 'microsoft.js'), 'provider'],
+  ]);
   let foundUploadOwner = false;
   for (const entry of await fs.readdir(pkgRoot, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -96,11 +101,13 @@ export async function discoverSecuritySurfaces() {
     if (!(await fs.readdir(directory)).includes('package.js')) continue;
     for (const file of await filesUnder(directory, true)) {
       const isUploadOwner = file === uploadOwner;
-      await checkedApplicationSource(file, isUploadOwner);
+      await checkedApplicationSource(file, isUploadOwner, microsoftOwners.get(file));
+      microsoftOwners.delete(file);
       if (isUploadOwner) foundUploadOwner = true;
     }
   }
   if (!foundUploadOwner) throw new Error('Missing maintained upload package registration owner');
+  if (microsoftOwners.size) throw new Error('Missing maintained Microsoft package registration owner');
   const serverFiles = await filesUnder(path.join(appRoot, 'server'));
   const methods = [];
   const publications = [];

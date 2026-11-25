@@ -3,6 +3,7 @@ import { Meteor } from 'meteor/meteor';
 import { Random } from 'meteor/random';
 import { WebApp } from 'meteor/webapp';
 import { HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registerMemphisAccountService } from '../securitySurfaces/registerFrameworkAuth';
 import { registerHttpMiddleware } from '../securitySurfaces/registerHttpRoutes.ts';
 import { XMLParser } from 'fast-xml-parser';
 import { SAML, SamlStatusError, type Profile, type SamlConfig } from '@node-saml/node-saml';
@@ -825,17 +826,7 @@ function registerMemphisSamlService() {
   if (serviceRegistered) {
     return;
   }
-  const oauthAccounts = Accounts as unknown as {
-    oauth?: {
-      registerService?: (name: string) => void;
-      serviceNames?: () => string[];
-    };
-  };
-  if (oauthAccounts.oauth?.serviceNames?.().includes(MEMPHIS_SAML_SERVICE_NAME)) {
-    serviceRegistered = true;
-    return;
-  }
-  oauthAccounts.oauth?.registerService?.(MEMPHIS_SAML_SERVICE_NAME);
+  registerMemphisAccountService(Accounts as unknown as Parameters<typeof registerMemphisAccountService>[0], MEMPHIS_SAML_SERVICE_NAME);
   serviceRegistered = true;
 }
 

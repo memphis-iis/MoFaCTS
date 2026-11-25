@@ -17,6 +17,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import { unusedExpiredResetPrecondition, resetAttemptOutcome } from '../common/securityAudit/resetProtocol';
 import { sessionLifetimeStatus } from '../common/securityAudit/sessionLifetime';
 import { CONDITION_COUNT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { FRAMEWORK_AUTH_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
+import { registeredFrameworkAuthSurfaces } from './securitySurfaces/registerFrameworkAuth';
 import { registeredMeteorMethodSurfaces } from './securitySurfaces/registerMeteorMethods';
 
 const MeteorAny = Meteor as any;
@@ -138,6 +140,17 @@ describe('server auth and session methods', function() {
     await clearServerCompositionCollections();
     await Roles.createRoleAsync('admin', { unlessExists: true });
     await Roles.createRoleAsync('teacher', { unlessExists: true });
+  });
+
+  it('observes installed account hooks, native methods and provider service owners', function() {
+    const observed = registeredFrameworkAuthSurfaces();
+    if (observed.state !== 'observed') throw Error(observed.reason);
+    expect(observed.surfaces.map(row => row.verification.verificationId)).to.have.members(
+      Object.values(FRAMEWORK_AUTH_VERIFICATIONS).map(row => row.verificationId),
+    );
+    expect(observed.surfaces.map(row => row.surfaceId)).to.have.members(
+      Object.values(FRAMEWORK_AUTH_VERIFICATIONS).map(row => row.surfaceId),
+    );
   });
 
   it('serves only public sign-in configuration and active help with per-connection limits', async function() {

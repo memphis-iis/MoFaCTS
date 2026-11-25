@@ -1,10 +1,12 @@
 import { compile, parse } from 'svelte/compiler';
 import ts from 'typescript';
 
+const CLIENT_ACCOUNT_NOTIFICATIONS = new Set(['onLogin', 'onLoginFailure', 'onLogout']);
+const ACCOUNT_HOOKS = new Set(['onLogin', 'onLoginFailure', 'onLogout', 'onCreateUser', 'validateLoginAttempt', 'registerLoginHandler']);
 const HTTP_STACKS = new Set(['connectHandlers', 'rawConnectHandlers', 'handlers']);
 
 // A reference to a registration function can be retained and called later.
-export function directFrameworkRegistrationReferences(source, acceptsRegistration = () => false) {
+export function directFrameworkRegistrationReferences(source, acceptsRegistration = () => false, { clientOnly = false } = {}) {
   let checker;
   function declarationOf(identifier) {
     if (!checker) {
@@ -33,6 +35,8 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
   function frameworkModule(name) {
     if (name === 'Meteor') return 'meteor/meteor';
     if (name === 'WebApp') return 'meteor/webapp';
+    if (name === 'Accounts') return 'meteor/accounts-base';
+    if (name === 'OAuth') return 'meteor/oauth';
     return undefined;
   }
   function bindingName(element) {
@@ -55,7 +59,10 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
       if (ts.isBindingElement(decl) && ts.isVariableDeclaration(decl.parent.parent)) {
         const initializer = decl.parent.parent.initializer;
         const member = bindingName(decl);
-        if (initializer && HTTP_STACKS.has(member) && registrationOwner(initializer, visited) === 'WebApp') return member;
+        if (!initializer) return undefined;
+        const owner = registrationOwner(initializer, visited);
+        if (HTTP_STACKS.has(member) && owner === 'WebApp') return member;
+        if (member === 'oauth' && owner === 'Accounts') return 'Accounts.oauth';
       }
       return undefined;
     }
@@ -63,6 +70,7 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
     if (!name) return undefined;
     const receiver = unwrap(node.expression);
     if (HTTP_STACKS.has(name) && registrationOwner(receiver, visited) === 'WebApp') return name;
+    if (name === 'oauth' && registrationOwner(receiver, visited) === 'Accounts') return 'Accounts.oauth';
     const decl = ts.isIdentifier(receiver) && declarationOf(receiver);
     if (decl && ts.isNamespaceImport(decl) && frameworkModule(name) && frameworkImport(decl, frameworkModule(name))) return name;
     return undefined;
@@ -71,6 +79,10 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
     if (owner === 'Meteor' && (member === 'methods' || member === 'publish' || member === '[unresolved property]')) return member;
     if (owner === 'WebApp' && member === '[unresolved property]') return 'WebApp.[unresolved property]';
     if (HTTP_STACKS.has(owner) && (member === 'use' || member === '[unresolved property]')) return 'WebApp.' + owner + '.' + member;
+    // Client notification hooks coordinate presentation and cannot admit or create accounts.
+    if (owner === 'Accounts' && clientOnly && CLIENT_ACCOUNT_NOTIFICATIONS.has(member)) return undefined;
+    if (owner === 'Accounts' && (ACCOUNT_HOOKS.has(member) || member === '[unresolved property]')) return 'Accounts.' + member;
+    if ((owner === 'OAuth' || owner === 'Accounts.oauth') && (member === 'registerService' || member === '[unresolved property]')) return owner + '.' + member;
     return undefined;
   }
   const findings = [];
@@ -85,12 +97,16 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
       if (owner === 'WebApp' && HTTP_STACKS.has(member) && ts.isObjectBindingPattern(element.name)) {
         checkBindings(element.name, member);
       }
+      if (owner === 'Accounts' && member === 'oauth' && ts.isObjectBindingPattern(element.name)) {
+        checkBindings(element.name, 'Accounts.oauth');
+      }
     }
   }
   function visit(node) {
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       const name = property(node);
-      if (name === 'methods' || name === 'publish' || name === 'use' || name === undefined) {
+      if (name === 'methods' || name === 'publish' || name === 'use' || name === 'registerService' ||
+          ACCOUNT_HOOKS.has(name) || name === undefined) {
         const member = registrationMember(registrationOwner(node.expression), name ?? '[unresolved property]');
         if (member && !acceptsRegistration(node, member)) addFinding(node, member);
       }
@@ -104,7 +120,7 @@ export function directFrameworkRegistrationReferences(source, acceptsRegistratio
   return findings;
 }
 
-export function componentRegistrationReferences(filename, text) {
+export function componentRegistrationReferences(filename, text, options) {
   const ast = parse(text, { filename, modern: true });
   const findings = [];
   for (const script of [ast.module, ast.instance]) {
@@ -117,7 +133,7 @@ export function componentRegistrationReferences(filename, text) {
       ? text.slice(ast.module.content.start, ast.module.content.end) + '\n{\n' : '';
     const prefixLines = outer.split('\n').length - 1;
     const source = ts.createSourceFile(filename + '.ts', outer + body + (outer ? '\n}' : ''), ts.ScriptTarget.Latest, true);
-    for (const row of directFrameworkRegistrationReferences(source)) {
+    for (const row of directFrameworkRegistrationReferences(source, undefined, options)) {
       if (row.line > prefixLines) findings.push({ ...row, line: row.line - prefixLines + offset });
     }
   }
@@ -125,16 +141,33 @@ export function componentRegistrationReferences(filename, text) {
   // Compilation resolves template expressions and references across script scopes.
   const { js } = compile(text, { filename, generate: 'client' });
   const emitted = ts.createSourceFile(filename + '.js', js.code, ts.ScriptTarget.Latest, true);
-  return directFrameworkRegistrationReferences(emitted).map(row => ({ ...row, line: 'generated line ' + row.line }));
+  return directFrameworkRegistrationReferences(emitted, undefined, options).map(row => ({ ...row, line: 'generated line ' + row.line }));
 }
 
-export function packageRegistrationReferences(source, isUploadOwner) {
+export function packageRegistrationReferences(source, isUploadOwner, microsoftOwner) {
   let methodCalls = 0;
   let httpCalls = 0;
+  let microsoftCalls = 0;
   const findings = directFrameworkRegistrationReferences(source, (node, member) => {
     const call = node.parent;
     const statement = call.parent;
     const body = statement.parent;
+    if (microsoftOwner && ts.isCallExpression(call) && call.expression === node &&
+        ts.isExpressionStatement(statement) && ts.isSourceFile(body)) {
+      const [serviceName, version, options, callback] = call.arguments;
+      if (microsoftOwner === 'accounts' && member === 'Accounts.oauth.registerService' && call.arguments.length === 1 &&
+          ts.isStringLiteral(serviceName) && serviceName.text === 'microsoft') {
+        microsoftCalls++;
+        return true;
+      }
+      if (microsoftOwner === 'provider' && member === 'OAuth.registerService' && call.arguments.length === 4 &&
+          ts.isPropertyAccessExpression(serviceName) && serviceName.expression.getText(source) === 'Microsoft' &&
+          serviceName.name.text === 'serviceName' && ts.isNumericLiteral(version) && version.text === '2' &&
+          options.kind === ts.SyntaxKind.NullKeyword && ts.isArrowFunction(callback)) {
+        microsoftCalls++;
+        return true;
+      }
+    }
     if (!isUploadOwner || !ts.isPropertyAccessExpression(node) ||
         !ts.isCallExpression(call) || call.expression !== node || call.arguments.length !== 1 ||
         !ts.isExpressionStatement(statement) || !ts.isBlock(body) ||
@@ -154,5 +187,6 @@ export function packageRegistrationReferences(source, isUploadOwner) {
   });
   if (isUploadOwner && methodCalls !== 1) throw new Error('Expected exactly one FilesCollection constructor upload registration');
   if (isUploadOwner && httpCalls !== 1) throw new Error('Expected exactly one FilesCollection HTTP registration in its owner method');
+  if (microsoftOwner && microsoftCalls !== 1) throw new Error('Expected exactly one Microsoft ' + microsoftOwner + ' service registration');
   return findings;
 }

@@ -6,6 +6,7 @@ import { Roles } from 'meteor/alanning:roles';
 import { ServiceConfiguration } from 'meteor/service-configuration';
 import { WebApp } from 'meteor/webapp';
 import { HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { bindAccountServiceOwner, bindNativeAccountMethods, registerAccountLifecycleHook } from '../securitySurfaces/registerFrameworkAuth';
 import { registerHttpMiddleware } from '../securitySurfaces/registerHttpRoutes.ts';
 import { curSemester } from '../../common/Definitions';
 import { displayify } from '../../common/globalHelpers';
@@ -473,7 +474,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     deps.serverConsole('WARNING: No Microsoft OAuth configuration found in settings');
   }
 
-  Accounts.onLogin(async (loginInfo: {
+  registerAccountLifecycleHook(Accounts, 'onLogin', async (loginInfo: {
     type?: string;
     user?: { _id?: string; emails?: Array<{ address?: string }>; email?: string; username?: string };
     methodName?: string;
@@ -613,10 +614,11 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       }
     },
   });
-  meteorMethodHandlers.login = wrapPasswordLoginMethodWithResponseEnvelope(
-    passwordLoginMethod,
-    failedPasswordResponseEnvelope,
-  );
+  const installedPasswordLogin = wrapPasswordLoginMethodWithResponseEnvelope(passwordLoginMethod, failedPasswordResponseEnvelope);
+  meteorMethodHandlers.login = installedPasswordLogin;
+  bindNativeAccountMethods(installedPasswordLogin, () => (Meteor as unknown as {
+    server?: { method_handlers?: Record<string, unknown> };
+  }).server?.method_handlers);
   deps.serverConsole('Failed-password response timing envelope registered');
   const meteorPasswordVerifier = (Accounts as unknown as {
     _checkPasswordAsync?: Parameters<typeof createPasswordTimingDefense>[0];
@@ -644,7 +646,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     runCaseInsensitivePasswordUserLookup,
   );
 
-  Accounts.validateLoginAttempt(async (attempt: {
+  registerAccountLifecycleHook(Accounts, 'validateLoginAttempt', async (attempt: {
     allowed?: boolean;
     type?: string;
     user?: {
@@ -743,7 +745,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     });
   }
 
-  Accounts.onCreateUser(function(options: { profile?: {} | undefined }, user: Meteor.User) {
+  registerAccountLifecycleHook(Accounts, 'onCreateUser', function(options: { profile?: {} | undefined }, user: Meteor.User) {
     deps.serverConsole('[ACCOUNTS] onCreateUser called');
     deps.serverConsole('[ACCOUNTS] User services:', Object.keys(user.services || {}));
 
@@ -828,6 +830,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     return user;
   });
 
+  bindAccountServiceOwner(Accounts as unknown as Parameters<typeof bindAccountServiceOwner>[0]);
   deps.serverConsole('Password hash runtime info:', deps.getPasswordHashRuntimeInfo());
 
   await deps.AuditLog.rawCollection().createIndex(

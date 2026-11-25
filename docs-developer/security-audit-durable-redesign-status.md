@@ -236,6 +236,7 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   - [x] Remove course-list grants from login and ignore old account lists when authorizing lesson, dashboard and asset reads. Course-only asset metadata is delivered as a snapshot from current released assignments. No learner-history or account migration.
   - [x] Verify assignment removal and reassignment, independent lesson sharing, the current course-only asset snapshot and passwordless return in native Meteor on 18fae3b1. Slot 59 had a separate asset failure.
   - [x] Verify immediate asset sharing on the corrected source in a full native Meteor run (slot 60). Each new subscription resolves independent permissions afresh. Staging2 qualification remains a separate open item.
+- [ ] Verify the Accounts lifecycle, native login/logout and provider registration observations in slot 99. This covers installed ownership and leaves live provider sign-in acceptance with staging2.
 - [ ] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory.
 - [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
 - [ ] Verify static bypass detection across active source roots and retire the old manifest and inference checker after parity.
@@ -243,7 +244,8 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   - [x] Extend direct Meteor registration checks to JavaScript and TypeScript in client, common and learning-components. Computed Meteor access that cannot be resolved is now reported. Checked 218 server, 380 client, 107 common and 163 learning-component files. Package owners and other registration APIs have separate acceptance checks.
   - [x] Check direct Meteor method/publication registration across 61 tracked Svelte components. Cover authored typed scripts, module/instance scope, template event expressions and unrelated shadowed names. The full source check still finds 306 declared surfaces.
   - [x] Extend direct method/publication registration checks to local Meteor packages with package manifests. Require exactly one registration of the upload handler table in the maintained FilesCollection constructor. Reject additional calls and deferred references there and direct registrations in other package sources. Full lint and Linux source-security regressions passed.
-  - [x] Extend the static adapter check to WebApp HTTP stack registrations across the same source roots. Cover renamed and namespace imports, stack aliases, destructuring, unresolved computed properties and unrelated local routers. The maintained FilesCollection HTTP registration is permitted only in its existing owner method. Six focused checker tests, repository lint and the full Linux source-security suite passed. OAuth and account hook ownership and retirement of the old checker are still open.
+  - [x] Extend the static adapter check to WebApp HTTP stack registrations across the same source roots. Cover renamed and namespace imports, stack aliases, destructuring, unresolved computed properties and unrelated local routers. The maintained FilesCollection HTTP registration is permitted only in its existing owner method. Six focused checker tests, repository lint and the full Linux source-security suite passed. Retirement of the old checker is still open.
+  - [x] Extend the static adapter check to app-owned Accounts hooks and OAuth services. Pin and check both Microsoft package registration owners and the Accounts/OAuth package versions. Verify alias, namespace, shadowing, and stray-registration cases in source tests.
 - [ ] Qualify the complete matched image and scanner on staging2, including login, ordinary learner behavior and enabled providers. The earlier condition-index cutover covered that specific change only.
 
 ## Phase 3 HTTP characterization started (2026-11-18)
@@ -1947,11 +1949,11 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 101 total, 97 consumed, 0 reserved, 3 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 101 total, 97 consumed, 1 reserved, 2 generally available, and 1 for the earlier `/health` batch only.**
 
 The operator authorized up to five additional batched local Meteor integration invocations, including retries, for the remaining security-audit work (slots 92–96). Reserve each invocation here before starting the suite and record its outcome afterward.
 
-The operator authorized up to five additional local batched Meteor invocations on 2026-11-24 (slots 97–101), including retries. Slots 99–101 remain available.
+The operator authorized up to five additional local batched Meteor invocations on 2026-11-24 (slots 97–101), including retries. Slot 99 reserved for installed Accounts lifecycle hooks, native method ownership, and observed provider service membership. Slots 100–101 remain available.
 
 Slot 98 passed on 6be07c80. Server 1,159 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. Both audio authorization cases passed with stubbed provider responses. The worker reused its image and completed cleanup. Receipt /var/tmp/mofacts-integration.7y8QyG4q/results/native-verification.json SHA-256 5b00d16293eed2878d3eeb820b146a3a98580c81213521641f276df7d032f9c8. An earlier preparation attempt hit a Docker Hub TLS timeout while acquiring MongoDB and cleaned up before invoking Meteor. It did not consume another slot.
 

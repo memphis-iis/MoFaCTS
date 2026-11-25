@@ -322,6 +322,22 @@ export const HTTP_FILE_VERIFICATIONS = Object.freeze({
       'routes a canonical missing CDN asset through the application raw handler'] as const) }),
 });
 
+const frameworkAuthTest = { kind: 'integrationTest', lane: 'meteor', suite: 'server auth and session methods',
+  expectedOutcome: 'pass', mutation: 'none',
+  cases: Object.freeze(['observes installed account hooks, native methods and provider service owners'] as const),
+} as const;
+export const FRAMEWORK_AUTH_VERIFICATIONS = Object.freeze({
+  onLogin: Object.freeze({ ...frameworkAuthTest, surfaceId: 'framework:accounts-base:on-login', verificationId: 'framework.accounts.on-login' }),
+  validateLoginAttempt: Object.freeze({ ...frameworkAuthTest, surfaceId: 'framework:accounts-base:validate-login-attempt', verificationId: 'framework.accounts.validate-login-attempt' }),
+  onCreateUser: Object.freeze({ ...frameworkAuthTest, surfaceId: 'framework:accounts-base:on-create-user', verificationId: 'framework.accounts.on-create-user' }),
+  password: Object.freeze({ ...frameworkAuthTest, surfaceId: 'framework:accounts-password:password-login', verificationId: 'framework.accounts.password-login' }),
+  resume: Object.freeze({ ...frameworkAuthTest, surfaceId: 'framework:accounts-base:resume', verificationId: 'framework.accounts.resume' }),
+  logout: Object.freeze({ ...frameworkAuthTest, surfaceId: 'framework:accounts-base:logout', verificationId: 'framework.accounts.logout' }),
+  google: Object.freeze({ ...frameworkAuthTest, surfaceId: 'framework:accounts-oauth:google', verificationId: 'framework.accounts.google-service' }),
+  microsoft: Object.freeze({ ...frameworkAuthTest, surfaceId: 'framework:accounts-oauth:microsoft', verificationId: 'framework.accounts.microsoft-service' }),
+  memphisSaml: Object.freeze({ ...frameworkAuthTest, surfaceId: 'framework:accounts-oauth:memphis-saml', verificationId: 'framework.accounts.memphis-saml-service' }),
+});
+
 const middlewareTest = { kind: 'integrationTest', lane: 'meteor', suite: 'application HTTP registration',
   expectedOutcome: 'pass', mutation: 'none' } as const;
 export const HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION = Object.freeze({
@@ -998,7 +1014,7 @@ export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS
   ...AUTHENTICATION_SESSION_VERIFICATIONS,
   ...HTTP_HEALTH_VERIFICATIONS.endpoints, HTTP_HEALTH_VERIFICATIONS.fallthrough,
   HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download, ...Object.values(HTTP_FILE_VERIFICATIONS),
-  ...Object.values(DIRECT_WRITE_VERIFICATIONS), HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION, ...Object.values(DEFAULT_PUBLICATION_VERIFICATIONS),
+  ...Object.values(DIRECT_WRITE_VERIFICATIONS), ...Object.values(FRAMEWORK_AUTH_VERIFICATIONS), HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION, ...Object.values(DEFAULT_PUBLICATION_VERIFICATIONS),
   ...Object.values(NAMED_PUBLICATION_VERIFICATIONS),
   ...Object.values(HTTP_MIDDLEWARE_VERIFICATIONS).flat(), ...Object.values(FILES_DDP_VERIFICATIONS),
   ...Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS), DEPLOYMENT_READINESS_VERIFICATION, ...Object.values(BACKUP_METHOD_VERIFICATIONS),
