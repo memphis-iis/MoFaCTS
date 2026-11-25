@@ -37,8 +37,24 @@ test('passwordless fixture creates actual progress without a password, email or 
   assert.equal((await remove(f.input)).removedFixtureRecordCount, 5); assert.equal((await remove(f.input)).removedFixtureRecordCount, 0);
   assert.ok(f.data('users').has(user._id)); assert.ok(f.data('users').has('existing'));
 });
+test('normal return uses only its participant, lesson and owned progress', async () => {
+  const f = fixture();
+  f.input.foreignActor = null;
+  const originalLearner = structuredClone(f.data('users').get('owned-foreign'));
+  const seeded = await seed(f.input);
+  assert.deepEqual(f.writes, ['users', collectionMongoName('Tdfs'), collectionMongoName('GlobalExperimentStates')]);
+  assert.deepEqual(Object.keys(seeded.values).sort(), [
+    'lesson.progress', 'passwordless.experimentTarget', 'passwordless.ownProgress', 'passwordless.participantId',
+  ]);
+  assert.equal((await inspect(f.input)).ownedRecordCount, 3);
+  assert.equal((await remove(f.input)).removedFixtureRecordCount, 2);
+  assert.equal((await remove(f.input)).removedFixtureRecordCount, 0);
+  assert.ok(f.data('users').has(seeded.participant.userId));
+  assert.deepEqual(f.data('users').get('owned-foreign'), originalLearner);
+});
 test('runtime, foreign-owner and collision checks reject before any fixture insertion', async () => {
   for (const mutate of [f => { f.input.environment.ROOT_URL = 'https://production.invalid'; },
+    f => { delete f.input.foreignActor; },
     f => { f.data('users').get('owned-foreign').profile.createdBy = 'different'; },
     f => { const p = plan(f.input); f.data('users').set('collision', { _id: 'collision', username: p.participant.username }); },
     f => { const p = plan(f.input); f.data(collectionMongoName('Tdfs')).set('other', { _id: 'other', content: p.roots[0].content }); }]) {

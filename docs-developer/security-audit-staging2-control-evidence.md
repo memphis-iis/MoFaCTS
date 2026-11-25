@@ -7,11 +7,11 @@ The report gate uses the deployment start `2026-11-25T18:08:10.948Z`.
 
 | Section | Passed | Findings | Needs evidence |
 | --- | ---: | ---: | ---: |
-| External | 7 | 0 | 5 |
+| External | 8 | 0 | 4 |
 | Authentication | 1 | 0 | 21 |
-| Host | 9 | 0 | 2 |
+| Host | 10 | 0 | 1 |
 | Repository and image | 20 | 4 | 1 |
-| **Total** | **37** | **4** | **29** |
+| **Total** | **39** | **4** | **27** |
 
 The existing Phase III gate still requires one matched catalog v2 Full report,
 independent receiver readback and saved archive verification. These individual
@@ -27,7 +27,7 @@ qualification and synthetic integration results retain their original scope.
 | [ ] Needs evidence | `external.public-tcp-ports.sensitive` | Needs public reachability evidence for the catalog’s sensitive TCP tier. Host listener and firewall checks passed. |
 | [ ] Needs evidence | `external.public-udp-ports` | Host UDP listeners, Docker publications and firewall matched policy. Conclusive results for the selected public UDP endpoints are still required. |
 | [x] Pass | `external.http-redirect` | All three catalog requests redirected to the same HTTPS host, preserving path and query. |
-| [ ] Needs evidence | `external.tls-protocols` | Trusted TLS 1.2 and 1.3 connections worked. The catalog also requires outcomes for both legacy protocols. |
+| [x] Pass | `external.tls-protocols` | The public endpoint returned explicit protocol-version alerts for TLS 1.0 and 1.1. Trusted TLS 1.2 and 1.3 handshakes succeeded. All four outcomes were observed on the sole public address. |
 | [x] Pass | `external.certificate` | Hostname and trust-chain validation passed on both supported modern connections. The certificate had 67 days remaining. |
 | [ ] Needs evidence | `external.tls-ciphers` | Needs a complete accepted-cipher inventory and its weak-cipher classification for the resolved public address. |
 | [x] Pass | `external.websocket-tls` | The sole address upgraded the HTTPS request with HTTP 101 and redirected the HTTP request with HTTP 301. |
@@ -76,7 +76,7 @@ qualification and synthetic integration results retain their original scope.
 | [x] Pass | `internal.reverse-proxy-routes` | Apache was active and passed its syntax test. The configured host and all four upstream entries matched the loopback route policy. |
 | [ ] Needs evidence | `internal.mongodb-auth.unauthenticated-access` | Needs the catalog’s direct unauthenticated data-access rejection observation. Authenticated scope and connectivity were verified separately. |
 | [x] Pass | `internal.mongodb-auth.scoped-roles` | Authenticated connectivity, replica set, app grants, read-concern role and the expected sidecar account state all matched. |
-| [ ] Needs evidence | `internal.redis-auth` | Both authorized connections worked, and Docker published zero Redis host ports. The required unauthenticated command-rejection observation is still outstanding. |
+| [x] Pass | `internal.redis-auth` | Redis returned `NOAUTH` for a credential-free health ping. The host-auditor and application credentials both returned `PONG`. Docker published zero Redis ports, and both containers retained their identity throughout the check. |
 
 ## Repository and image controls
 
@@ -115,6 +115,12 @@ the bounded public HTTP, DNS, certificate and WebSocket results, the synthetic
 learner session-lifetime result, read-only host measurements, the sidecar inventory,
 the repository audit results and the two source-suite summaries. The accepted
 workstation authority and host receipt matched before and after the host checks.
+
+The `tls-versions.json` and `redis-auth.json` receipts bind the four public
+TLS handshakes and the private Redis health checks to the accepted staging2
+source and platform manifest. The checks retained protocol outcomes, booleans
+and the published-port count. The Redis check used only `PING` and ordinary
+authentication within the private service network.
 
 The exact catalog v2 policy set was unavailable at the installed host path.
 The review used temporary root-private copies of the exact source policies and
