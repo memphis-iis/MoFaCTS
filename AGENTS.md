@@ -56,7 +56,7 @@ Run app commands from `mofacts/`:
 - `npm run lint`
 - `npm run generate:schemas`
 
-Lint includes the security surface contract. Changes to server methods, publications, HTTP handlers, exports, or management routes require authorization review and a matching update to `mofacts/security-surface-contract.json`; never automatically classify discovered surfaces.
+Lint checks direct security registrations against their source owners. Changes to server methods, publications, HTTP handlers or exports require authorization review and corresponding updates to the owning registration descriptor and verification catalog. Management route policies reference the registered server surfaces that enforce their data and actions. Review those references when changing a page's server calls. Keep presentation and server authorization separate.
 
 ## Repo Map
 

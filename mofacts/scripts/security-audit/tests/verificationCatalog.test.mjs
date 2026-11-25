@@ -10,6 +10,7 @@ import { registerHttpMiddleware, registerProtocolHttpMount, registeredHttpSurfac
 import { observeAssetUploadSurfaces } from '../../../server/securitySurfaces/bindAssetUploadSurfaces.ts';
 import { observeMeteorMethodBindings, registerMeteorMethods, registeredMeteorMethodSurfaces } from '../../../server/securitySurfaces/registerMeteorMethods.ts';
 import { uploadMethodNames } from '../../../packages/ostrio-files/upload-policy.js';
+import { getManagementRoutePolicies } from '../../../client/lib/adminUi/managementRoutePresentationPolicies.ts';
 
 test('file and unmounted registrations use the original callback and framework call shape', () => {
   const calls = [];
@@ -37,6 +38,16 @@ test('file and unmounted registrations use the original callback and framework c
 test('the common evidence catalog includes each registered publication and the external runtime configuration', () => {
   for (const verification of [...Object.values(DEFAULT_PUBLICATION_VERIFICATIONS), ...Object.values(NAMED_PUBLICATION_VERIFICATIONS), HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION]) {
     assert.equal(AUDIT_VERIFICATIONS.find(entry => entry.verificationId === verification.verificationId), verification);
+  }
+});
+
+test('management routes point to verified server surfaces for their data and actions', () => {
+  const registered = new Set(AUDIT_VERIFICATIONS.filter(row => row.kind === 'integrationTest' && row.lane === 'meteor')
+    .map(row => row.surfaceId));
+  for (const { routeName, serverSurfaceIds } of getManagementRoutePolicies()) {
+    assert.ok(serverSurfaceIds.length > 0, routeName);
+    assert.equal(new Set(serverSurfaceIds).size, serverSurfaceIds.length, routeName);
+    for (const id of serverSurfaceIds) assert.ok(registered.has(id), `${routeName} refers to ${id}`);
   }
 });
 

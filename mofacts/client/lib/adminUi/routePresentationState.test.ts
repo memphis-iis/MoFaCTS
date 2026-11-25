@@ -10,6 +10,7 @@ const policy: ManagementRoutePresentationPolicy = {
   chromeMode: 'app',
   requiresAuth: true,
   allowedRoles: 'admin',
+  serverSurfaceIds: ['method:deploymentReadiness'],
   load: async () => undefined,
 };
 

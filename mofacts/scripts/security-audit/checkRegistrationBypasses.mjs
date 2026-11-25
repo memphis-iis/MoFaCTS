@@ -34,11 +34,10 @@ async function checkedApplicationSource(file, packageOwner, microsoftOwner) {
       path.relative(sourceRepoRoot, file) + ':' + line + ' references ' + (member.includes('.') ? member : 'Meteor.' + member) + ' outside its registration owner.'
     ).join('\n'));
   }
-  return source;
 }
 
-// Walk declared source roots and enforce ownership before any inventory consumer
-// infers labels or compares evidence. Only the legacy checker consumes the ASTs.
+// Enforce source registration ownership. The installed registry supplies the
+// runtime inventory and its policy, egress and verification classifications.
 export async function checkRegistrationBypasses() {
   for (const root of [path.join(appRoot, 'common'), path.join(appRoot, 'client'), path.join(sourceRepoRoot, 'learning-components')]) {
     for (const file of await filesUnder(root)) await checkedApplicationSource(file);
@@ -63,10 +62,7 @@ export async function checkRegistrationBypasses() {
   }
   if (!foundUploadOwner) throw new Error('Missing maintained upload package registration owner');
   if (microsoftOwners.size) throw new Error('Missing maintained Microsoft package registration owner');
-  const serverFiles = await filesUnder(path.join(appRoot, 'server'));
-  const serverSources = [];
-  for (const file of serverFiles) serverSources.push(await checkedApplicationSource(file));
-  return serverSources;
+  for (const file of await filesUnder(path.join(appRoot, 'server'))) await checkedApplicationSource(file);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
