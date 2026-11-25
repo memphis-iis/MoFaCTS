@@ -74,6 +74,8 @@ The existing `build` action accepts `--verification-bundle` pointing to that fil
 
 On staging2, `node scripts/security-audit/qualification/observeStaging2Registry.mjs <protected-admin-binding> <verification-bundle> <result-file>` reuses the existing private audit browser login and the read-only administrator inventory method. Supply the retained canonical bundle from the exact image build and a private file containing just the approved administrator binding. The helper checks the origin and bound administrator before and after the read, writes only the compact comparison result, and closes the private browser. Image, host and release identity still have their separate evidence checks.
 
+After the existing staged acceptance transaction, `node scripts/security-audit/qualification/bindStaging2ReleaseRegistry.mjs <protected-evidence-directory> <accepted-release-record> <result-file>` joins those results for later environment verification. The evidence directory holds the browser acceptance, embedded bundle, publication mapping, running-image observation and retained host receipt. This command reads only those artifacts and writes a new compact binding.
+
 The hosted combined job still needs fresh authorization if it invokes Meteor
 again. A build-only retry through the capture helper can reuse the same retained
 proof while its verified inputs and expected profile match. Keep raw source,

@@ -1,25 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
-import { componentRegistrationReferences, directFrameworkRegistrationReferences, packageRegistrationReferences } from './checkApplicationMeteorRegistration.mjs';
+import { checkRegistrationBypasses } from './checkRegistrationBypasses.mjs';
 import { uploadMethodNames } from '../../packages/ostrio-files/upload-policy.js';
 
 const toolAppRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1')), '..', '..');
 const sourceRepoRoot = path.resolve(toolAppRoot, '..');
 const appRoot = path.join(sourceRepoRoot, 'mofacts');
 const manifestPath = path.join(appRoot, 'security-surface-contract.json');
-
-async function filesUnder(directory, packageSource = false) {
-  const entries = await fs.readdir(directory, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    const full = path.join(directory, entry.name);
-    if (packageSource && (entry.name.startsWith('.') || ['node_modules', 'tests'].includes(entry.name) || entry.name.endsWith('.d.ts'))) continue;
-    if (entry.isDirectory()) files.push(...await filesUnder(full, packageSource));
-    else if (entry.isFile() && /\.(?:[cm]?[jt]s|svelte)$/.test(entry.name) && !/\.test\.[cm]?[jt]s$/.test(entry.name)) files.push(full);
-  }
-  return files;
-}
 
 function propertyName(property) {
   if (!property.name) return null;
@@ -69,56 +57,14 @@ function regexMatches(text, pattern, mapper) {
   return [...text.matchAll(pattern)].map(mapper);
 }
 
-async function checkedApplicationSource(file, packageOwner, microsoftOwner) {
-  const text = await fs.readFile(file, 'utf8');
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
-  const options = {
-    clientOnly: file.startsWith(path.join(appRoot, 'client') + path.sep),
-    collectionModule: path.join(appRoot, 'common', 'Collections.ts'),
-  };
-  const bypasses = file.endsWith('.svelte') ? componentRegistrationReferences(file, text, options) :
-    packageOwner !== undefined ? packageRegistrationReferences(source, packageOwner, microsoftOwner) :
-      directFrameworkRegistrationReferences(source, undefined, options);
-  if (bypasses.length) {
-    throw new Error(bypasses.map(({ member, line }) =>
-      path.relative(sourceRepoRoot, file) + ':' + line + ' references ' + (member.includes('.') ? member : 'Meteor.' + member) + ' outside its registration owner.'
-    ).join('\n'));
-  }
-  return source;
-}
-
 export async function discoverSecuritySurfaces() {
-  for (const root of [path.join(appRoot, 'common'), path.join(appRoot, 'client'), path.join(sourceRepoRoot, 'learning-components')]) {
-    for (const file of await filesUnder(root)) await checkedApplicationSource(file);
-  }
-  const pkgRoot = path.join(appRoot, 'packages');
-  const uploadOwner = path.join(pkgRoot, 'ostrio-files', 'server.js');
-  const microsoftOwners = new Map([
-    [path.join(pkgRoot, 'mofacts-accounts-microsoft', 'server', 'microsoft.js'), 'accounts'],
-    [path.join(pkgRoot, 'mofacts-microsoft-oauth', 'server', 'microsoft.js'), 'provider'],
-  ]);
-  let foundUploadOwner = false;
-  for (const entry of await fs.readdir(pkgRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const directory = path.join(pkgRoot, entry.name);
-    if (!(await fs.readdir(directory)).includes('package.js')) continue;
-    for (const file of await filesUnder(directory, true)) {
-      const isUploadOwner = file === uploadOwner;
-      await checkedApplicationSource(file, isUploadOwner, microsoftOwners.get(file));
-      microsoftOwners.delete(file);
-      if (isUploadOwner) foundUploadOwner = true;
-    }
-  }
-  if (!foundUploadOwner) throw new Error('Missing maintained upload package registration owner');
-  if (microsoftOwners.size) throw new Error('Missing maintained Microsoft package registration owner');
-  const serverFiles = await filesUnder(path.join(appRoot, 'server'));
+  const serverSources = await checkRegistrationBypasses();
   const methods = [];
   const publications = [];
   const httpRoutes = [];
   const httpMiddleware = [];
-  for (const file of serverFiles) {
-    const source = await checkedApplicationSource(file);
-    if (file.endsWith('.svelte')) continue;
+  for (const source of serverSources) {
+    if (source.fileName.endsWith('.svelte')) continue;
     const text = source.text;
     methods.push(...discoverMethods(source));
     httpMiddleware.push(...regexMatches(text, /registerHttpMiddleware\(\s*\w+,\s*'(?:handlers|connectHandlers)',\s*\{\s*surfaceId:\s*'(middleware:[^']+)'/g, (match) => match[1]));

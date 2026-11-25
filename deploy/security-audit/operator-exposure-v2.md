@@ -7,13 +7,16 @@ as the optional hosted workflow. No application deployment, account creation,
 new SSH permission, GitHub runner registration or Meteor invocation is needed.
 
 Use the pinned Node/npm runtime and an exact committed checkout. Keep evidence in
-a new operator-owned private directory. For staging2's catalog v2 release,
-use commit `93b7d444ba2216cf68c9b930a2e51052f7d022bb` on
-`codex/staging2-audit-catalog` for both acquisition and signing. The paired
-producer and receiver were verified on 2026-11-18. Keep the hosted staging2
-workflow paused while its `main` checkout selects catalog v1. After a later
-cutover, use the producer revision recorded for the active receiver in the
-[audit status](../../docs-developer/security-audit-durable-redesign-status.md).
+a new operator-owned private directory. The Nov. 18 catalog v2 producer and
+receiver were paired at `93b7d444ba2216cf68c9b930a2e51052f7d022bb` on
+`codex/staging2-audit-catalog`. The currently accepted staging2 revision
+`dac554f2` selects catalog v1 for new ingestion, as did its immediate
+rollback revision `b319e0d4`. The archived catalog v2 producer is therefore
+incompatible with new ingestion on this release. The v2 catalog and its
+retained-report decoder are present. Keep the full catalog v2 reporting lane
+pending until the producer and receiver are paired on the accepted staging2
+release. The [audit status](../../docs-developer/security-audit-durable-redesign-status.md)
+owns that decision and the current exact revision.
 
 Use the existing approved staging2
 restricted SSH identity to acquire the no-argument forced command described in

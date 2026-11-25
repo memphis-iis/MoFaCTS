@@ -15,6 +15,8 @@ import { carryImageVerificationBundle, validateBuildVerificationBundle } from '.
 import { compareRuntimeVerification } from '../qualification/compareRuntimeVerification.mjs';
 import { projectExpectedRegistry } from '../qualification/registryProjection.mjs';
 import { observeStaging2Registry } from '../qualification/observeStaging2Registry.mjs';
+import { bindStaging2ReleaseRegistry } from '../qualification/bindStaging2ReleaseRegistry.mjs';
+import { projectReleaseReceiptV2 } from '../qualification/releaseRecordStore.mjs';
 
 const hash = data => createHash('sha256').update(data).digest('hex');
 const bytes = value => Buffer.from(JSON.stringify(value));
@@ -225,6 +227,38 @@ test('matches the runtime response to the independent proof and recomputes all h
     update(changed);
     await assert.rejects(compareRuntimeVerification(changed, expected), reason);
   }
+});
+
+test('binds the verified registry to the staged image and exact workstation receipt', async () => {
+  const { observation, expected } = await runtimeObservation();
+  const registry = await compareRuntimeVerification(observation, expected);
+  const publication = { kind: 'manifest', digest: 'sha256:' + 'a'.repeat(64),
+    configDigest: 'sha256:' + 'b'.repeat(64), platform: 'linux/amd64' };
+  const tag = 'fixture-phase3';
+  const authorityBytes = Buffer.from(JSON.stringify({
+    deployedAtUtc: '2026-11-24T10:00:00.000Z', baseCommit: buildIdentity.baseCommit,
+    includedUncommittedLocalChanges: false, image: 'ppavlikmemphis/mofacts-staging2:' + tag,
+    tag, digest: publication.digest, imageId: publication.configDigest,
+    acceptance: 'operator-confirmed readiness and participant smoke checks',
+  }));
+  const receipt = projectReleaseReceiptV2(authorityBytes, publication);
+  const input = {
+    authorityBytes, publication, runningImage: { baseCommit: buildIdentity.baseCommit,
+      configDigest: publication.configDigest, platform: publication.platform },
+    hostReceipt: { state: 'observed', result: 'MATCH', receipt },
+    bundleBytes: Buffer.from(canonicalAuditJson(observation.verificationBundle.bundle)),
+    acceptance: { state: 'phase3-runtime-verified', sameLearnerAfterReload: true, ordinaryRoleVerified: true,
+      sessionCleanupVerified: true, registry },
+  };
+  const binding = await bindStaging2ReleaseRegistry(input);
+  assert.equal(binding.recordDigestSha256, hash(authorityBytes));
+  assert.equal(binding.inventorySha256, registry.inventorySha256);
+  assert.equal(binding.publishedImage.configDigest, publication.configDigest);
+  await assert.rejects(bindStaging2ReleaseRegistry({ ...input, authorityBytes: Buffer.concat([authorityBytes, Buffer.from('\n')]) }), /do not match/);
+  await assert.rejects(bindStaging2ReleaseRegistry({ ...input, runningImage: { ...input.runningImage, configDigest: publication.digest } }), /do not match/);
+  await assert.rejects(bindStaging2ReleaseRegistry({ ...input, acceptance: { ...input.acceptance, sessionCleanupVerified: false } }), /incomplete/);
+  await assert.rejects(bindStaging2ReleaseRegistry({ ...input, acceptance: { ...input.acceptance,
+    registry: { ...registry, inventorySha256: 'f'.repeat(64) } } }), /does not match/);
 });
 
 test('reads the installed staging2 registry through the bound administrator and returns only hashes', async () => {
