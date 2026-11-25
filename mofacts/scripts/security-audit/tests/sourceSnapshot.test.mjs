@@ -240,6 +240,14 @@ test('CLI rejects incomplete/unknown options and broad cleanup targets without D
   }
 });
 
+test('compose-proof accepts its SHA-256 option before looking for the capture', async t => {
+  const root = await directory(t);
+  await assert.rejects(main([
+    'compose-proof', '--builder', 'default', '--workspace', path.join(root, 'absent'),
+    '--native-results', root, '--native-receipt-sha256', 'a'.repeat(64), '--registry', path.join(root, 'registry.json'),
+  ]), { code: 'ENOENT' });
+});
+
 async function syntheticCapture(t, change = () => {}, dirty = true) {
   const repositoryRoot = await directory(t);
   await fs.mkdir(path.join(repositoryRoot, 'deploy'));

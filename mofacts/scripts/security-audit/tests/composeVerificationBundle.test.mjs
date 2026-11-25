@@ -4,6 +4,7 @@ import test from 'node:test';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { AUDIT_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
 import { requireMatchingSourceVerification } from '../../../common/securityAudit/verificationBundle.ts';
@@ -13,6 +14,7 @@ import { bindNativeCaseEvidence } from '../qualification/nativeCaseEvidence.mjs'
 import { carryImageVerificationBundle, validateBuildVerificationBundle } from '../qualification/imageVerificationBundle.mjs';
 import { compareRuntimeVerification } from '../qualification/compareRuntimeVerification.mjs';
 import { projectExpectedRegistry } from '../qualification/registryProjection.mjs';
+import { observeStaging2Registry } from '../qualification/observeStaging2Registry.mjs';
 
 const hash = data => createHash('sha256').update(data).digest('hex');
 const bytes = value => Buffer.from(JSON.stringify(value));
@@ -223,6 +225,37 @@ test('matches the runtime response to the independent proof and recomputes all h
     update(changed);
     await assert.rejects(compareRuntimeVerification(changed, expected), reason);
   }
+});
+
+test('reads the installed staging2 registry through the bound administrator and returns only hashes', async () => {
+  const { observation, expected } = await runtimeObservation();
+  const origin = 'https://staging2.optimallearning.org';
+  const admin = 'fixture-admin';
+  let actor = admin;
+  let switchActor = false;
+  const calls = [];
+  const page = {
+    url: () => origin + '/',
+    evaluate: (callback, args) => runInNewContext('(' + callback.toString() + ')(args)', {
+      args, location: { origin }, setTimeout, clearTimeout, TextEncoder,
+      Meteor: { status: () => ({ connected: true }), userId: () => actor,
+        callAsync: async (...method) => {
+          calls.push(method);
+          if (switchActor) actor = 'unrelated';
+          return observation;
+        } },
+      Session: { get: key => ({ authReady: true, authRolesHydrated: true,
+        authRolesSyncedUserId: admin, authRoles: { admin: true, teacher: false } })[key] },
+    }),
+  };
+  await assert.rejects(observeStaging2Registry({ ...page, url: () => 'https://other.example/' }, admin, expected), /session did not match/);
+  assert.deepEqual(calls, []);
+  const result = await observeStaging2Registry(page, admin, expected);
+  assert.equal(result.state, 'runtime-proof-matched-unqualified');
+  assert.deepEqual(calls, [['admin.securityAudits.surfaceInventory']]);
+  assert.equal(Object.hasOwn(result, 'inventory'), false);
+  switchActor = true;
+  await assert.rejects(observeStaging2Registry(page, admin, expected), /Invalid staging2 registry observation/);
 });
 
 test('rejects a registry with missing or repeated verification IDs even when its bytes match the expectation', async () => {

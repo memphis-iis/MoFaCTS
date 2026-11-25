@@ -459,7 +459,7 @@ export async function main(argv) {
   const [action, ...rest] = argv;
   const args = new Map();
   for (let i = 0; i < rest.length; i += 2) {
-    if (!/^--[a-z-]+$/.test(rest[i]) || !rest[i + 1] || args.has(rest[i])) invalidSnapshot();
+    if (!/^--[a-z][a-z0-9-]*$/.test(rest[i]) || !rest[i + 1] || args.has(rest[i])) invalidSnapshot();
     args.set(rest[i], rest[i + 1]);
   }
   const allowed = { prepare: ['--builder', '--base-commit', '--dirty'],
