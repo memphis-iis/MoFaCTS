@@ -15,6 +15,11 @@ export function requireProductionRegistryProfile(value) {
   return profile;
 }
 
+function classified(value) {
+  return typeof value === 'string' ? value.trim().length > 0
+    : value !== null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0;
+}
+
 export function checkRegistryCoverage(surfaces) {
   if (!Array.isArray(surfaces) || surfaces.length > requiredIds.size) throw Error('Invalid runtime surface inventory');
   const surfaceIds = new Set();
@@ -24,6 +29,8 @@ export function checkRegistryCoverage(surfaces) {
     if (entry && Object.hasOwn(entry, 'transport')) keys.push('transport');
     const row = proofRecord(entry, keys);
     const name = proofString(row.surfaceId, /^[A-Za-z0-9][A-Za-z0-9_./:-]*$/, 256);
+    proofString(row.owner, /^[A-Za-z0-9][A-Za-z0-9_./:@-]*$/, 128);
+    if (!classified(row.policy) || !classified(row.dataEgress)) throw Error('Runtime surface classification is incomplete');
     if (surfaceIds.has(name) || !Array.isArray(row.verificationIds) || row.verificationIds.length < 1) {
       throw Error('Runtime registry has duplicate surfaces or missing verification');
     }

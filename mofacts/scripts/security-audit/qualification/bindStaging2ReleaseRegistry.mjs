@@ -17,6 +17,11 @@ import { requiredMeteorVerificationIds } from './verificationCatalogProof.mjs';
 
 const staging2ImageRepository = 'ppavlikmemphis/mofacts-staging2';
 
+export function staging2PlatformImage(publishedImage) {
+  const digest = publishedImage.kind === 'index' ? publishedImage.platformManifestDigest : publishedImage.digest;
+  return `${staging2ImageRepository}@${digest}`;
+}
+
 // The registry observer verifies the installed surface inventory. The host
 // observer verifies the running image independently. Match both to the same
 // retained workstation authority before using them in an environment run.
@@ -67,9 +72,7 @@ export async function bindStaging2ReportReadback({ releaseEvidence, reportPath, 
   const binding = await bindStaging2ReleaseRegistry(releaseEvidence);
   const report = await readMatchedAuditReportV2({ reportPath, readbackPath, env: { AUDIT_TARGET: binding.target } });
   const { buildIdentity } = binding;
-  const { publishedImage } = binding;
-  const platformDigest = publishedImage.kind === 'index' ? publishedImage.platformManifestDigest : publishedImage.digest;
-  const platformImage = `${staging2ImageRepository}@${platformDigest}`;
+  const platformImage = staging2PlatformImage(binding.publishedImage);
   if (buildIdentity.includedUncommittedLocalChanges || report.reportType !== 'full'
     || report.catalogDigestSha256 !== await auditDigest(AUTHENTICATION_QUALIFICATION_CATALOG)
     || report.scannerSourceRevision !== buildIdentity.baseCommit
@@ -86,22 +89,26 @@ export async function bindStaging2ReportReadback({ releaseEvidence, reportPath, 
   };
 }
 
+export async function readStaging2ReleaseRegistryEvidence(evidenceDirectory, authorityFile) {
+  const root = await realDirectory(evidenceDirectory);
+  const json = async name => parseCiEvidenceJson(await readCiFile(path.join(root, name), 16384), 16384);
+  return {
+    authorityBytes: await readReleaseBytes(path.resolve(authorityFile)),
+    publication: await json('publication.json'), runningImage: await json('running-image.json'),
+    hostReceipt: await json('host-receipt.json'), acceptance: await json('accepted.json'),
+    bundleBytes: await readCiFile(path.join(root, 'verification-bundle.json'), MAX_VERIFICATION_BUNDLE_BYTES),
+  };
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [evidenceDirectory, authorityFile, outputFile, mode, ...extra] = process.argv.slice(2);
   try {
     if (!evidenceDirectory || !authorityFile || !outputFile || extra.length
       || (mode !== undefined && mode !== '--report-readback')) throw Error();
-    const root = await realDirectory(evidenceDirectory);
-    const json = async name => parseCiEvidenceJson(await readCiFile(path.join(root, name), 16384), 16384);
-    const releaseEvidence = {
-      authorityBytes: await readReleaseBytes(path.resolve(authorityFile)),
-      publication: await json('publication.json'), runningImage: await json('running-image.json'),
-      hostReceipt: await json('host-receipt.json'), acceptance: await json('accepted.json'),
-      bundleBytes: await readCiFile(path.join(root, 'verification-bundle.json'), MAX_VERIFICATION_BUNDLE_BYTES),
-    };
+    const releaseEvidence = await readStaging2ReleaseRegistryEvidence(evidenceDirectory, authorityFile);
     const result = mode === '--report-readback'
-      ? await bindStaging2ReportReadback({ releaseEvidence, reportPath: path.join(root, 'report.json'),
-        readbackPath: path.join(root, 'receiver-readback.json') })
+      ? await bindStaging2ReportReadback({ releaseEvidence, reportPath: path.join(evidenceDirectory, 'report.json'),
+        readbackPath: path.join(evidenceDirectory, 'receiver-readback.json') })
       : await bindStaging2ReleaseRegistry(releaseEvidence);
     await writeNew(outputFile, Buffer.from(canonicalAuditJson(result) + '\n'));
   } catch {

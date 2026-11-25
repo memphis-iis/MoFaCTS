@@ -10,7 +10,7 @@ import membership from './fixtures/v1-membership.json' with { type: 'json' };
 import { historicalScannerSource, historicalScannerPath, historicalScannerModule } from './helpers/historicalScanner.mjs';
 const { finalizeReport, control, section, canonicalJson: scannerCanonicalJson } = await historicalScannerModule('audit-lib.mjs');
 import { canonicalJson, parseSecurityAuditReport } from '../../../common/securityAuditReport.ts';
-import { sourceFile, oneNode, initializer, evaluateNode, findNodes, ts } from './helpers/sourceWitnesses.mjs';
+import { oneNode, initializer, evaluateNode, ts } from './helpers/sourceWitnesses.mjs';
 
 const appRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const authSource = ts.createSourceFile('historical-production-auth-audit.mjs', historicalScannerSource('production-auth-audit.mjs'), ts.ScriptTarget.Latest, true);
@@ -139,22 +139,4 @@ test('P0-2 WITNESS: an already-expired session lifetime is accepted as PASS', ()
   assert.equal(evaluateNode(initializer(authSource, 'lifetimeStatus'), authSource, {
     expiryLogin: { ok: true }, lifetimeDays: -1,
   }), 'PASS');
-});
-
-test('the source checker lists the migrated middleware and distinguishes both default publications', () => {
-  const inventory = JSON.parse(execFileSync(process.execPath, [
-    'scripts/security-audit/check-security-surfaces.mjs', '--discover',
-  ], { cwd: appRoot, windowsHide: true, timeout: 15000, encoding: 'utf8', env: {
-    ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-  } }));
-  const pwa = sourceFile('server/http/pwa.ts');
-  assert.equal(findNodes(pwa, (node) => ts.isCallExpression(node)
-    && node.expression.getText(pwa) === 'registerHttpMiddleware'
-    && node.arguments[1]?.getText(pwa) === "'handlers'").length, 1);
-  assert.ok(pwa.text.includes("'/site.webmanifest'"));
-  assert.equal(inventory.httpRoutes.includes('/site.webmanifest'), false);
-  assert.ok(inventory.httpMiddleware.includes('middleware:pwa-assets'));
-  assert.deepEqual(inventory.publications.filter(name => name.startsWith('publication:default:')),
-    ['publication:default:account-self', 'publication:default:role-assignments-self']);
-  assert.equal(inventory.publications.includes('<default>'), false);
 });

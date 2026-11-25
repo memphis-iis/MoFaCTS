@@ -30,7 +30,7 @@ export function runSecurityLanes(source, evidence, execute) {
   ], source));
   lane('source-contracts', () => {
     command('source-install', 'npm', ['ci', '--ignore-scripts'], app);
-    command('source-surfaces', process.execPath, ['scripts/security-audit/check-security-surfaces.mjs'], app);
+    command('source-surfaces', process.execPath, ['scripts/security-audit/checkRegistrationBypasses.mjs'], app);
     command('source-tests', process.execPath, ['--test', 'scripts/security-audit/source-security.test.mjs',
       'scripts/security-audit/source-security-v2.test.mjs'], app);
   });

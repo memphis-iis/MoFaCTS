@@ -5,10 +5,11 @@ import { AUTHORIZATION_VERIFICATIONS, auditVerification, AUDIT_VERIFICATIONS, AU
   DEFAULT_PUBLICATION_VERIFICATIONS, NAMED_PUBLICATION_VERIFICATIONS, HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION,
   AUTHENTICATION_PROTOCOL_MUTATIONS, AUTHORIZATION_MUTATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 
-import { AUDIT_ADMIN_METHOD_VERIFICATIONS, FILES_DDP_VERIFICATIONS, HTTP_FILE_VERIFICATIONS, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
+import { AUDIT_ADMIN_METHOD_VERIFICATIONS, FILES_DDP_VERIFICATIONS, HTTP_AUDIT_VERIFICATIONS, HTTP_FILE_VERIFICATIONS, HTTP_MIDDLEWARE_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 import { registerHttpMiddleware, registerProtocolHttpMount, registeredHttpSurfaces } from '../../../server/securitySurfaces/registerHttpRoutes.ts';
 import { observeAssetUploadSurfaces } from '../../../server/securitySurfaces/bindAssetUploadSurfaces.ts';
 import { observeMeteorMethodBindings, registerMeteorMethods, registeredMeteorMethodSurfaces } from '../../../server/securitySurfaces/registerMeteorMethods.ts';
+import { uploadMethodNames } from '../../../packages/ostrio-files/upload-policy.js';
 
 test('file and unmounted registrations use the original callback and framework call shape', () => {
   const calls = [];
@@ -39,7 +40,6 @@ test('the common evidence catalog includes each registered publication and the e
   }
 });
 
-const manifest = JSON.parse(fs.readFileSync(new URL('../../../security-surface-contract.json', import.meta.url)));
 test('audit method observation requires identity in both the submitted and installed maps', () => {
   const bindings = Object.values(AUDIT_ADMIN_METHOD_VERIFICATIONS).map(verification => ({
     verification,
@@ -59,7 +59,6 @@ test('audit method observation requires identity in both the submitted and insta
   for (const surface of observation.surfaces) {
     assert.deepEqual(surface.policy, { kind: 'role', role: 'admin' });
     assert.ok(AUDIT_VERIFICATIONS.includes(surface.verification));
-    assert.ok(manifest.methods.some(method => method.name === surface.name && method.access === 'admin-only'));
   }
 
   assert.deepEqual(observeMeteorMethodBindings(bindings, { ...submitted, unrelatedMethod() {} }, installed),
@@ -80,8 +79,7 @@ test('Assets ownership requires the exact registered package handlers and disabl
   const owner = { observeDdpUploadRegistration: () => ({ collectionName: 'Assets', allowClientCode: false, methods }) };
   const result = observeAssetUploadSurfaces(owner, () => installed);
   assert.equal(result.state, 'observed');
-  assert.deepEqual(new Set(result.surfaces.map(row => row.name)), new Set(manifest.methods
-    .filter(row => /^_FilesCollection.*_Assets$/.test(row.name)).map(row => row.name)));
+  assert.deepEqual(new Set(result.surfaces.map(row => row.name)), new Set(Object.values(uploadMethodNames('Assets'))));
   const packageSource = fs.readFileSync(new URL('../../../packages/ostrio-files/package.js', import.meta.url), 'utf8');
   const version = packageSource.match(/\bversion:\s*'([^']+)'/)?.[1];
   assert.ok(version);
@@ -129,14 +127,16 @@ test('selected authorization catalog has exact subjects and explicit successful 
   }
   assert.throws(() => auditVerification('unreviewed.fixture.subject'));
 });
-test('every selected server subject resolves to the current reviewed security-surface manifest', () => {
-  const names = key => new Set(manifest[key].map(row => row.name));
-  const methods = names('methods'), publications = names('publications'), routes = names('httpRoutes');
+test('every selected server subject resolves to its installed verification declaration', () => {
+  const methods = new Set(AUDIT_VERIFICATIONS.filter(row => row.kind === 'integrationTest' && 'method' in row)
+    .map(row => row.surfaceId));
+  const publications = new Set(Object.values(NAMED_PUBLICATION_VERIFICATIONS).map(row => row.surfaceId));
+  const routes = new Set([HTTP_AUDIT_VERIFICATIONS.download, HTTP_FILE_VERIFICATIONS.history]
+    .map(row => row.surfaceId.replace(/^http:get:(.*)\/:token\/:filename$/, 'http:$1')));
   for (const row of AUTHORIZATION_VERIFICATIONS) {
-    const name = row.surfaceId.slice(row.surfaceId.indexOf(':') + 1);
-    if (row.family === 'method') assert(methods.has(name), row.verificationId);
-    if (row.family === 'publication') assert(publications.has(name), row.verificationId);
-    if (row.family === 'download') assert(routes.has(name), row.verificationId);
+    if (row.family === 'method') assert(methods.has(row.surfaceId), row.verificationId);
+    if (row.family === 'publication') assert(publications.has(row.surfaceId), row.verificationId);
+    if (row.family === 'download') assert(routes.has(row.surfaceId), row.verificationId);
   }
   assert.deepEqual(auditVerification('authz.method.own-settings.anonymous').policyDenialCodes, ['401']);
   assert.deepEqual(auditVerification('authz.method.foreign-performance.learnerA').policyDenialCodes, ['403']);

@@ -308,6 +308,7 @@ const fileHttpTest = { kind: 'integrationTest', lane: 'meteor', suite: 'applicat
 const capabilityResponses = Object.freeze(['retains download method and invalid-capability responses at the mounted paths'] as const);
 const assetResponses = Object.freeze(['preserves the retired upload response on both asset mounts',
   'preserves existing asset URLs and keeps private files behind both mounts'] as const);
+export const DYNAMIC_ASSET_HTTP_MOUNTS = Object.freeze({ dynamic: '/dynamic-assets', cdn: '/cdn/storage/Assets' });
 export const HTTP_FILE_VERIFICATIONS = Object.freeze({
   backup: Object.freeze({ ...fileHttpTest, verificationId: 'http.backup.download',
     surfaceId: 'http:get:/admin/backups/download/:token/:filename', cases: capabilityResponses }),

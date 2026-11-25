@@ -1,7 +1,6 @@
 import { registerDirectWriteDenial } from '../../../server/securitySurfaces/registerDirectWriteDenial.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import fs from 'node:fs';
 import { sourceFile, oneNode, evaluateNode, namedFunction, ts } from './helpers/sourceWitnesses.mjs';
 import { canAccessContentUploadTdf, canDownloadOwnedTdfData, canViewDashboardTdf } from '../../../server/lib/contentAccessPolicy.ts';
 import { registerPublicHttpMount } from '../../../server/securitySurfaces/registerHttpRoutes.ts';
@@ -10,24 +9,6 @@ import { HTTP_HEALTH_VERIFICATIONS } from '../../../common/securityAudit/verific
 function registration(source, expression) {
   return oneNode(source, (node) => ts.isCallExpression(node) && node.expression.getText(source) === expression);
 }
-
-test('Phase 0 manifest: reviewed brand and progressive surfaces retain explicit classifications', () => {
-  const manifest = JSON.parse(fs.readFileSync(new URL('../../../security-surface-contract.json', import.meta.url), 'utf8'));
-  for (const name of ['exportDeploymentBrandProfile', 'getDeploymentBrandProfileDraft',
-    'importDeploymentBrandProfileDraft', 'publishDeploymentBrandProfile', 'saveDeploymentBrandProfileDraft']) {
-    assert.deepEqual(manifest.methods.filter((entry) => entry.name === name)
-      .map(({ name, access }) => ({ name, access })), [{ name, access: 'admin-only' }]);
-  }
-  assert.deepEqual(manifest.methods.filter((entry) => entry.name === 'getProgressiveAssignmentLaunch'), [{
-    name: 'getProgressiveAssignmentLaunch',
-    access: 'authenticated-self',
-    notes: 'Starting or reopening a progressive course assignment requires an ordinary account session. Before returning member lesson content, the server verifies the current course, current owner/admin status or live section enrollment, course dates and assignment release.',
-  }]);
-  for (const [kind, name, access] of [
-    ['publications', 'deploymentBrandProfile', 'public'],
-    ['exports', 'method:exportDeploymentBrandProfile', 'admin-only'],
-  ]) assert.deepEqual(manifest[kind].filter((entry) => entry.name === name), [{ name, access }]);
-});
 
 test('Phase 0 compatibility: all brand methods authorize before reading, parsing or writing drafts', async () => {
   const source = sourceFile('server/methods/deploymentBrandProfileMethods.ts');
@@ -47,6 +28,9 @@ test('Phase 0 compatibility: all brand methods authorize before reading, parsing
   const { methods, methodBindings } = registration;
   assert.deepEqual(Array.from(methodBindings, binding => binding.handler), Object.values(methods));
   assert.ok(methodBindings.every(binding => binding.policy === methodBindings[0].policy));
+  assert.equal(methodBindings[0].policy.kind, 'role');
+  assert.equal(methodBindings[0].policy.role, 'admin');
+  assert.equal(methodBindings.find(binding => binding.handler === methods.exportDeploymentBrandProfile).dataEgress, 'redacted-brand-profile-export');
   for (const method of Object.values(methods)) {
     for (const userId of [null, 'synthetic-learner']) {
       calls.length = 0;

@@ -9,7 +9,7 @@ const fail = category => { throw new RecoveryTransferError(category); };
 
 // One existing baseline version, in memory. No restore, writes, label changes,
 // provider/application requests or new verification intent is produced here.
-export async function inspectRecoveryProbeInventory({ target, expected, candidateId, runId, aws, manifest }) {
+export async function inspectRecoveryProbeInventory({ target, expected, candidateId, runId, aws }) {
   validateRestoreTarget(target); validateRestoreExpected(expected); validateConfirmationCandidate(candidateId, expected);
   if (typeof runId !== 'string' || !/^[1-9][0-9]*$/.test(runId)) fail('runner-context');
   const identity = await aws('sts', 'get-caller-identity', {});
@@ -23,7 +23,7 @@ export async function inspectRecoveryProbeInventory({ target, expected, candidat
   });
   const bundle = validateRecoveredPayload(read, target, expected, expected.versionId, versions[expected.versionId]);
   let inventory;
-  try { inventory = legacyProbeInventory(Buffer.from(bundle.secrets.AUDIT_AUTH_FIXTURES_JSON), manifest); }
+  try { inventory = legacyProbeInventory(Buffer.from(bundle.secrets.AUDIT_AUTH_FIXTURES_JSON)); }
   catch { fail('probe-inventory'); }
   await check();
   return { state: 'recovery-authentication-probe-inventory-unqualified', versionId: expected.versionId,

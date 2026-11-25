@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { parseCiEvidenceJson } from '../qualification/ciEvidence.mjs';
 import { readCiFile, realDirectory } from '../qualification/collectCiEvidence.mjs';
 import { countPotentialSensitiveLogStatements } from '../scanner-parsers.mjs';
-import { proofRecord } from '../../../common/securityAudit/proofFields.ts';
+import { sourceCommit } from '../../../common/securityAudit/proofFields.ts';
+import { bindStaging2ReleaseRegistry, staging2PlatformImage } from '../qualification/bindStaging2ReleaseRegistry.mjs';
+import { requiredMeteorVerificationIds } from '../qualification/verificationCatalogProof.mjs';
 import { runRepositoryCommandV2 } from './commandV2.mjs';
 import { auditToolEnvironmentV2 } from '../core/childEnvironmentV2.mjs';
 import { parseNodeSourceTestObservationV2 } from './observationsV2.mjs';
@@ -20,26 +21,21 @@ const unchanged = (before, after) => {
   for (const key of ['ino', 'dev', 'mode', 'nlink', 'size', 'mtimeNs', 'ctimeNs']) if (before[key] !== after[key]) invalid();
 };
 
-// Preserve the existing inference checker as the sole policy owner. Its default
-// success message supplies a completed count, cross-checked against its actual
-// --discover inventory. A nonzero exit alone proves no specific policy violation.
-export function parseSurfaceCoverageObservationV2(discovery, check) {
-  const error = processError(discovery) || processError(check); if (error) return error;
+// Count the required Meteor cases tied to the sealed runtime registry. Static
+// registration ownership is a separate prerequisite, never runtime evidence.
+export function parseSurfaceCoverageObservationV2({ revision, changes, check, binding, imageContext, target }) {
+  const error = processError(revision) || processError(changes) || processError(check); if (error) return error;
   try {
-    if (discovery?.exitCode !== 0 || check?.exitCode !== 0) return unavailable('evidence-incomplete');
-    const inventory = proofRecord(parseCiEvidenceJson(discovery.stdout, 2 * 1024 * 1024),
-      ['methods', 'publications', 'httpRoutes', 'httpMiddleware', 'exports', 'managementRoutes']);
-    let expected = 0;
-    for (const names of Object.values(inventory)) {
-      if (!Array.isArray(names) || names.length > 10000 || new Set(names).size !== names.length
-        || names.some(name => typeof name !== 'string' || !name.length || name.length > 512
-          || [...name].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127))) invalid();
-      expected += names.length;
-    }
-    if (!expected || expected > 10000 || !(check.stdout instanceof Uint8Array) || check.stdout.length > 1024) invalid();
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(check.stdout);
-    const completed = /^Security surface contract covers ([1-9][0-9]*) surfaces\.\n$/.exec(text);
-    if (!completed || Number(completed[1]) !== expected) invalid();
+    if (!binding || binding.state !== 'matched' || binding.target !== target
+      || revision?.exitCode !== 0 || changes?.exitCode !== 0 || check?.exitCode !== 0) return unavailable('evidence-incomplete');
+    const text = result => new TextDecoder('utf-8', { fatal: true }).decode(result.stdout);
+    const scanner = sourceCommit(text(revision).trim());
+    if (text(changes) || text(check) !== 'Application registration owners verified.\n'
+      || binding.buildIdentity.includedUncommittedLocalChanges || scanner !== binding.buildIdentity.baseCommit
+      || imageContext?.deployedApplicationRevision?.state !== 'observed' || imageContext.deployedApplicationRevision.value !== scanner
+      || imageContext?.deployedImageDigest?.state !== 'observed'
+      || imageContext.deployedImageDigest.value !== staging2PlatformImage(binding.publishedImage)) return unavailable('evidence-incomplete');
+    const expected = requiredMeteorVerificationIds.length;
     return observed({ expectedCaseCount: expected, completedCaseCount: expected, matchedCaseCount: expected,
       domainRejectionCount: 0, transportErrorCount: 0, inconclusiveCaseCount: 0 });
   } catch { return unavailable('producer-malformed'); }
@@ -86,22 +82,30 @@ export async function observeSensitiveLoggingV2(serverDirectory) {
 // The caller supplies its selected source checkout and narrow test environment.
 // Running the full source suite can create owned temporary synthetic fixtures;
 // it does not invoke Meteor. Source/release authenticity remains independently owned.
-export async function acquireRepositorySourceObservationsV2({ repositoryDirectory, environment },
-  dependencies = { run: runRepositoryCommandV2 }) {
-  if (!dependencies || Object.keys(dependencies).length !== 1 || typeof dependencies.run !== 'function') invalid();
+export async function acquireRepositorySourceObservationsV2({ repositoryDirectory, environment, imageContext, registryEvidence, target },
+  { run: execute = runRepositoryCommandV2, bindRegistry = bindStaging2ReleaseRegistry } = {}) {
   const toolEnvironment = auditToolEnvironmentV2(environment);
   const root = await realDirectory(repositoryDirectory), app = await realDirectory(path.join(root, 'mofacts'));
-  const run = async args => {
-    try { return await dependencies.run({ command: process.execPath, args, cwd: app, environment: toolEnvironment,
+  const run = async (command, args) => {
+    try { return await execute({ command, args, cwd: app, environment: toolEnvironment,
       timeoutMs: 15 * 60 * 1000, maximum: 8 * 1024 * 1024 }); }
     catch { return { exitCode: -1, stdout: Buffer.alloc(0), failure: 'command-unavailable' }; }
   };
-  const checker = path.join(app, 'scripts', 'security-audit', 'check-security-surfaces.mjs');
-  const discovery = await run([checker, '--discover']), check = await run([checker]);
-  const observations = { [REPOSITORY_SOURCE_CONTROLS_V2.surface]: parseSurfaceCoverageObservationV2(discovery, check),
+  let surface = unavailable('evidence-incomplete');
+  if (registryEvidence !== undefined) {
+    try {
+      const binding = await bindRegistry(registryEvidence);
+      const revision = await run('git', ['rev-parse', '--verify', 'HEAD']);
+      const changes = await run('git', ['status', '--porcelain', '--untracked-files=normal']);
+      const checker = path.join(app, 'scripts', 'security-audit', 'checkRegistrationBypasses.mjs');
+      const check = await run(process.execPath, [checker]);
+      surface = parseSurfaceCoverageObservationV2({ revision, changes, check, binding, imageContext, target });
+    } catch { surface = unavailable('producer-malformed'); }
+  }
+  const observations = { [REPOSITORY_SOURCE_CONTROLS_V2.surface]: surface,
     [REPOSITORY_SOURCE_CONTROLS_V2.logging]: await observeSensitiveLoggingV2(path.join(app, 'server')) };
   const source = path.join(app, 'scripts', 'security-audit', 'source-security-v2.test.mjs');
-  const tests = await run(['--test', '--test-reporter=tap', source]);
+  const tests = await run(process.execPath, ['--test', '--test-reporter=tap', source]);
   observations[REPOSITORY_SOURCE_CONTROLS_V2.tests] = processError(tests) || parseNodeSourceTestObservationV2(tests, source);
   return observations;
 }

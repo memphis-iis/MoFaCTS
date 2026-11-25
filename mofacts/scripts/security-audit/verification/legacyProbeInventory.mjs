@@ -1,19 +1,39 @@
 import { parseCiEvidenceJson } from '../qualification/ciEvidence.mjs';
+import { collectionMongoName } from '../../../common/collectionOwnership.ts';
+import { AUDIT_VERIFICATIONS, DEFAULT_PUBLICATION_VERIFICATIONS, DYNAMIC_ASSET_HTTP_MOUNTS, NAMED_PUBLICATION_VERIFICATIONS,
+  HTTP_AUDIT_VERIFICATIONS, HTTP_FILE_VERIFICATIONS, HTTP_HEALTH_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
+import { getManagementRoutePolicies } from '../../../client/lib/adminUi/managementRoutePresentationPolicies.ts';
+import { uploadMethodNames } from '../../../packages/ostrio-files/upload-policy.js';
 
 const actors = new Set(['anonymous', 'learnerA', 'learnerB', 'teacherA', 'teacherB', 'admin', 'reset', 'expiry', 'lockout']);
 const invalid = () => { throw new Error('Protected probe inventory could not be established; no values were emitted.'); };
 const primitiveKind = value => value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
 
+// Historical fixtures record method names and mounted paths. Resolve them from
+// current owners so the metadata diagnostic has no access-policy manifest.
+export function legacyProbeSubjectNames() {
+  const endpoints = [...Object.values(HTTP_AUDIT_VERIFICATIONS), ...Object.values(HTTP_FILE_VERIFICATIONS),
+    ...HTTP_HEALTH_VERIFICATIONS.endpoints];
+  const mounts = endpoints.map(row => /^http:[a-z]+:(\/.*?)(?:\/:token\/:filename)?$/.exec(row.surfaceId)?.[1]).filter(Boolean);
+  return {
+    methods: [...AUDIT_VERIFICATIONS.filter(row => row.kind === 'integrationTest' && row.surfaceId === `method:${row.method}`).map(row => row.method),
+      ...Object.values(uploadMethodNames(collectionMongoName('DynamicAssets')))],
+    publications: [...Object.keys(NAMED_PUBLICATION_VERIFICATIONS), ...Object.values(DEFAULT_PUBLICATION_VERIFICATIONS).map(row => row.surfaceId)],
+    httpRoutes: [...new Set([...mounts, ...Object.values(DYNAMIC_ASSET_HTTP_MOUNTS)])],
+    managementRoutes: getManagementRoutePolicies().map(({ routeName, path }) => `${routeName}|${path}`),
+  };
+}
+
 // Diagnostic only: names come from public source, values never from protected
 // arguments/URLs/canaries. Unresolved cases are retained, never declared policy.
-export function legacyProbeInventory(bytes, manifest) {
+export function legacyProbeInventory(bytes, subjects = legacyProbeSubjectNames()) {
   try {
     const fixture = parseCiEvidenceJson(bytes, 65536);
     if (!fixture || typeof fixture !== 'object' || Array.isArray(fixture)) invalid();
-    const methods = new Set(manifest.methods.map(row => row.name));
-    const publications = new Set(manifest.publications.map(row => row.name));
-    const http = manifest.httpRoutes.map(row => row.name).filter(name => typeof name === 'string' && name.startsWith('/'));
-    const routes = manifest.managementRoutes.map(row => row.name).filter(name => typeof name === 'string' && name.includes('|'));
+    const methods = new Set(subjects.methods);
+    const publications = new Set(subjects.publications);
+    const http = subjects.httpRoutes.filter(name => typeof name === 'string' && name.startsWith('/'));
+    const routes = subjects.managementRoutes.filter(name => typeof name === 'string' && name.includes('|'));
     const families = {}, seen = new Set();
     let total = 0;
     for (const [family, key, subjectKey] of [['method', 'authorizationProbes', 'method'],

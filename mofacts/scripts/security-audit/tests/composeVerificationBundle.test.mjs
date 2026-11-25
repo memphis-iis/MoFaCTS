@@ -334,12 +334,14 @@ test('reads the installed staging2 registry through the bound administrator and 
   await assert.rejects(observeStaging2Registry(page, admin, expected), /Invalid staging2 registry observation/);
 });
 
-test('rejects a registry with missing or repeated verification IDs even when its bytes match the expectation', async () => {
-  for (const update of [
-    inventory => { inventory.surfaces.pop(); },
-    inventory => { inventory.surfaces[0].verificationIds.push(inventory.surfaces[0].verificationIds[0]); },
+test('rejects a registry with incomplete classifications or missing or repeated verification IDs even when its bytes match', async () => {
+  for (const [update, reason] of [
+    [inventory => { inventory.surfaces.pop(); }, /missing required verification/],
+    [inventory => { inventory.surfaces[0].verificationIds.push(inventory.surfaces[0].verificationIds[0]); }, /repeated ID/],
+    [inventory => { inventory.surfaces[0].policy = null; }, /classification is incomplete/],
+    [inventory => { inventory.surfaces[0].dataEgress = {}; }, /classification is incomplete/],
   ]) {
     const { observation, expected } = await runtimeObservation(update);
-    await assert.rejects(compareRuntimeVerification(observation, expected), /missing required verification|repeated ID/);
+    await assert.rejects(compareRuntimeVerification(observation, expected), reason);
   }
 });

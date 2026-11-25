@@ -85,6 +85,16 @@ proof. A report with execution errors records `executionComplete: false`.
 Keep the binding in protected evidence with the separate fixture, enabled
 provider and encrypted archive results.
 
+For the full repository report, the existing `emit-repository-producer-v2.mjs`
+command accepts two additional positional arguments after the image context and
+canary inputs: the protected release evidence directory and the exact accepted
+release record. It revalidates those same release and registry observations,
+matches the independently observed application revision and platform manifest,
+and requires a clean scanner checkout at that revision and a passing static
+registration-ownership check. The coverage result counts required Meteor
+verification cases. Missing or mismatched proof leaves the surface coverage
+control in `ERROR` and the independent repository controls still run.
+
 The hosted combined job still needs fresh authorization if it invokes Meteor
 again. A build-only retry through the capture helper can reuse the same retained
 proof while its verified inputs and expected profile match. Keep raw source,

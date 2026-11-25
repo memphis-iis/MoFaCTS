@@ -3,6 +3,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import { checkRegistrationBypasses } from './checkRegistrationBypasses.mjs';
 import { uploadMethodNames } from '../../packages/ostrio-files/upload-policy.js';
+import { DYNAMIC_ASSET_HTTP_MOUNTS } from '../../common/securityAudit/verificationCatalog.ts';
 
 const toolAppRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1')), '..', '..');
 const sourceRepoRoot = path.resolve(toolAppRoot, '..');
@@ -75,6 +76,8 @@ export async function discoverSecuritySurfaces() {
     httpRoutes.push(...regexMatches(text, /(?:connectHandlers|rawConnectHandlers)\.use\(\s*'([^']+)'/g, (match) => match[1]));
     httpRoutes.push(...regexMatches(text, /registerPublicHttpMount\(\s*WebApp\.connectHandlers,\s*'([^']+)'/g, (match) => match[1]));
     httpRoutes.push(...regexMatches(text, /registerProtocolHttpMount\(\s*WebApp,\s*'(?:rawConnectHandlers|connectHandlers)',\s*'([^']+)'/g, (match) => match[1]));
+    httpRoutes.push(...regexMatches(text, /registerProtocolHttpMount\(\s*WebApp,\s*'(?:rawConnectHandlers|connectHandlers)',\s*DYNAMIC_ASSET_HTTP_MOUNTS\.(cdn|dynamic)\b/g,
+      (match) => DYNAMIC_ASSET_HTTP_MOUNTS[match[1]]));
   }
   const routePolicyText = await fs.readFile(
     path.join(appRoot, 'client', 'lib', 'adminUi', 'managementRoutePresentationPolicies.ts'), 'utf8',

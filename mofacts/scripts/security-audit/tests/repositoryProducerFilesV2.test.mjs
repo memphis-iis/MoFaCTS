@@ -10,11 +10,14 @@ import { runRepositoryCommandV2 } from '../repository/commandV2.mjs';
 import { parseAuditFileV2, readAuditFileV2 } from '../core/producerFilesV2.mjs';
 import { assembleAuditReportV2 } from '../core/assembleV2.mjs';
 import { parseSecurityAuditReportV2 } from '../../../common/securityAudit/reportV2.ts';
-import { envelope, errorArtifacts, ingestionContext, platformImage, revision } from './fixtures/v2Fixtures.mjs';
+import { envelope, errorArtifacts, ingestionContext, revision } from './fixtures/v2Fixtures.mjs';
 
 const encode = value => Buffer.from(JSON.stringify(value));
 const zeroNpm = { vulnerabilities: {}, metadata: { vulnerabilities: { info: 0, low: 0, moderate: 0, high: 0, critical: 0, total: 0 } } };
 const cleanImage = { state: 'observed', value: { evaluatedCount: 2, findingCount: 0 } };
+const digest = 'sha256:' + 'b'.repeat(64);
+const platformImage = { state: 'observed', value: 'ppavlikmemphis/mofacts-staging2@' + digest };
+const target = 'https://staging2.optimallearning.org';
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-repository-emitter-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -24,16 +27,17 @@ async function fixture(t) {
   await fs.writeFile(path.join(scripts, 'development-dependency-exposure.json'), JSON.stringify({ schema: 'DevelopmentDependencyExposurePolicyV1', confirmedBuildExposures: [] }));
   await fs.writeFile(path.join(scripts, 'source-security-v2.test.mjs'), "import test from 'node:test'; test('fixture one',()=>{});test('fixture two',()=>{});");
   const options = { profile: 'full', artifactDirectory: path.join(root, 'artifacts'), repositoryDirectory: root,
-    environment: { PATH: process.env.PATH, NODE_OPTIONS: '' }, canaries: ['SYNTHETIC-PRIVATE-CANARY'],
+    environment: { PATH: process.env.PATH, NODE_OPTIONS: '' }, canaries: ['SYNTHETIC-PRIVATE-CANARY'], registryEvidence: {}, target,
     imageContext: { AUDIT_RUNTIME_IMAGE: platformImage.value, deployedApplicationRevision: structuredClone(revision), deployedImageDigest: structuredClone(platformImage) } };
   const calls = [], images = [], components = [];
   const run = async spec => {
     calls.push(spec);
     if (spec.command === process.execPath) {
       if (spec.args[0] === '--test') return runRepositoryCommandV2(spec);
-      if (spec.args.includes('--discover')) return { exitCode: 0, stdout: encode({ methods: ['fixture-method'], publications: [], httpRoutes: [], httpMiddleware: [], exports: [], managementRoutes: [] }) };
-      return { exitCode: 0, stdout: Buffer.from('Security surface contract covers 1 surfaces.\n') };
+      assert.equal(path.basename(spec.args[0]), 'checkRegistrationBypasses.mjs');
+      return { exitCode: 0, stdout: Buffer.from('Application registration owners verified.\n') };
     }
+    if (spec.command === 'git') return { exitCode: 0, stdout: Buffer.from(spec.args[0] === 'rev-parse' ? revision.value + '\n' : '') };
     if (spec.command === 'npm') return { exitCode: 0, stdout: encode(zeroNpm) };
     const report = spec.args[spec.args.indexOf(spec.command === 'gitleaks' ? '--report-path' : '--output') + 1];
     await fs.writeFile(report, JSON.stringify(spec.command === 'gitleaks' ? []
@@ -42,7 +46,12 @@ async function fixture(t) {
   };
   const dependencies = {
     tools: async input => { components.push('tools'); assert.equal(Object.hasOwn(input, 'canaries'), false); return acquireRepositoryToolObservationsV2(input, { run }); },
-    source: async input => { components.push('source'); assert.equal(Object.hasOwn(input, 'canaries'), false); return acquireRepositorySourceObservationsV2(input, { run }); },
+    source: async input => {
+      components.push('source'); assert.equal(Object.hasOwn(input, 'canaries'), false);
+      return acquireRepositorySourceObservationsV2(input, { run, bindRegistry: async () => ({
+        state: 'matched', target, buildIdentity: { baseCommit: revision.value, includedUncommittedLocalChanges: false }, publishedImage: { kind: 'manifest', digest },
+      }) });
+    },
     image: async input => { components.push('image'); images.push(input); return cleanImage; },
   };
   return { root, options, calls, images, dependencies, components, output: path.join(options.artifactDirectory, 'repository.json') };
@@ -71,7 +80,7 @@ test('V2 repository emitter gates image I/O on independent context and canaries 
     const artifact = await writeRepositoryProducerFileV2(f.options, f.dependencies);
     assert.equal(f.images.length, 0);
     assert.equal(f.calls.filter(row => row.command === 'trivy').length, mode === 'canaries' ? 1 : 0);
-    assert.equal(artifact.controls.filter(row => row.status === 'ERROR').length, mode === 'canaries' ? 1 : 3);
+    assert.equal(artifact.controls.filter(row => row.status === 'ERROR').length, mode === 'canaries' ? 1 : 4);
     assert.equal(artifact.controls.find(row => row.controlId === REPOSITORY_SOURCE_CONTROLS_V2.tests).status, 'PASS');
   }
 });

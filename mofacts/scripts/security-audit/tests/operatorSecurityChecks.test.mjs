@@ -12,6 +12,7 @@ test('operator security lane preserves four jobs and the existing dependency pol
   assert.ok(calls[0].args.includes('/source:/repo:ro'));
   assert.deepEqual(calls.filter(row => row.name.endsWith('-policy')).map(row => row.args[1]), ['application', 'sidecar-mongo']);
   assert.equal(calls.filter(row => row.executable === 'npm' && row.args[0] === 'audit').length, 4);
+  assert.deepEqual(calls.find(row => row.name === 'source-surfaces').args, ['scripts/security-audit/checkRegistrationBypasses.mjs']);
   assert.ok(calls.some(row => row.args.includes('scripts/security-audit/source-security.test.mjs')));
 });
 

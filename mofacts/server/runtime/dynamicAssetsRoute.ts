@@ -1,5 +1,5 @@
 import { WebApp } from 'meteor/webapp';
-import { HTTP_FILE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { DYNAMIC_ASSET_HTTP_MOUNTS, HTTP_FILE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
 import { allowsGenericSparcImageDownload } from '../../common/lib/sparcPromptImage';
 import { registerProtocolHttpMount } from '../securitySurfaces/registerHttpRoutes.ts';
 import type { IncomingMessage, ServerResponse } from 'http';
@@ -222,7 +222,7 @@ export function registerDynamicAssetsRoute(deps: DynamicAssetsRouteDeps) {
   }
   routeRegistered = true;
 
-  registerProtocolHttpMount(WebApp, 'rawConnectHandlers', '/cdn/storage/Assets', {
+  registerProtocolHttpMount(WebApp, 'rawConnectHandlers', DYNAMIC_ASSET_HTTP_MOUNTS.cdn, {
     surfaceId: 'middleware:cdn-public-assets',
     policy: Object.freeze({ kind: 'public-asset-marker' }),
     dataEgress: Object.freeze({ kind: 'public-asset' }),
@@ -235,7 +235,7 @@ export function registerDynamicAssetsRoute(deps: DynamicAssetsRouteDeps) {
     await serveDynamicAssetById(deps, res, getFirstPathSegment(String(req.url || '')));
   });
 
-  registerProtocolHttpMount(WebApp, 'connectHandlers', '/dynamic-assets', {
+  registerProtocolHttpMount(WebApp, 'connectHandlers', DYNAMIC_ASSET_HTTP_MOUNTS.dynamic, {
     surfaceId: 'middleware:dynamic-assets',
     policy: Object.freeze({ kind: 'public-asset-marker' }),
     dataEgress: Object.freeze({ kind: 'public-asset' }),
