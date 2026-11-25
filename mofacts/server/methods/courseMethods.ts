@@ -5,7 +5,7 @@ import { enrolledCourseLessonIds } from '../lib/enrolledCourseLessons';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
 import { Meteor } from 'meteor/meteor';
 import { progressiveRevisionId, progressiveRevisionPrefix } from '../lib/progressiveAssignmentRevision';
-import type { DueDateException } from '../../common/courseAssignments.contracts';
+import { DEFAULT_COURSE_TIMEZONE, type DueDateException } from '../../common/courseAssignments.contracts';
 import { ensurePublishedDeploymentBrandProfile } from '../lib/deploymentBrandProfileRegistry';
 import { curSemester } from '../../common/Definitions';
 import { unitHasConfigurableRuntime } from '../../common/lib/learnerTdfConfig';
@@ -42,7 +42,6 @@ type MethodContext = {
   connection?: { id?: string; clientAddress?: string | null } | null;
 };
 const MAX_ASSIGNMENTS_PER_COURSE = 250;
-const DEFAULT_COURSE_TIMEZONE = 'America/Chicago';
 const DEFAULT_COURSE_SECTION_NAME = '001';
 
 type Cursor<T = any> = {
@@ -180,8 +179,8 @@ function parseNullablePersistedDate(value: unknown): Date | null {
 
 function normalizeCourseDates(payload: UnknownRecord, existingCourse?: any) {
   const timezone = normalizeTimezone(payload.timezone ?? existingCourse?.timezone, !!existingCourse);
-  const beginDate = parseDateLike(payload.beginDate ?? existingCourse?.beginDate ?? null, 'Course begin date', timezone);
-  const endDate = parseDateLike(payload.endDate ?? existingCourse?.endDate ?? null, 'Course end date', timezone);
+  const beginDate = parseDateLike(payload.beginDate === undefined ? existingCourse?.beginDate : payload.beginDate, 'Course begin date', timezone);
+  const endDate = parseDateLike(payload.endDate === undefined ? existingCourse?.endDate : payload.endDate, 'Course end date', timezone);
   if (beginDate && endDate && endDate.getTime() < beginDate.getTime()) {
     throw new Meteor.Error(400, 'Course end date must be on or after begin date');
   }

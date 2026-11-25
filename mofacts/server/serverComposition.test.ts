@@ -2864,19 +2864,20 @@ describe('course method authorization', function() {
     if (reason !== undefined) expect(denied).to.include({ reason });
   }
 
-  it('counts all practice for enrolled learners only on assigned lessons', async function() {
+  it('counts assigned practice for enrolled learners at the exact report cutoff', async function() {
     const observed = registeredMeteorMethodSurfaces();
     if (observed.state !== 'observed') throw new Error('Expected installed class performance handler');
     const binding = observed.surfaces.find(row => row.name === 'getClassPerformanceByTDF');
     expect(binding?.verification).to.equal(CLASS_PERFORMANCE_VERIFICATION);
     const [owner, learner, outsider] = await Promise.all(Array.from({ length: 3 }, () =>
       MeteorUsersAny.insertAsync({ username: Random.id() })));
-    const course = await CoursesAny.insertAsync({ teacherUserId: owner });
+    const course = await CoursesAny.insertAsync({ teacherUserId: owner, timezone: 'America/Chicago' });
     const section = await SectionsAny.insertAsync({ courseId: course });
     await SectionUserMapAny.insertAsync({ userId: learner, sectionId: section });
     const lesson = Random.id(), otherCourse = Random.id(), otherLesson = Random.id();
     const assignment = await AssignmentsAny.insertAsync({ courseId: course, assignmentType: 'lesson', TDFId: lesson });
-    const run = (who: string, selected: string) => MeteorAny.server.method_handlers.getClassPerformanceByTDF.call({ userId: who }, course, selected);
+    const run = (who: string, selected: string, cutoff: number | false = false) =>
+      MeteorAny.server.method_handlers.getClassPerformanceByTDF.call({ userId: who }, course, selected, cutoff);
     for (const origin of [undefined, course, otherCourse]) {
       await HistoriesAny.insertAsync({ userId: learner, TDFId: lesson, outcome: 'correct', recordedServerTime: 1,
         ...(origin ? { courseAssignment: { courseId: origin } } : {}) });
@@ -2890,6 +2891,20 @@ describe('course method authorization', function() {
     expect(late).to.deep.equal([]);
     await AssignmentsAny.updateAsync(assignment, { $set: { assignmentType: 'progressive', memberTdfIds: [lesson] }, $unset: { TDFId: 1 } });
     expect((await run(owner, lesson))[0][0].count).to.equal(3);
+
+    const cutoff = Date.parse('2026-12-01T17:00:00-06:00');
+    await AssignmentsAny.updateAsync(assignment, { $set: { dueAt: new Date(cutoff) } });
+    for (const recordedServerTime of [cutoff - 1, cutoff, cutoff + 1]) {
+      await HistoriesAny.insertAsync({ userId: learner, TDFId: lesson, outcome: 'correct', recordedServerTime });
+    }
+    const [before, after, timing] = await run(owner, lesson);
+    expect(timing).to.deep.equal({ assignmentDueAt: cutoff, cutoffAt: cutoff, timezone: 'America/Chicago' });
+    expect([before[0].count, after[0].count]).to.deep.equal([4, 2]);
+    await MeteorUsersAny.updateAsync(learner, { $set: { dueDateExceptions: [{ assignmentId: assignment, courseId: course, date: cutoff + 1 }] } });
+    const [withException, stillLate, refreshed] = await run(owner, lesson);
+    expect([withException[0].count, stillLate[0].count]).to.deep.equal([5, 1]);
+    expect(refreshed).to.deep.equal(timing);
+    expect((await run(owner, lesson, cutoff - 1))[2]).to.deep.equal({ ...timing, cutoffAt: cutoff - 1 });
   });
 
   it('binds course deletion to its owner or an administrator', async function() {
@@ -3010,6 +3025,32 @@ describe('course method authorization', function() {
     expect(await AssignmentsAny.findOneAsync(assignment)).to.exist;
     expect((await CourseLearnerSnapshotCache.findOneAsync({ userId: formerStudent }))?.invalidatedAt).to.be.instanceOf(Date);
     expect((await CourseLearnerSnapshotCache.findOneAsync({ userId: student }))?.invalidatedAt).to.be.instanceOf(Date);
+  });
+
+  it('clears either course boundary and invalidates the learner snapshot', async function() {
+    const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const learner = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    const beginDate = new Date('2035-01-01T00:00:00Z');
+    const endDate = new Date('2035-02-01T00:00:00Z');
+    const courseName = Random.id();
+    const courseId = await CoursesAny.insertAsync({ courseName, teacherUserId: teacher, timezone: 'America/Chicago', beginDate, endDate });
+    const sectionId = await SectionsAny.insertAsync({ courseId, sectionName: 'A' });
+    await SectionUserMapAny.insertAsync({ sectionId, userId: learner });
+    await CourseLearnerSnapshotCache.insertAsync({ userId: learner, assignedCourseIds: [courseId], publicCourseIds: [], version: COURSE_SNAPSHOT_VERSION } as any);
+    const edit = (dates: { beginDate?: Date | null; endDate?: Date | null }) =>
+      MeteorAny.server.method_handlers.editCourse.call({ userId: teacher }, {
+        courseId, courseName, existingSections: [{ sectionId, originalName: 'A', sectionName: 'A', remove: false }], sections: [], ...dates,
+      });
+
+    await edit({ beginDate: null });
+    expect(await CoursesAny.findOneAsync(courseId)).to.include({ beginDate: null });
+    expect((await CoursesAny.findOneAsync(courseId)).endDate).to.deep.equal(endDate);
+    expect((await CourseLearnerSnapshotCache.findOneAsync({ userId: learner }))?.invalidatedAt).to.be.instanceOf(Date);
+
+    await edit({ beginDate, endDate: null });
+    expect(await CoursesAny.findOneAsync(courseId)).to.include({ endDate: null });
+    expect((await CoursesAny.findOneAsync(courseId)).beginDate).to.deep.equal(beginDate);
   });
 
   it('requires current course enrollment for each due-date exception edit', async function() {

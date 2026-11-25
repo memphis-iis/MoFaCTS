@@ -15,6 +15,7 @@ import { createProlificMethodRegistration } from './methods/prolificMethods';
 import { createProlificTestExperiment } from './lib/prolificTestExperiment';
 import { createProlificParticipationService } from './lib/prolificParticipation';
 import { createProlificManagementService } from './lib/prolificManagement';
+import { saveProlificStudyBinding } from './lib/prolificStudyBinding';
 import { ensureProlificIndexes, ProlificParticipations, ProlificStudies } from './lib/prolificCollections';
 import {Roles} from 'meteor/alanning:roles';
 // import * as ElaboratedFeedback from './lib/CachedElaboratedFeedback';
@@ -612,10 +613,12 @@ const prolificParticipation = createProlificParticipationService({
 });
 const prolificTestExperiment = createProlificTestExperiment({ Tdfs, Histories, states: GlobalExperimentStates,
   assignments: Assignments, studies: ProlificStudies, participants: ProlificParticipations,
+  saveStudyBinding: saveProlificStudyBinding,
   saveContent: (ownerId, root, content) => saveTdfContent.call({ userId: ownerId }, root._id, content, {}, [],
     { expectedRevision: root.tdfRevision ?? 0, confirmed: true }),
 });
 const prolificManagement = createProlificManagementService({ resolveExperimentTargetFamily, progress: prolificParticipation.progress, Tdfs, encrypt: encryptData, decrypt: decryptData, audit: writeAuditLog,
+  saveStudyBinding: saveProlificStudyBinding,
   testExperiment: { ...prolificTestExperiment, baseUrl: () => Meteor.absoluteUrl() },
 });
 

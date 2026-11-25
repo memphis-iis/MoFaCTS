@@ -1,4 +1,5 @@
 import { strict as assert } from 'node:assert';
+import { applyAdaptiveAssessmentTemplateSchedule } from './adaptiveAssessmentSchedule';
 import { createAssessmentSchedule } from './createAssessmentSchedule';
 import { multipleGroupsMatchingTemplateAndClusterRepeats } from './__fixtures__/assessmentScheduleFixtures';
 
@@ -31,6 +32,15 @@ function assessmentUnit(final: { permutefinalresult?: string; swapfinalresult?: 
 }
 
 describe('assessment final cluster permutation', function() {
+  it('schedules the adaptive writer’s selected clusters, including zero and repeats', function() {
+    const unit = assessmentUnit();
+    const schedule = [2, 0, 2].map(clusterIndex => ({ clusterIndex }));
+    assert.equal(applyAdaptiveAssessmentTemplateSchedule({ unit, schedule }), true);
+
+    const result = withRandomDraws([.5], () => createAssessmentSchedule({}, 2, unit, dependencies));
+    assert.deepEqual(result.value.q.map((question: any) => question.clusterIndex), [2, 0, 2, 2]);
+  });
+
   it('reorders assembled questions through the shared shuffle-then-swap mapping', function() {
     const unit = assessmentUnit({ permutefinalresult: '0-3', swapfinalresult: '0-1 2-3' });
     const result = withRandomDraws([0, 0, 0, 0, 0, 0], () => createAssessmentSchedule({}, 2, unit, dependencies));

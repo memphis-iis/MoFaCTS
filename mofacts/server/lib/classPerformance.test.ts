@@ -24,7 +24,7 @@ describe('class performance assignment exceptions', function() {
         ) }) }) },
       }, { assignmentId: 'target' });
       expect(result.flat()).to.have.length(1);
-      expect(result.flat()[0]!.exception).to.equal(includeCurrent ? date.toLocaleDateString() : false);
+      expect(result.flat()[0]!.exception).to.equal(includeCurrent ? date.toISOString() : false);
     }
   });
 });

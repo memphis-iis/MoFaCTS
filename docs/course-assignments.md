@@ -779,20 +779,16 @@ Launch behavior:
 
 ## Instructor Reporting
 
-Reporting due-date precedence:
+Reports resolve the exact saved `Assignments.dueAt`. An older lesson-level
+`setspec.duedate` supplies the cutoff if the assignment has no due date. A
+date-only lesson setting keeps its midnight UTC interpretation. A custom report
+cutoff overrides the saved deadline for that report. Both controls display time
+in the course timezone.
 
-1. User due-date exception for matching `assignmentId`, if present.
-2. Assignment `dueAt`.
-3. Legacy TDF `setspec.duedate`.
-4. No due date.
-
-Compatibility:
-
-- Existing due-date exceptions matching `{ classId/courseId, TDFId }` must continue to work.
-- Adding, changing, or removing an exception requires current student enrollment in a section of the course. Leaving the course preserves the existing exception. It can be edited again after re-enrollment.
-- New due-date exceptions must store `assignmentId`.
-- Existing exceptions continue to read old `{ classId/courseId, TDFId }` shapes.
-- Assignment `dueAt` is authoritative over TDF `setspec.duedate` for course reporting.
+Attempts at the cutoff belong to the at-or-after group. A matching assignment
+exception extends the individual learner's cutoff when its timestamp is later.
+With deadline grouping off, Instructor Reporting shows all eligible attempts in
+one row per learner.
 
 New due-date exception shape:
 
@@ -811,8 +807,8 @@ Rules:
 
 - Store new exceptions under the existing user due-date exception mechanism.
 - Validate that `assignmentId`, `courseId`, and `TDFId` refer to the same assignment before writing.
-- When reading exceptions, check `assignmentId` first, then legacy `{ classId/courseId, TDFId }`.
-- Do not write new legacy-only exceptions.
+- Match exceptions by `assignmentId` and `courseId`.
+- Adding, changing, or removing an exception requires current course enrollment. Leaving the course preserves the existing exception.
 
 Reporting query requirements:
 

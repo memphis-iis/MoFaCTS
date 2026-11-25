@@ -100,7 +100,13 @@ function fixture() {
     if (path.endsWith('/projects/')) return { results: [{ id: projectId }] };
     throw new Error(`Unexpected synthetic request ${path}`);
   };
-  const deps = { resolveExperimentTargetFamily: async target => ({ root: await Tdfs.findOneAsync({ 'content.tdfs.tutor.setspec.experimentTarget': target }) }), Tdfs, encrypt: value => value, decrypt: value => value, audit: async (...args) => audits.push(args), request };
+  const deps = { resolveExperimentTargetFamily: async target => ({ root: await Tdfs.findOneAsync({ 'content.tdfs.tutor.setspec.experimentTarget': target }) }), Tdfs, encrypt: value => value, decrypt: value => value, audit: async (...args) => audits.push(args), request,
+    saveStudyBinding: async (binding, revision) => {
+      assert.equal(revision, 0);
+      const { ownerId, rootTdfId, studyId } = binding;
+      await db.studies.upsertAsync({ ownerId, rootTdfId, studyId }, { $set: binding });
+    },
+  };
   const participation = createProlificParticipationService({ ...deps, states, users, baseUrl: () => 'https://example.org/',
     createUser: async (username, password, profile) => users.insertAsync({ username, password, profile }),
     issueToken: async userId => `token:${userId}`, withLock: async (_key, work) => work(),
@@ -244,6 +250,22 @@ describe('participation persistence and session boundaries', () => {
 });
 
 describe('researcher operations and reminders', () => {
+  it('passes the reviewed study identity and lesson revision to the shared binding writer', async () => {
+    const f = fixture();
+    f.Tdfs.rows[0].tdfRevision = 7;
+    f.deps.saveStudyBinding = async (binding, revision) => {
+      assert.equal(revision, 7);
+      assert.deepEqual({ ...binding, updatedAt: undefined }, {
+        studyId, ownerId: 'owner', rootTdfId: 'root', workspaceId, projectId, accountId,
+        currency: 'USD', reminderText: 'Return for session two', updatedAt: undefined,
+      });
+    };
+    const result = await f.management.bind('owner', {
+      studyId, workspaceId, projectId, rootTdfId: 'root', reminderText: 'Return for session two',
+    });
+    assert.deepEqual(result, { linked: true });
+  });
+
   it('requires ownership and remote identity matches before previewing or sending', async () => {
     const f = fixture(); await started(f);
     await assert.rejects(f.management.dashboard('other', { studyId }), /accessDenied/);
@@ -496,7 +518,11 @@ const { createProlificTestExperiment } = require('../server/lib/prolificTestExpe
 function unusedExperimentFixture() {
  const root={_id:'root',ownerId:'owner',tdfAvailability:'available',tdfRevision:3,content:{tdfs:{tutor:{setspec:{lessonname:'Synthetic',loadbalancing:'not-max'},unit:[{unitname:'Preserved'}]}}}};
  const deps={Tdfs:new Store([root]),Histories:new Store(),states:new Store(),assignments:new Store(),studies:new Store([], [['rootTdfId'],['studyId']]),participants:new Store(),
- saveContent:async(_owner,previous,content)=>{const current=deps.Tdfs.rows[0];assert.equal(current.tdfRevision,previous.tdfRevision);current.content=content;current.tdfRevision++;}};
+ saveContent:async(_owner,previous,content)=>{const current=deps.Tdfs.rows[0];assert.equal(current.tdfRevision,previous.tdfRevision);current.content=content;current.tdfRevision++;},
+ saveStudyBinding:async(binding,revision)=>{
+   const current=deps.Tdfs.rows[0];assert.equal(current.tdfRevision,revision);
+   await deps.studies.insertAsync(binding);current.tdfRevision++;
+ }};
  const service=createProlificTestExperiment(deps);
  const operation={_id:'operation',rootTdfId:'root',studyId,accountId,workspaceId,projectId,currency:'USD',reminderText:'Return',revisions:{root:3},completionCode:'TEST123'};
  return {deps,service,operation};
@@ -504,8 +530,10 @@ function unusedExperimentFixture() {
 describe('unused test experiment contract',()=>{
  it('uses the normal content writer and retries without another revision',async()=>{
   const f=unusedExperimentFixture();assert.deepEqual((await f.service.inspect('owner','root')).revisions,{root:3});
-  await f.service.configure('owner',f.operation);await f.service.configure('owner',f.operation);
-  assert.equal(f.deps.Tdfs.rows[0].tdfRevision,4);assert.equal(f.deps.Tdfs.rows[0].content.tdfs.tutor.setspec.loadbalancing,'not-max');
+  await f.service.configure('owner',f.operation);
+  await f.deps.participants.insertAsync({rootTdfId:'root'});
+  await f.service.configure('owner',f.operation);
+  assert.equal(f.deps.Tdfs.rows[0].tdfRevision,5);assert.equal(f.deps.Tdfs.rows[0].content.tdfs.tutor.setspec.loadbalancing,'not-max');
   assert.equal(f.deps.Tdfs.rows[0].content.tdfs.tutor.unit[0].unitname,'Preserved');assert.equal(f.deps.studies.rows.length,1);
  });
  for(const store of ['Histories','states','assignments','participants'])it('rejects existing '+store,async()=>{

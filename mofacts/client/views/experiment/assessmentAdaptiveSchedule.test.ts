@@ -23,7 +23,7 @@ describe('assessment adaptive schedule', function() {
     });
 
     expect(applied).to.equal(true);
-    expect(unit.assessmentsession.clusterlist).to.equal('2 4 1');
+    expect(unit.assessmentsession.clusterlist).to.equal('2-2 4-4 1-1');
   });
 
   it('leaves non-assessment adaptive templates to other owners', function() {

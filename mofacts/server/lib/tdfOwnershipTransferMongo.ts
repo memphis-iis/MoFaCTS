@@ -2,6 +2,7 @@ import { LESSON_PROVIDER_KEY_FIELDS } from '../../common/lessonProviderKeys';
 import { MongoInternals } from 'meteor/mongo';
 import { Meteor } from 'meteor/meteor';
 import { Tdfs } from '../../common/Collections';
+import { ProlificStudies } from './prolificCollections';
 import { createTdfOwnershipTransfer } from './tdfOwnershipTransfer';
 
 const transferredFieldsToClear = {
@@ -23,6 +24,9 @@ export const transferTdfOwnership = createTdfOwnershipTransfer({
             findOneAsync: (selector, options) => tdfs.findOne(selector, { projection: options?.fields, session }),
           },
           userExists: async userId => Boolean(await Meteor.users.rawCollection().findOne({ _id: userId }, { projection: { _id: 1 }, session })),
+          hasProlificBinding: async ids => Boolean(await ProlificStudies.rawCollection().findOne(
+            { rootTdfId: { $in: ids } }, { projection: { _id: 1 }, session },
+          )),
           updateOwners: async (ids, currentOwnerId, newOwnerId) => {
             const updated = await tdfs.updateMany({ _id: { $in: ids }, ownerId: currentOwnerId }, {
               $set: { ownerId: newOwnerId }, $inc: { tdfRevision: 1 },

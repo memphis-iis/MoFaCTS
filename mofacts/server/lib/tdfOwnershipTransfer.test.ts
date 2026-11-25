@@ -13,7 +13,7 @@ function fixture(count = 16) {
       experimentTarget: 'spanish-test',
     } } } },
   };
-  const state = { rows: [root, ...children] as any[], recipientExists: true, conflict: false, writes: 0 };
+  const state = { rows: [root, ...children] as any[], boundRoots: new Set<string>(), recipientExists: true, conflict: false, writes: 0 };
   const matches = (row: any, query: any) => {
     if (query._id) return query._id.$in ? query._id.$in.includes(row._id) : row._id === query._id;
     const ids = query['content.tdfs.tutor.setspec.conditionTdfIds'].$in;
@@ -27,6 +27,7 @@ function fixture(count = 16) {
         find: query => ({ fetchAsync: async () => pending.filter(r => matches(r, query)) }),
       },
       userExists: async () => state.recipientExists,
+      hasProlificBinding: async ids => ids.some(id => state.boundRoots.has(id)),
       updateOwners: async ids => {
         state.writes++;
         for (const row of pending.filter(r => ids.includes(r._id))) { row.ownerId = 'recipient'; row.tdfRevision++; }
@@ -55,6 +56,15 @@ describe('whole lesson-family ownership transfer', function() {
     const { state, transfer } = fixture();
     expect(await transfer('child-0', 'owner', 'recipient')).to.equal(17);
     expect(state.rows.every(r => r.ownerId === 'recipient')).to.equal(true);
+  });
+  it('rejects transfer of a bound study from the root or any condition before writing', async function() {
+    const { state, transfer } = fixture();
+    state.boundRoots.add('root');
+    const before = structuredClone(state.rows);
+    await rejects(transfer('root', 'owner', 'recipient'), 'prolific-study-bound');
+    await rejects(transfer('child-0', 'owner', 'recipient'), 'prolific-study-bound');
+    expect(state.writes).to.equal(0);
+    expect(state.rows).to.deep.equal(before);
   });
   it('continues to support a standalone runnable lesson', async function() {
     const { state, transfer } = fixture(1); state.rows.shift();

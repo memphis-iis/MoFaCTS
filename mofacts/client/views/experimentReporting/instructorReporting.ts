@@ -6,6 +6,8 @@ import './instructorReporting.css';
 import '../shared/adminUi/adminUi';
 import { meteorCallAsync } from '../..';
 import { INVALID } from '../../../common/Definitions';
+import { parseCourseReportingDateTime, reportingTimestamp } from '../../../common/lib/courseReportingTime';
+import { formatInterfaceDateTime } from '../../../common/lib/interfaceFormatting';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import {
@@ -24,14 +26,13 @@ import {
   findAssignmentForTdf,
   getCourseAssignments,
   getReportingTotals,
-  normalizePerformanceBuckets,
+  mergeReportingRows,
+  normalizePerformanceReport,
   rowsHaveData,
-  toDateInputValue,
-  toDateMillis,
   type ReportingAssignment,
   type ReportingAssignmentsByCourseId,
   type ReportingCourse,
-  type ReportingPerformanceBuckets,
+  type ReportingPerformanceReport,
   type ReportingPerformanceRow,
 } from './instructorReportingState';
 
@@ -45,7 +46,7 @@ type InstructorReportingInitialData = Readonly<{
 
 type InstructorReportingInstance = Blaze.TemplateInstance & {
   initialPresentation: ReactiveVar<LoadableState<InstructorReportingInitialData>>;
-  performancePresentation: ReactiveVar<LoadableState<ReportingPerformanceBuckets>>;
+  performancePresentation: ReactiveVar<LoadableState<ReportingPerformanceReport>>;
   commandStates: ReactiveVar<ReportingCommandStates>;
   commandRegistry: ScopedAsyncCommandRegistry<ReportingCommandResult>;
   initialLifetime: TemplateLifetime;
@@ -55,8 +56,9 @@ type InstructorReportingInstance = Blaze.TemplateInstance & {
   selectedCourseId: ReactiveVar<string>;
   selectedTdfId: ReactiveVar<string>;
   selectedAssignmentId: ReactiveVar<string | null>;
-  selectedDueDate: ReactiveVar<string>;
   deadlineDate: ReactiveVar<string>;
+  customCutoff: ReactiveVar<number | null>;
+  deadlineDateError: ReactiveVar<string>;
   exceptionDate: ReactiveVar<string>;
   dueDateFilter: ReactiveVar<boolean>;
   exceptionDateError: ReactiveVar<string>;
@@ -107,11 +109,17 @@ function getInitialData(instance: InstructorReportingInstance): InstructorReport
   };
 }
 
-function getPerformanceBuckets(instance: InstructorReportingInstance): ReportingPerformanceBuckets {
-  return readyLoadValue(instance.performancePresentation.get()) || {
-    met: [],
-    notMet: [],
-  };
+function getPerformanceReport(instance: InstructorReportingInstance): ReportingPerformanceReport | null {
+  return readyLoadValue(instance.performancePresentation.get());
+}
+
+function formatReportDate(timestamp: number | null, timezone: string): string {
+  if (timestamp === null) return '';
+  return formatInterfaceDateTime(getActiveUiLocale(), timestamp, {
+    timeZone: timezone, timeZoneName: 'short', year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', ...(timestamp % 60000 !== 0 ? { second: '2-digit' } : {}),
+    ...(timestamp % 1000 !== 0 ? { fractionalSecondDigits: 3 } : {}),
+  });
 }
 
 function exceptionScope(userId: string): string {
@@ -170,11 +178,10 @@ async function loadInitialReportingData(instance: InstructorReportingInstance): 
   }
 }
 
-function clearTdfSelection(instance: InstructorReportingInstance): void {
-  instance.selectedTdfId.set(String(INVALID));
-  instance.selectedAssignmentId.set(null);
-  instance.selectedDueDate.set('');
+function resetReportFilters(instance: InstructorReportingInstance): void {
   instance.deadlineDate.set('');
+  instance.customCutoff.set(null);
+  instance.deadlineDateError.set('');
   instance.exceptionDate.set('');
   instance.exceptionDateError.set('');
   instance.exceptionDateValidationUserId.set('');
@@ -184,32 +191,21 @@ function clearTdfSelection(instance: InstructorReportingInstance): void {
 
 function selectClass(instance: InstructorReportingInstance, courseId: string): void {
   instance.selectedCourseId.set(courseId);
-  clearTdfSelection(instance);
+  instance.selectedTdfId.set(String(INVALID));
+  instance.selectedAssignmentId.set(null);
+  resetReportFilters(instance);
 }
 
 function selectTdf(instance: InstructorReportingInstance, tdfId: string): void {
   const data = getInitialData(instance);
   const courseId = instance.selectedCourseId.get();
   const assignment = findAssignmentForTdf(data.assignmentsByCourseId, courseId, tdfId);
-  const dueDate = toDateInputValue(assignment?.dueAt);
   instance.selectedTdfId.set(tdfId);
   instance.selectedAssignmentId.set(assignment?.assignmentId || null);
-  instance.selectedDueDate.set(dueDate);
-  instance.deadlineDate.set('');
-  instance.exceptionDate.set('');
-  instance.exceptionDateError.set('');
-  instance.exceptionDateValidationUserId.set('');
-  instance.dueDateFilter.set(false);
+  resetReportFilters(instance);
 }
 
-function currentFilterDate(instance: InstructorReportingInstance): number | false {
-  if (instance.dueDateFilter.get()) {
-    return toDateMillis(instance.selectedDueDate.get());
-  }
-  return toDateMillis(instance.deadlineDate.get());
-}
-
-function reloadPerformance(instance: InstructorReportingInstance, date: number | false = currentFilterDate(instance)): void {
+function reloadPerformance(instance: InstructorReportingInstance): void {
   const courseId = instance.selectedCourseId.get();
   const tdfId = instance.selectedTdfId.get();
   if (!courseId || !tdfId || tdfId === String(INVALID)) {
@@ -221,16 +217,19 @@ function reloadPerformance(instance: InstructorReportingInstance, date: number |
   const generation = instance.performanceLifetime.begin();
   instance.performancePresentation.set(startLoad(instance.performancePresentation.get(), requestId));
 
-  meteorCallAsync('getClassPerformanceByTDF', courseId, tdfId, date || false)
+  const date = instance.dueDateFilter.get() ? instance.customCutoff.get() : null;
+  meteorCallAsync('getClassPerformanceByTDF', courseId, tdfId, date ?? false)
     .then((result) => {
       if (!instance.performanceLifetime.isCurrent(generation)) return;
-      const buckets = normalizePerformanceBuckets(result);
-      instance.performancePresentation.set(resolveLoad(
+      const report = normalizePerformanceReport(result);
+      const state = resolveLoad(
         instance.performancePresentation.get(),
         requestId,
-        buckets,
+        report,
         (value) => value.met.length === 0 && value.notMet.length === 0,
-      ));
+      );
+      instance.performancePresentation.set(state);
+      if (report.timing.cutoffAt === null) instance.dueDateFilter.set(false);
     })
     .catch((error) => {
       if (!instance.performanceLifetime.isCurrent(generation)) return;
@@ -241,10 +240,6 @@ function reloadPerformance(instance: InstructorReportingInstance, date: number |
         { message, retryable: true },
       ));
     });
-}
-
-function exceptionRefreshDate(instance: InstructorReportingInstance): number | false {
-  return toDateMillis(instance.selectedDueDate.get()) || currentFilterDate(instance);
 }
 
 function runExceptionCommand(
@@ -259,14 +254,14 @@ function runExceptionCommand(
   }, {
     getErrorMessage: (error) => errorMessage(error),
     onSuccess: () => {
-      reloadPerformance(instance, exceptionRefreshDate(instance));
+      reloadPerformance(instance);
     },
   });
 }
 
 Template.instructorReporting.onCreated(function(this: InstructorReportingInstance) {
   this.initialPresentation = new ReactiveVar<LoadableState<InstructorReportingInitialData>>({ status: 'idle' });
-  this.performancePresentation = new ReactiveVar<LoadableState<ReportingPerformanceBuckets>>({ status: 'idle' });
+  this.performancePresentation = new ReactiveVar<LoadableState<ReportingPerformanceReport>>({ status: 'idle' });
   this.commandStates = new ReactiveVar<ReportingCommandStates>({});
   this.commandRegistry = createScopedAsyncCommandRegistry<ReportingCommandResult>((scope, state) => {
     this.commandStates.set({ ...this.commandStates.get(), [scope]: state });
@@ -278,8 +273,9 @@ Template.instructorReporting.onCreated(function(this: InstructorReportingInstanc
   this.selectedCourseId = new ReactiveVar('');
   this.selectedTdfId = new ReactiveVar(String(INVALID));
   this.selectedAssignmentId = new ReactiveVar<string | null>(null);
-  this.selectedDueDate = new ReactiveVar('');
   this.deadlineDate = new ReactiveVar('');
+  this.customCutoff = new ReactiveVar<number | null>(null);
+  this.deadlineDateError = new ReactiveVar('');
   this.exceptionDate = new ReactiveVar('');
   this.dueDateFilter = new ReactiveVar(false);
   this.exceptionDateError = new ReactiveVar('');
@@ -334,14 +330,19 @@ Template.instructorReporting.helpers({
   },
   classReportingTableData() {
     const instance = Template.instance() as InstructorReportingInstance;
-    const buckets = getPerformanceBuckets(instance);
+    const report = getPerformanceReport(instance);
+    const dueDateFilter = instance.dueDateFilter.get();
+    const allRows = report ? [...report.met, ...report.notMet] : [];
+    const metRows = dueDateFilter ? report?.met ?? [] : mergeReportingRows(allRows);
+    const notMetRows = dueDateFilter ? report?.notMet ?? [] : [];
     return {
-      metRows: buckets.met,
-      notMetRows: buckets.notMet,
-      hasMetRows: rowsHaveData(buckets.met),
-      hasNotMetRows: rowsHaveData(buckets.notMet),
-      totals: getReportingTotals([...buckets.met, ...buckets.notMet]),
-      dueDateFilter: instance.dueDateFilter.get(),
+      metRows,
+      notMetRows,
+      hasMetRows: rowsHaveData(metRows),
+      hasNotMetRows: rowsHaveData(notMetRows),
+      totals: getReportingTotals(allRows),
+      dueDateFilter,
+      reportTimezone: report?.timing.timezone,
       performanceLoading: loadBusy(instance.performancePresentation.get()),
       loadError: performanceLoadError(instance),
       commandStates: instance.commandStates.get(),
@@ -349,8 +350,14 @@ Template.instructorReporting.helpers({
       exceptionDateValidationUserId: instance.exceptionDateValidationUserId.get(),
     };
   },
-  selectedTdfDueDate(): string {
-    return (Template.instance() as InstructorReportingInstance).selectedDueDate.get();
+  reportingTiming() {
+    return getPerformanceReport(Template.instance() as InstructorReportingInstance)?.timing;
+  },
+  formattedCutoff(): string {
+    const instance = Template.instance() as InstructorReportingInstance;
+    const timing = getPerformanceReport(instance)?.timing;
+    if (!timing) return '';
+    return formatReportDate(instance.dueDateFilter.get() ? timing.cutoffAt : timing.assignmentDueAt, timing.timezone);
   },
   deadlineDateValue(): string {
     return (Template.instance() as InstructorReportingInstance).deadlineDate.get();
@@ -369,11 +376,21 @@ Template.instructorReporting.helpers({
     return loadPending(instance.initialPresentation.get()) || !instance.selectedCourseId.get();
   },
   deadlineDisabled(): boolean {
+    return loadBusy((Template.instance() as InstructorReportingInstance).performancePresentation.get());
+  },
+  deadlineFilterDisabled(): boolean {
     const instance = Template.instance() as InstructorReportingInstance;
-    return !instance.selectedTdfId.get()
-      || instance.selectedTdfId.get() === String(INVALID)
-      || instance.dueDateFilter.get()
-      || loadBusy(instance.performancePresentation.get());
+    const report = getPerformanceReport(instance);
+    return loadBusy(instance.performancePresentation.get())
+      || (report?.timing.assignmentDueAt == null && instance.customCutoff.get() === null);
+  },
+  deadlineDateError(): string {
+    return (Template.instance() as InstructorReportingInstance).deadlineDateError.get();
+  },
+  deadlineDateAttrs() {
+    return (Template.instance() as InstructorReportingInstance).deadlineDateError.get()
+      ? { 'aria-invalid': 'true', 'aria-describedby': 'reporting-deadline-date-error' }
+      : { 'aria-invalid': 'false' };
   },
   exceptionDateError(): string {
     return (Template.instance() as InstructorReportingInstance).exceptionDateError.get();
@@ -401,6 +418,9 @@ Template.instructorReportingStudentRow.helpers({
   },
   exceptionActionLabel(key: Parameters<typeof translatePlatformString>[1], row: ReportingPerformanceRow): string {
     return reportingActionLabel(key, row);
+  },
+  formattedException(value: string, timezone: string): string {
+    return formatReportDate(reportingTimestamp(value), timezone);
   },
   rowCommandFeedback(userId: string) {
     const states = Template.instance().data?.commandStates as ReportingCommandStates | undefined;
@@ -441,16 +461,24 @@ Template.instructorReporting.events({
   'change #tdf-select'(event: Event, instance: InstructorReportingInstance) {
     const tdfId = String((event.currentTarget as HTMLSelectElement).value || '');
     selectTdf(instance, tdfId);
-    reloadPerformance(instance, false);
+    reloadPerformance(instance);
   },
 
   'change #practice-deadline-date'(event: Event, instance: InstructorReportingInstance) {
-    const date = String((event.currentTarget as HTMLInputElement).value || '');
+    const timing = getPerformanceReport(instance)?.timing;
+    if (!timing) return;
+    const input = event.currentTarget as HTMLInputElement;
+    const date = input.value;
     instance.deadlineDate.set(date);
-    const dateInt = toDateMillis(date);
-    if (dateInt) {
-      reloadPerformance(instance, dateInt);
+    const cutoff = date ? parseCourseReportingDateTime(date, timing.timezone) : null;
+    if (input.validity.badInput || (date && cutoff === null)) {
+      instance.deadlineDateError.set(reportingText('reporting.invalidCutoff'));
+      return;
     }
+    instance.deadlineDateError.set('');
+    instance.customCutoff.set(cutoff);
+    instance.dueDateFilter.set(cutoff !== null || (instance.dueDateFilter.get() && timing.assignmentDueAt !== null));
+    reloadPerformance(instance);
   },
 
   'change #exception-date'(event: Event, instance: InstructorReportingInstance) {
@@ -462,16 +490,11 @@ Template.instructorReporting.events({
   'change #due-date-filter'(event: Event, instance: InstructorReportingInstance) {
     const checked = Boolean((event.currentTarget as HTMLInputElement).checked);
     instance.dueDateFilter.set(checked);
-    if (checked) {
-      instance.deadlineDate.set(instance.selectedDueDate.get());
-      const dateInt = toDateMillis(instance.selectedDueDate.get());
-      if (dateInt) {
-        reloadPerformance(instance, dateInt);
-      }
-    } else {
-      instance.deadlineDate.set('');
-      reloadPerformance(instance, false);
-    }
+    reloadPerformance(instance);
+  },
+
+  'click #retry-instructor-performance'(_event: Event, instance: InstructorReportingInstance) {
+    reloadPerformance(instance);
   },
 
   'click .instructor-reporting-student-link'(event: Event, instance: InstructorReportingInstance) {
@@ -488,9 +511,10 @@ Template.instructorReporting.events({
   'click .add-exception'(event: Event, instance: InstructorReportingInstance) {
     event.preventDefault();
     const userId = String((event.currentTarget as HTMLElement).dataset.userid || '');
-    const dateInt = toDateMillis(instance.exceptionDate.get());
-    if (!dateInt) {
-      instance.exceptionDateError.set(reportingText('reporting.exceptionDate'));
+    const timing = getPerformanceReport(instance)?.timing;
+    const dateInt = timing ? parseCourseReportingDateTime(instance.exceptionDate.get(), timing.timezone) : null;
+    if (dateInt === null) {
+      instance.exceptionDateError.set(reportingText('reporting.invalidCutoff'));
       instance.exceptionDateValidationUserId.set(userId);
       document.getElementById('exception-date')?.focus();
       return;

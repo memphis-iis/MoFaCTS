@@ -679,7 +679,7 @@ export const COURSE_EXCEPTION_VERIFICATIONS = Object.freeze({
 export const CLASS_PERFORMANCE_VERIFICATION = Object.freeze({
   ...middlewareTest, suite: 'course method authorization', method: 'getClassPerformanceByTDF',
   surfaceId: 'method:getClassPerformanceByTDF', verificationId: 'method.course.class-performance',
-  cases: Object.freeze(['counts all practice for enrolled learners only on assigned lessons']),
+  cases: Object.freeze(['counts assigned practice for enrolled learners at the exact report cutoff']),
 } as const);
 
 export const COURSE_DELETE_VERIFICATION = Object.freeze({
@@ -699,7 +699,8 @@ export const COURSE_CREATE_VERIFICATION = Object.freeze({
 export const COURSE_EDIT_VERIFICATION = Object.freeze({
   ...middlewareTest, suite: 'course method authorization', method: 'editCourse',
   surfaceId: 'method:editCourse', verificationId: 'method.course.edit',
-  cases: Object.freeze(['renames sections in place and deletes only explicitly selected sections', 'limits new course owners to existing teachers and administrators']),
+  cases: Object.freeze(['renames sections in place and deletes only explicitly selected sections',
+    'limits new course owners to existing teachers and administrators', 'clears either course boundary and invalidates the learner snapshot']),
 } as const);
 export const COURSE_ASSIGNMENT_SAVE_VERIFICATION = Object.freeze({
   ...middlewareTest, suite: 'course method authorization', method: 'saveCourseAssignments',
@@ -745,7 +746,8 @@ export const LESSON_ACCESS_VERIFICATIONS = Object.freeze({
   list: Object.freeze({ ...middlewareTest, suite: 'lesson access bindings', method: 'getAccessableTDFSForUser', surfaceId: 'method:getAccessableTDFSForUser',
     verificationId: 'method.lesson-access.own-list', cases: Object.freeze(['lists only owned lessons and transfers ownership only for the owner']) } as const),
   transfer: Object.freeze({ ...middlewareTest, suite: 'lesson access bindings', method: 'transferDataOwnership', surfaceId: 'method:transferDataOwnership',
-    verificationId: 'method.lesson-access.transfer', cases: Object.freeze(['lists only owned lessons and transfers ownership only for the owner']) } as const),
+    verificationId: 'method.lesson-access.transfer', cases: Object.freeze(['lists only owned lessons and transfers ownership only for the owner',
+      'rejects transfer of a Prolific-bound lesson at the installed method']) } as const),
 });
 
 export const LEARNER_PROGRESS_VERIFICATIONS = Object.freeze(([

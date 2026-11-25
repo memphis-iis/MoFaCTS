@@ -1,3 +1,5 @@
+import type { ClassReportingTiming } from '../../../common/lib/courseReportingTime';
+
 export type ReportingCourse = {
   _id: string;
   courseName?: string;
@@ -7,7 +9,6 @@ export type ReportingAssignment = {
   assignmentId?: string | null;
   TDFId: string;
   displayName?: string;
-  dueAt?: unknown;
 };
 
 export type ReportingAssignmentsByCourseId = Record<string, ReportingAssignment[]>;
@@ -16,14 +17,17 @@ export type ReportingPerformanceRow = {
   userId: string;
   username: string;
   count: number;
+  numCorrect: number;
+  totalTime: number;
   percentCorrect: string;
   totalTimeMins: string;
   exception?: string | false | null;
 };
 
-export type ReportingPerformanceBuckets = Readonly<{
+export type ReportingPerformanceReport = Readonly<{
   met: ReportingPerformanceRow[];
   notMet: ReportingPerformanceRow[];
+  timing: ClassReportingTiming;
 }>;
 
 export type ReportingTotals = Readonly<{
@@ -32,25 +36,17 @@ export type ReportingTotals = Readonly<{
   totalTimeMins: string;
 }>;
 
-function finiteNumber(value: unknown): number {
-  const numberValue = Number(value);
-  return Number.isFinite(numberValue) ? numberValue : 0;
-}
-
-function parsePercent(value: unknown): number {
-  if (typeof value === 'string') {
-    return finiteNumber(value.replace('%', ''));
+export function normalizePerformanceReport(raw: unknown): ReportingPerformanceReport {
+  const timing = Array.isArray(raw) ? raw[2] : null;
+  if (!Array.isArray(raw) || !Array.isArray(raw[0]) || !Array.isArray(raw[1]) || typeof timing?.timezone !== 'string'
+    || (timing.assignmentDueAt !== null && !Number.isFinite(timing.assignmentDueAt))
+    || (timing.cutoffAt !== null && !Number.isFinite(timing.cutoffAt))) {
+    throw new Error('Invalid instructor report response');
   }
-  return finiteNumber(value);
-}
-
-export function normalizePerformanceBuckets(raw: unknown): ReportingPerformanceBuckets {
-  const rows = Array.isArray(raw) ? raw : [];
-  const met = Array.isArray(rows[0]) ? rows[0] : [];
-  const notMet = Array.isArray(rows[1]) ? rows[1] : [];
   return {
-    met: met as ReportingPerformanceRow[],
-    notMet: notMet as ReportingPerformanceRow[],
+    met: raw[0] as ReportingPerformanceRow[],
+    notMet: raw[1] as ReportingPerformanceRow[],
+    timing: timing as ClassReportingTiming,
   };
 }
 
@@ -74,33 +70,32 @@ export function findAssignmentForTdf(
     .find((assignment) => String(assignment?.TDFId || '') === String(tdfId || '')) || null;
 }
 
-export function toDateInputValue(value: unknown): string {
-  if (!value) return '';
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-  const date = new Date(value as string | number | Date);
-  if (!Number.isFinite(date.getTime())) return '';
-  const pad = (num: number) => String(num).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+function formatReportingStats(count: number, numCorrect: number, totalTime: number): ReportingTotals {
+  return {
+    count,
+    percentCorrect: `${(count > 0 ? 100 * numCorrect / count : 0).toFixed(2)}%`,
+    totalTimeMins: (totalTime / 60000).toFixed(3),
+  };
 }
 
-export function toDateMillis(value: unknown): number | false {
-  const text = typeof value === 'string' ? value.trim() : value;
-  if (!text) return false;
-  const time = new Date(text as string | number | Date).getTime();
-  return Number.isFinite(time) ? time : false;
+export function mergeReportingRows(rows: ReportingPerformanceRow[]): ReportingPerformanceRow[] {
+  const byUser = new Map<string, ReportingPerformanceRow>();
+  for (const row of rows) {
+    const prior = byUser.get(row.userId);
+    if (!prior) {
+      byUser.set(row.userId, row);
+      continue;
+    }
+    const numCorrect = prior.numCorrect + row.numCorrect;
+    const totalTime = prior.totalTime + row.totalTime;
+    byUser.set(row.userId, { ...prior, ...formatReportingStats(prior.count + row.count, numCorrect, totalTime), numCorrect, totalTime });
+  }
+  return [...byUser.values()];
 }
 
 export function getReportingTotals(rows: ReportingPerformanceRow[]): ReportingTotals {
-  const count = rows.reduce((sum, row) => sum + finiteNumber(row.count), 0);
-  const totalTime = rows.reduce((sum, row) => sum + finiteNumber(row.totalTimeMins), 0);
-  const weightedPercent = count > 0
-    ? rows.reduce((sum, row) => sum + parsePercent(row.percentCorrect) * finiteNumber(row.count), 0) / count
-    : 0;
-  return {
-    count,
-    percentCorrect: `${weightedPercent.toFixed(2)}%`,
-    totalTimeMins: totalTime.toFixed(3),
-  };
+  const count = rows.reduce((sum, row) => sum + row.count, 0);
+  const totalTime = rows.reduce((sum, row) => sum + row.totalTime, 0);
+  const numCorrect = rows.reduce((sum, row) => sum + row.numCorrect, 0);
+  return formatReportingStats(count, numCorrect, totalTime);
 }

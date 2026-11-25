@@ -1,5 +1,7 @@
 import type { PracticeDashboardProgressStats } from '../server/methods/dashboardCacheMethods.contracts';
 
+export const DEFAULT_COURSE_TIMEZONE = 'America/Chicago';
+
 export type CourseVisibility = 'private' | 'public';
 export type CourseAssignmentAvailability = 'available' | 'scheduled' | 'unavailable';
 export type CourseAssignmentType = 'lesson' | 'progressive';
