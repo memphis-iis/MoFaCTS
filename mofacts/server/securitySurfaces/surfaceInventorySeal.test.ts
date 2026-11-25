@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import { writeFile } from 'node:fs/promises';
 import { Meteor } from 'meteor/meteor';
 import { Random } from 'meteor/random';
 import { Roles } from 'meteor/alanning:roles';
-import { auditDigest } from '../../common/securityAudit/canonicalReport';
+import { auditDigest, canonicalAuditJson } from '../../common/securityAudit/canonicalReport';
 import { readStartupSurfaceInventory } from './startupSurfaceInventory';
 import { createSurfaceInventorySeal, type StartupProfile, type StartupSurface } from './surfaceInventorySeal';
 
@@ -57,6 +58,13 @@ describe('startup surface inventory', () => {
     assert.ok(rows.some(row => row.surfaceId === 'framework:accounts-base:on-create-user'));
     assert.ok(rows.some(row => row.surfaceId === 'framework:webapp:external-runtime-config'));
     assert.ok(rows.some(row => row.surfaceId === 'middleware:cdn-public-assets'));
+    // Only the isolated native worker mounts this test evidence destination.
+    const registryFile = process.env.MOFACTS_TEST_STARTUP_REGISTRY_FILE;
+    if (registryFile !== undefined) {
+      assert.equal(registryFile, '/evidence/startup-registry.json');
+      assert.equal(observed.inventory.profile.mode, 'test');
+      await writeFile(registryFile, canonicalAuditJson(observed.inventory), { flag: 'wx', mode: 0o600 });
+    }
   });
 
   it('allows only administrators to observe the bounded registry and proof state', async () => {

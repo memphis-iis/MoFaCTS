@@ -9,8 +9,8 @@ import { readCiFile, realDirectory, writeNew } from './collectCiEvidence.mjs';
 import { validateBuildVerificationBundle, verificationBundleHash } from './imageVerificationBundle.mjs';
 import { parseVerificationBundle, requireMatchingSourceVerification } from '../../../common/securityAudit/verificationBundle.ts';
 import { bindNativeCaseEvidence } from './nativeCaseEvidence.mjs';
-
 import { digestVerificationCatalog, requiredMeteorVerificationIds } from './verificationCatalogProof.mjs';
+import { MAX_REGISTRY_BYTES, projectExpectedRegistry, readNativeStartupRegistry } from './registryProjection.mjs';
 
 // The registry expectation is supplied by the release workflow. Deriving it
 // from the Meteor test run would conflate its installed profile with the image.
@@ -45,19 +45,25 @@ export async function composeNativeVerificationBundle({ nativeEvidence, buildIde
 export async function writeCapturedVerificationBundle({ root, expectedTestInputs, resultsDirectory, expectedReceiptSha256, registryFile }) {
   const app = path.join(root, 'test-context/mofacts');
   const results = await realDirectory(resultsDirectory);
-  const expectedRegistry = proofRecord(parseCiEvidenceJson(await readCiFile(registryFile, 16384), 16384), ['profile', 'inventorySha256']);
+  const declaration = proofRecord(parseCiEvidenceJson(await readCiFile(registryFile, 4096), 4096),
+    ['schema', 'profile', 'registrationProjection']);
+  if (declaration.schema !== 'RegistryProjectionDeclarationV1' ||
+    declaration.registrationProjection !== 'same-reviewed-owner-descriptors') throw Error('Unsupported registry projection declaration');
+  const release = (await fs.readFile(path.join(app, '.meteor/release'), 'utf8')).trim();
+  const startupRegistryBytes = await readCiFile(path.join(results, 'startup-registry.json'), MAX_REGISTRY_BYTES);
+  const installedDescriptors = readNativeStartupRegistry(startupRegistryBytes, release);
+  const expectedRegistry = await projectExpectedRegistry({ ...installedDescriptors, profile: declaration.profile });
   const bundle = await composeNativeVerificationBundle({
     buildIdentity: expectedTestInputs.identity, expectedRegistry, variant: 'source-evidence',
     nativeEvidence: {
       receiptBytes: await readCiFile(path.join(results, 'native-verification.json'), 16384),
       runBytes: await readCiFile(path.join(results, 'meteor-run.json'), meteorEvidence.MAX_BYTES * 2),
-      expectedReceiptSha256, expectedTestInputs, expectedModules: meteorEvidence.discoverTestModules(app),
+      startupRegistryBytes, expectedReceiptSha256, expectedTestInputs, expectedModules: meteorEvidence.discoverTestModules(app),
     },
   });
   const bytes = Buffer.from(canonicalAuditJson(bundle));
-  const release = (await fs.readFile(path.join(app, '.meteor/release'), 'utf8')).trim();
   await validateBuildVerificationBundle(bytes, expectedTestInputs.identity, release);
   const bundleFile = path.join(root, 'verification-bundle.json');
   await writeNew(bundleFile, bytes);
-  return { state: 'source-proof-prepared-unqualified', bundleFile, bundleDigestSha256: verificationBundleHash(bytes) };
+  return { state: 'source-proof-prepared-unqualified', bundleFile, bundleDigestSha256: verificationBundleHash(bytes), ...expectedRegistry };
 }

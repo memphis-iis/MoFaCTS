@@ -3,11 +3,12 @@ import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { parseBuildIdentity } from '../../../common/securityAudit/buildIdentity.ts';
 import { auditDigest } from '../../../common/securityAudit/canonicalReport.ts';
-import { contentDigest, proofRecord, proofString } from '../../../common/securityAudit/proofFields.ts';
+import { contentDigest, proofRecord } from '../../../common/securityAudit/proofFields.ts';
 import { digestVerificationBundle, requireMatchingSourceVerification } from '../../../common/securityAudit/verificationBundle.ts';
 import { readCiFile } from './collectCiEvidence.mjs';
 import { parseCiEvidenceJson } from './ciEvidence.mjs';
 import { digestVerificationCatalog, requiredMeteorVerificationIds } from './verificationCatalogProof.mjs';
+import { checkRegistryCoverage, requireProductionRegistryProfile } from './registryProjection.mjs';
 
 const maxResponseBytes = 600 * 1024;
 const maxExpectationBytes = 16384;
@@ -20,9 +21,7 @@ export async function compareRuntimeVerification(observation, expected) {
   const buildIdentity = parseBuildIdentity(target.buildIdentity);
   const inventorySha256 = contentDigest(target.inventorySha256);
   const bundleDigestSha256 = contentDigest(target.bundleDigestSha256);
-  const profile = proofRecord(target.profile, ['mode', 'meteorRelease']);
-  if (profile.mode !== 'production') throw Error('Expected runtime profile is not production');
-  proofString(profile.meteorRelease, /^METEOR@[A-Za-z0-9_.-]+$/, 80);
+  const profile = requireProductionRegistryProfile(target.profile);
   const profileSha256 = await auditDigest(profile);
   const requiredIds = new Set(requiredMeteorVerificationIds);
 
@@ -39,27 +38,7 @@ export async function compareRuntimeVerification(observation, expected) {
     || registry.inventorySha256 !== inventorySha256 || await auditDigest(inventory) !== inventorySha256) {
     throw Error('Runtime registry or profile differs from the build expectation');
   }
-  if (!Array.isArray(inventory.surfaces) || inventory.surfaces.length > requiredIds.size) {
-    throw Error('Invalid runtime surface inventory');
-  }
-
-  const surfaceIds = new Set();
-  const observedIds = new Set();
-  for (const entry of inventory.surfaces) {
-    const keys = ['surfaceId', 'owner', 'policy', 'dataEgress', 'verificationIds'];
-    if (entry && Object.hasOwn(entry, 'transport')) keys.push('transport');
-    const row = proofRecord(entry, keys);
-    const name = proofString(row.surfaceId, /^[A-Za-z0-9][A-Za-z0-9_./:-]*$/, 256);
-    if (surfaceIds.has(name) || !Array.isArray(row.verificationIds) || row.verificationIds.length < 1) {
-      throw Error('Runtime registry has duplicate surfaces or missing verification');
-    }
-    surfaceIds.add(name);
-    for (const id of row.verificationIds) {
-      if (!requiredIds.has(id) || observedIds.has(id)) throw Error('Runtime registry verification has an unexpected or repeated ID');
-      observedIds.add(id);
-    }
-  }
-  if (observedIds.size !== requiredIds.size) throw Error('Runtime registry is missing required verification IDs');
+  const verificationCount = checkRegistryCoverage(inventory.surfaces);
 
   const verificationCatalogSha256 = await digestVerificationCatalog();
   const embedded = proofRecord(response.verificationBundle, ['state', 'bundle', 'digestSha256']);
@@ -72,7 +51,7 @@ export async function compareRuntimeVerification(observation, expected) {
     verificationCatalogSha256, sourceVerificationIds: requiredIds,
   });
   return { state: 'runtime-proof-matched-unqualified', buildIdentity, profileSha256, inventorySha256,
-    bundleDigestSha256, verificationCatalogSha256, verificationCount: observedIds.size };
+    bundleDigestSha256, verificationCatalogSha256, verificationCount };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

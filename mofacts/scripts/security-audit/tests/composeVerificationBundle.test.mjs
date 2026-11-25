@@ -12,6 +12,7 @@ import { digestVerificationCatalog } from '../qualification/verificationCatalogP
 import { bindNativeCaseEvidence } from '../qualification/nativeCaseEvidence.mjs';
 import { carryImageVerificationBundle, validateBuildVerificationBundle } from '../qualification/imageVerificationBundle.mjs';
 import { compareRuntimeVerification } from '../qualification/compareRuntimeVerification.mjs';
+import { projectExpectedRegistry } from '../qualification/registryProjection.mjs';
 
 const hash = data => createHash('sha256').update(data).digest('hex');
 const bytes = value => Buffer.from(JSON.stringify(value));
@@ -124,7 +125,9 @@ test('carries a canonical source bundle into a build only for the captured revis
 test('writes the proof once from retained inputs and the separately declared registry', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-proof-prepare-test-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const { nativeEvidence } = fixture();
+  const registry = fixtureInventory();
+  const testRegistry = Buffer.from(canonicalAuditJson({ ...registry, profile: { ...registry.profile, mode: 'test' } }));
+  const { nativeEvidence } = fixture({ amendReceipt(receipt) { receipt.startupRegistryDigestSha256 = hash(testRegistry); } });
   const app = path.join(root, 'test-context/mofacts');
   for (const name of ['common', 'tests', 'server', 'client', '.meteor']) {
     await fs.mkdir(path.join(app, name), { recursive: true });
@@ -136,16 +139,28 @@ test('writes the proof once from retained inputs and the separately declared reg
   await fs.writeFile(path.join(root, 'native-verification.json'), nativeEvidence.receiptBytes);
   await fs.writeFile(path.join(root, 'meteor-run.json'), nativeEvidence.runBytes);
   const registryFile = path.join(root, 'registry.json');
-  await fs.writeFile(registryFile, bytes(expectedRegistry));
+  await fs.writeFile(path.join(root, 'startup-registry.json'), testRegistry);
+  const declaration = { schema: 'RegistryProjectionDeclarationV1', profile: expectedRegistry.profile,
+    registrationProjection: 'same-reviewed-owner-descriptors' };
+  await fs.writeFile(registryFile, bytes(declaration));
   const options = { root, expectedTestInputs, resultsDirectory: root, registryFile,
     expectedReceiptSha256: nativeEvidence.expectedReceiptSha256 };
+  await fs.writeFile(path.join(root, 'startup-registry.json'), canonicalAuditJson({
+    ...JSON.parse(testRegistry), surfaces: [...registry.surfaces].reverse(),
+  }));
+  await assert.rejects(writeCapturedVerificationBundle(options), /does not match the retained receipt/);
+  await fs.writeFile(path.join(root, 'startup-registry.json'), testRegistry);
+  await fs.writeFile(registryFile, bytes({ ...declaration, registrationProjection: 'unreviewed' }));
+  await assert.rejects(writeCapturedVerificationBundle(options), /Unsupported registry projection/);
+  await fs.writeFile(registryFile, bytes(declaration));
   const result = await writeCapturedVerificationBundle(options);
   assert.equal(result.state, 'source-proof-prepared-unqualified');
   assert.equal(result.bundleDigestSha256, hash(await fs.readFile(result.bundleFile)));
+  assert.equal(result.inventorySha256, (await projectExpectedRegistry(registry)).inventorySha256);
   await assert.rejects(writeCapturedVerificationBundle(options), { code: 'EEXIST' });
 });
 
-async function runtimeObservation(amendInventory = () => {}) {
+function fixtureInventory() {
   const inventory = {
     schema: 'StartupSurfaceInventoryV1', profile: expectedRegistry.profile,
     surfaces: declared.map(({ surfaceId, verificationId }) => ({
@@ -160,6 +175,25 @@ async function runtimeObservation(amendInventory = () => {}) {
     else rows.set(row.surfaceId, row);
   }
   inventory.surfaces = [...rows.values()];
+  return inventory;
+}
+
+test('projects the reviewed production registry deterministically with exact HTTP case ownership', async () => {
+  const inventory = fixtureInventory();
+  const surface = inventory.surfaces.find(row => row.surfaceId === 'http:get:/health');
+  surface.owner = 'http';
+  surface.transport = { verifiedSurfaces: [surface.surfaceId] };
+  surface.surfaceId = 'middleware:health-get-test';
+  const expected = await projectExpectedRegistry(inventory);
+  const reversed = { ...inventory, surfaces: [...inventory.surfaces].reverse() };
+  assert.deepEqual(await projectExpectedRegistry(reversed), expected);
+  await assert.rejects(projectExpectedRegistry({ ...inventory, profile: { ...inventory.profile, mode: 'test' } }), /not production/);
+  surface.transport.verifiedSurfaces[0] = 'http:head:/health';
+  await assert.rejects(projectExpectedRegistry(inventory), /different surface/);
+});
+
+async function runtimeObservation(amendInventory = () => {}) {
+  const inventory = fixtureInventory();
   amendInventory(inventory);
   const profileSha256 = await auditDigest(inventory.profile);
   const inventorySha256 = await auditDigest(inventory);
@@ -194,7 +228,7 @@ test('matches the runtime response to the independent proof and recomputes all h
 test('rejects a registry with missing or repeated verification IDs even when its bytes match the expectation', async () => {
   for (const update of [
     inventory => { inventory.surfaces.pop(); },
-    inventory => { inventory.surfaces[0].verificationIds.push(inventory.surfaces[1].verificationIds[0]); },
+    inventory => { inventory.surfaces[0].verificationIds.push(inventory.surfaces[0].verificationIds[0]); },
   ]) {
     const { observation, expected } = await runtimeObservation(update);
     await assert.rejects(compareRuntimeVerification(observation, expected), /missing required verification|repeated ID/);

@@ -27,11 +27,13 @@ function parseTestInputs(value) {
 // The receipt digest comes from retained operator evidence. The expected test
 // inputs come from capture verification for the source being built.
 export async function bindNativeCaseEvidence(input, requestedIds) {
-  const { receiptBytes, runBytes, expectedReceiptSha256, expectedTestInputs, expectedModules } = input;
-  const receipt = proofRecord(parseCiEvidenceJson(receiptBytes, 16384), [
+  const { receiptBytes, runBytes, startupRegistryBytes, expectedReceiptSha256, expectedTestInputs, expectedModules } = input;
+  const decoded = parseCiEvidenceJson(receiptBytes, 16384);
+  const receipt = proofRecord(decoded, [
     'schema', 'qualification', 'provider', 'sourceObservation', 'toolImageId', 'mongoImageId',
     'runEvidenceDigestSha256', 'toolSourceManifestDigestSha256', 'isolation', 'startedAt',
     'finishedAt', 'environments', 'limits',
+    ...(decoded && Object.hasOwn(decoded, 'startupRegistryDigestSha256') ? ['startupRegistryDigestSha256'] : []),
   ]);
   if (sha256(receiptBytes) !== contentDigest(expectedReceiptSha256) ||
       receipt.schema !== 'NativeMeteorVerificationV1' || receipt.qualification !== 'unqualified' ||
@@ -42,6 +44,9 @@ export async function bindNativeCaseEvidence(input, requestedIds) {
   imageDigest(receipt.toolImageId);
   imageDigest(receipt.mongoImageId);
   contentDigest(receipt.toolSourceManifestDigestSha256);
+  if (Object.hasOwn(receipt, 'startupRegistryDigestSha256')) contentDigest(receipt.startupRegistryDigestSha256);
+  if (startupRegistryBytes !== undefined && (!Buffer.isBuffer(startupRegistryBytes) ||
+    sha256(startupRegistryBytes) !== receipt.startupRegistryDigestSha256)) throw Error('Native startup registry does not match the retained receipt');
   if (timestamp(receipt.finishedAt) < timestamp(receipt.startedAt) ||
       !isDeepStrictEqual(receipt.limits, { workerMemoryMiB: 6144, mongoMemoryMiB: 384, workerCpus: 2, mongoCpus: 0.25 }) ||
       !isDeepStrictEqual(receipt.isolation, { schema: 'NativeIntegrationIsolationV1', dockerSocketAbsent: true,

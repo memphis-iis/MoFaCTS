@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { createHash } = require('node:crypto');
 const test = require('node:test');
 const app = path.resolve(__dirname, '../../mofacts');
 const { discoverTestModules } = require(path.join(app, 'scripts/meteorTestEvidence.cjs'));
@@ -12,7 +13,7 @@ const observation = () => ({
   identity: { schema: 'BuildIdentityV1', baseCommit: commit, includedUncommittedLocalChanges: false, sourceSnapshotDigestSha256: 'b'.repeat(64) },
   testInputContractDigestSha256: 'c'.repeat(64), supplementalDigestSha256: 'd'.repeat(64),
 });
-function fixture(changes = () => {}) {
+function fixture(changes = () => {}, registry) {
   const modules = discoverTestModules(app);
   const run = { schema: 'MeteorTestRunEvidenceV1', exitStatus: 0, environments: ['server', 'client'].map(side => ({
     schema: 'MeteorEnvironmentEvidenceV1', side, modules: modules[side],
@@ -34,7 +35,10 @@ function fixture(changes = () => {}) {
     for (const name of ['tool-image-id', 'mongo-image-id']) fs.writeFileSync(path.join(root, name), 'sha256:' + '3'.repeat(64));
     for (const name of ['started-at', 'finished-at']) fs.writeFileSync(path.join(root, name), '2026-11-06T00:00:00Z');
     fs.writeFileSync(path.join(root, 'tool-source-run-sha256'), 'synthetic tool source manifest');
-    const invoke = () => spawnSync(process.execPath, [path.join(__dirname, 'record-native.cjs'), root, app, commit], { encoding: 'utf8' });
+    if (registry !== undefined) fs.writeFileSync(path.join(root, 'startup-registry.json'), registry);
+    const args = [path.join(__dirname, 'record-native.cjs'), root, app, commit];
+    if (registry !== undefined) args.push('--with-startup-registry');
+    const invoke = () => spawnSync(process.execPath, args, { encoding: 'utf8' });
     const result = invoke();
     const file = path.join(root, 'native-verification.json');
     return { result, receipt: fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : undefined,
@@ -53,6 +57,28 @@ test('native receipt preserves pending outcomes and cannot overwrite evidence', 
   assert.equal(Object.hasOwn(receipt, 'mongoImageConfig'), false);
   assert.deepEqual(receipt.limits, { workerMemoryMiB: 6144, mongoMemoryMiB: 384, workerCpus: 2, mongoCpus: 0.25 });
   assert.notEqual(repeatedStatus, 0);
+});
+
+test('native receipt records the exact test registry bytes and refuses a production-mode observation', () => {
+  const { AUDIT_VERIFICATIONS } = require(path.join(app, 'common/securityAudit/verificationCatalog.ts'));
+  const { canonicalAuditJson } = require(path.join(app, 'common/securityAudit/canonicalReport.ts'));
+  const surfaces = new Map();
+  for (const row of AUDIT_VERIFICATIONS.filter(row => row.lane === 'meteor' && row.kind === 'integrationTest')) {
+    const surface = surfaces.get(row.surfaceId) ?? { surfaceId: row.surfaceId, owner: 'fixture',
+      policy: 'bounded', dataEgress: 'none', verificationIds: [] };
+    surface.verificationIds.push(row.verificationId);
+    surfaces.set(row.surfaceId, surface);
+  }
+  const inventory = { schema: 'StartupSurfaceInventoryV1', profile: { mode: 'test',
+    meteorRelease: fs.readFileSync(path.join(app, '.meteor/release'), 'utf8').trim() }, surfaces: [...surfaces.values()] };
+  const bytes = canonicalAuditJson(inventory);
+  const { result, receipt } = fixture(undefined, bytes);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(receipt.startupRegistryDigestSha256, createHash('sha256').update(bytes).digest('hex'));
+  inventory.profile.mode = 'production';
+  const rejected = fixture(undefined, canonicalAuditJson(inventory));
+  assert.notEqual(rejected.result.status, 0);
+  assert.equal(rejected.receipt, undefined);
 });
 
 test('native receipt rejects missing, contradictory or excessive Docker resource limits', () => {

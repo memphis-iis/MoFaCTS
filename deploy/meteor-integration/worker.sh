@@ -172,6 +172,7 @@ docker create --init --name "$name-test" --label "$label" --network "$name" \
   --workdir /capture/test-context/mofacts \
   --env CI=1 --env TEST_SETTINGS_FILE=settings.ci.json \
   --env MOFACTS_TEST_EVIDENCE_FILE=/evidence/meteor-run.json \
+  --env MOFACTS_TEST_STARTUP_REGISTRY_FILE=/evidence/startup-registry.json \
   --env TEST_RUN_TIMEOUT_MS=1200000 \
   --env 'MONGO_URL=mongodb://mongodb:27017/meteor?replicaSet=mofacts-ci-rs&directConnection=true' \
   --env MOFACTS_MONGO_REPLICA_SET_NAME=mofacts-ci-rs \
@@ -189,5 +190,5 @@ docker inspect "$name-test" --format '{{json .State}}' > "$job/results/test-stat
 date -u +%FT%TZ > "$job/results/finished-at"
 (( test_status == 0 )) || exit "$test_status"
 coordinator node "$capture" verify-tests --builder default --workspace "$workspace" > "$job/results/source-after.json"
-coordinator node "$job/control/record-native.cjs" "$job/results" "$job/source/mofacts" "$commit"
+coordinator node "$job/control/record-native.cjs" "$job/results" "$job/source/mofacts" "$commit" --with-startup-registry
 printf 'Native integration verified; no GitHub or release qualification claimed.\n'

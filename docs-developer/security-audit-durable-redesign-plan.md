@@ -87,12 +87,17 @@ design. Existing approved staging2 tooling, image construction/publication,
 deployment, synthetic checks and application rollback may proceed when their
 technical prerequisites pass. Preserve the current branch and unrelated work.
 
-Continue until the written acceptance conditions are met or a real decision is
-required. The 2026-11-12 bounded access delegation below permits necessary new
+Continue until the written acceptance conditions are met, a real decision is
+required, or a concrete blocker prevents all remaining authorized work. Checking
+off an item, passing a test, publishing a batch, and finishing a stage are
+checkpoints. Record the evidence and start the next unchecked item in the same
+work session. If one item is blocked, continue independent work. A remaining
+Meteor allowance is a ceiling. Ask for more runs only when an outstanding
+acceptance check actually needs one and no authorized slot remains. The 2026-11-12 bounded access delegation below permits necessary new
 security-sensitive access within its conditions without per-change approval.
 Ask for a consequential design change, access outside those conditions, new
-spending, destructive data changes, production operations, exhaustion of the
-ten-run allowance, or a blocker remaining after reasonable diagnosis. Existing
+spending, destructive data changes, production operations, or help resolving a
+blocker that remains after reasonable diagnosis. Existing
 approved identities and permissions may be reused within their scope. Additional
 AWS/IAM/recovery-store access and protected backup reads remain separately bounded;
 this delegation does not renew a consumed one-use authorization.
@@ -828,7 +833,7 @@ acceptance is still distinct from these bounded passing results.
 
 **Cold restore, approved 2026-11-05:** implement and perform the isolated read-only
 fresh-runner check in the [restore review](../deploy/security-audit/recovery-transfer/restore-rehearsal-review.md).
-The approved scope is steps 1–2 only, with no deployment-secret copies or provider
+The approved scope is steps 1ï¿½2 only, with no deployment-secret copies or provider
 logins and with access/workflow/environment cleanup. Phil authorized one fresh
 Meteor invocation plus up to ten additional project invocations if needed;
 reserve/count each in the status ledger. Accepted rollback labels, candidate

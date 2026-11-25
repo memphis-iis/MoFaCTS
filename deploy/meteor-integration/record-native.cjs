@@ -4,8 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
-const [results, app, commit] = process.argv.slice(2);
-if (process.argv.length !== 5 || !path.isAbsolute(results) || !path.isAbsolute(app)
+const [results, app, commit, flag, ...extra] = process.argv.slice(2);
+if (!results || !app || !path.isAbsolute(results) || !path.isAbsolute(app) || extra.length
+  || (flag !== undefined && flag !== '--with-startup-registry')
   || !/^[0-9a-f]{40}$/.test(commit)) throw Error('Invalid native verification arguments');
 const { discoverTestModules, validateRun, MAX_BYTES } = require(path.join(app, 'scripts/meteorTestEvidence.cjs'));
 const { parseBuildIdentity } = require(path.join(app, 'common/securityAudit/buildIdentity.ts'));
@@ -52,6 +53,14 @@ const resourceLimit = (value, memoryMiB, nanoCpus) => {
 };
 const workerLimits = resourceLimit(resources.worker, 6144, 2e9);
 const mongoLimits = resourceLimit(resources.mongo, 384, 0.25e9);
+let startupRegistryDigestSha256;
+if (flag === '--with-startup-registry') {
+  const { readNativeStartupRegistry } = require(path.join(app, 'scripts/security-audit/qualification/registryProjection.mjs'));
+  const inventoryBytes = read('startup-registry.json');
+  const release = fs.readFileSync(path.join(app, '.meteor/release'), 'utf8').trim();
+  readNativeStartupRegistry(inventoryBytes, release);
+  startupRegistryDigestSha256 = createHash('sha256').update(inventoryBytes).digest('hex');
+}
 const receipt = {
   schema: 'NativeMeteorVerificationV1', qualification: 'unqualified', provider: 'operator-linux-docker',
   sourceObservation: after,
@@ -61,6 +70,7 @@ const receipt = {
   mongoImageId: imageId('mongo-image-id'),
   runEvidenceDigestSha256: createHash('sha256').update(raw).digest('hex'),
   toolSourceManifestDigestSha256: createHash('sha256').update(read('tool-source-run-sha256')).digest('hex'),
+  ...(startupRegistryDigestSha256 === undefined ? {} : { startupRegistryDigestSha256 }),
   isolation,
   startedAt: read('started-at').toString('utf8').trim(),
   finishedAt: read('finished-at').toString('utf8').trim(),
