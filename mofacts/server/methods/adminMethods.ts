@@ -1,5 +1,5 @@
+import Papa from 'papaparse';
 import { Meteor } from 'meteor/meteor';
-import { Accounts } from 'meteor/accounts-base';
 import { check, Match } from 'meteor/check';
 import { Roles } from 'meteor/alanning:roles';
 import {
@@ -13,6 +13,7 @@ import {
   type AdminApiKeyProvider,
   type AdminApiKeySettingsDoc,
 } from '../lib/apiKeyResolution';
+import { roleGrantedBySettings } from '../lib/configuredRoles';
 import { removeUserOwnedData } from '../lib/userDeletion';
 
 type UnknownRecord = Record<string, unknown>;
@@ -21,9 +22,6 @@ type MethodContext = {
   userId?: string | null;
   unblock?: () => void;
   connection?: { id?: string; clientAddress?: string | null } | null;
-};
-type CsvParser = {
-  parse: (csv: string) => { data: unknown[] };
 };
 type CountAndFetchCursor = {
   countAsync: () => Promise<number>;
@@ -34,8 +32,8 @@ type FetchCursor = {
 };
 
 type AdminMethodsDeps = {
+  isValidEmailAddress: (value: string) => boolean;
   serverConsole: Logger;
-  csvParser?: CsvParser | undefined;
   usersCollection: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => FetchCursor;
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
@@ -44,16 +42,13 @@ type AdminMethodsDeps = {
   Tdfs: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => CountAndFetchCursor;
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
-    removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
   DynamicAssets: {
-    find: (selector: UnknownRecord, options?: UnknownRecord) => CountAndFetchCursor;
     collection: {
       rawCollection: () => {
         countDocuments: (selector: UnknownRecord) => Promise<number>;
       };
     };
-    removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
   Courses: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { countAsync: () => Promise<number> };
@@ -103,11 +98,8 @@ type AdminMethodsDeps = {
   sendVerificationEmailForUser: (userId: string, actorUserId: string | null, source: string) => Promise<boolean>;
   getUserDisplayIdentifier: (user: any) => string;
   syncUsernameCaches: (userId: string, nextUsername: string, previousUsername?: string) => void;
-  deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
-  removeUploadedAsset: (assetId: string) => Promise<void>;
   removeSparcFigureUserDecisions: (userId: string) => Promise<void>;
   removeSimulationResearchUserRecords: (userId: string) => Promise<void>;
-  clearStimDisplayTypeMap: () => void;
   encryptData?: (value: string) => string;
   decryptData?: (value: string) => string;
   openRouterModelCatalogService: OpenRouterModelCatalogService;
@@ -298,34 +290,6 @@ async function writeAdminApiKeySettings(
   throw new Meteor.Error('admin-api-key-settings-unavailable', 'Dynamic settings cannot save API key alternatives');
 }
 
-function addEmailCandidate(emailSet: Map<string, string>, candidate: unknown) {
-  const email = trimString(candidate);
-  if (!email.includes('@')) {
-    return;
-  }
-  const canonical = email.toLowerCase();
-  if (!emailSet.has(canonical)) {
-    emailSet.set(canonical, email);
-  }
-}
-
-function getUserAdminEmailCandidates(user: any) {
-  const candidates: unknown[] = [
-    user?.email_canonical,
-    user?.email_original,
-    user?.username,
-    user?.email,
-  ];
-
-  if (Array.isArray(user?.emails)) {
-    for (const emailEntry of user.emails) {
-      candidates.push(emailEntry?.address);
-    }
-  }
-
-  return candidates;
-}
-
 async function getUserDeletionBlockingReasons(deps: AdminMethodsDeps, targetUserId: string) {
   const reasons: string[] = [];
 
@@ -354,60 +318,35 @@ async function getUserDeletionBlockingReasons(deps: AdminMethodsDeps, targetUser
   return reasons;
 }
 
-async function upsertManagedUser(
-  deps: AdminMethodsDeps,
-  params: {
-    actingUserId: string | null | undefined;
-    rawUserName: string;
-    password: string;
-    existingUserSource: string;
-    createdUserSource: string;
-    verificationSource: string;
-    bulkSource?: string;
-  }
-) {
-  const normalizedEmail = deps.normalizeCanonicalEmail(params.rawUserName);
-  deps.assertStrongPassword(params.password);
+async function createRosterAccount(deps: AdminMethodsDeps, actor: string, email: string, password: string) {
+  const normalizedEmail = deps.normalizeCanonicalEmail(email);
 
   return await deps.withSignUpLock(normalizedEmail.canonical, async () => {
-    const existingUser = await deps.findNormalAccountUserByCanonicalEmail(normalizedEmail.canonical);
-
-    if (existingUser) {
-      Accounts.setPassword(existingUser._id, params.password);
-      await deps.enforceCanonicalEmailIdentity(existingUser._id, normalizedEmail.original, {
-        actorUserId: params.actingUserId || null,
-        source: params.existingUserSource,
-      });
-      await deps.writeAuditLog('admin.userPasswordReset', params.actingUserId || null, existingUser._id, {
-        username: normalizedEmail.canonical,
-        ...(params.bulkSource ? { source: params.bulkSource } : {}),
-      });
-      return { userExists: true, userId: existingUser._id, passwordUpdated: true };
-    }
-
+    if (await deps.findNormalAccountUserByCanonicalEmail(normalizedEmail.canonical)) return 'skipped';
+    deps.assertStrongPassword(password);
     const createdId = await deps.createUserWithRetry(
       normalizedEmail.canonical,
-      params.password,
-      { experiment: false, createdBy: params.actingUserId, username: normalizedEmail.canonical },
+      password,
+      { experiment: false, createdBy: actor, username: normalizedEmail.canonical },
       {
         emailOriginal: normalizedEmail.original,
         emailCanonical: normalizedEmail.canonical,
       }
     );
     await deps.enforceCanonicalEmailIdentity(createdId, normalizedEmail.original, {
-      actorUserId: params.actingUserId || null,
-      source: params.createdUserSource,
+      actorUserId: actor,
+      source: 'insertNewUsers.createdUser',
     });
     await deps.syncUserAuthState(createdId, 'password');
-    await deps.writeAuditLog('admin.userCreated', params.actingUserId || null, createdId, {
+    await deps.writeAuditLog('admin.userCreated', actor, createdId, {
       username: normalizedEmail.canonical,
-      ...(params.bulkSource ? { source: params.bulkSource } : {}),
+      source: 'insertNewUsers',
     });
     if (deps.isEmailVerificationRequired()) {
-      await deps.sendVerificationEmailForUser(createdId, params.actingUserId || null, params.verificationSource);
+      await deps.sendVerificationEmailForUser(createdId, actor, 'insertNewUsers');
     }
 
-    return { userExists: false, userId: createdId, passwordUpdated: false };
+    return 'created';
   });
 }
 
@@ -595,35 +534,16 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
       await deps.requireAdminUser(this.userId, 'Only admins can compose news emails');
 
       const users = await deps.usersCollection.find(
-        {
-          $or: [
-            { email_canonical: { $regex: '@' } },
-            { email_original: { $regex: '@' } },
-            { 'emails.address': { $regex: '@' } },
-            { username: { $regex: '@' } },
-            { email: { $regex: '@' } },
-          ],
-        },
-        {
-          fields: {
-            username: 1,
-            email: 1,
-            email_canonical: 1,
-            email_original: 1,
-            emails: 1,
-          },
-          sort: { email_canonical: 1, username: 1 },
-        }
+        { $or: [{ email_canonical: { $type: 'string' } }, { 'emails.0.address': { $type: 'string' } }] },
+        { fields: { email_canonical: 1, emails: { $slice: 1 }, _id: 0 } },
       ).fetchAsync();
 
-      const emailSet = new Map<string, string>();
+      const recipients = new Set<string>();
       for (const user of users) {
-        for (const candidate of getUserAdminEmailCandidates(user)) {
-          addEmailCandidate(emailSet, candidate);
-        }
+        const address = trimString(user.email_canonical || user.emails?.[0]?.address).toLowerCase();
+        if (deps.isValidEmailAddress(address)) recipients.add(address);
       }
-
-      const emails = Array.from(emailSet.values()).sort((a, b) => a.localeCompare(b));
+      const emails = [...recipients].sort((a, b) => a.localeCompare(b));
       await deps.writeAuditLog('admin.newsEmailComposeRequested', this.userId || null, null, {
         recipientCount: emails.length,
       });
@@ -632,21 +552,6 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         emails,
         count: emails.length,
       };
-    },
-
-    adminCreateOrUpdateUser: async function(this: MethodContext, rawUserName: string, newUserPassword: string) {
-      check(rawUserName, String);
-      check(newUserPassword, String);
-      await deps.requireAdminUser(this.userId, 'Only admins can create or update users');
-
-      return await upsertManagedUser(deps, {
-        actingUserId: this.userId,
-        rawUserName,
-        password: newUserPassword,
-        existingUserSource: 'adminCreateOrUpdateUser.existingUser',
-        createdUserSource: 'adminCreateOrUpdateUser.createdUser',
-        verificationSource: 'adminCreateOrUpdateUser',
-      });
     },
 
     userAdminRoleChange: async function(this: MethodContext, targetUserId: string, roleAction: string, roleName: string) {
@@ -672,6 +577,16 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         throw new Meteor.Error('not-found', 'Invalid: could not find that user');
       }
 
+      if (normalizedRoleAction === 'remove') {
+        if (normalizedRoleName === 'admin' && normalizedTargetUserId === this.userId) {
+          throw new Meteor.Error('admin-self-demotion', 'Another administrator must remove your admin role.');
+        }
+        const settings = Meteor.settings as any;
+        if (roleGrantedBySettings(settings.initRoles, normalizedRoleName as 'admin' | 'teacher', targetUser,
+          deps.isValidEmailAddress, settings.owner)) {
+          throw new Meteor.Error('role-granted-by-settings', 'Site settings grant this role. Remove the setting before removing the role in User Admin.');
+        }
+      }
       const targetUsername = targetUser?.username;
 
       if (normalizedRoleAction === 'add') {
@@ -713,6 +628,11 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         throw new Meteor.Error('not-found', 'Invalid: could not find that user');
       }
 
+      const settings = Meteor.settings as any;
+      if ((['admin', 'teacher'] as const).some(role =>
+        roleGrantedBySettings(settings.initRoles, role, targetUser, deps.isValidEmailAddress, settings.owner))) {
+        throw new Meteor.Error('delete-user-configured', 'Remove the account from site role settings before deleting it.');
+      }
       const blockingReasons = await getUserDeletionBlockingReasons(deps, normalizedTargetUserId);
       if (blockingReasons.length > 0) {
         throw new Meteor.Error(
@@ -738,74 +658,26 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
       };
     },
 
-    deleteAllFiles: async function(this: MethodContext) {
-      await deps.requireAdminUser(this.userId, 'Admin access required to delete all files');
-
-      try {
-        deps.serverConsole('delete all uploaded files');
-
-        const tdfs = await deps.Tdfs.find({}).fetchAsync();
-        deps.serverConsole('TDFs to remove: ' + tdfs.length);
-        let tdfsRemoved = 0;
-
-        for (const tdf of tdfs) {
-          const tdfId = String(tdf?._id || '');
-          if (!tdfId) {
-            continue;
-          }
-          try {
-            await deps.deleteTdfRuntimeData(tdfId);
-            await deps.Tdfs.removeAsync({ _id: tdfId });
-            tdfsRemoved++;
-            deps.serverConsole('removed TDF ' + tdfId);
-          } catch (tdfError: unknown) {
-            deps.serverConsole('Error removing TDF ' + tdfId + ':', tdfError);
-          }
-        }
-
-        const files = await deps.DynamicAssets.find({}).fetchAsync();
-        deps.serverConsole('Asset files to remove: ' + files.length);
-        let filesRemoved = 0;
-
-        for (const file of files) {
-          const fileId = String(file?._id || '');
-          if (!fileId) {
-            continue;
-          }
-          try {
-            deps.serverConsole('removing file ' + fileId);
-            await deps.removeUploadedAsset(fileId);
-            filesRemoved++;
-          } catch (fileError: unknown) {
-            deps.serverConsole('Error removing file ' + fileId + ':', fileError);
-          }
-        }
-
-        deps.clearStimDisplayTypeMap();
-        deps.serverConsole('removed ' + tdfsRemoved + ' TDFs and ' + filesRemoved + ' asset files');
-        return filesRemoved + tdfsRemoved;
-      } catch (error: unknown) {
-        deps.serverConsole('Error in deleteAllFiles:', error);
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Meteor.Error('delete-failed', 'Failed to delete files: ' + message);
-      }
-    },
-
     insertNewUsers: async function(this: MethodContext, filename: string, filecontents: string) {
       await deps.requireAdminUser(this.userId, 'Only admins can bulk import users');
       deps.serverConsole('insertNewUsers: ' + filename);
 
-      if (!deps.csvParser || typeof deps.csvParser.parse !== 'function') {
-        throw new Meteor.Error('csv-parser-missing', 'Papa parser is not available on server');
+      check(filename, String);
+      check(filecontents, String);
+      const parsed = Papa.parse(filecontents, { delimiter: ',' });
+      if (parsed.errors.length) {
+        throw new Meteor.Error('invalid-roster-csv', 'The roster contains invalid CSV quoting');
       }
 
-      const allErrors: Array<{ username: string; error: string }> = [];
-      let rows = deps.csvParser.parse(filecontents).data;
-      deps.serverConsole('insertNewUsers parsed row count:', Array.isArray(rows) ? rows.length : 0);
-      rows = rows.slice(1);
+      const errors: Array<{ row: number; error: string }> = [];
+      const skippedRows: number[] = [];
+      let created = 0;
+      const rows = parsed.data.slice(1);
+      deps.serverConsole('insertNewUsers parsed row count:', rows.length);
 
-      for (const row of rows) {
-        if (!Array.isArray(row)) {
+      for (const [index, row] of rows.entries()) {
+        const rowNumber = index + 2;
+        if (row.every(value => value === '')) {
           continue;
         }
 
@@ -813,29 +685,23 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         const password = typeof row[1] === 'string' ? row[1] : '';
 
         try {
-          await upsertManagedUser(deps, {
-            actingUserId: this.userId,
-            rawUserName: username,
-            password,
-            existingUserSource: 'insertNewUsers.existingUser',
-            createdUserSource: 'insertNewUsers.createdUser',
-            verificationSource: 'insertNewUsers',
-            bulkSource: 'insertNewUsers',
-          });
+          const outcome = await createRosterAccount(deps, this.userId!, username, password);
+          if (outcome === 'skipped') skippedRows.push(rowNumber);
+          else created++;
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error);
           deps.serverConsole('Bulk user creation failed for one row');
-          allErrors.push({ username, error: message });
+          errors.push({ row: rowNumber, error: message });
         }
       }
 
-      deps.serverConsole('Bulk user creation error count:', allErrors.length);
+      deps.serverConsole('Bulk user creation error count:', errors.length);
       await deps.writeAuditLog('admin.bulkImportUsers', this.userId || null, null, {
         fileName: filename,
         rowCount: rows.length,
-        errorCount: allErrors.length,
+        created, skipped: skippedRows.length, errorCount: errors.length,
       });
-      return allErrors;
+      return { created, skippedRows, errors };
     },
   };
 }

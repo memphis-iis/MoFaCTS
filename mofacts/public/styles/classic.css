@@ -1684,8 +1684,7 @@ body:has(.instructions-container) {
 }
 
 .instructions-action-button,
-.cur-page-number-card,
-.app-disabled-error-field {
+.cur-page-number-card {
     margin-right: auto;
     margin-left: auto;
 }

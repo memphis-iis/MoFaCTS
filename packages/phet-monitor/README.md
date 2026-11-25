@@ -30,6 +30,20 @@ The collector does not recognize objects by `_value`, `listeners`, `tinyProperty
 
 Rendering, Screen, Sim, and Tandem exclusions use explicitly registered constructor identities, including subclasses. There is no private-field exclusion heuristic. Axon/Joist/Scenery/Tandem adapters are maintained by framework generation, with no simulation-model patches. Preparation validates every transformation before writing source; each build records the declaration hash and registration version. Upstream source hooks remain a deliberate maintained extension, not a promise of compatibility with arbitrary framework versions.
 
+Shared Sun/Scenery controls use `registerInteraction(control, { version: 1, kind: 'value', property })` or `kind: 'reset'`, followed by `interaction(control, 'start' | 'complete' | 'cancel', { trusted, modality })`. Controls remain opaque identities and never become model-discovery roots. Native DOM trust establishes input provenance; callbacks without a verified input event remain observations. Identical shared registrations are idempotent; conflicting registrations fail.
+
+`linkInteractionProperties(owner, element)` accepts the framework's explicit public `addLinkedElement` property relation. This associates a control adapter with its scientific model property while preserving model units. It does not infer relationships from field names or convert units itself. The collector follows only declared property links at interaction boundaries, with cycle detection and weak references; disposed properties are excluded. The pilot browser must support `WeakRef`. Reset markers suppress reset-induced component-removal activity; raw notifications remain intact.
+
+## Meaningful activity and ordinary history
+
+Protocol 3 adds ordered `interaction` records to the independent bridge. `activity.ts` projects selected bindings over reconstructed trace state, emitting completed/cancelled interactions, explicit reset, collection membership changes and settled observation facts. No model reads or polling are introduced. Transient collection changes retain object IDs even if added and removed before one checkpoint. Ordinary physics notifications may drive authored conditions without generating a learner-history row.
+
+Stimulus production rules may use one `history-event` effect per rule, with `selection`, `action`, `input`, optional `outcome` (default `unknown`), optional expression-valued `values`, and optional `endsAttempt`. It writes semantic fields through the existing canonical history boundary. It does not award credit, classify answers, or update KCs; those remain separate authored effects. A completed control interaction is an input only when the framework supplies trusted input provenance. Property changes and component topology alone remain observations.
+
+The normal Download TSV includes a bounded, lossless `CF (Simulation Activity)` JSON column containing build/attempt/source-event identity, origin, selected values with labels/units and evidence sequences. Internal simulation state/trace rows are retained for SPARC replay and excluded from this export. Other units and historical records retain their existing export behavior. Raw catalogs, initial object inventories and detailed notifications stay in the separate research collection.
+
+Build descriptions live in a hash-verified catalog asset, without attempt values or IDs. Stimuli own bindings and instructional meaning. Initial selected values and dynamic object IDs belong to attempt metadata/research traces. Lifecycle history records Start, interruption and monitoring failure with stable retry identities. Completion is an authored history effect after successful persistence. Reload starts no simulation automatically; host actions referring to prior evidence explicitly carry `last-recorded-state-after-reload` and do not claim restored physical state. The pilot associates general host buttons only when one simulation node is present; multiple simulation nodes need explicit authored association before this convenience can be extended.
+
 ## Coverage contract
 
 | Data | Continuous coverage |
@@ -69,3 +83,7 @@ Origin, source window, protocol version, build identity, session, sequence, orde
 Run `node --test packages/phet-monitor/*.test.mjs mofacts/scripts/simulationResearch.test.cjs`. Browser probes and exact build identities are documented in the [pilot tools](../../tools/phet-pilot/README.md). Successful reconstruction covers recorded state only, not silent mutable state or full physical replay.
 
 Research-only coalescing starts a 100 ms window for each pending storage group. Contiguous receipts are combined into bounded storage batches without changing record sequences. Further writes follow completion of the preceding write and receive their own coalescing window, limiting sustained requests to at most ten per second. No timer runs on an idle queue. This storage scheduling never gates SPARC observation delivery.
+
+## Packaged assets and browser isolation
+
+Simulations are ordinary lesson ZIP assets, referenced by `simulation.asset` (HTML URL/hash and catalog URL/hash). The normal uploader verifies content and resolves package filenames to stored asset IDs; no per-lesson server settings are used. HTML runs in a CSP and iframe sandbox with scripts but no same-origin capability. Messages require the exact iframe window, opaque origin `null`, protocol/build and attempt identity. The shared child bridge verifies its parent window and browser-provided embedding origin. Source/license archives and notices accompany the three packaged builds. This changes transport embedding, not collector registration or event capture.

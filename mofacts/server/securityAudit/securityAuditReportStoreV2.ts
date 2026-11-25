@@ -1,4 +1,4 @@
-import { ACTIVE_AUDIT_CATALOG, AUDIT_SECTION_IDS, readAuditCatalog, type AuditCatalog, type AuditCatalogCoordinates } from '../../common/securityAudit/catalogRegistry.ts';
+import { AUDIT_SECTION_IDS, readAuditCatalog, type AuditCatalog, type AuditCatalogCoordinates } from '../../common/securityAudit/catalogRegistry.ts';
 import { AUDIT_ERROR_CATEGORIES, evidenceRequiresDeployedIdentity, type AuditErrorCategory } from '../../common/securityAudit/evidenceContracts.ts';
 import { parseAuditIdentity } from '../../common/securityAudit/reportIdentity.ts';
 import { AUDIT_MAX_DURATION_MS, auditReportId, auditTargetOrigin, auditTimestamp, parseSecurityAuditReportV2, type AuditCounts, type AuditReportReadContext, type AuditSectionStatus, type SecurityAuditReportV2 } from '../../common/securityAudit/reportV2.ts';
@@ -81,7 +81,9 @@ function summary(record: Document, catalog: AuditCatalog): AuditReportSummaryV2 
 
 // No collection is created/imported here. Binding stays with the owning app
 // composition; the storage model still needs previous-image qualification.
-export function createAuditReportStoreV2(reports: AuditReportCollectionV2, now: () => Date) {
+export function createAuditReportStoreV2(reports: AuditReportCollectionV2, now: () => Date, catalog: AuditCatalogCoordinates) {
+  const { catalogId, catalogVersion, catalogDigestSha256 } = catalog;
+  const acceptedCatalog = { catalogId, catalogVersion, catalogDigestSha256 };
   async function project(row: Document, catalogs: Map<string, Promise<AuditCatalog>>) {
     proofRecord(row, SUMMARY_KEYS);
     const coordinates: AuditCatalogCoordinates = {
@@ -102,7 +104,7 @@ export function createAuditReportStoreV2(reports: AuditReportCollectionV2, now: 
       await raw.createIndex({ schema: 1, catalogId: 1, catalogVersion: 1, catalogDigestSha256: 1, reportType: 1, completedAt: -1 });
     },
     async store(value: unknown, nonce: unknown, context: Extract<AuditReportReadContext, { purpose: 'ingestion' }>): Promise<void> {
-      const report = await parseSecurityAuditReportV2(value, context);
+      const report = await parseSecurityAuditReportV2(value, context, acceptedCatalog);
       const ingestNonce = proofString(nonce, /^[A-Za-z0-9_-]{22,128}(?![\s\S])/, 128);
       const ingestedAt = serverDate(now());
       // Preserve the established 90-day TTL; no new retention or pruning policy.
@@ -113,8 +115,8 @@ export function createAuditReportStoreV2(reports: AuditReportCollectionV2, now: 
       const options: QueryOptions = { fields: { ...SUMMARY_FIELDS }, sort: { completedAt: -1 } };
       const [rows, exposure, full] = await Promise.all([
         reports.find({ schema: SCHEMA }, { ...options, limit: 200 }).fetchAsync(),
-        reports.findOneAsync({ schema: SCHEMA, ...ACTIVE_AUDIT_CATALOG, reportType: 'exposure' }, options),
-        reports.findOneAsync({ schema: SCHEMA, ...ACTIVE_AUDIT_CATALOG, reportType: 'full' }, options),
+        reports.findOneAsync({ schema: SCHEMA, ...acceptedCatalog, reportType: 'exposure' }, options),
+        reports.findOneAsync({ schema: SCHEMA, ...acceptedCatalog, reportType: 'full' }, options),
       ]);
       if (rows.length > 200) invalid();
       const catalogs = new Map<string, Promise<AuditCatalog>>();

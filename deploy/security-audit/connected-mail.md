@@ -1,0 +1,87 @@
+# Connected Gmail observations for staging2
+
+Approved on 2026-11-13. Use the operator's existing Gmail connection for the
+security audit's disposable staging2 reset accounts. No IMAP client, app password,
+new provider grant, production credential or recovery-backup read is needed.
+
+## Scope and ownership
+
+The connected inbox is mixed personal mail. Each job owns an unpredictable
+`mofacts_audit_fixture_<12 hex>` namespace and exact plus-address recipient.
+Create only ordinary synthetic staging2 accounts under the bounded-access
+delegation. Record ownership and recovery before creation, verify no collision,
+and delete only those accounts and their owned reset state after the checks.
+An exclusive environment lease must survive the mail handoff; a browser timeout
+or interrupted caller requires recovery of that same job before another starts.
+
+## Acquire only the selected test message
+
+1. Record the exact recipient, staging2 origin and original reset-request time.
+   Keep the source-owned two-minute delivery window; later acquisition does not
+   move the window forward.
+2. Search the existing connection for that exact recipient and password-reset
+   subject. Request at most ten metadata records. Do not search or read unrelated
+   personal messages. A search substring is not evidence of exact identity.
+3. Check the returned To/Cc/Bcc recipients and provider receipt timestamp with
+   `resetMailboxMessageMatchesV2`. Require one exact recipient and one matching
+   fresh message before reading its body. Zero matches is missing evidence;
+   duplicate matches are ambiguous. Neither is a passing control.
+   `connectedGmailMetadataV2` selects the single Gmail `X-Received` ingestion
+   timestamp. The observed connector's `internal_date` is rounded to a second
+   and can precede a request in that same second. Missing/malformed/duplicate
+   ingestion headers fail; do not shift the request window or select another
+   clock. Recheck that same metadata in the full response using
+   `connectedGmailResetMessageV2` before the private handoff.
+4. Read only that message's plain-text part. Use
+   `readResetMailboxMessageV2` to enforce the 16-KiB bound, staging2 HTTPS origin,
+   reset path, exact email, one 64-hex token and exact query shape. Reject missing,
+   malformed, ambiguous or foreign links. Never follow an unchecked email link.
+5. Pass the validated capability privately to the same owning reset-test process.
+   Use private process input/in-memory handoff, never shell arguments, console
+   output, screenshots, tracked files or report evidence. Retain only the
+   content-free receipt. Do not copy Gmail authorization into the runner.
+
+No mailbox send, deletion, label or filter change is needed. Application-generated
+verification/reset messages may remain in the inbox. Dispose of transient body
+and capability values when the owned scenario finishes.
+
+## Acceptance and limits
+
+A fresh current reset, rejected replay, old/new password checks, existing-session
+invalidation and unused aged-token expiry are distinct observations. A previous
+delivery receipt proves none of the later mutations. Use real wall-clock aging
+for the live expiry case; changing stored dates qualifies only a synthetic test.
+Retain preconditions, typed outcomes and independent cleanup confirmation.
+
+Package `launch-staging2-fixture.mjs` with the pinned fixture source for
+`reset-observe` and `reset-token-age`. Invoke that launcher through the trusted
+container entrypoint with the exact owned request on private stdin. The launcher
+passes only the storage environment to the fixture child. Require the separate
+account-absence and reset-state-absence observations for each owned fixture.
+
+`captureCurrentResetV2` drives the source-owned current-reset cases and requires
+two successful independent pre-reset sessions with distinct capabilities.
+Both old sessions must lose their guarded method access and fail fresh token
+resume. The fixture owner supplies the private browser/transport callbacks,
+selected mail, environment lease and cleanup; the helper itself grants no access.
+`withAuthenticationLeaseV2` owns the shared per-environment lease file. Never
+override a stale lease based on time alone. Explicit recovery requires confirming
+the previous job stopped and independently verifying owned cleanup. Its recorded
+deadline is enforced by the caller's bounded job, not automatic account expiry.
+
+The connected tool supports operator-assisted acquisition during this audit.
+It does not provide a reusable credential or prove unattended acquisition by the
+standalone scanner. Keep unattended mailbox qualification visibly pending;
+do not introduce another mail transport or credential to bypass that boundary.
+Other authorization scenarios and source implementation can continue meanwhile.
+
+
+## Bounded acquisition helper (2026-11-15)
+
+The existing connector adapter includes a bounded acquisition coordinator and
+private stdin transport, using the same mailbox validation owner and current-reset
+input contract. All 28 mailbox/connector/transport/current-reset tests and full
+application lint pass. Actual interactive terminal carriage is verified; the
+isolated scheduled probe reached Gmail but failed before local execution. No
+production target, unattended worker access or new credential is enabled. See
+the [execution evidence and remaining proof](unattended-authentication-review.md).

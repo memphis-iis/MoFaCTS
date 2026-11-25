@@ -209,15 +209,20 @@ function groupEntry(params: {
 export const SPARC_ATOMIC_NODE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [
   atomicEntry({
     atomType: 'simulation', label: 'Simulation',
-    description: 'Approved simulation build with continuous observations mapped to authored production-rule facts. Reload starts a fresh physical attempt and retains completed work.',
+    description: 'Packaged simulation HTML and catalog assets with event-based observations mapped to authored production-rule facts. Reload starts a fresh physical attempt and retains completed work.',
     requiredProperties: ['label', 'simulation'],
-    properties: { label: { type: 'string' }, simulation: { type: 'object', required: ['buildId', 'bindings'],
-      properties: { buildId: { type: 'string' }, bindings: { type: 'array', items: { type: 'object', required: ['name', 'address', 'projection'],
+    properties: { label: { type: 'string' }, simulation: { type: 'object', required: ['buildId', 'asset', 'bindings'],
+      properties: { buildId: { type: 'string' }, asset: { type: 'object', required: ['url', 'sha256', 'catalog'], properties: {
+        url: { type: 'string' }, sha256: { type: 'string' }, attachments: { type: 'array', items: { type: 'object', required: ['url', 'sha256'], properties: { url: { type: 'string' }, sha256: { type: 'string' } }, additionalProperties: false } }, catalog: { type: 'object', required: ['url', 'sha256'], properties: {
+          url: { type: 'string' }, sha256: { type: 'string' },
+        }, additionalProperties: false },
+      }, additionalProperties: false }, bindings: { type: 'array', items: { type: 'object', required: ['name', 'address', 'projection'],
         properties: { name: { type: 'string' }, address: { oneOf: [
           { type: 'object', required: ['path'], properties: { path: { type: 'string' } }, additionalProperties: false },
           { type: 'object', required: ['tandem'], properties: { tandem: { type: 'string' } }, additionalProperties: false },
-        ] }, projection: { enum: ['value', 'count', 'any-nonzero'] }, memberProperty: { type: 'string' } }, additionalProperties: false } } }, additionalProperties: false } },
-    defaultValue: { nodeType: 'atomic', atomType: 'simulation', label: 'Simulation', simulation: { buildId: 'select-an-approved-build',
+        ] }, projection: { enum: ['value', 'count', 'any-nonzero'] }, memberProperty: { type: 'string' }, label: { type: 'string' }, unit: { type: 'string' } }, additionalProperties: false } } }, additionalProperties: false } },
+    defaultValue: { nodeType: 'atomic', atomType: 'simulation', label: 'Simulation', simulation: { buildId: 'replace-with-packaged-build-id',
+      asset: { url: 'simulation.html', sha256: '0'.repeat(64), catalog: { url: 'simulation.catalog.json', sha256: '0'.repeat(64) } },
       bindings: [{ name: 'observation', address: { path: 'replace-with-validated-property-address' }, projection: 'value' }] } },
     renderedBy: ['SparcSimulation.svelte'],
   }),
@@ -1258,6 +1263,19 @@ export const SPARC_RULE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
       nodeId: { anyOf: [{ type: 'string' }, ruleExpressionSchema] },
       responseValue: ruleExpressionSchema,
       input: ruleExpressionSchema,
+    },
+  },
+}, {
+  id: 'rule.effect.history-event',
+  label: 'Record activity history',
+  category: 'production-rule-effect',
+  description: 'Write a meaningful Selection–Action–Input–Outcome event without automatic grading or KC credit. Configure expressions and selected values in rule JSON.',
+  schema: {
+    type: 'object', required: ['type', 'selection', 'action', 'input'],
+    properties: {
+      type: { const: 'history-event' }, selection: ruleExpressionSchema, action: ruleExpressionSchema,
+      input: { anyOf: [{ type: 'string' }, ruleExpressionSchema] }, outcome: ruleExpressionSchema,
+      values: { type: 'object', additionalProperties: ruleExpressionSchema }, endsAttempt: { type: 'boolean' },
     },
   },
 }, {

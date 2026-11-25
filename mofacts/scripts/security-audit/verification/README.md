@@ -23,8 +23,9 @@ canary or resource values. Temporary AWS access was removed after use. The
 [optional read-only inventory preparation](../../../../deploy/security-audit/recovery-transfer/probe-inventory-review.md)
 can use this formatter, with explicit operational approval. AWS is not imported
 here or by the application. Other operators may supply their approved fixture
-bytes and public manifest directly; the formatter reads no file/environment,
-starts no process and makes no network call.
+bytes directly. The formatter derives public subject names from the shared
+verification declarations, upload package and route owners. It reads no
+files or environment, starts no process and makes no network call.
 
 This is a Phase 1 migration/review diagnostic owned by the audit maintainer. The
 active V1 scanner never imports it. Author and review actual catalog entries

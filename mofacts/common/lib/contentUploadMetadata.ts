@@ -1,12 +1,12 @@
 /** DDP-only metadata. No backing Mongo collection and no authored schema changes. */
 export const CONTENT_UPLOAD_METADATA_COLLECTION = 'content_upload_metadata';
-export const CONTENT_UPLOAD_CACHE_VERSION = 1;
+export const CONTENT_UPLOAD_CACHE_VERSION = 2;
 export const CONTENT_UPLOAD_BATCH_SIZE = 200;
 
 export type ContentUploadMetadata = {
   _id: string;
   userId: string;
-  kind: 'tdf' | 'stim' | 'count';
+  kind: 'tdf' | 'count';
   root?: boolean;
   data: Record<string, any>;
 };
@@ -40,13 +40,11 @@ export const CONTENT_UPLOAD_TDF_FIELDS = {
   'content.tdfs.tutor.setspec.openRouterApiKey': 1,
   'content.tdfs.tutor.setspec.condition': 1,
   'content.tdfs.tutor.setspec.conditionTdfIds': 1,
-  'content.tdfs.tutor.setspec.stimulusfile': 1,
   'content.tdfs.tutor.setspec.experimentTarget': 1,
   'content.tdfs.tutor.setspec.aiVisibilityLockReason': 1,
   'content.tdfs.tutor.setspec.contentLanguage': 1,
   'content.tdfs.tutor.setspec.recommendedUiLocales': 1,
   'content.tdfs.tutor.setspec.translationStatus': 1,
-  'content.tdfs.tutor.unit.learningsession.stimulusfile': 1,
   'content.tdfs.tutor.unit.sparcsession.pageId': 1,
   'rawStimuliFile.setspec.sparcPages.pageId': 1,
   'rawStimuliFile.setspec.sparcPages.display.unitType': 1,
@@ -57,10 +55,7 @@ export function uploadMetadataReferences(tdf: Record<string, any>) {
   const setspec = tutor?.setspec;
   const conditions: string[] = (Array.isArray(setspec?.conditionTdfIds) ? setspec.conditionTdfIds : [])
     .filter((id: unknown) => typeof id === 'string' && id);
-  const files: string[] = [setspec?.stimulusfile, ...(Array.isArray(tutor?.unit) ? tutor.unit : [])
-    .map((unit: any) => unit?.learningsession?.stimulusfile)]
-    .filter((name: unknown) => typeof name === 'string' && name.trim()).map((name: string) => name.trim());
-  return { conditions, files, sets: stimuliSetCandidates(tdf.stimuliSetId) };
+  return { conditions, sets: stimuliSetCandidates(tdf.stimuliSetId) };
 }
 
 export function publicUploadMetadata(tdf: Record<string, any>): Record<string, any> {

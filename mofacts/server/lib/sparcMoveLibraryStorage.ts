@@ -26,6 +26,8 @@ export async function ensureSparcMoveLibraryIndexes() {
   await SparcMoveLibrary.rawCollection().createIndex({ kind: 1, version: 1, embeddingModel: 1, embeddingVersion: 1, _id: 1 });
   await SparcMoveLibrary.rawCollection().createIndex({ contentUseKeys: 1, _id: 1 });
   await SparcMoveRequests.rawCollection().createIndex({ userId: 1, 'query.tdfId': 1, 'query.context.kind': 1, entryId: 1 });
+  await SparcMoveRequests.rawCollection().createIndex({ userId: 1, entryId: 1, 'query.tdfId': 1, 'query.sessionId': 1, 'query.eventId': 1 });
+  await SparcMoveRequests.rawCollection().createIndex({ userId: 1, entryId: 1, 'scope.tdfId': 1, 'scope.sessionId': 1, 'scope.eventId': 1 }, { partialFilterExpression: { kind: 'presentation-use' } });
   await SparcMoveRequests.rawCollection().createIndex({ userId: 1, contentUseKeys: 1, _id: 1 });
   await SparcMoveRequests.rawCollection().createIndex({ userId: 1, _id: 1 });
 }

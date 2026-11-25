@@ -502,8 +502,16 @@ declare module 'meteor/ostrio:files' {
     observeChangesAsync(callbacks: Mongo.ObserveChangesCallbacks<FileObj>): Promise<Meteor.LiveQueryHandle>;
   }
 
+  export type DdpUploadRegistration = Readonly<{
+    collectionName: string;
+    allowClientCode: boolean;
+    methods: readonly Readonly<{ operation: string; name: string; handler: (...args: never[]) => unknown }>[];
+  }>;
+
   export class FilesCollection extends FilesCollectionCore {
     constructor(config: FilesCollectionConfig);
+    /** Available in the maintained server implementation only. */
+    observeDdpUploadRegistration?(): DdpUploadRegistration | null;
   }
 
   // --------------------------------------------------------------------------

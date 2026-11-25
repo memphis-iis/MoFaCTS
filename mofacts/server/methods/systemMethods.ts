@@ -1,25 +1,38 @@
+import { validPersonalAudioSetting } from '../../common/personalAudioSettings';
+import { accountDiagnosticsPolicy } from '../lib/participantSession';
 import { Meteor } from 'meteor/meteor';
-import { check, Match } from 'meteor/check';
+import { PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY } from '../../common/practiceStatisticsPreference';
 import {
   CLIENT_VERBOSITY_SETTING,
   SERVER_VERBOSITY_SETTING,
   parseLoggingVerbosityLevel,
 } from '../../common/loggingSettings';
-import {
-  requireAuthenticatedUser,
-  requireUserWithRoles,
-  type MethodAuthorizationDeps,
-} from '../lib/methodAuthorization';
+import { requireAuthenticatedUser } from '../lib/methodAuthorization';
+
+export const audioSavePolicy = Object.freeze({
+  kind: 'personal-audio', operation: 'self',
+  authorize: (userId: string | null | undefined) => requireAuthenticatedUser(userId, 'Must be logged in to save audio settings', 401),
+} as const);
+
+const statisticsField = 'preferences.' + PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY;
+export const preferencePolicy = Object.freeze({
+  kind: 'dashboard-preference', operation: 'self',
+  authorize(userId: string | null | undefined, key: string, action: 'get' | 'set') {
+    if (!userId) throw new Meteor.Error('not-authorized', `Must be logged in to ${action} preferences`);
+    if (key !== PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY) throw new Meteor.Error('invalid-preference', 'Unknown dashboard preference');
+    return userId;
+  },
+} as const);
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
   userId?: string | null;
-  unblock?: () => void;
   connection?: { id?: string; clientAddress?: string | null } | null;
 };
 
 type SystemMethodsDeps = {
-  validateProlificLockout?: (userId: string, tdfId: string, unit: number) => Promise<number | null>;
+  savePersonalAudio: (userId: string, patch: UnknownRecord) => Promise<void>;
+  studyWaitMinutes: (context: MethodContext, userId: string, tdfId: string, unit: number) => Promise<number | null>;
   serverConsole: (...args: unknown[]) => void;
   usersCollection: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
@@ -31,15 +44,12 @@ type SystemMethodsDeps = {
   DynamicSettings: {
     upsertAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
   };
-  getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
   requireAdminUser: (
     userId: string | null | undefined,
     errMsg?: string,
     errorCode?: string | number
   ) => Promise<void>;
   buildDiskUsageStatus: (path?: string) => unknown;
-  sendErrorReportSummaries: () => Promise<unknown>;
-  sendEmail: (to: string, from: string, subject: string, text: string) => void;
   getCurrentUser: () => Promise<any>;
   setVerbosityLevel: (level: number) => void;
 };
@@ -48,7 +58,6 @@ const MAX_ERROR_REPORT_TEXT_LENGTH = 20000;
 const MAX_ERROR_REPORT_JSON_LENGTH = 250000;
 const MAX_ERROR_REPORT_LOG_ROWS = 200;
 const MAX_ERROR_REPORT_LOG_ROW_LENGTH = 2000;
-const MAX_DEBUG_LOG_LENGTH = 2000;
 
 function truncateText(value: unknown, maxLength: number) {
   const text = typeof value === 'string' ? value : String(value ?? '');
@@ -88,29 +97,16 @@ function sanitizeLogRows(logs: unknown) {
 export function createSystemMethods(deps: SystemMethodsDeps) {
   return {
     saveAudioSettings: async function(this: MethodContext, audioSettings: UnknownRecord) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in to save audio settings');
+      const userId = audioSavePolicy.authorize(this.userId);
+
+      if (!audioSettings || typeof audioSettings !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(audioSettings))) {
+        throw new Meteor.Error('invalid-audio-settings', 'Expected audio settings');
       }
-
-      const DEFAULT_AUDIO_SETTINGS = {
-        audioPromptMode: 'silent',
-        audioPromptQuestionVolume: 0,
-        audioPromptQuestionSpeakingRate: 1,
-        audioPromptVoice: 'en-US-Standard-A',
-        audioPromptFeedbackVolume: 0,
-        audioPromptFeedbackSpeakingRate: 1,
-        audioPromptFeedbackVoice: 'en-US-Standard-A',
-        audioInputMode: false,
-        audioInputSensitivity: 60,
-      };
-
-      const settingsToSave = { ...DEFAULT_AUDIO_SETTINGS, ...audioSettings };
-
-      await deps.usersCollection.updateAsync(
-        { _id: this.userId },
-        { $set: { audioSettings: settingsToSave } }
-      );
-
+      const entries = Object.entries(audioSettings);
+      if (!entries.length || !entries.every(([key, value]) => validPersonalAudioSetting(key, value))) {
+        throw new Meteor.Error('invalid-audio-settings', 'Invalid audio settings');
+      }
+      await deps.savePersonalAudio(userId, audioSettings);
       return { success: true };
     },
 
@@ -122,16 +118,16 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
       TDFId: string
     ) {
       const actingUserId = requireAuthenticatedUser(this.userId);
-      const prolificMinutes = await deps.validateProlificLockout?.(actingUserId, TDFId, currentUnitNumber);
-      if (prolificMinutes !== null && prolificMinutes !== undefined) {
+      const studyMinutes = await deps.studyWaitMinutes(this, actingUserId, TDFId, currentUnitNumber);
+      if (studyMinutes !== null) {
         const path = `lockouts.${TDFId}`;
         // One persisted start per unit, including concurrent tabs/server replicas.
         await deps.usersCollection.updateAsync({ _id: actingUserId, [`${path}.currentLockoutUnit`]: { $ne: currentUnitNumber } }, {
-          $set: { [path]: { lockoutMinutes: prolificMinutes, lockoutTimeStamp: Date.now(), currentLockoutUnit: currentUnitNumber } },
+          $set: { [path]: { lockoutMinutes: studyMinutes, lockoutTimeStamp: Date.now(), currentLockoutUnit: currentUnitNumber } },
         });
         const user = await deps.usersCollection.findOneAsync({ _id: actingUserId }, { fields: { [path]: 1 } });
         const saved = user?.lockouts?.[TDFId];
-        if (saved?.currentLockoutUnit !== currentUnitNumber || !Number.isFinite(saved.lockoutTimeStamp) || !Number.isFinite(saved.lockoutMinutes)) throw new Meteor.Error('prolific.failed', 'prolific.failed');
+        if (saved?.currentLockoutUnit !== currentUnitNumber || !Number.isFinite(saved.lockoutTimeStamp) || !Number.isFinite(saved.lockoutMinutes)) throw new Meteor.Error(409, 'Unable to persist the study waiting period');
         return saved;
       }
       const currentUser = await deps.getCurrentUser();
@@ -173,31 +169,6 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
       return deps.buildDiskUsageStatus('/');
     },
 
-    sendErrorReportSummaries: async function(this: MethodContext) {
-      await requireUserWithRoles(deps.getMethodAuthorizationDeps(), {
-        userId: this.userId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Admin access required',
-        forbiddenCode: 403,
-      });
-      return await deps.sendErrorReportSummaries();
-    },
-
-    sendEmail: async function(this: MethodContext, to: string, from: string, subject: string, text: string) {
-      await requireUserWithRoles(deps.getMethodAuthorizationDeps(), {
-        userId: this.userId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Admin access required',
-        forbiddenCode: 403,
-      });
-      this.unblock?.();
-      deps.sendEmail(to, from, subject, text);
-    },
-
     sendUserErrorReport: async function(
       this: MethodContext,
       userID: string,
@@ -212,6 +183,7 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
       if (userID && userID !== actingUserId) {
         throw new Meteor.Error(403, 'Can only submit error reports for the current user');
       }
+      if (!await accountDiagnosticsPolicy.authorize(this)) return;
       assertJsonSize(sessionVars, MAX_ERROR_REPORT_JSON_LENGTH, 'Session snapshot');
       assertJsonSize(currentExperimentState, MAX_ERROR_REPORT_JSON_LENGTH, 'Experiment state snapshot');
       const errorReport = {
@@ -235,30 +207,9 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
       if (userID !== this.userId) {
         throw new Meteor.Error(403, 'Can only update your own login status');
       }
+      if (!await accountDiagnosticsPolicy.authorize(this)) return;
       const loginTime = new Date();
       return await deps.usersCollection.updateAsync({ _id: userID }, { $set: { status: { lastLogin: loginTime, userAgent } } });
-    },
-
-    serverLog: async function(this: MethodContext, data: unknown) {
-      requireAuthenticatedUser(this.userId, 'Must be logged in to write server logs', 401);
-      const currentUser = await deps.getCurrentUser();
-      if (currentUser) {
-        const logData = 'User:' + currentUser._id + ', log:' + truncateText(data, MAX_DEBUG_LOG_LENGTH);
-        deps.serverConsole(logData);
-      }
-    },
-
-    debugLog: async function(this: MethodContext, logtxt: unknown) {
-      requireAuthenticatedUser(this.userId, 'Must be logged in to write debug logs', 401);
-      let usr = await deps.getCurrentUser();
-      if (!usr) {
-        usr = '[No Current User]';
-      } else {
-        usr = usr.username ? usr.username : usr._id;
-        usr = '[USER:' + usr + ']';
-      }
-
-      deps.serverConsole(usr + ' ' + truncateText(logtxt, MAX_DEBUG_LOG_LENGTH));
     },
 
     setVerbosity: async function(this: MethodContext, level: number | string) {
@@ -298,35 +249,17 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
     },
 
     async getUserPreference(this: MethodContext, key: string) {
-      if (!this.userId) {
-        throw new Meteor.Error('not-authorized', 'Must be logged in to get preferences');
-      }
-
-      check(key, String);
-
-      const user = await deps.usersCollection.findOneAsync(
-        { _id: this.userId },
-        { fields: { preferences: 1 } }
-      );
-
-      return user?.preferences?.[key];
+      const userId = preferencePolicy.authorize(this.userId, key, 'get');
+      const user = await deps.usersCollection.findOneAsync({ _id: userId }, { fields: { [statisticsField]: 1 } });
+      const saved = user?.preferences?.[PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY];
+      if (saved !== undefined && typeof saved !== 'boolean') throw new Meteor.Error('invalid-preference', 'Invalid saved dashboard preference');
+      return saved;
     },
 
     async setUserPreference(this: MethodContext, key: string, value: unknown) {
-      if (!this.userId) {
-        throw new Meteor.Error('not-authorized', 'Must be logged in to set preferences');
-      }
-
-      check(key, String);
-      check(value, Match.Any);
-
-      const updateField = `preferences.${key}`;
-      await deps.usersCollection.updateAsync(
-        { _id: this.userId },
-        { $set: { [updateField]: value } }
-      );
-
-      deps.serverConsole(2, `User ${this.userId} set preference ${key} to ${value}`);
+      const userId = preferencePolicy.authorize(this.userId, key, 'set');
+      if (typeof value !== 'boolean') throw new Meteor.Error('invalid-preference', 'Expected a boolean dashboard preference');
+      await deps.usersCollection.updateAsync({ _id: userId }, { $set: { [statisticsField]: value } });
       return true;
     },
   };

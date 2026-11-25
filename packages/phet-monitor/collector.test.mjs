@@ -167,3 +167,39 @@ test('wrapper and source disposal produce one logical lifecycle record',()=>{
   const late=make(),ownedSource={};late.register(ownedSource,{version:1,kind:'emitter'});late.model({ownedSource});
   late.register({}, {version:1,kind:'property',source:ownedSource,read:()=>1});assert.equal(late.status().complete,false);
 });
+
+test('explicit control notifications summarize a drag without discovering or polling the control',()=>{
+  const c=make(),p=property(2),control={viewOnly:{x:1}};
+  c.model({p});c.frame();c.drain();
+  c.registerInteraction(control,{version:1,kind:'value',property:p});
+  c.registerInteraction(control,{version:1,kind:'value',property:p});
+  c.interaction(control,'start',{trusted:true,modality:'pointer'});
+  emit(c,p,3);emit(c,p,4);c.frame();
+  c.interaction(control,'complete',{trusted:true,modality:'pointer'});c.frame();
+  const events=c.drain().filter(r=>r.type==='interaction');
+  assert.equal(events.length,2);assert.equal(events[0].data.before,2);assert.equal(events[1].data.value,4);
+  assert.equal(events[0].data.controlId,events[1].data.controlId);
+  assert.equal(c.snapshot().some(e=>e.path.includes('viewOnly')),false);
+  const reads=c.status().objectInspections;for(let i=0;i<1000;i++)c.frame();assert.equal(c.status().objectInspections,reads);
+  assert.equal(c.status().complete,true);
+});
+
+test('interaction conflicts and malformed registrations fail explicitly; cancellation is recorded',()=>{
+  const c=make(),p=property(1),control={};c.model({p});c.frame();c.drain();
+  c.registerInteraction(control,{version:1,kind:'value',property:p});
+  c.interaction(control,'start',{trusted:true,modality:'keyboard'});emit(c,p,2);c.interaction(control,'cancel');c.frame();
+  assert.equal(c.drain().filter(r=>r.type==='interaction').at(-1).data.phase,'cancel');
+  c.registerInteraction(control,{version:2,kind:'value',property:p});assert.equal(c.status().complete,false);
+});
+
+test('declared linked properties retain scientific units without discovering view adapters',()=>{
+  const c=make(),model=property(.005),adapter=property(5),control={};
+  c.model({model});c.frame();c.drain();registerFixture(c,adapter);
+  c.linkInteractionProperties(adapter,model);c.registerInteraction(control,{version:1,kind:'value',property:adapter});
+  c.interaction(control,'start',{trusted:true,modality:'keyboard'});emit(c,adapter,10);emit(c,model,.01);
+  c.interaction(control,'complete',{trusted:true,modality:'keyboard'});c.frame();
+  const end=c.drain().filter(r=>r.type==='interaction').at(-1);
+  assert.equal(end.data.before,5);assert.equal(end.data.value,10);
+  assert.ok(end.data.properties.some(p=>p.before===.005&&p.value===.01));
+  assert.equal(c.snapshot().some(entry=>entry.object===adapter),false);assert.equal(c.status().complete,true);
+});

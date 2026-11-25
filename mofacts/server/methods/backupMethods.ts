@@ -9,6 +9,8 @@ import {
   type BackupServiceDeps,
 } from '../lib/backup/backupService';
 import type { BackupRegistry } from '../lib/backup/backupTypes';
+import { BACKUP_METHOD_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -26,11 +28,6 @@ function publicJobFields() {
   return {
     error: { stack: 0 },
   };
-}
-
-async function requireAdmin(deps: BackupMethodsDeps, context: MethodContext): Promise<string> {
-  await deps.requireAdminUser(context.userId, 'Only admins can manage backups', 'not-authorized');
-  return String(context.userId);
 }
 
 function backupJobsCollection(deps: BackupMethodsDeps): BackupRegistry {
@@ -63,15 +60,22 @@ function actorFromContext(userId: string, context: MethodContext) {
   };
 }
 
-export function createBackupMethods(deps: BackupMethodsDeps) {
-  return {
+export function createBackupMethodRegistration(deps: BackupMethodsDeps) {
+  const policy = Object.freeze({
+    kind: 'role',
+    role: 'admin',
+    async authorize(userId: string | null | undefined) {
+      await deps.requireAdminUser(userId, 'Only admins can manage backups', 'not-authorized');
+    },
+  } as const);
+  const methods = {
     'admin.backups.config': async function(this: MethodContext) {
-      await requireAdmin(deps, this);
+      await policy.authorize(this.userId);
       return publicBackupConfigStatus(readBackupConfig(deps.settings, deps.env || process.env));
     },
 
     'admin.backups.list': async function(this: MethodContext) {
-      await requireAdmin(deps, this);
+      await policy.authorize(this.userId);
       return await backupJobsCollection(deps)
         .find({ jobType: 'backup', status: { $ne: 'deleted' } }, {
           sort: { createdAt: -1 },
@@ -82,7 +86,7 @@ export function createBackupMethods(deps: BackupMethodsDeps) {
     },
 
     'admin.backups.get': async function(this: MethodContext, jobId: unknown) {
-      await requireAdmin(deps, this);
+      await policy.authorize(this.userId);
       const normalizedJobId = typeof jobId === 'string' ? jobId.trim() : '';
       if (!normalizedJobId) {
         throw new Meteor.Error('invalid-backup-job', 'Backup job id is required');
@@ -95,13 +99,15 @@ export function createBackupMethods(deps: BackupMethodsDeps) {
     },
 
     'admin.backups.create': async function(this: MethodContext) {
-      const userId = await requireAdmin(deps, this);
+      await policy.authorize(this.userId);
+      const userId = String(this.userId);
       this.unblock?.();
       return await runExclusiveBackupOperation(async () => await createBackupJob(deps, actorFromContext(userId, this)));
     },
 
     'admin.backups.verify': async function(this: MethodContext, backupJobId: unknown) {
-      const userId = await requireAdmin(deps, this);
+      await policy.authorize(this.userId);
+      const userId = String(this.userId);
       const normalizedJobId = typeof backupJobId === 'string' ? backupJobId.trim() : '';
       if (!normalizedJobId) {
         throw new Meteor.Error('invalid-backup-job', 'Backup job id is required');
@@ -111,7 +117,8 @@ export function createBackupMethods(deps: BackupMethodsDeps) {
     },
 
     'admin.backups.downloadToken': async function(this: MethodContext, backupJobId: unknown) {
-      const userId = await requireAdmin(deps, this);
+      await policy.authorize(this.userId);
+      const userId = String(this.userId);
       const normalizedJobId = typeof backupJobId === 'string' ? backupJobId.trim() : '';
       if (!normalizedJobId) {
         throw new Meteor.Error('invalid-backup-job', 'Backup job id is required');
@@ -120,7 +127,8 @@ export function createBackupMethods(deps: BackupMethodsDeps) {
     },
 
     'admin.backups.delete': async function(this: MethodContext, backupJobId: unknown, confirmation: unknown) {
-      const userId = await requireAdmin(deps, this);
+      await policy.authorize(this.userId);
+      const userId = String(this.userId);
       const normalizedJobId = typeof backupJobId === 'string' ? backupJobId.trim() : '';
       if (!normalizedJobId) {
         throw new Meteor.Error('invalid-backup-job', 'Backup job id is required');
@@ -134,7 +142,8 @@ export function createBackupMethods(deps: BackupMethodsDeps) {
     },
 
     'admin.backups.restore': async function(this: MethodContext, backupJobId: unknown, confirmation: unknown) {
-      const userId = await requireAdmin(deps, this);
+      await policy.authorize(this.userId);
+      const userId = String(this.userId);
       const normalizedJobId = typeof backupJobId === 'string' ? backupJobId.trim() : '';
       if (!normalizedJobId) {
         throw new Meteor.Error('invalid-backup-job', 'Backup job id is required');
@@ -146,6 +155,19 @@ export function createBackupMethods(deps: BackupMethodsDeps) {
       return await runExclusiveBackupOperation(async () => await restoreBackupJob(deps, actorFromContext(userId, this), normalizedJobId));
     },
   };
+  function bind(name: keyof typeof methods, dataEgress: MeteorMethodBinding['dataEgress']): MeteorMethodBinding {
+    return Object.freeze({ handler: methods[name], policy, verification: BACKUP_METHOD_VERIFICATIONS[name], dataEgress });
+  }
+  return { methods, methodBindings: Object.freeze([
+    bind('admin.backups.config', 'backup-configuration'),
+    bind('admin.backups.list', 'backup-job-metadata'),
+    bind('admin.backups.get', 'backup-job-metadata'),
+    bind('admin.backups.create', 'backup-job-metadata'),
+    bind('admin.backups.verify', 'backup-job-metadata'),
+    bind('admin.backups.downloadToken', 'backup-download-capability'),
+    bind('admin.backups.delete', 'backup-job-metadata'),
+    bind('admin.backups.restore', 'backup-job-metadata'),
+  ]) };
 }
 
 export type BackupJobsCollectionLike = {

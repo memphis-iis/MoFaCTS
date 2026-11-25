@@ -56,7 +56,7 @@ test('probe inventory reads one exact version through the real SDK and emits no 
 
 test('probe inventory refuses foreign identity and missing/finally moved version labels without guessing another version', async () => {
   const f = setup(), aws = makeAwsReadClient(credentials, { requestHandler: f.cloud.handler });
-  await assert.rejects(inspectRecoveryProbeInventory({ target: readTarget, expected: f.expected, candidateId, runId: '123', aws, manifest: {} }), /aws-identity/);
+  await assert.rejects(inspectRecoveryProbeInventory({ target: readTarget, expected: f.expected, candidateId, runId: '123', aws }), /aws-identity/);
   for (const point of ['before', 'after']) {
     const value = setup({ fault: (stage, operation, _input, context) => {
       if (stage === point && operation === 'GetSecretValue') context.versions.get(candidateId).labels = [];

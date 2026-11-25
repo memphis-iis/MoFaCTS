@@ -13,6 +13,7 @@ const { assertCompletePlatformLocaleResources } = require('../client/lib/interfa
 it('keeps single choices, submits one combined move, and scales unwrapped columns uniformly', { timeout: 120000 }, async () => {
   assertCompletePlatformLocaleResources();
   const app = path.resolve(__dirname, '..');
+  fs.mkdirSync(path.join(app, '../tmp'), { recursive: true });
   const directory = fs.mkdtempSync(path.join(app, '../tmp/sparc-move-menu-'));
   const component = path.join(app, 'client/views/experiment/svelte/components/SparcStudentMoveMenu.svelte').replaceAll('\\', '/');
   const locale = path.join(directory, 'locale.js');
@@ -147,17 +148,62 @@ it('keeps single choices, submits one combined move, and scales unwrapped column
       subsetKind: 'question', engine: { curUnit: { sparcsession: {} } }, userId: 'synthetic', tdfId: 'synthetic', attemptId: 'synthetic', levelUnit: 0,
     }), node);
     assert.equal(await page.locator('[data-node-id="instructional-choice-menu"] button').count(), 10);
+    await page.evaluate(() => { window.fixture.submissionGate = new Promise(resolve => { window.finishSubmission = resolve; }); });
     await page.getByRole('button', { name: 'Next KC', exact: true }).click();
     await page.getByRole('button', { name: 'Explain + visual + Q', exact: true }).click();
-    await page.getByRole('button', { name: 'Multiple choice', exact: true }).click();
+    await page.getByRole('button', { name: 'Text answer', exact: true }).click();
     await page.waitForFunction(() => window.fixture.submissions.length === 1);
     const submission = await page.evaluate(() => window.fixture.submissions[0]);
-    assert.equal(submission.triggeredBy, 'synthetic-menu:explanation-visual-question.multiple-choice');
+    assert.equal(submission.triggeredBy, 'synthetic-menu:explanation-visual-question.text');
     assert.deepEqual(submission.submittedNodes, {
-      'synthetic-menu:explanation-visual-question.multiple-choice': 'explanation-visual-question.multiple-choice',
+      'synthetic-menu:explanation-visual-question.text': 'explanation-visual-question.text',
       'synthetic-menu:next-target': 'next-target',
     });
 
+    const activeMenu = page.locator('[data-node-id="instructional-choice-menu"]');
+    assert.equal(await activeMenu.count(), 0, 'Completed choice disappears while the submission is pending');
+    await page.evaluate(async () => {
+      window.showTurn = nodes => window.fixture.update({ display: { pageKey: 'synthetic',
+        unitType: 'sparc-autotutor-dialogue', instructionalController: { policyId: 'dynamic-instruction-student-v2' }, nodes } });
+      window.firstSelection = { id: 'synthetic-menu:selected', nodeType: 'group', groupType: 'button-group', children: [
+        { value: 'explanation-visual-question.text', selected: true }, { value: 'next-target', selected: true },
+      ] };
+      await window.showTurn([window.firstSelection, {
+        id: 'generated:question', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor',
+        turnEventId: 'generated', component: 'question', action: 'instruction.dynamic.question.text', value: 'Which species matches?',
+      }, { id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input' },
+      { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit' }]);
+      window.finishSubmission();
+    });
+    const input = page.locator('input[data-node-id="learner-response-input"]');
+    await input.fill('Species D');
+    await page.evaluate(() => { window.fixture.submissionGate = new Promise(resolve => { window.finishSubmission = resolve; }); });
+    await input.press('Enter');
+    await page.waitForFunction(() => window.fixture.submissions.length === 2);
+    await page.evaluate(async node => {
+      await window.showTurn([window.firstSelection, { ...node, nodeType: 'group', groupType: 'button-group',
+        children: node.children.map(child => ({ ...child, menuId: 'next-turn', id: 'next-turn:' + child.optionId })) }]);
+      window.finishSubmission();
+    }, node);
+    await activeMenu.getByRole('button', { name: 'Same KC', exact: true }).click();
+    assert.equal(await activeMenu.locator('button:enabled').count(), 10);
+    await activeMenu.getByRole('button', { name: 'Question (Q)', exact: true }).click();
+    await activeMenu.getByRole('button', { name: 'Fill in the blank', exact: true }).click();
+    await page.waitForFunction(() => window.fixture.submissions.length === 3);
+    assert.deepEqual(await page.evaluate(() => window.fixture.submissions[2].submittedNodes),
+      { 'next-turn:question.cloze': 'question.cloze' });
+    // A restored accepted choice can retry only that saved combination.
+    await page.evaluate(async node => {
+      await window.showTurn([window.firstSelection, { ...node, nodeType: 'group', groupType: 'button-group',
+        children: node.children.map(child => ({ ...child,
+          selected: ['explanation-visual-question.text', 'next-target'].includes(child.optionId),
+          readOnly: child.optionId !== 'explanation-visual-question.text',
+        })) }]);
+    }, node);
+    assert.equal(await page.locator('.sparc-student-move-menu:not(.sparc-student-move-history)').count(), 0);
+    await page.getByRole('button', { name: 'Try again', exact: true }).click();
+    await page.waitForFunction(() => window.fixture.submissions.length === 4);
+    assert.deepEqual(await page.evaluate(() => window.fixture.submissions[3].submittedNodes), submission.submittedNodes);
     // Render replayed history as the FIRST conversation item: its entire border
     // and text must be reachable at scrollTop=0, even when the chat overflows.
     const { projectSparcMenuOperations } = require('../../learning-components/units/sparcsession/sparcInstructionalCycle.ts');

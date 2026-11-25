@@ -53,5 +53,5 @@ if (!expectedDatabase || db.getName() !== expectedDatabase) throw new Error('Exp
 const collections = db.getCollectionInfos({ name: 'tdfs', type: 'collection' });
 if (!collections.length) throw new Error('Application TDF collection is unavailable');
 qualifyConditionRootConstraint(db.getCollection('tdfs'), { apply: process.env.MOFACTS_APPLY_CONDITION_ROOT_INDEX === '1' })
-  .then(report => printjson(report))
+  .then(report => print(JSON.stringify(report)))
   .catch(error => { print(error.message); quit(1); });

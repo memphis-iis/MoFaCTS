@@ -11,7 +11,6 @@ import { meteorCallAsync } from '../../../../index';
 import { checkUserSession, clientConsole, startSessionCheckInterval } from '../../../../lib/userSessionHelpers';
 import { translatePlatformString } from '../../../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
-import { ensureStimDisplayTypeMapReady, startStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTypeMapSync';
 import { setStudentPerformance } from '../../../../lib/studentPerformanceRuntime';
 import { getStimCount } from '../../../../lib/runtimeStimuli';
 import { getUserDisplayIdentifier } from '../../../../lib/userIdentity';
@@ -539,9 +538,6 @@ async function initializeStandardCardEntry(
   await checkUserSession();
 
   startSessionCheckInterval('svelte init');
-
-  await ensureStimDisplayTypeMapReady('svelte init');
-  startStimDisplayTypeMapVersionSync('svelte init');
 
   await ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile);
 

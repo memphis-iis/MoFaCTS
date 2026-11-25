@@ -1,5 +1,6 @@
 import { HISTORY_KEY_MAP } from './Definitions';
 import { CANONICAL_HISTORY_CORE_FIELDS } from './historyEnvelope';
+import { assertSimulationActivityHistory } from './simulationActivityHistory';
 
 export type HistoryWireRecord = Record<string, unknown>;
 
@@ -18,6 +19,11 @@ export function normalizeHistoryValueForWire(value: unknown, preserveBlank = fal
   if (value && typeof value === 'object') {
     const compacted: HistoryWireRecord = {};
     for (const [nestedKey, nestedValue] of Object.entries(value as HistoryWireRecord)) {
+      if (nestedKey === 'simulationActivity') {
+        assertSimulationActivityHistory(nestedValue);
+        compacted[nestedKey] = nestedValue;
+        continue;
+      }
       if (nestedKey === 'attribution') {
         continue;
       }

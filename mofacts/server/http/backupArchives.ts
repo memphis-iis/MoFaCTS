@@ -1,6 +1,8 @@
 import { Meteor } from 'meteor/meteor';
 import { Roles } from 'meteor/alanning:roles';
 import { WebApp } from 'meteor/webapp';
+import { HTTP_FILE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registerProtocolHttpMount } from '../securitySurfaces/registerHttpRoutes.ts';
 import type { IncomingMessage, ServerResponse } from 'http';
 import fs from 'fs';
 import fsp from 'fs/promises';
@@ -28,7 +30,12 @@ function attachmentDisposition(fileName: string): string {
   return `attachment; filename="${fileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
 
-WebApp.connectHandlers.use('/admin/backups/download', async (req: IncomingMessage, res: ServerResponse) => {
+registerProtocolHttpMount(WebApp, 'connectHandlers', '/admin/backups/download', {
+  surfaceId: 'middleware:backup-download',
+  policy: Object.freeze({ kind: 'single-use-capability', issuerAuthorization: 'current-admin' }),
+  dataEgress: Object.freeze({ kind: 'backup-archive' }),
+  verification: HTTP_FILE_VERIFICATIONS.backup,
+}, async (req: IncomingMessage, res: ServerResponse) => {
   if (req.method !== 'GET') {
     writeText(res, 405, 'Method not allowed');
     return;

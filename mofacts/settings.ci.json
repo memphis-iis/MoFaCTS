@@ -32,7 +32,6 @@
     "systemName": "MoFaCTS",
     "forceSSL": false,
     "admin": "admin@localhost.test",
-    "enableDeleteAllButton": false,
     "testLogin": false,
     "socialPreview": {
       "title": "MoFaCTS | Mobile Fact and Concept Training System",

@@ -27,7 +27,8 @@ test('V2 repository command passes only explicit environment and bounded input, 
   for (const changes of [{ environment: { ...environment, AUDIT_AUTH_FIXTURES_JSON: 'PRIVATE' } },
     { environment: { ...environment, NODE_TEST_CONTEXT: 'child-v8' } }, { environment: { ...environment, NODE_OPTIONS: '--test-name-pattern=one' } },
     { cwd: 'relative' }, { maximum: 0 }, { timeoutMs: 0 }, { input: Buffer.alloc(65537) }]) {
-    assert.throws(() => command([], changes), /Invalid repository command configuration/);
+    assert.throws(() => command([], changes), Object.hasOwn(changes, 'environment')
+      ? /Invalid audit child environment/ : /Invalid repository command configuration/);
   }
 });
 

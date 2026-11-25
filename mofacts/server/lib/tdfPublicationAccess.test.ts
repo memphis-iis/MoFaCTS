@@ -14,79 +14,7 @@ function cursor(rows: any[]) {
 }
 
 describe('tdfPublicationAccess', function() {
-  it('uses root visibility to include condition content even when a child is not independently selectable', async function() {
-    const roots = ['true', 'false'].map((userselect, index) => ({
-      _id: `root-${index}`, ownerId: 'owner', content: { tdfs: { tutor: { setspec: {
-        userselect, condition: [`child-${index}.json`], conditionTdfIds: [`child-${index}`],
-      } } } },
-    }));
-    const resolver = createTdfPublicationAccessResolver({
-      tdfs: {
-        find({ $or }) {
-          return cursor(roots.filter(root => $or.some((term: PublicationSelector) =>
-            term._id?.$in?.includes(root._id) || term['content.tdfs.tutor.setspec.userselect'] === root.content.tdfs.tutor.setspec.userselect)));
-        },
-        async findOneAsync() { return null; },
-      },
-      users: { async findOneAsync() { return null; } },
-      roles: { async userIsInRoleAsync() { return false; } },
-      async resolveAssignedRootTdfIdsForUser(userId) { return userId === 'assigned' ? ['root-1'] : []; },
-    });
-    const ordinary = await resolver.resolveDashboardSelector('ordinary');
-    expect(ordinary.$or).to.deep.include({ _id: { $in: ['child-0'] } });
-    expect(ordinary.$or.flatMap((term: PublicationSelector) => term._id?.$in ?? [])).not.to.include('child-1');
-    const assigned = await resolver.resolveDashboardSelector('assigned');
-    expect(assigned.$or).to.deep.include({ _id: { $in: ['child-0', 'child-1'] } });
-  });
-
-  it('expands dashboard visibility to conditions from accessible roots', async function() {
-    const findCalls: PublicationSelector[] = [];
-    const resolver = createTdfPublicationAccessResolver({
-      tdfs: {
-        find(selector: PublicationSelector) {
-          findCalls.push(selector);
-          return cursor([
-            {
-              content: {
-                tdfs: {
-                  tutor: {
-                    setspec: {
-                      condition: ['cond-file', 'cond-7'],
-                      conditionTdfIds: ['cond-id', '7']
-                    }
-                  }
-                }
-              }
-            }
-          ]);
-        },
-        async findOneAsync() {
-          return null;
-        }
-      },
-      users: {
-        async findOneAsync() {
-          return { accessedTDFs: ['accessed-root'] };
-        }
-      },
-      roles: {
-        async userIsInRoleAsync() {
-          return false;
-        }
-      },
-      async resolveAssignedRootTdfIdsForUser() {
-        return ['assigned-root'];
-      }
-    });
-
-    const selector = await resolver.resolveDashboardSelector('user-1');
-
-    expect(findCalls[0]?.$or).to.deep.include({ ownerId: 'user-1' });
-    expect(selector.$or).to.deep.include({ _id: { $in: ['assigned-root', 'accessed-root'] } });
-    expect(selector.$or).to.deep.include({ _id: { $in: ['cond-id', '7'] } });
-  });
-
-  it('normalizes asset stimulus ids and reuses the per-user cache inside the ttl', async function() {
+  it('normalizes asset stimulus ids and reads current permissions on each subscription', async function() {
     let findCalls = 0;
     let findOneCalls = 0;
     let userCalls = 0;
@@ -135,9 +63,6 @@ describe('tdfPublicationAccess', function() {
         async userIsInRoleAsync() {
           return false;
         }
-      },
-      async resolveAssignedRootTdfIdsForUser() {
-        return [];
       }
     });
 
@@ -146,26 +71,25 @@ describe('tdfPublicationAccess', function() {
 
     expect(first).to.deep.equal(normalizeStimSetIds([101, 202, 303, 404]));
     expect(second).to.deep.equal(first);
-    expect(userCalls).to.equal(1);
-    expect(findOneCalls).to.equal(1);
-    expect(findCalls).to.equal(3);
+    expect(userCalls).to.equal(2);
+    expect(findOneCalls).to.equal(2);
+    expect(findCalls).to.equal(6);
     expect(findOptions[0]?.fields?.['content.tdfs.tutor.setspec.conditionTdfIds']).to.equal(1);
   });
 
-  it('bounds cached entries by evicting the oldest user lookup', async function() {
-    const userCalls: string[] = [];
+  it('observes a changed grant when the same user subscribes again', async function() {
+    let granted = true;
     const resolver = createTdfPublicationAccessResolver({
       tdfs: {
         find() {
-          return cursor([]);
+          return cursor(granted ? [{ stimuliSetId: 123 }] : []);
         },
         async findOneAsync() {
           return null;
         }
       },
       users: {
-        async findOneAsync(selector: PublicationSelector) {
-          userCalls.push(selector._id);
+        async findOneAsync() {
           return { accessedTDFs: [] };
         }
       },
@@ -173,16 +97,11 @@ describe('tdfPublicationAccess', function() {
         async userIsInRoleAsync() {
           return false;
         }
-      },
-      async resolveAssignedRootTdfIdsForUser() {
-        return [];
       }
-    }, { maxCacheEntries: 1 });
+    });
 
-    await resolver.resolveListingSelector('user-1');
-    await resolver.resolveListingSelector('user-2');
-    await resolver.resolveListingSelector('user-1');
-
-    expect(userCalls).to.deep.equal(['user-1', 'user-2', 'user-1']);
+    expect(await resolver.resolveAssetStimuliSetIds('user-1')).to.deep.equal(normalizeStimSetIds([123]));
+    granted = false;
+    expect(await resolver.resolveAssetStimuliSetIds('user-1')).to.deep.equal([]);
   });
 });

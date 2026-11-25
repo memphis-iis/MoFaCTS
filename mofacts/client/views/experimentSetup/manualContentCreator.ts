@@ -10,7 +10,7 @@ import './manualContentCreator.css';
 import './draftEditorWorkspace';
 import { buildImportPackageFromDraftLessons } from '../../lib/importPackageBuilder';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
-import { uploadAndProcessPackage } from '../../lib/packageUploadClient';
+import { createLessonArchiveUpload, uploadAndProcessPackage } from '../../lib/packageUploadClient';
 import {
   buildManualDraftLesson,
   createDefaultManualCreatorState,
@@ -947,21 +947,7 @@ Template.manualContentCreator.events({
 
     const startUpload = async () => {
       try {
-        const existingFile = await (Meteor as any).callAsync('getUserAssetByName', fileName);
-        if (existingFile) {
-          const confirmed = await requestManualConfirmation(instance, uploadTrigger, {
-            title: manualText('content.overwriteExistingPackage'),
-            message: manualText('content.packageOverwriteMessage', { filename: fileName }),
-            confirmLabel: manualText('content.overwritePackage'),
-            placement: 'upload',
-          });
-          if (!confirmed) {
-            return;
-          }
-          await (Meteor as any).callAsync('removeAssetById', existingFile._id);
-        }
-
-        const file = new File([result.zipBlob], fileName, { type: 'application/zip' });
+        const file = await createLessonArchiveUpload(result.zipBlob, fileName, name => (Meteor as any).callAsync('getUserAssetByName', name));
         const { processing: processResult } = await uploadAndProcessPackage({
           dynamicAssets: DynamicAssets,
           file,

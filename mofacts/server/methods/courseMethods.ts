@@ -1,3 +1,7 @@
+import { commitCourseEdit } from '../lib/courseSectionEdit';
+import { COURSE_DELETE_VERIFICATION, COURSE_JOIN_VERIFICATION, COURSE_CREATE_VERIFICATION, COURSE_EDIT_VERIFICATION, COURSE_EXCEPTION_VERIFICATIONS, COURSE_ASSIGNMENT_SAVE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
+import { enrolledCourseLessonIds } from '../lib/enrolledCourseLessons';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
 import { Meteor } from 'meteor/meteor';
 import { progressiveRevisionId, progressiveRevisionPrefix } from '../lib/progressiveAssignmentRevision';
@@ -20,16 +24,14 @@ import {
   MIN_PROGRESSIVE_MEMBERS,
   progressiveTdfIneligibilityReasons,
 } from '../../common/progressiveAssignments';
-import { getCourse } from '../orm';
 import { normalizeOptionalString } from './dashboardCacheShared';
 import {
   getUserRoleFlags,
   requireAuthenticatedUser,
-  requireUserMatchesOrHasRole,
-  requireUserWithRoles,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
 import { courseIsDateVisible, createCourseLearnerSnapshotCacheHelpers } from '../lib/courseLearnerSnapshotCache';
+import { requireAccountProgressSession } from '../lib/participantProgressScope';
 import { prepareStimuliSetForRuntime } from '../lib/stimulusLookup';
 
 type UnknownRecord = Record<string, unknown>;
@@ -60,7 +62,7 @@ type CollectionLike = {
 type CourseMethodsDeps = {
   serverConsole: Logger;
   Roles: {
-    getUsersInRoleAsync: (roles: string, options: { queryOptions: { fields: Record<string, 1> } }) => Promise<Cursor>;
+    getUsersInRoleAsync: (roles: string, scope: undefined, userQuery: { fields: Record<string, 1> }) => Promise<Cursor>;
   };
   Courses: CollectionLike;
   Sections: CollectionLike;
@@ -81,7 +83,7 @@ type CourseMethodsDeps = {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
   };
-  sendEmail: (to: string, from: string, subject: string, text: string) => void;
+  sendEmail: (to: string, from: string, subject: string, text: string) => void | Promise<void>;
   emailFrom: string;
   thisServerUrl: string;
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
@@ -302,13 +304,6 @@ function normalizeCourseDocumentForRead<T extends Record<string, any>>(course: T
   };
 }
 
-function getSetAMinusB<T>(arrayA: T[], arrayB: T[]) {
-  const a = new Set(arrayA);
-  const b = new Set(arrayB);
-  const difference = new Set([...a].filter((x) => !b.has(x)));
-  return Array.from(difference);
-}
-
 function throwLoggedCourseOperationError(
   deps: CourseMethodsDeps,
   operation: string,
@@ -322,7 +317,7 @@ function throwLoggedCourseOperationError(
   throw new Meteor.Error('course-operation-failed', `${operation} failed`);
 }
 
-export function createCourseMethods(deps: CourseMethodsDeps) {
+export function createCourseService(deps: CourseMethodsDeps) {
   async function requireTeacherOrAdmin(thisArg: MethodContext) {
     const actingUserId = requireAuthenticatedUser(thisArg.userId, 'Must be logged in', 401);
     const roleFlags = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), actingUserId, ['admin', 'teacher'] as const);
@@ -330,6 +325,20 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       throw new Meteor.Error(403, 'Teacher or admin access required');
     }
     return { actingUserId, roleFlags };
+  }
+
+  async function resolveCourseOwner(actor: Awaited<ReturnType<typeof requireTeacherOrAdmin>>, requested: unknown, currentOwner?: string) {
+    const { actingUserId, roleFlags } = actor;
+    if (!roleFlags.admin) return actingUserId;
+    if (requested === undefined) return currentOwner ?? actingUserId;
+    if (typeof requested !== 'string' || !requested.trim()) throw new Meteor.Error(400, 'A valid course owner ID is required');
+    const ownerId = requested.trim();
+    if (ownerId === actingUserId || ownerId === currentOwner) return ownerId;
+    const user = await deps.usersCollection.findOneAsync({ _id: ownerId }, { fields: { _id: 1 } });
+    if (!user) throw new Meteor.Error(400, 'Course owner must be an existing teacher or administrator');
+    const roles = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), ownerId, ['admin', 'teacher'] as const);
+    if (!roles.teacher && !roles.admin) throw new Meteor.Error(400, 'Course owner must be an existing teacher or administrator');
+    return ownerId;
   }
 
   async function assertCanManageCourse(thisArg: MethodContext, courseId: string) {
@@ -347,6 +356,9 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     }
     return { course, actingUserId, roleFlags };
   }
+
+  const createCoursePolicy = Object.freeze({ kind: 'course-management', operation: 'create-course', authorize: requireTeacherOrAdmin } as const);
+  const courseManagementPolicy = Object.freeze({ kind: 'course-management', operation: 'manage-course', authorize: assertCanManageCourse } as const);
 
   async function assertUniqueCourseNameForTeacher(courseName: string, teacherUserId: string, semester: string, excludingCourseId?: string) {
     const normalizedCourseName = courseName.toLowerCase();
@@ -372,6 +384,18 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return normalizedInstructorId;
   }
 
+  const instructorReadPolicy = Object.freeze({
+    kind: 'course-read', operation: 'instructor-or-admin', authorize: resolveInstructorForCaller,
+  } as const);
+  const snapshotPolicy = Object.freeze({
+    kind: 'course-read', operation: 'own-account-session',
+    authorize(context: MethodContext) {
+      const userId = requireAuthenticatedUser(context.userId, 'Must be logged in', 401);
+      requireAccountProgressSession(context);
+      return userId;
+    },
+  } as const);
+
   function requireCourseSnapshotDeps() {
     if (!deps.CourseLearnerSnapshotCache || !deps.UserDashboardCache) {
       throw new Meteor.Error(500, 'Course learner snapshot cache dependencies are not registered');
@@ -382,10 +406,14 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     };
   }
 
-  async function getTdfSummariesByIds(tdfIds: string[]) {
+  function assignableLessonSelectors(userId: string) {
+    return [{ ownerId: userId }, { accessors: userId }, { 'accessors.userId': userId }];
+  }
+
+  async function getTdfSummariesByIds(tdfIds: string[], scope: UnknownRecord = {}) {
     if (tdfIds.length === 0) return new Map<string, ReturnType<typeof getTdfSummary>>();
     const tdfs = await deps.Tdfs.find(
-      { _id: { $in: [...new Set(tdfIds)] } },
+      { _id: { $in: [...new Set(tdfIds)] }, ...scope },
       {
         fields: {
           _id: 1,
@@ -468,50 +496,49 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return sourceSentencesRet.sourceSentences;
   }
 
-  async function getAllCourses(this: MethodContext) {
-    await requireUserWithRoles(deps.getMethodAuthorizationDeps(), {
-      userId: this.userId,
-      roles: ['admin'],
-      notLoggedInMessage: 'Must be logged in',
-      notLoggedInCode: 401,
-      forbiddenMessage: 'Admin access required',
-      forbiddenCode: 403,
-    });
-    try {
-      const coursesRet = await deps.Courses.find().fetchAsync();
-      const courses = [];
-      for (const course of coursesRet) {
-        courses.push(getCourse(normalizeCourseDocumentForRead(course)));
-      }
-      return courses;
-    } catch (e: unknown) {
-      throwLoggedCourseOperationError(deps, 'getAllCourses', e);
-    }
+  const directoryPolicy = Object.freeze({
+    kind: 'course-read', operation: 'section-directory',
+    authorize(context: MethodContext) {
+      return requireAuthenticatedUser(context.userId, 'Must be logged in', 401);
+    },
+  } as const);
+
+  async function learnerSectionFilter(userId: string) {
+    const roles = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), userId, ['admin', 'teacher'] as const);
+    if (roles.admin || roles.teacher) return null;
+    const enrollments = await deps.SectionUserMap.find({ userId }, { fields: { sectionId: 1 } }).fetchAsync();
+    return { $match: { $or: [{ visibility: 'public' }, { 'section._id': { $in: enrollments.map(row => row.sectionId).filter(Boolean) } }] } };
+  }
+
+  function currentCourseSections() {
+    return [
+      {
+        $match: { semester: curSemester },
+      },
+      {
+        $lookup: {
+          from: 'section',
+          localField: '_id',
+          foreignField: 'courseId',
+          as: 'section',
+        },
+      },
+      {
+        $unwind: {
+          path: '$section',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    ];
   }
 
   async function getAllCourseSections(this: MethodContext) {
-    const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+    const actingUserId = directoryPolicy.authorize(this);
     try {
-      deps.serverConsole('getAllCourseSections');
-      const roleFlags = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), actingUserId, ['admin', 'teacher'] as const);
-      const allSections = await deps.Courses.rawCollection().aggregate([
-        {
-          $match: { semester: curSemester },
-        },
-        {
-          $lookup: {
-            from: 'section',
-            localField: '_id',
-            foreignField: 'courseId',
-            as: 'section',
-          },
-        },
-        {
-          $unwind: {
-            path: '$section',
-            preserveNullAndEmptyArrays: true,
-          },
-        },
+      const filter = await learnerSectionFilter(actingUserId);
+      return await deps.Courses.rawCollection().aggregate([
+        ...currentCourseSections(),
+        ...(filter ? [filter] : []),
         {
           $project: {
             _id: 0,
@@ -528,25 +555,13 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
           },
         },
       ]).toArray();
-      if (roleFlags.admin || roleFlags.teacher) {
-        return allSections;
-      }
-      const enrollmentRows = await deps.SectionUserMap.find(
-        { userId: actingUserId },
-        { fields: { sectionId: 1 } }
-      ).fetchAsync();
-      const enrolledSectionIds = new Set(enrollmentRows.map((row: any) => String(row?.sectionId || '')).filter(Boolean));
-      return allSections.filter((section: any) =>
-        section.visibility === 'public' ||
-        enrolledSectionIds.has(String(section.sectionId || ''))
-      );
     } catch (e: unknown) {
       throwLoggedCourseOperationError(deps, 'getAllCourseSections', e);
     }
   }
 
   async function getAllCoursesForInstructor(this: MethodContext, instructorId: string) {
-    instructorId = await resolveInstructorForCaller(this, instructorId);
+    instructorId = await instructorReadPolicy.authorize(this, instructorId);
     deps.serverConsole('getAllCoursesForInstructor:', instructorId);
     const courses = await deps.Courses.find(
       { teacherUserId: instructorId, semester: curSemester },
@@ -555,111 +570,59 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return courses.map(normalizeCourseDocumentForRead);
   }
 
-  async function getAllCourseAssignmentsForInstructor(this: MethodContext, instructorId: string) {
-    try {
-      instructorId = await resolveInstructorForCaller(this, instructorId);
-      deps.serverConsole('getAllCourseAssignmentsForInstructor:' + instructorId);
-      return await deps.Assignments.rawCollection().aggregate([
-        {
-          $set: {
-            effectiveTdfIds: {
-              $cond: [
-                { $eq: ['$assignmentType', 'progressive'] },
-                '$memberTdfIds',
-                ['$TDFId'],
-              ],
-            },
-          },
-        },
-        { $unwind: '$effectiveTdfIds' },
-        {
-          $lookup: {
-            from: 'tdfs',
-            localField: 'effectiveTdfIds',
-            foreignField: '_id',
-            as: 'TDF',
-          },
-        },
-        {
-          $unwind: { path: '$TDF' },
-        },
-        {
-          $lookup: {
-            from: 'course',
-            localField: 'courseId',
-            foreignField: '_id',
-            as: 'course',
-          },
-        },
-        {
-          $unwind: { path: '$course' },
-        },
-        {
-          $match: {
-            'course.teacherUserId': instructorId,
-            'course.semester': curSemester,
-          },
-        },
-        {
-          $project: {
-            _id: 0,
-            fileName: '$TDF.content.fileName',
-            courseName: '$course.courseName',
-            courseId: '$course._id',
-          },
-        },
-      ]).toArray();
-    } catch (e: unknown) {
-      throwLoggedCourseOperationError(deps, 'getAllCourseAssignmentsForInstructor', e, instructorId);
-    }
-  }
-
   async function sendCourseAssignmentEmail(userId: string, course: any, section: any) {
-    const student = await deps.usersCollection.findOneAsync(
-      { _id: userId },
-      { fields: { username: 1, email_canonical: 1, emails: 1 } }
-    );
-    const to = getPrimaryUserEmail(student);
-    if (!to) {
-      throw new Meteor.Error(400, 'Cannot send course assignment email because the learner account has no email address');
+    let stage = 'recipient';
+    try {
+      const student = await deps.usersCollection.findOneAsync(
+        { _id: userId },
+        { fields: { username: 1, email_canonical: 1, emails: 1 } }
+      );
+      const to = getPrimaryUserEmail(student);
+      if (!to) {
+        throw new Meteor.Error(400, 'Cannot send course assignment email because the learner account has no email address');
+      }
+      stage = 'configuration';
+      const baseUrl = normalizeOptionalString(deps.thisServerUrl);
+      if (!baseUrl) {
+        throw new Meteor.Error(500, 'Cannot send course assignment email because ROOT_URL is not configured');
+      }
+      const from = normalizeOptionalString(deps.emailFrom);
+      if (!from) {
+        throw new Meteor.Error(500, 'Cannot send course assignment email because emailFrom is not configured');
+      }
+      stage = 'message';
+      const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
+      const coursesUrl = `${normalizedBaseUrl}/courses`;
+      const courseName = String(course?.courseName || 'your course');
+      const sectionName = String(section?.sectionName || 'your section');
+      const brandName = (await ensurePublishedDeploymentBrandProfile()).identity.name;
+      const subject = `${brandName} course assignment: ${courseName}`;
+      const displayName = deps.getUserDisplayIdentifier(student) || 'learner';
+      const text = [
+        `Hello ${displayName},`,
+        '',
+        `You have been assigned to ${courseName} (${sectionName}) in ${brandName}.`,
+        '',
+        `Open ${brandName}: ${normalizedBaseUrl}`,
+        `Go directly to Courses: ${coursesUrl}`,
+        '',
+        'After signing in, choose Courses from the Learn menu. Your assigned course will appear at the top of the Courses page. Select Start or Continue on an assignment to begin practicing.',
+        '',
+        'If you do not see the course after signing in, contact your instructor.',
+      ].join('\n');
+      stage = 'delivery';
+      await deps.sendEmail(to, from, subject, text);
+    } catch {
+      deps.serverConsole(0, 'Course enrollment saved; confirmation email failed', { stage });
     }
-    const baseUrl = normalizeOptionalString(deps.thisServerUrl);
-    if (!baseUrl) {
-      throw new Meteor.Error(500, 'Cannot send course assignment email because ROOT_URL is not configured');
-    }
-    const from = normalizeOptionalString(deps.emailFrom);
-    if (!from) {
-      throw new Meteor.Error(500, 'Cannot send course assignment email because emailFrom is not configured');
-    }
-    const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
-    const coursesUrl = `${normalizedBaseUrl}/courses`;
-    const courseName = String(course?.courseName || 'your course');
-    const sectionName = String(section?.sectionName || 'your section');
-    const brandName = (await ensurePublishedDeploymentBrandProfile()).identity.name;
-    const subject = `${brandName} course assignment: ${courseName}`;
-    const displayName = deps.getUserDisplayIdentifier(student) || 'learner';
-    const text = [
-      `Hello ${displayName},`,
-      '',
-      `You have been assigned to ${courseName} (${sectionName}) in ${brandName}.`,
-      '',
-      `Open ${brandName}: ${normalizedBaseUrl}`,
-      `Go directly to Courses: ${coursesUrl}`,
-      '',
-      'After signing in, choose Courses from the Learn menu. Your assigned course will appear at the top of the Courses page. Select Start or Continue on an assignment to begin practicing.',
-      '',
-      'If you do not see the course after signing in, contact your instructor.',
-    ].join('\n');
-    deps.sendEmail(to, from, subject, text);
   }
 
   async function getCourseAssignmentEditorSnapshot(this: MethodContext, courseId: string): Promise<CourseAssignmentEditorSnapshot> {
-    const { course } = await assertCanManageCourse(this, courseId);
+    const { course, actingUserId, roleFlags } = await courseManagementPolicy.authorize(this, courseId);
     const assignments = await fetchNormalizedAssignmentSummaries(String(course._id));
-    const { actingUserId, roleFlags } = await requireTeacherOrAdmin(this);
     const tdfSelector = roleFlags.admin
       ? {}
-      : { $or: [{ ownerId: actingUserId }, { accessors: actingUserId }, { 'accessors.userId': actingUserId }] };
+      : { $or: assignableLessonSelectors(actingUserId) };
     const assignableTdfs = await deps.Tdfs.find(
       tdfSelector,
       {
@@ -808,7 +771,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       throw new Meteor.Error(400, 'Assignment save payload must be an object');
     }
     assertKnownFields(input as unknown as UnknownRecord, ['courseId', 'assignments'], 'Assignment save payload');
-    const { course } = await assertCanManageCourse(this, input.courseId);
+    const { course, actingUserId, roleFlags } = await courseManagementPolicy.authorize(this, input.courseId);
     const timezone = normalizeTimezone(course.timezone, true);
     if (!Array.isArray(input.assignments)) {
       throw new Meteor.Error(400, 'Assignments must be an array');
@@ -823,7 +786,27 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     if (duplicateTdfIds.length > 0) {
       throw new Meteor.Error(400, `Duplicate TDF assignments are not allowed: ${[...new Set(duplicateTdfIds)].join(', ')}`);
     }
-    const tdfSummaries = await getTdfSummariesByIds(allTdfIds);
+    const existingRows = await deps.Assignments.find(
+      { courseId: String(course._id) },
+      { fields: { _id: 1, courseId: 1, assignmentType: 1, TDFId: 1, memberTdfIds: 1 } }
+    ).fetchAsync();
+    const existingById = new Map(existingRows.map((row: any) => [String(row._id), row]));
+    const retainedIds: string[] = [];
+    const submittedIds = new Set<string>();
+    for (const row of normalizedRows) {
+      if (!row.assignmentId) continue;
+      const existing = existingById.get(row.assignmentId);
+      if (!existing || submittedIds.has(row.assignmentId)) {
+        throw new Meteor.Error(400, 'Each existing assignment must belong to this course and appear only once');
+      }
+      submittedIds.add(row.assignmentId);
+      if (existing.assignmentType === row.assignmentType) {
+        const previous = new Set(assignmentMemberTdfIds(existing));
+        retainedIds.push(...assignmentMemberTdfIds(row).filter(id => previous.has(id)));
+      }
+    }
+    const scope = roleFlags.admin ? {} : { $or: [...assignableLessonSelectors(actingUserId), { _id: { $in: retainedIds } }] };
+    const tdfSummaries = await getTdfSummariesByIds(allTdfIds, scope);
     for (const tdfId of allTdfIds) {
       if (!tdfSummaries.has(tdfId)) throw new Meteor.Error(404, `Assignable TDF not found: ${tdfId}`);
     }
@@ -841,28 +824,22 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
         throw new Meteor.Error(400, `${lessonTitle} cannot be used in a progressive assignment: ${reasons.join(' ')}`);
       }
     }
-    const existingRows = await deps.Assignments.find(
-      { courseId: String(course._id) },
-      { fields: { _id: 1, courseId: 1, assignmentType: 1, TDFId: 1, memberTdfIds: 1 } }
-    ).fetchAsync();
-    const existingById = new Map(existingRows.map((row: any) => [String(row._id), row]));
     const keepIds = new Set<string>();
     const now = new Date();
     const changedAssignmentIds = new Set<string>();
 
     for (const row of normalizedRows) {
       const existing = row.assignmentId ? existingById.get(row.assignmentId) : undefined;
-      if (row.assignmentId && !existing) {
-        throw new Meteor.Error(400, `Assignment id does not belong to this course: ${row.assignmentId}`);
-      }
       if (existing) {
         keepIds.add(String(existing._id));
         changedAssignmentIds.add(String(existing._id));
         const assignmentFields = row.assignmentType === 'lesson'
           ? { assignmentType: 'lesson', TDFId: row.TDFId }
           : { assignmentType: 'progressive', title: row.title, memberTdfIds: row.memberTdfIds };
-        await deps.Assignments.updateAsync(
-          { _id: existing._id, courseId: String(course._id) },
+        const previousMembers = existing.assignmentType === 'progressive'
+          ? { memberTdfIds: existing.memberTdfIds } : { TDFId: existing.TDFId };
+        const changed = await deps.Assignments.updateAsync(
+          { _id: existing._id, courseId: String(course._id), assignmentType: existing.assignmentType, ...previousMembers },
           {
             $set: {
               ...assignmentFields,
@@ -880,6 +857,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
               : { TDFId: '' },
           }
         );
+        if (changed !== 1) throw new Meteor.Error(409, 'Course assignment changed during save. Reload before editing.');
       } else {
         const assignmentFields = row.assignmentType === 'lesson'
           ? { assignmentType: 'lesson', TDFId: row.TDFId }
@@ -912,32 +890,8 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return await getCourseAssignmentEditorSnapshot.call(this, String(course._id));
   }
 
-  async function editCourseAssignments(this: MethodContext, newCourseAssignment: { courseId: string; tdfIds: string[] }) {
-    try {
-      await assertCanManageCourse(this, newCourseAssignment.courseId);
-      if (!Array.isArray(newCourseAssignment.tdfIds)) {
-        throw new Meteor.Error(400, 'Assignment payload requires a tdfIds array');
-      }
-      const tdfIds = [...new Set(newCourseAssignment.tdfIds.map((tdfId) => String(tdfId || '').trim()).filter(Boolean))];
-      const result = await saveCourseAssignments.call(this, {
-        courseId: newCourseAssignment.courseId,
-        assignments: tdfIds.map((tdfId, order) => ({
-          assignmentType: 'lesson' as const,
-          TDFId: tdfId,
-          order,
-          releaseAt: null,
-          dueAt: null,
-          required: true,
-        })),
-      });
-      return result;
-    } catch (e: unknown) {
-      throwLoggedCourseOperationError(deps, 'editCourseAssignments', e, newCourseAssignment.courseId);
-    }
-  }
-
   async function getTdfAssignmentsByCourseIdMap(this: MethodContext, instructorId: string) {
-    instructorId = await resolveInstructorForCaller(this, instructorId);
+    instructorId = await instructorReadPolicy.authorize(this, instructorId);
     deps.serverConsole('getTdfAssignmentsByCourseIdMap', instructorId);
     const assignmentTdfs = await deps.Assignments.rawCollection().aggregate([
       {
@@ -986,7 +940,8 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
         $project: {
           _id: 0,
           assignmentId: '$_id',
-          content: '$TDF.content',
+          displayName: '$TDF.content.tdfs.tutor.setspec.lessonname',
+          lessonDueDate: '$TDF.content.tdfs.tutor.setspec.duedate',
           TDFId: '$effectiveTdfIds',
           courseId: 1,
           dueAt: 1,
@@ -1004,74 +959,30 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       assignmentsByCourseId[courseId]!.push({
         assignmentId: assignment._id || assignment.assignmentId,
         TDFId: assignment.TDFId,
-        displayName: assignment.content.tdfs.tutor.setspec.lessonname,
-        dueAt: assignment.dueAt || null,
+        displayName: assignment.displayName,
+        dueAt: assignment.dueAt || assignment.lessonDueDate || null,
       });
     }
     return assignmentsByCourseId;
   }
 
-  async function resolveAssignedRootTdfIdsForUser(userId: string) {
-    const enrollmentRows = await deps.SectionUserMap.find(
-      { userId },
-      { fields: { sectionId: 1 } }
-    ).fetchAsync();
-    const sectionIds: string[] = enrollmentRows
-      .map((row: any) => deps.normalizeCanonicalId(row?.sectionId))
-      .filter((id: string | null): id is string => typeof id === 'string');
-    if (sectionIds.length === 0) {
-      return [];
-    }
-
-    const uniqueSectionIds = [...new Set(sectionIds)];
-    const sections = await deps.Sections.find(
-      { _id: { $in: uniqueSectionIds } },
-      { fields: { _id: 1, courseId: 1 } }
-    ).fetchAsync();
-    const courseIds = [...new Set(
-      sections
-        .map((section: any) => deps.normalizeCanonicalId(section?.courseId))
-        .filter((courseId: string | null): courseId is string => typeof courseId === 'string')
-    )];
-    if (courseIds.length === 0) {
-      return [];
-    }
-
-    const activeCourses = await deps.Courses.find(
-      { _id: { $in: courseIds }, semester: curSemester },
-      { fields: { _id: 1 } }
-    ).fetchAsync();
-    const activeCourseIds = activeCourses.map((course: any) => String(course?._id || '').trim()).filter(Boolean);
-    if (activeCourseIds.length === 0) {
-      return [];
-    }
-
-    const assignmentRows = await deps.Assignments.find(
-      { courseId: { $in: activeCourseIds } },
-      { fields: { assignmentType: 1, TDFId: 1, memberTdfIds: 1 } }
-    ).fetchAsync();
-    const assignedIdSet = new Set<string>();
-    for (const row of assignmentRows) {
-      for (const rawId of assignmentMemberTdfIds(row)) {
-        const normalizedId = deps.normalizeCanonicalId(rawId);
-        if (normalizedId) assignedIdSet.add(normalizedId);
-      }
-    }
-    return Array.from(assignedIdSet);
+  function resolveAssignedRootTdfIdsForUser(userId: string) {
+    return enrolledCourseLessonIds(deps, userId, false);
   }
 
   async function getLearnerCoursesSnapshot(this: MethodContext): Promise<LearnerCoursesSnapshot> {
-    const userId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+    const userId = snapshotPolicy.authorize(this);
     return await getCourseSnapshotCache().ensureLearnerCoursesSnapshot(userId);
   }
 
-  async function getProgressiveAssignmentLaunch(
-    this: MethodContext,
+  async function authorizeProgressiveLaunch(
+    context: MethodContext,
     assignmentId: string,
     endpointTdfId: string,
     revisionId?: string,
-  ): Promise<ProgressiveAssignmentLaunchPayload> {
-    const userId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+  ) {
+    const userId = requireAuthenticatedUser(context.userId, 'Must be logged in', 401);
+    requireAccountProgressSession(context);
     const normalizedAssignmentId = deps.normalizeCanonicalId(assignmentId);
     const normalizedEndpointId = deps.normalizeCanonicalId(endpointTdfId);
     if (!normalizedAssignmentId || !normalizedEndpointId) {
@@ -1132,6 +1043,13 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     if (!prefixTdfIds.every((id) => memberTdfIds.includes(id))) {
       throw new Meteor.Error(403, 'A lesson in this progressive session has been removed; launch again from Courses');
     }
+    return { normalizedAssignmentId, normalizedEndpointId, courseId: visibleAssignment.courseId, assignment, memberTdfIds, prefixTdfIds, orderingRevisionId };
+  }
+  const progressiveLaunchPolicy = Object.freeze({ kind: 'course-launch', operation: 'progressive-prefix', authorize: authorizeProgressiveLaunch } as const);
+
+  async function getProgressiveAssignmentLaunch(this: MethodContext, assignmentId: string, endpointTdfId: string, revisionId?: string): Promise<ProgressiveAssignmentLaunchPayload> {
+    const { normalizedAssignmentId, normalizedEndpointId, courseId, assignment, memberTdfIds, prefixTdfIds, orderingRevisionId } =
+      await progressiveLaunchPolicy.authorize(this, assignmentId, endpointTdfId, revisionId);
     const tdfs = await deps.Tdfs.find({ _id: { $in: prefixTdfIds } }).fetchAsync();
     const tdfById = new Map(tdfs.map((tdf: any) => [String(tdf?._id || ''), tdf]));
     const orderedTdfs = prefixTdfIds.map((tdfId) => tdfById.get(tdfId));
@@ -1173,163 +1091,12 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return {
       progressiveRevisionId: orderingRevisionId,
       assignmentId: normalizedAssignmentId,
-      courseId: visibleAssignment.courseId,
+      courseId,
       title: String(assignment.title),
       endpointTdfId: normalizedEndpointId,
       memberTdfIds: prefixTdfIds,
       tdfs: launchTdfs,
     };
-  }
-
-  async function getTdfsAssignedToStudent(this: MethodContext, userId: string, curSectionId: string) {
-    deps.serverConsole('getTdfsAssignedToStudent', userId, curSectionId);
-    const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
-    if (!userId || !curSectionId) {
-      throw new Meteor.Error(400, 'User and section are required');
-    }
-
-    const roleFlags = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), actingUserId, ['admin', 'teacher'] as const);
-    const callerIsAdmin = roleFlags.admin;
-    const callerIsTeacher = roleFlags.teacher;
-    const isSelfRequest = actingUserId === userId;
-    if (!isSelfRequest && !callerIsAdmin && !callerIsTeacher) {
-      throw new Meteor.Error(403, 'Permission denied');
-    }
-
-    const pipeline = [
-      { $match: { _id: curSectionId } },
-      {
-        $lookup: {
-          from: 'course',
-          let: { courseId: '$courseId' },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$_id', '$$courseId'] },
-                    { $eq: ['$semester', curSemester] },
-                  ],
-                },
-              },
-            },
-          ],
-          as: 'course',
-        },
-      },
-      { $unwind: { path: '$course', preserveNullAndEmptyArrays: false } },
-      {
-        $lookup: {
-          from: 'section_user_map',
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$sectionId', curSectionId] },
-                    { $eq: ['$userId', userId] },
-                  ],
-                },
-              },
-            },
-            { $limit: 1 },
-          ],
-          as: 'enrollment',
-        },
-      },
-      {
-        $lookup: {
-          from: 'assessments',
-          localField: 'course._id',
-          foreignField: 'courseId',
-          as: 'assignments',
-        },
-      },
-      {
-        $project: {
-          'course.teacherUserId': 1,
-          enrollment: 1,
-          'assignments.assignmentType': 1,
-          'assignments.TDFId': 1,
-          'assignments.memberTdfIds': 1,
-        },
-      },
-    ];
-
-    const results = await deps.Sections.rawCollection().aggregate(pipeline).toArray();
-    const result = results[0];
-    if (!result) {
-      const sectionExists = await deps.Sections.findOneAsync({ _id: curSectionId }, { fields: { _id: 1 } });
-      if (!sectionExists) {
-        throw new Meteor.Error(404, 'Section not found');
-      }
-      return [];
-    }
-
-    const enrolled = Array.isArray(result.enrollment) && result.enrollment.length > 0;
-    const teacherOwnsCourse = callerIsTeacher &&
-      String(result.course?.teacherUserId || '') === this.userId;
-    if (!enrolled && !callerIsAdmin && !teacherOwnsCourse) {
-      throw new Meteor.Error(403, 'User is not enrolled in this section');
-    }
-
-    const assignments = Array.isArray(result.assignments) ? result.assignments : [];
-    const assignedIdSet = new Set<string>();
-    for (const row of assignments) {
-      for (const rawId of assignmentMemberTdfIds(row)) {
-        const id = deps.normalizeCanonicalId(rawId);
-        if (id) assignedIdSet.add(id);
-      }
-    }
-    return Array.from(assignedIdSet);
-  }
-
-  async function getTdfNamesAssignedByInstructor(this: MethodContext, instructorID: string) {
-    try {
-      instructorID = await resolveInstructorForCaller(this, instructorID);
-      let assignmentTdfFileNames = await deps.Courses.rawCollection().aggregate([
-        {
-          $lookup: {
-            from: 'assessments',
-            localField: '_id',
-            foreignField: 'courseId',
-            as: 'assessment',
-          },
-        },
-        {
-          $unwind: { path: '$assessment' },
-        },
-        {
-          $lookup: {
-            from: 'tdfs',
-            localField: 'assessment.TDFId',
-            foreignField: '_id',
-            as: 'TDF',
-          },
-        },
-        {
-          $unwind: { path: '$TDF' },
-        },
-        {
-          $match: {
-            semester: curSemester,
-            teacherUserId: instructorID,
-          },
-        },
-        {
-          $project: {
-            _id: 0,
-            fileName: '$TDF.content.fileName',
-            TDFId: '$TDF._id',
-          },
-        },
-      ]).toArray();
-      assignmentTdfFileNames = [...new Set(assignmentTdfFileNames.map((item: { fileName?: string; TDFId?: string }) => item.fileName || item.TDFId))];
-      deps.serverConsole('assignmentTdfFileNames', assignmentTdfFileNames);
-      return assignmentTdfFileNames;
-    } catch (e: unknown) {
-      throwLoggedCourseOperationError(deps, 'getTdfNamesAssignedByInstructor', e);
-    }
   }
 
   async function getTdfIdsByOwnerId(ownerId: string) {
@@ -1345,31 +1112,32 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   }
 
   async function getAllTeachers(this: MethodContext) {
-    deps.serverConsole('getAllTeachers');
-    if (!this.userId) {
-      throw new Meteor.Error(401, 'Must be logged in');
+    const userId = directoryPolicy.authorize(this);
+    const filter = await learnerSectionFilter(userId);
+    let visibleTeachers: Set<string> | undefined;
+    if (filter) {
+      const owners = await deps.Courses.rawCollection().aggregate([
+        ...currentCourseSections(), filter,
+        { $match: { 'section._id': { $exists: true } } },
+        { $group: { _id: '$teacherUserId' } },
+      ]).toArray();
+      visibleTeachers = new Set(owners.map((owner: { _id: string }) => owner._id));
+      if (!visibleTeachers.size) return [];
     }
-    const teacherCursor = await deps.Roles.getUsersInRoleAsync('teacher', {
-      queryOptions: {
-        fields: {
-          _id: 1,
-          username: 1,
-          email_canonical: 1,
-          'emails.address': 1,
-        },
-      },
+    // The third argument projects user records. Putting fields in role options also projects assignment records.
+    const teacherCursor = await deps.Roles.getUsersInRoleAsync('teacher', undefined, {
+      fields: { _id: 1, username: 1, email_canonical: 1, 'emails.address': 1 },
     });
     const allTeachers = await teacherCursor.fetchAsync();
 
-    return allTeachers.map((teacher: any) => ({
-      ...teacher,
-      username: deps.getUserDisplayIdentifier(teacher),
+    return allTeachers.filter((teacher: any) => !visibleTeachers || visibleTeachers.has(teacher._id)).map((teacher: any) => ({
+      _id: teacher._id,
       displayIdentifier: deps.getUserDisplayIdentifier(teacher),
     }));
   }
 
   async function addCourse(this: MethodContext, mycourse: { sections: string[] } & UnknownRecord) {
-    const { actingUserId, roleFlags } = await requireTeacherOrAdmin(this);
+    const actor = await createCoursePolicy.authorize(this);
     assertKnownFields(mycourse, ['courseId', 'courseName', 'teacherUserId', 'semester', 'beginDate', 'endDate', 'timezone', 'visibility', 'sections'], 'Course');
     const { beginDate, endDate, timezone } = normalizeCourseDates(mycourse);
     const sections = normalizeCourseSections(mycourse.sections);
@@ -1377,10 +1145,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     if (!courseName) {
       throw new Meteor.Error(400, 'Course name is required');
     }
-    const adminTeacherUserId = deps.normalizeCanonicalId(mycourse.teacherUserId);
-    const teacherUserId = roleFlags.admin && adminTeacherUserId
-      ? adminTeacherUserId
-      : actingUserId;
+    const teacherUserId = await resolveCourseOwner(actor, mycourse.teacherUserId);
     const semester = normalizeOptionalString(mycourse.semester) || curSemester;
     await assertUniqueCourseNameForTeacher(courseName, teacherUserId, semester);
     const courseDoc = {
@@ -1402,67 +1167,31 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   }
 
   async function editCourse(this: MethodContext, mycourse: { _id: string; courseId: string; sections: string[] } & UnknownRecord) {
-    assertKnownFields(mycourse, ['_id', 'courseId', 'courseName', 'teacherUserId', 'semester', 'beginDate', 'endDate', 'timezone', 'visibility', 'sections'], 'Course');
+    assertKnownFields(mycourse, ['_id', 'courseId', 'courseName', 'teacherUserId', 'semester', 'beginDate', 'endDate', 'timezone', 'visibility', 'sections', 'existingSections'], 'Course');
     const targetCourseId = deps.normalizeCanonicalId(mycourse._id) || deps.normalizeCanonicalId(mycourse.courseId);
-    const { course, actingUserId, roleFlags } = await assertCanManageCourse(this, targetCourseId || '');
+    const actor = await courseManagementPolicy.authorize(this, targetCourseId || '');
+    const { course } = actor;
     const { beginDate, endDate, timezone } = normalizeCourseDates(mycourse, course);
     const courseName = normalizeCourseName(mycourse.courseName);
     if (!courseName) {
       throw new Meteor.Error(400, 'Course name is required');
     }
-    const adminTeacherUserId = deps.normalizeCanonicalId(mycourse.teacherUserId);
-    const teacherUserId = roleFlags.admin && adminTeacherUserId
-      ? adminTeacherUserId
-      : (!roleFlags.admin ? actingUserId : course.teacherUserId);
+    const teacherUserId = await resolveCourseOwner(actor, mycourse.teacherUserId, course.teacherUserId);
     const semester = normalizeOptionalString(mycourse.semester) || course.semester || curSemester;
     await assertUniqueCourseNameForTeacher(courseName, teacherUserId, semester, targetCourseId || undefined);
     const visibility = mycourse.visibility === undefined
       ? normalizeCourseVisibility(course.visibility)
       : normalizeCourseVisibility(mycourse.visibility);
-    const courseUpdate = {
-      $set: {
-        courseName,
-        teacherUserId,
-        semester,
-        beginDate,
-        endDate,
-        timezone,
-        visibility,
-      },
-    };
-    deps.serverConsole('editCourse:' + JSON.stringify(courseUpdate));
-    await deps.Courses.updateAsync({ _id: targetCourseId }, courseUpdate);
-    const newSections = normalizeCourseSections(mycourse.sections);
-    const curCourseSections = await deps.Sections.find(
-      { courseId: targetCourseId },
-      { fields: { _id: 1, sectionName: 1 } },
-    ).fetchAsync();
-    const oldSections = curCourseSections.map((section: { sectionName: string }) => section.sectionName);
-    deps.serverConsole('old/new', oldSections, newSections);
-
-    const sectionsAdded = getSetAMinusB(newSections, oldSections);
-    const sectionsRemoved = getSetAMinusB(oldSections, newSections);
-    deps.serverConsole('sectionsAdded,', sectionsAdded);
-    deps.serverConsole('sectionsRemoved,', sectionsRemoved);
-
-    for (const sectionName of sectionsAdded) {
-      await deps.Sections.insertAsync({ courseId: targetCourseId, sectionName });
-    }
-    const removedSectionIds = curCourseSections
-      .filter((section: any) => sectionsRemoved.includes(section.sectionName))
-      .map((section: any) => section._id);
-    if (removedSectionIds.length > 0) {
-      await deps.SectionUserMap.removeAsync({ sectionId: { $in: removedSectionIds } });
-      await deps.Sections.removeAsync({ _id: { $in: removedSectionIds } });
-    }
-
+    await commitCourseEdit(String(course._id), course.teacherUserId, {
+      courseName, teacherUserId, semester, beginDate, endDate, timezone, visibility,
+    }, mycourse.existingSections, mycourse.sections);
     await invalidateCourseSnapshotsForCourse(String(targetCourseId), 'course-updated');
     return targetCourseId;
   }
 
   async function deleteCourse(this: MethodContext, courseId: string) {
     const targetCourseId = deps.normalizeCanonicalId(courseId);
-    const { course } = await assertCanManageCourse(this, targetCourseId || '');
+    const { course } = await courseManagementPolicy.authorize(this, targetCourseId || '');
     const sectionRows = await deps.Sections.find({ courseId: targetCourseId }, { fields: { _id: 1 } }).fetchAsync();
     const sectionIds = sectionRows.map((section: any) => String(section?._id || '')).filter(Boolean);
     await invalidateCourseSnapshotsForCourse(String(course._id), 'course-deleted');
@@ -1482,13 +1211,12 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return true;
   }
 
-  async function addUserToTeachersClass(this: MethodContext, teacherID: string, sectionId: string) {
-    const userId = this.userId;
-    deps.serverConsole('addUserToTeachersClass', userId, teacherID, sectionId);
+  async function authorizeCourseJoin(context: MethodContext, teacherID: string, sectionId: string) {
+    const userId = context.userId;
     if (!userId) {
       throw new Meteor.Error(401, 'Must be logged in');
     }
-    if (!teacherID || !sectionId) {
+    if (typeof teacherID !== 'string' || !teacherID.trim() || typeof sectionId !== 'string' || !sectionId.trim()) {
       throw new Meteor.Error(400, 'Teacher and section are required');
     }
 
@@ -1505,10 +1233,14 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       throw new Meteor.Error(403, 'Teacher does not own this section');
     }
 
+    return { userId, course, section };
+  }
+  const joinPolicy = Object.freeze({ kind: 'course-management', operation: 'join-section', authorize: authorizeCourseJoin } as const);
+
+  async function addUserToTeachersClass(this: MethodContext, teacherID: string, sectionId: string) {
+    const { userId, course, section } = await joinPolicy.authorize(this, teacherID, sectionId);
     const existingMappingCount = await deps.SectionUserMap.find({ sectionId, userId }).countAsync?.() || 0;
-    deps.serverConsole('existingMapping', existingMappingCount);
     if (existingMappingCount === 0) {
-      deps.serverConsole('new user, inserting into section_user_mapping', [sectionId, userId]);
       await deps.SectionUserMap.insertAsync({ sectionId, userId });
       await invalidateCourseSnapshotForUser(userId, 'membership-updated');
       await invalidateCourseSnapshotsForCourse(String(course._id), 'membership-updated');
@@ -1518,8 +1250,9 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return true;
   }
 
-  async function resolveAssignmentForDueDateException(this: MethodContext, classId: string, tdfId: string, assignmentId: string) {
-    await assertCanManageCourse(this, classId);
+  async function authorizeDueDateException(context: MethodContext, studentId: string, classId: string, tdfId: string, assignmentId: string) {
+    await assertCanManageCourse(context, classId);
+    if (!deps.normalizeCanonicalId(studentId)) throw new Meteor.Error(400, 'Student id is required');
     if (!deps.normalizeCanonicalId(assignmentId)) throw new Meteor.Error(400, 'Assignment id is required');
     const assignment = await deps.Assignments.findOneAsync(
       { _id: assignmentId, courseId: classId },
@@ -1528,11 +1261,27 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     if (!assignment || !assignmentMemberTdfIds(assignment).includes(tdfId)) {
       throw new Meteor.Error(404, 'Course assignment not found for due date exception');
     }
+    const sections = await deps.Sections.find({ courseId: classId }, { fields: { _id: 1 } }).fetchAsync();
+    const membership = await deps.SectionUserMap.findOneAsync({ userId: studentId, sectionId: { $in: sections.map(section => section._id) } }, { fields: { _id: 1 } });
+    if (!membership) throw new Meteor.Error(403, 'Due-date changes require current course enrollment');
     return assignment;
+  }
+  const exceptionPolicy = Object.freeze({ kind: 'course-management', operation: 'enrolled-student-exception', authorize: authorizeDueDateException } as const);
+
+  async function editStudentExceptions(studentId: string, edit: (current: DueDateException[]) => DueDateException[]) {
+    const student = await deps.usersCollection.findOneAsync({ _id: studentId }, { fields: { dueDateExceptions: 1 } });
+    if (!student) throw new Meteor.Error(404, 'Student account not found');
+    const current = student.dueDateExceptions;
+    if (current != null && !Array.isArray(current)) throw new Meteor.Error(409, 'Invalid stored due-date exceptions');
+    const changed = await deps.usersCollection.updateAsync(
+      { _id: studentId, dueDateExceptions: current === undefined ? { $exists: false } : current },
+      { $set: { dueDateExceptions: edit(current ?? []) } },
+    );
+    if (changed !== 1) throw new Meteor.Error(409, 'Due-date exceptions changed during save. Reload before editing.');
   }
 
   async function addUserDueDateException(this: MethodContext, userId: string, tdfId: string, classId: string, date: string | number | Date, assignmentId: string) {
-    const assignment = await resolveAssignmentForDueDateException.call(this, classId, tdfId, assignmentId);
+    const assignment = await exceptionPolicy.authorize(this, userId, classId, tdfId, assignmentId);
     deps.serverConsole('addUserDueDateException', userId, tdfId, date, assignment._id);
     const now = new Date();
     const exception = {
@@ -1543,21 +1292,11 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       createdAt: now,
       updatedAt: now,
     };
-    const user = await deps.usersCollection.findOneAsync({ _id: userId });
-    const dueDateExceptions = Array.isArray(user.dueDateExceptions) ? user.dueDateExceptions : [];
-    const existingIndex = dueDateExceptions.findIndex((item: DueDateException) => item.assignmentId === exception.assignmentId);
-    if (existingIndex >= 0) {
-      dueDateExceptions[existingIndex] = {
-        ...dueDateExceptions[existingIndex],
-        ...exception,
-        createdAt: dueDateExceptions[existingIndex].createdAt || now,
-        updatedAt: now,
-      };
-    } else {
-      dueDateExceptions.push(exception);
-    }
-    user.dueDateExceptions = dueDateExceptions;
-    await deps.usersCollection.updateAsync({ _id: userId }, user);
+    await editStudentExceptions(userId, current => {
+      const index = current.findIndex(item => item.assignmentId === exception.assignmentId && item.courseId === classId);
+      if (index < 0) return [...current, exception];
+      return current.map((item, i) => i === index ? { ...item, ...exception, createdAt: item.createdAt || now } : item);
+    });
   }
 
   async function checkForTDFData(tdfId: string) {
@@ -1575,74 +1314,58 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return !!tdf;
   }
 
-  async function checkForUserException(this: MethodContext, userId: string, assignmentId: string) {
-    await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-      actingUserId: this.userId,
-      subjectUserId: userId,
-      roles: ['admin'],
-      notLoggedInMessage: 'Must be logged in',
-      notLoggedInCode: 401,
-      forbiddenMessage: 'Can only read your own due date exceptions',
-      forbiddenCode: 403,
-    });
-    if (!deps.normalizeCanonicalId(assignmentId)) throw new Meteor.Error(400, 'Assignment id is required');
-    const user = await deps.usersCollection.findOneAsync({ _id: userId });
-    if (user.dueDateExceptions) {
-      const exceptions = user.dueDateExceptions as DueDateException[];
-      const exception = exceptions.find((item) => item.assignmentId === assignmentId);
-      if (exception) {
-        const exceptionDate = new Date(exception.date);
-        return exceptionDate.toLocaleDateString();
-      }
-    }
-    return false;
-  }
-
   async function removeUserDueDateException(this: MethodContext, userId: string, tdfId: string, classId: string, assignmentId: string) {
     if (!classId || !assignmentId) throw new Meteor.Error(400, 'Course and assignment ids are required');
-    const assignment = await resolveAssignmentForDueDateException.call(this, classId, tdfId, assignmentId);
+    const assignment = await exceptionPolicy.authorize(this, userId, classId, tdfId, assignmentId);
     deps.serverConsole('removeUserDueDateException', userId, tdfId);
-    const user = await deps.usersCollection.findOneAsync({ _id: userId });
-    if (user.dueDateExceptions) {
-      const exceptionIndex = (user.dueDateExceptions as DueDateException[]).findIndex((item: DueDateException) => (
-        item.assignmentId === String(assignment._id) && item.courseId === classId
-      ));
-      if (exceptionIndex > -1) {
-        user.dueDateExceptions.splice(exceptionIndex, 1);
-      } else {
-        deps.serverConsole('removeUserDueDateException ERROR, no exception found', userId, tdfId);
-      }
-    }
-    await deps.usersCollection.updateAsync({ _id: userId }, user);
+    await editStudentExceptions(userId, current => current.filter(item =>
+      item.assignmentId !== String(assignment._id) || item.courseId !== classId));
   }
 
-  return {
-    getSourceSentences,
-    getAllCourses,
+  const methods = {
     getAllCourseSections,
     getAllCoursesForInstructor,
-    getAllCourseAssignmentsForInstructor,
     getCourseAssignmentEditorSnapshot,
     saveCourseAssignments,
-    editCourseAssignments,
     getTdfAssignmentsByCourseIdMap,
-    resolveAssignedRootTdfIdsForUser,
     getLearnerCoursesSnapshot,
     getProgressiveAssignmentLaunch,
-    invalidateCourseSnapshotForUser,
-    invalidateCourseSnapshotsForCourse,
-    invalidateCourseSnapshotsForAssignment,
-    getTdfsAssignedToStudent,
-    getTdfNamesAssignedByInstructor,
-    getTdfIdsByOwnerId,
     getAllTeachers,
     addCourse,
     editCourse,
     deleteCourse,
     addUserToTeachersClass,
     addUserDueDateException,
-    checkForTDFData,
-    checkForUserException,
     removeUserDueDateException,
+  };
+  function bind(name: keyof typeof COURSE_READ_VERIFICATIONS, policy: MeteorMethodBinding['policy'], dataEgress: MeteorMethodBinding['dataEgress']): MeteorMethodBinding {
+    return Object.freeze({ handler: methods[name], verification: COURSE_READ_VERIFICATIONS[name], policy, dataEgress });
+  }
+  return {
+    methods,
+    methodBindings: Object.freeze([
+      bind('getProgressiveAssignmentLaunch', progressiveLaunchPolicy, 'progressive-lesson-content'),
+      Object.freeze({ handler: methods.deleteCourse, verification: COURSE_DELETE_VERIFICATION, policy: courseManagementPolicy, dataEgress: 'delete-result' as const }),
+      Object.freeze({ handler: methods.addUserToTeachersClass, verification: COURSE_JOIN_VERIFICATION, policy: joinPolicy, dataEgress: 'join-result' as const }),
+      Object.freeze({ handler: methods.addCourse, verification: COURSE_CREATE_VERIFICATION, policy: createCoursePolicy, dataEgress: 'course-id' as const }),
+      Object.freeze({ handler: methods.editCourse, verification: COURSE_EDIT_VERIFICATION, policy: courseManagementPolicy, dataEgress: 'course-id' as const }),
+      ...Object.values(COURSE_EXCEPTION_VERIFICATIONS).map(verification => Object.freeze({
+        handler: methods[verification.method], verification, policy: exceptionPolicy, dataEgress: 'none' as const,
+      })),
+      Object.freeze({ handler: methods.saveCourseAssignments, verification: COURSE_ASSIGNMENT_SAVE_VERIFICATION,
+        policy: courseManagementPolicy, dataEgress: 'assignment-editor-snapshot' as const }),
+      bind('getCourseAssignmentEditorSnapshot', courseManagementPolicy, 'assignment-editor-snapshot'),
+      bind('getAllTeachers', directoryPolicy, 'teacher-display-list'),
+      bind('getAllCourseSections', directoryPolicy, 'course-section-list'),
+      bind('getLearnerCoursesSnapshot', snapshotPolicy, 'learner-course-snapshot'),
+      bind('getTdfAssignmentsByCourseIdMap', instructorReadPolicy, 'assignments-by-course'),
+      bind('getAllCoursesForInstructor', instructorReadPolicy, 'instructor-course-list'),
+    ]),
+    resolveAssignedRootTdfIdsForUser,
+    invalidateCourseSnapshotsForCourse,
+    invalidateCourseSnapshotsForAssignment,
+    getTdfIdsByOwnerId,
+    getSourceSentences,
+    checkForTDFData,
   };
 }

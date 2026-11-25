@@ -15,6 +15,7 @@
   let timer: ReturnType<typeof setTimeout> | undefined;
   let finished = false;
   let run = 0;
+  let previewHost: HTMLDivElement;
   $: target = stage === 'training' ? training[index] : validation[index];
   async function start() {
     const token = ++run;
@@ -24,6 +25,9 @@
     try {
       await startGazeCalibration();
       if (token !== run) return;
+      const preview = document.getElementById('webgazerVideoContainer');
+      if (!preview) throw new Error('Gaze camera preview was not initialized');
+      previewHost.appendChild(preview);
       index = 0;
       samples = 0;
       sampling = false;
@@ -77,10 +81,15 @@
   onDestroy(() => {
     stopTimers();
     if (!finished) cancelGazeCalibration();
+    // The gaze service retains the hidden camera between lesson units and
+    // owns its eventual release. Do not destroy its DOM with this component.
+    const preview = previewHost?.querySelector('#webgazerVideoContainer');
+    if (preview) document.body.appendChild(preview);
   });
 </script>
 
 <section class="calibration" aria-label="Gaze calibration">
+  <div class="calibration-preview" bind:this={previewHost} aria-label="Camera preview"></div>
   <h2>Gaze calibration</h2>
   <p role="status">{$gazeState.status}</p>
   {#if stage === 'setup' || stage === 'starting'}
@@ -112,7 +121,16 @@
 </section>
 
 <style>
-  .calibration { padding: 1rem; min-height: 75vh; }
+  .calibration { padding: 1rem; min-height: 75vh; display: flow-root; }
+  .calibration-preview { float: right; width: min(40%, 320px); aspect-ratio: 4 / 3;
+    margin: 0 0 1rem 1rem; pointer-events: none; }
+  .calibration-preview :global(#webgazerVideoContainer) {
+    position: relative !important; top: auto !important; left: auto !important;
+    width: 100% !important; height: 100% !important;
+  }
+  .calibration-preview :global(video), .calibration-preview :global(canvas) {
+    width: 100% !important; height: 100% !important;
+  }
   .target { position: fixed; width: 24px; height: 24px; border-radius: 50%;
     background: #0064c8; border: 3px solid white; outline: 2px solid black;
     transform: translate(-50%, -50%); z-index: 9999; }

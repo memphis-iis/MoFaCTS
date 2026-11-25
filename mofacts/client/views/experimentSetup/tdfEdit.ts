@@ -1,3 +1,4 @@
+import { prepareEditorProviderKeyChanges } from '../../../common/lessonProviderKeys';
 import { removeEmptyEditorProperties } from '../../../common/lib/editorSaveShape';
 import '../shared/adminUi/adminUi';
 import { createContentUpdateConfirmation, saveEditedContent } from '../../lib/contentUpdateWarningsClient';
@@ -307,7 +308,7 @@ Template.tdfEdit.events({
         syncFieldEditorFromDom(instance, document.activeElement);
 
         // Get edited tutor from json-editor
-        const editedTutor = instance.editor.getValue();
+        const editedTutor = cloneJsonLike(instance.editor.getValue());
 
         // Run json-editor schema validation
         const schemaErrors = instance.editor.validate();
@@ -336,28 +337,12 @@ Template.tdfEdit.events({
         instance.saving.set(true);
 
         try {
-            // Handle API keys: if empty but had original, keep original encrypted value
-            // If user entered new value, mark it for encryption on server
-            const apiKeyUpdates: Record<string, any> = {};
-            API_KEY_FIELDS.forEach((field: string) => {
-                const newValue = editedTutor.setspec?.[field];
-                const originalEncrypted = instance.originalApiKeys[field];
-
-                if (!newValue && originalEncrypted) {
-                    // User didn't change it - restore original encrypted value
-                    if (editedTutor.setspec) {
-                        editedTutor.setspec[field] = originalEncrypted;
-                    }
-                } else if (newValue && newValue !== originalEncrypted) {
-                    // User entered new value - mark for encryption
-                    apiKeyUpdates[field] = true;
-                }
-            });
+            const removedTutorPaths = collectRemovedEditorPaths(instance._baselineValue, editedTutor);
+            const apiKeyUpdates = prepareEditorProviderKeyChanges(editedTutor.setspec || {}, instance.configuredProviderKeyFields, removedTutorPaths);
 
             // Wrap back in the expected structure for storage
             // Editor edits tutor, content is { tdfs: { tutor: {...} } }
             const tdfContent = { tdfs: { tutor: editedTutor } };
-            const removedTutorPaths = collectRemovedEditorPaths(instance._baselineValue, editedTutor);
 
             // Call server to save (server validates ownership, encrypts new API keys, and saves)
             const saved = await saveEditedContent({ callAsync: meteorCallAsync, method: 'saveTdfContent',
@@ -614,7 +599,7 @@ async function initializeTdfEditor(instance: any): Promise<void> {
 }
 
 // API key fields that are stored encrypted - clear for display, allow re-entry
-const API_KEY_FIELDS = ['speechAPIKey', 'textToSpeechAPIKey', 'openRouterApiKey'];
+
 
 /**
  * Check if a value is considered "empty" for display purposes
@@ -938,28 +923,17 @@ async function initEditor(instance: any, tdf: any) {
         container.classList.remove('hide-descriptions');
     }
 
-    // Store original for comparison (keep encrypted values)
+    // Keep the redacted lesson as the change-detection baseline.
     instance.originalTdf = JSON.parse(JSON.stringify(tdf.content.tdfs));
 
-    // Track which API keys had values (so we know to keep them if not re-entered)
-    instance.originalApiKeys = {};
-    API_KEY_FIELDS.forEach((field: string) => {
-        if (tdf.content.tdfs.tutor?.setspec?.[field]) {
-            instance.originalApiKeys[field] = tdf.content.tdfs.tutor.setspec[field];
-        }
-    });
-
-    // Create a copy for editing with API keys cleared (they're encrypted gibberish)
     let tutorData = JSON.parse(JSON.stringify(tdf.content.tdfs.tutor));
-    API_KEY_FIELDS.forEach((field: string) => {
-        if (tutorData.setspec?.[field]) {
-            tutorData.setspec[field] = ''; // Clear for display - user can re-enter
-        }
-    });
     // Remove empty properties so json-editor only shows populated fields
     // Users can add new fields via the Properties button
     const tutorSchema = prepareTutorSchemaForJsonEditor(cachedSchema.properties?.tutor || cachedSchema);
     tutorData = removeEmptyEditorProperties(tutorData, tutorSchema);
+
+    instance.configuredProviderKeyFields = tdf.configuredProviderKeyFields || [];
+    for (const field of instance.configuredProviderKeyFields) tutorData.setspec[field] = '';
 
     // Inject tooltip descriptions based on current mode (brief or verbose)
     const schemaWithDescriptions = injectDescriptions(tutorSchema, TDF_TOOLTIPS, tooltipMode);

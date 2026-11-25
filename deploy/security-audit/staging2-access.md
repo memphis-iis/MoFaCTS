@@ -5,6 +5,50 @@ root-owned staging2 host auditor through its forced-command SSH account. It does
 not deploy, run Meteor, create a production report, ingest data, or qualify a
 release. It requires an explicit accepted release-record digest for each run.
 
+## Coordinated V2 replacement
+
+Staging2 passed its paired V2 application/host/receipt cutover and live rollback
+on 2026-11-11. Its manual checker selects immutable source
+`c79735ff91e2dcd9109d9dc389c03c6646104152`; checkout and equality assertions
+change together. Production retains its separate V1 selection. No new hosted
+tagged-runner execution is claimed: the unchanged network policy retains its
+earlier accepted proof; actual new forced-command acquisition and arbitrary
+command/PTY denial passed directly through the existing private operator path.
+
+The V2 forced-command source is `deploy/security-audit/host-audit-v2.sh`.
+At cutover it occupies the existing `/usr/local/sbin/mofacts-host-exposure-audit`
+entry point. Its raw measurement collector is installed as root:root 0755 at
+`/usr/local/libexec/mofacts-security-audit/host-observations.sh`; the existing
+protected receipt tool remains root:root 0755. Save original files and receipt
+before installation. No SSH, sudo, forwarding or network permission is added.
+
+The command accepts no arguments or `SSH_ORIGINAL_COMMAND`. It invokes only the
+two fixed protected children with bounded output/time, returning one canonical
+`MoFaCTSHostAuditAcquisitionV2` transport object containing `hostObservations`
+and `releaseReceipt`. The nested measurement schema/descriptor digest remains
+unchanged. The receipt is the same V2 identity used by the application; an
+unavailable or mismatched receipt stays explicit. Node validates both contracts
+before writing separate measurement/receipt files. V1 verdicts/receipts, duplicate
+JSON keys and extra fields are rejected.
+
+```sh
+node mofacts/scripts/security-audit/internal/hostAcquisitionV2.mjs \
+  "$private_acquisition" "$private_host_observations" "$private_receipt_observation"
+```
+
+The V2 access checker derives its internal subset from the canonical catalog,
+evaluates the raw facts independently, and requires every applicable exposure
+control to pass plus an exact accepted receipt match. It retains only fixed
+statuses and public identity fields. Existing tagged-runner identity, terminal,
+forwarding and denied-peer checks remain required. A transport-valid envelope
+alone cannot pass access acceptance, and a PC operator cannot impersonate the
+separately tagged runner to manufacture its network proof.
+
+The replacement has Node and root permission/argument/bounds fixtures. Its live
+installation, paired application receipt, actual restricted SSH and workflow
+selection are still a coordinated acceptance gate; do not repeat the completed
+raw measurement qualification as a substitute.
+
 ## Identity and ownership
 
 - GitHub environment: `staging2-security-audit`, limited to the `main` branch.
@@ -80,7 +124,7 @@ no schedule, pull-request trigger or caller-supplied target. Pinned actions and
 the repository-pinned Node runtime are used, with no application installation or
 new runner dependency. The existing Tailscale action owns ephemeral-node logout.
 
-The shared checker requires all nine exact host control IDs to PASS and a valid
+The V2 checker derives all eleven host controls from the catalog, requires PASS and a valid
 `observed/MATCH` receipt with the explicitly supplied record digest and the
 separate staging2 image repository. It checks the runner has only its audit tag,
 arbitrary commands cannot execute, PTYs and forwarding are refused, and all 44
@@ -95,8 +139,8 @@ artifacts contain only fixed statuses, counts and public receipt identity fields
 for 14 days. A failed run uploads no raw host output or credential files.
 
 An accepted result is `staging2-access-accepted-unqualified`. This is an access
-and host identity rehearsal, not full report/catalog authentication, automated
-receipt integration into the V1 assembler, Phase 1 activation or Phase 0 closure.
+and host identity rehearsal. It does not establish a full four-section report,
+production cutover or overall audit closure.
 An updated deployed release requires its newly accepted workstation record
 digest on the next manual dispatch; missing or stale identity fails explicitly.
 

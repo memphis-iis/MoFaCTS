@@ -1,5 +1,6 @@
 import type { UploadedPackageFile } from './packageParser';
 import type { PackageUploadRuntimeState, ProcessPackageUploadDeps } from './packageUploadShared';
+import { resolvePackagedSimulations } from './packageSimulations';
 import { resolvePreferredApiKey } from './apiKeyResolution';
 import { callOpenRouterEmbeddings } from '../../common/lib/openRouterClient';
 import { SPARC_EMBEDDING_MODEL } from '../../common/lib/sparcEmbeddingModel';
@@ -184,6 +185,7 @@ export async function postProcessUploadedTdfs(args: {
       tdf.content.tdfs.tutor.unit = processedTdf.tutor.unit;
 
       if (tdf.rawStimuliFile && scopedStimuliSetId !== undefined && scopedStimuliSetId !== null) {
+        resolvePackagedSimulations(tdf.rawStimuliFile, uploadedMediaPathMap);
         await deps.canonicalizeStimDisplayMediaRefs(tdf.rawStimuliFile, scopedStimuliSetId, {
           rejectUnresolved: true,
           allowFilenameLookup: false,

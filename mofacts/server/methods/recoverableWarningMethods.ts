@@ -1,3 +1,4 @@
+import { privateParticipantActivity } from '../lib/participantSession';
 import { check, Match } from 'meteor/check';
 import {
   RECOVERABLE_WARNING_ACTION,
@@ -9,6 +10,8 @@ import {
 } from '../../common/recoverableWarnings';
 import { requireAuthenticatedUser } from '../lib/methodAuthorization';
 import { redactSparcDialogueDiagnosticText } from '../../common/lib/sparcDiagnosticText';
+import { WARNING_METHOD_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 
 type RecordValue = Record<string, unknown>;
 type Context = { userId?: string | null };
@@ -22,10 +25,19 @@ type Dependencies = {
 const identifier = Match.Where((value: unknown) => typeof value === 'string'
   && /^[A-Za-z0-9_.:-]{1,128}$/.test(value));
 
-export function createRecoverableWarningMethods(deps: Dependencies) {
-  return {
+export function createRecoverableWarningRegistration(deps: Dependencies) {
+  const report = Object.freeze({
+    kind: 'diagnostic-telemetry', operation: 'non-private-report',
+    async authorize(context: Context) {
+      const userId = requireAuthenticatedUser(context.userId);
+      return await privateParticipantActivity(context) ? null : userId;
+    },
+  } as const);
+  const read = Object.freeze({ kind: 'role', role: 'admin', authorize: deps.requireAdminUser } as const);
+  const methods = {
     async reportRecoverableWarning(this: Context, warning: RecoverableWarning) {
-      const userId = requireAuthenticatedUser(this.userId);
+      const userId = await report.authorize(this);
+      if (userId === null) return false;
       const boundedSize = Match.Where((value: unknown) => Number.isInteger(value) && Number(value) > 0 && Number(value) <= 10000000);
       const questionIdentifier = Match.Where((value: unknown) => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,512}$/.test(value));
       const nullableQuestionIdentifier = Match.OneOf(null, questionIdentifier);
@@ -94,7 +106,7 @@ export function createRecoverableWarningMethods(deps: Dependencies) {
     },
 
     async getRecoverableWarnings(this: Context, cursor: RecoverableWarningCursor | null = null): Promise<RecoverableWarningPage> {
-      await deps.requireAdminUser(this.userId);
+      await read.authorize(this.userId);
       check(cursor, Match.OneOf(null, { createdAt: Date, id: identifier }));
       const selector: RecordValue = { action: RECOVERABLE_WARNING_ACTION };
       if (cursor) {
@@ -117,4 +129,11 @@ export function createRecoverableWarningMethods(deps: Dependencies) {
       };
     },
   };
+  const methodBindings: readonly MeteorMethodBinding[] = Object.freeze([
+    Object.freeze({ handler: methods.reportRecoverableWarning, verification: WARNING_METHOD_VERIFICATIONS.reportRecoverableWarning,
+      policy: report, dataEgress: 'warning-report-status' }),
+    Object.freeze({ handler: methods.getRecoverableWarnings, verification: WARNING_METHOD_VERIFICATIONS.getRecoverableWarnings,
+      policy: read, dataEgress: 'warning-page' }),
+  ]);
+  return { methods, methodBindings };
 }

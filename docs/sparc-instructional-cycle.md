@@ -1,5 +1,16 @@
 # SPARC instructional cycle
 
+## Text-response submission
+
+Submit and Enter use the same empty-response guard. An empty or whitespace-only
+answer leaves the current question and draft unchanged, returns focus through the
+existing desktop/touch response-focus policy, and does not start assessment,
+generation, history writes, or progress changes. Nonempty answers are captured
+before the input clears; failures before acceptance restore the draft. Accepted
+turns retain the existing durable recovery contract. Menu and
+multiple-choice bindings remain separate, and controller validation still rejects
+malformed submissions.
+
 ## Personas and embedding-based descriptive matching, November 9, 2026
 
 Student and teacher personas guide instructional generation, never target/move
@@ -44,15 +55,12 @@ or automatic reindex is needed solely to add this optional context.
 Reading level, language, support/composition labels, and personas never partition
 browser indexes, filter database candidates, rerank results, or independently reject
 the selected result. Keep the approved component-type and question-response-format
-boundaries, the separately approved orientation-owned text boundary, compatible
-vectors, authorization, availability, and the same-user no-repeat requirement. Choose the single maximum cosine similarity at 0.95,
-or 0.975 for feedback.
-
-Actual payload integrity remains required: a selected instruction lacking required
-support, or lacking the required actual medium, is blocked without accepting it,
-reranking, substituting content, or changing the move. Metadata labels alone cannot
-trigger that block. Saved decisions retain their existing event identity and accepted
-content; persona changes do not invalidate or regenerate a saved turn.
+boundaries, compatible vectors, lesson authorization, and asset availability.
+For a new instruction the browser ranks matching candidates by cosine similarity, with a
+minimum of 0.95 (0.975 for feedback). The server checks the actual content and required
+medium in score order. A removed, incomplete, or incompatible candidate gives the next
+qualifying candidate a chance. Generation starts after all qualifying candidates are
+exhausted. A service failure interrupts the turn. Saved turns restore their accepted content.
 
 This section supersedes historical descriptive retrieval restrictions below.
 Implementation and automated checks do not establish deployed behavior or live
@@ -109,9 +117,7 @@ decreases, and at completion. Connect to the lesson purpose when the authored
 content supports the connection rather than repeating a generic mastery slogan.
 
 The prompt receives the last five accepted bridges and adjacent feedback to vary
-its openings, sentence patterns, and acknowledgements. Generated bridges obey the
-same learner-wide exact-content no-repeat acceptance boundary as other directly
-generated tutor messages. Stable KC labels and numerical progress are navigation
+its openings, sentence patterns, and acknowledgements. Generated bridges are saved with the turn. Stable KC labels and numerical progress are navigation
 metadata rather than repeated instructional components. Bridges are saved with
 the learner's turn, separately from reusable library instructions.
 
@@ -124,13 +130,9 @@ and retain one heading for the menu and resulting instruction. Completion closes
 the sequence with its accepted final progress count in both enabled modes, without
 an empty extra instructional turn. `headings` completion makes no bridge call.
 
-Categorized reusable feedback, instructions, and questions in `full` and `headings`
-carry the internal `orientationOwned: true` generation/retrieval category. Browser
-eligibility and server selection require the same category, so older library text containing its
-own introductions or milestone announcements cannot be paired with the new
-bridge. `off` uses the original text pool and prompt contract. Visual assets remain
-shared in all modes. Exact accepted library decisions and saved history retain
-their original output; changing modes does not migrate content.
+Orientation mode controls how new text is composed. All modes share the same library
+of saved instructions, questions, feedback and visual assets. Earlier text may include
+its own introduction. Accepted decisions and saved conversations retain their original output.
 An older interrupted event without mode or orientation-ownership markers finishes
 under its original realization contract, including interruptions at submission,
 assessment, or feedback before selection. Its retry does not add
@@ -143,93 +145,14 @@ substituted. Navigation prose and metadata are excluded from learner-evidence
 scoring. The optional mode setting adds no new advancement criterion. Local source
 changes, automated verification, and production deployment are separate states.
 
-## Approved same-user no-repeat requirement, October 28, 2026
+## Library reuse across turns, November 23, 2026
 
-**Current source contract; production deployment is a separate operation.**
-This requirement addresses reuse of saved instructional content. It adds no
-paraphrase detector, semantic novelty evaluator or new similarity threshold.
-The sections below describe earlier implementations and do not override this rule.
+A learner can receive the same saved explanation, support, image, question, or feedback
+in a new turn. Prior presentations remain in history and do not narrow the search.
+The browser receives catalog IDs and compatible vectors after lesson authorization.
+Transactions record each new decision and presentation under its own event. A retry
+restores the accepted decision and preserves the identity and content of saved output.
 
-A new instructional turn must not deliver content already used for that user,
-across lessons and sessions. Shared library content can serve another user who
-has not received it. Reopening, retrying or restoring the same saved turn preserves
-its original accepted artifacts and is not a new instructional delivery. Existing
-history must not be rewritten to hide prior repetitions.
-
-This applies to every actual component: explanations; written examples, comparisons
-and tables; questions and answer choices; feedback; hints, pumps, assertions,
-summaries and other tutor utterances; images; and video segments. Repeated facts,
-the selected learning target and ordinary response-control labels are not themselves
-whole instructional components. The rule applies to complete content, including
-directly generated tutor output that bypasses the library.
-
-A matched instruction is eligible only when both its explanation and its support
-are eligible. A fresh instruction entry ID cannot make an old explanation or image
-new to the user. Exact component identities must be checked independently of the
-instruction's record identity. Changing
-multiple-choice option order or IDs does not make the same question new.
-
-Browser retrieval must choose the single maximum among eligible unseen candidates,
-using the existing category and similarity thresholds. If none qualifies, compose
-new material for the selected target, move and assistance level. The resulting
-material must pass the same no-repeat acceptance rule. Neither a link to earlier
-content nor a changed identifier satisfies it. Duplicate rejection must remain
-explicit; do not silently change the target, move, response format or media type,
-or add an automatic regeneration loop.
-
-The acceptance boundary enforces the rule while committing a content decision,
-so stale browser caches and simultaneous tabs cannot bypass it. Existing-user
-eligibility must include historical presentations; starting an empty cache is
-insufficient. A progress reset or content archival must not silently make used
-material unseen again. Account deletion must remove the user's no-repeat state.
-Initialization adds identity metadata in restartable pages of at most 100 records
-and keeps history immutable. Shared catalog records and accepted decisions carry
-`contentUseKeys`; exact component text/payload digests and media IDs are private
-metadata. The publication applies the authenticated user's eligibility before
-publishing candidate IDs and vectors. No usage ledger, answers or conversations
-are sent to the browser for this check.
-
-Existing accepted library and visual requests reserve their selected content for
-that user and turn. The same saved decision remains resumable, including when its
-presentation history has not yet committed. Canonical history owns the actual
-presented components under `sparc.stateTransition.writes[].value.node` and supplies
-original component snapshots for historical initialization. Composed/resolved drafts
-alone are not accepted delivery decisions. The retired exposure and manifest
-collections must not be revived as competing authorities. Eligibility metadata
-must have one explicit owner, indexed queries, atomic decision acceptance,
-bounded historical initialization, deletion/backup wiring and failure handling.
-
-`server/lib/sparcContentUse.ts` owns acceptance and metadata initialization through
-the existing request stores. Compact `presentation-use` receipts retain original
-component identities from actual saved output, including media inside matched
-instructions. Catalog revisions are not treated as proof of previously presented
-text. Existing decisions without an original saved snapshot retain their entry-ID
-exclusion; removed original data is not manufactured. Account deletion removes
-the records through the existing request owner. Restore clears the initialization
-checkpoint so actual restored decisions and history are reconciled again.
-
-Short snapshot/majority transactions serialize acceptance through an independent
-`contentUseRevision` on `HistoryCommitState`; they do not allocate practice sequence
-numbers or rebuild dashboard summaries. The history commit owner prepares metadata
-before an insertion and validates/persists presentation receipts within the same
-transaction as the output history. This also covers uncached hints, summaries and
-other directly generated messages. A rejection rolls back the receipt, history
-and sequence together. Provider calls are outside these transactions.
-
-An empty eligible browser index still calls the existing exact-event lookup before
-generation. An already accepted event returns its saved decision; an administrator
-revision cannot silently supply a changed payload in place of that decision. Actual
-saved conversations render their journaled nodes. Failed invariants remain explicit
-through the existing error UI; no reset requirement, deletion, semantic evaluator
-or automatic provider retry is added.
-
-Required acceptance coverage includes every component kind; new and retrieved
-material; any repeated part disqualifying a matched instruction; identical content
-under different IDs; unchanged questions with reordered choices; the same user
-across lessons, sessions, reset and archival; different-user eligibility;
-concurrent acceptance; failed writes; and idempotent saved-turn restoration.
-These checks concern actual saved content and exact component identities; no
-additional semantic judgment of newly generated wording is part of this change.
 
 ## Joint instruction composition and durable stages, October 24, 2026
 
@@ -296,8 +219,14 @@ Retries and reloads use the last durable checkpoint, preserving the explanation
 and its brief instead of regenerating completed work. Lost publication
 acknowledgements use the existing accepted library decision. Old incomplete
 unpaired moves are not resumed as matched instructions. Historical completed
-nodes remain readable. Navigation guards discard late UI updates from another
-scope. Loading messages are Preparing instruction, optional Preparing visual
+nodes remain readable. The SPARC surface owns an abort signal for each mounted
+dialogue scope. Navigation or a scope change cancels that controller's continuation:
+provider results and new history writes check the signal before acceptance. A write
+already sent retains its durable checkpoint, but cannot trigger further generation
+or UI publication after cancellation. Reopening resumes accepted checkpoints;
+abandoned startup work cannot keep writing into the resumed turn. This lifecycle
+does not introduce retries or weaken the server's conflicting-write rejection.
+Loading messages are Preparing instruction, optional Preparing visual
 support, and Preparing question; display order remains explanation, support,
 question. Client and server must be released together for the new instruction
 payload and checkpoint contract. No TDF authoring fields change.
@@ -365,16 +294,14 @@ not another stored library. Additions, vector changes and removals update the lo
 index. Account changes stop subscriptions and clear their normalized vectors.
 
 Each row is normalized once on cache insertion/update. Each lookup normalizes its
-query once, computes dot products in one pass over the user's eligible unseen
-candidates, and returns exactly the maximum with deterministic ID ordering for
-ties. There is no candidate sorting, semantic novelty evaluation or database
-paging during a practice search. Exact per-user use eligibility is enforced before
-vectors reach this search and again when content is accepted.
+query once and scores the compatible vectors. For instructions it orders qualifying
+entries by descending score and breaks ties by entry ID. The browser tries each
+entry at most once until the server accepts a usable result or the list is exhausted.
 Text component reuse uses 0.975 for feedback and 0.95 for other components, retaining
 the approved component-type/question-response-format categories. Images and videos across languages compete in a single
 visual index with one query and a shared **0.95** threshold. An absent authored
 content language is retained as descriptive metadata and does not exclude videos.
-Only the winning content is fetched by ID; a stale/deleted selection fails clearly.
+Each candidate is fetched by ID only when needed. A removed instruction is skipped.
 
 Completed query embeddings are cached in browser memory, scoped to account, lesson,
 model and exact input text. Missing embeddings use the existing authenticated API
@@ -1259,9 +1186,7 @@ validation, and matching live in `sparcMoveLibraryService.ts`,
   form the shared embedding input. Feedback adds the preceding question and learner
   answer; images add the illustration brief. Operational IDs and full prompt
   specifications are excluded.
-- The highest-similarity eligible candidate is selected subject to the approved
-  same-user no-repeat requirement above. Earlier support does not become eligible
-  through a link or highlight. Historical saved decisions remain readable.
+- The highest-scoring usable instruction is selected. Historical saved decisions remain readable.
 - Written rich support uses primitive retrieval before generation and cannot reuse a
   video or image. New visual moves request a visual brief and resolve video, image,
   then generated image in that order, rather than reusing a complete cached rich
@@ -1573,8 +1498,6 @@ used manual reload. The current advisory size-warning contract is documented in 
 The instructional library has **Delete** and **Revise**, with no exclusion or deprecation state. Delete permanently removes the catalog entry. Image deletion removes its saved image and dependent support entries; video deletion removes dependent saved support. Completed-move manifests that reference deleted entries are removed because they are retrieval metadata, not learner history. Revision updates the current item in place. Text revisions replace its text and answer key as applicable; image revisions replace its raster and description. No parent links, predecessor records, old-version controls, or retained image revisions are supported.
 
 `server/lib/sparcLibraryCurationStorage.ts` owns deletion. Its content-free receipts contain only an ID, removal time, and transient cleanup markers while deletion is unfinished. They are outside the catalog and contain no text, embeddings, media, or learner data. Readers use these receipts to show **Administrative removal** in the original field rather than report an error or regenerate substitute content. An image field can be removed without erasing neighboring tutor text. Batched receipt lookup checks at most 100 exact IDs per request. A deleted multiple-choice question has no answer controls or replacement answer key. Unrelated missing/corrupt records and storage/network failures remain errors.
-
-The existing bulk uploaded-file deletion uses this same owner for SPARC teaching images, including generated image assets without a catalog entry. It records removal and cleans dependent catalog content before media deletion, preserving learner decisions, histories and model values. Its scope remains uploaded files and their dependent content; unrelated text and video library entries are not part of the bulk asset operation.
 
 The forward startup migration runs after collection consolidation. It removes existing `reusable: false` entries in pages of at most 100, records removal receipts, and unsets retired exclusion and predecessor fields on survivors. It also retires the old image-revision layout, keeping only the current image and deleting obsolete image assets and revision records. Catalog entries, shared manifests, and receipts change transactionally; image-file cleanup runs afterward and retains a retry marker until successful. A transient cleanup marker lets restart finish dependent and media deletion after the catalog item is removed. Restart repeats unfinished work safely, logs deletion counts and failures, and never edits learner histories, accepted decisions, exposures, or model state. Deletion is permanent: restoring content requires an operator backup, not a hidden archive or an Allow reuse control. The authorized existing-exclusion cleanup therefore has no in-app rollback.
 

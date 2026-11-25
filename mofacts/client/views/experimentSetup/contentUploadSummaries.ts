@@ -25,14 +25,12 @@ type TdfLike = {
           openRouterApiKey?: unknown;
           condition?: string[];
           conditionTdfIds?: Array<string | null>;
-          stimulusfile?: string;
           experimentTarget?: string;
           aiVisibilityLockReason?: string;
           contentLanguage?: string;
           recommendedUiLocales?: string[];
           translationStatus?: string;
         };
-        unit?: Array<{ learningsession?: { stimulusfile?: string } }>;
       };
     };
   };
@@ -40,7 +38,6 @@ type TdfLike = {
 
 export function buildContentUploadSummaries(
   tdfs: TdfLike[], resolvedConditionDocs: TdfLike[],
-  stimDocs: Array<{ _id: string; meta?: { fileName?: string } }>,
   assetCounts: Array<{ stimuliSetId: string | number; count: number }>,
 ) {
   const resolvedConditionsById = new Map<string, TdfLike>();
@@ -50,14 +47,6 @@ export function buildContentUploadSummaries(
       continue;
     }
     resolvedConditionsById.set(resolvedId, conditionDoc);
-  }
-
-  const stimDocsByFileName = new Map<string, { _id: string }>();
-  for (const stimDoc of stimDocs as Array<{ _id: string; meta?: { fileName?: string } }>) {
-    const fileName = typeof stimDoc?.meta?.fileName === 'string' ? stimDoc.meta.fileName.trim() : '';
-    if (fileName) {
-      stimDocsByFileName.set(fileName, { _id: stimDoc._id });
-    }
   }
 
   const assetCountsByStimuliSetId = new Map(assetCounts.map(row => [stimuliSetCountKey(row.stimuliSetId), row.count]));
@@ -87,7 +76,6 @@ export function buildContentUploadSummaries(
       assetCount,
       conditions: [] as Array<{ condition: string; tdfId: string | null; count: number | null; supportsSparcVideoCatalog: boolean }>,
       errors: [] as string[],
-      stimFiles: [] as Array<{ filename: string; stimId: string | null; exists: boolean }>,
     };
 
     if (!setspec) {
@@ -121,30 +109,6 @@ export function buildContentUploadSummaries(
           supportsSparcVideoCatalog: supportsSparcVideoCatalog(resolvedConditionsById.get(resolvedConditionIds[index] ?? '')),
         }));
       }
-    }
-
-    const stimFileSet = new Set<string>();
-    if (setspec?.stimulusfile) {
-      stimFileSet.add(setspec.stimulusfile);
-    }
-    if (tdf.content?.tdfs?.tutor?.unit) {
-      for (const unit of tdf.content.tdfs.tutor.unit) {
-        if (unit.learningsession?.stimulusfile) {
-          stimFileSet.add(unit.learningsession.stimulusfile);
-        }
-      }
-    }
-
-    if (stimFileSet.size > 0) {
-      summary.stimFiles = Array.from(stimFileSet).map((filename: string) => {
-        const normalizedFilename = filename.trim();
-        const stimDoc = stimDocsByFileName.get(normalizedFilename);
-        return {
-          filename,
-          stimId: stimDoc?._id || null,
-          exists: !!stimDoc,
-        };
-      });
     }
 
     summaries.push(summary);

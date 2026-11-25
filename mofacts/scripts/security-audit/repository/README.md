@@ -126,7 +126,8 @@ wiring remain open.
 `sourceV2.mjs` now acquires the three independent source observations. It invokes
 the existing surface checker's `--discover` mode and normal check separately,
 validates the exact inventory and completed count, and cross-checks agreement.
-The active checker, classification vocabulary and source patterns are unchanged.
+Both commands cover methods, publications, HTTP routes, HTTP middleware,
+exports and management routes.
 This is proof of the current inference contract, not runtime authorization;
 Phase 3 retains that review/redesign. An arbitrary nonzero exit or unstructured
 diagnostic cannot supply a confirmed violation/count and remains ERROR.

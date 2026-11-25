@@ -8,7 +8,6 @@ import { prolificCompletionUrl } from '../../../../../common/prolific';
 import { sessionCleanUp } from '../../../../lib/sessionUtils';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { clientConsole } from '../../../../lib/clientLogger';
-import { stopStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTypeMapSync';
 import { cleanupAudioRecorder } from './speechRecognitionService';
 import { stopTtsPlayback } from './ttsService';
 import { completeCleanup } from '../utils/lifecycleCleanup';
@@ -53,7 +52,6 @@ export async function leavePage(dest: NavigationDestination, externalProlific = 
     ? buildActiveLessonRouteLocation(dest as LessonRouteSurface)
     : null;
   isNavigatingAway = true;
-  stopStimDisplayTypeMapVersionSync('svelte leavePage');
   stopCardAudioNow();
 
   try {

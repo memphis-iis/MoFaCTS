@@ -12,8 +12,12 @@ export async function writeHistoryDownloadBytes(res: ServerResponse, bytes: Buff
   if (res.destroyed || res.writableEnded) throw new Error('History download connection closed');
   if (res.write(bytes)) return;
   await new Promise<void>((resolve, reject) => {
+    // Meteor's compression wrapper forwards `on('drain')` to its compression
+    // stream and returns that emitter. Listen and remove on the same owner;
+    // `once` would bind its wrapper to the underlying HTTP response instead.
+    let drainOwner: Pick<ServerResponse, 'removeListener'> = res;
     const cleanup = () => {
-      res.removeListener('drain', drained);
+      drainOwner.removeListener('drain', drained);
       res.removeListener('close', closed);
       res.removeListener('error', failed);
       signal.removeEventListener('abort', aborted);
@@ -22,7 +26,7 @@ export async function writeHistoryDownloadBytes(res: ServerResponse, bytes: Buff
     const closed = () => { cleanup(); reject(new Error('History download connection closed')); };
     const failed = (error: Error) => { cleanup(); reject(error); };
     const aborted = () => { cleanup(); reject(signal.reason); };
-    res.once('drain', drained);
+    drainOwner = res.on('drain', drained);
     res.once('close', closed);
     res.once('error', failed);
     signal.addEventListener('abort', aborted, { once: true });

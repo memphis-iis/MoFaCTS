@@ -1,5 +1,22 @@
 # Live skeleton demo unit
 
+Camera capture uses `resizeMode: none` and prefers the maximum width and height
+reported by the selected device, rather than requesting 960 by 720. This selects
+a native camera mode without browser cropping; the preview and all overlays
+follow its delivered aspect ratio. The device/driver still determines which
+native modes and physical field of view it exposes to the browser.
+
+Pinching over a figure button works independently of the detector's left/right
+hand classification. Visible, valid palm and pinch landmarks remain required.
+Rotation and resizing require an unambiguous left/right identity with confidence
+at least 0.7; reacquiring that identity starts a fresh motion reference.
+
+The pose worker shares the application's browser bundle output contract. Its
+library export uses `globalThis`, which exists in both pages and workers; a
+`window` export crashes worker startup and releases the camera. The browser
+regression suite uses this same output contract, including the real inference
+and gaze-to-pose handoff checks.
+
 Add this unit to a TDF's `tutor.unit` array:
 
 ```json
@@ -50,7 +67,7 @@ and scale about their volume centroid, with a fixed orthographic view. Each
 remembers its own orientation and length when switching within this unit.
 
 Away from the palette, turn your palm to rotate. The figure follows the full
-orientation of the palm plane with temporal smoothing; no finger pose is required.
+orientation of the palm plane directly, without temporal smoothing; no finger pose is required.
 Bring all three tips together and move upward to grow
 the figure or downward to shrink it. This changes all edge lengths and the AB
 label, within 0.25-4 units. One-quarter of the preview height doubles/halves size.
@@ -126,7 +143,7 @@ database fields, or data migration are needed. The demo's labels are English.
 - `SkeletonDemoUnit.svelte`: owns the registered unit's camera controls,
   initialization, status, teardown and completion.
 - `learning-components/units/skeleton-demo/figureGestures.ts`: one pure classifier
-  for palette selection, smoothed palm-plane rotation, triple-pinch resizing, and
+  for palette selection, direct palm-plane rotation, triple-pinch resizing, and
   inactive movement. Explicit frame/context input includes actual palette bounds
   and the active figure; output supplies selection, axis/angle, or size factor.
 - `figureGeometry.ts` in the same directory: unit-edge cube and square-pyramid
@@ -138,8 +155,11 @@ database fields, or data migration are needed. The demo's labels are English.
   labels at readable screen sizes. There is one vector renderer, with no shaded
   mesh, separate cube path, GPU context, auto-spin, or inertia.
 
-The Full Pose model estimates one person's 33 body landmarks. The Hand Landmarker
-adds 21 landmarks per hand for up to two hands, including all five fingers.
+The Hand Landmarker estimates 21 landmarks per hand for up to two hands,
+including all five fingers. Ordinary hand tracking does not load or run Full
+Pose. Opening the existing 3D pose matcher comparison explicitly enables its
+33 body landmarks; closing that panel releases the body model and stops its
+inference. Hand detection never waits for body inference while the panel is closed.
 Hand landmarks use the hand detector's confidence thresholds, rather than the
 pose model's per-landmark visibility field. Depth is inferred, not a calibrated room
 measurement. Worker CPU inference is capped at 15 Hz and skips duplicate video frames;
@@ -154,19 +174,14 @@ A palm triangle area ratio below 0.08 disables rotation; a normalized side-propo
 change above 0.12 rejects that movement. The full relative orientation includes
 tilt and twist. Forward/backward wrist tilt is reversed about the camera-horizontal
 axis; side-to-side turning and clockwise/counterclockwise rotation keep their
-existing directions. This mapping is applied after smoothing in both mirrored
-and unmirrored views. A One Euro-style adaptive spherical orientation filter uses a 225 ms resting
-time constant and reduces it toward 100 ms during deliberate turns. Signed 3D angular
-velocity is low-pass filtered at 1 Hz before its magnitude sets the orientation
-cutoff (base 0.707 Hz plus 1 Hz per rad/s, capped at 1.592 Hz). Filtering the velocity
-vector lets alternating jitter cancel instead of automatically accelerating the filter.
-Both filters use elapsed-time exponential integration; orientation follows the shortest
-3D rotation without Euler-angle averaging or a dead zone. This is an SO(3) adaptation
-of the [One Euro filter](https://gery.casiez.net/publications/CHI2012-casiez.pdf), with a
-bounded cutoff. It does not predict motion or interpolate display frames between observations.
+existing directions in both mirrored and unmirrored views. Each accepted observation
+applies the complete shortest 3D rotation from the preceding accepted reference.
+There is no application-level temporal smoothing, angular-velocity filter, or
+delayed catch-up after the hand stops. Sensor and model-estimation jitter may
+therefore be visible directly.
 Resizing requires the three fingertips together and takes priority over palm rotation.
 Outside the palette, triple pinch takes priority over rotation. Ambiguous directions, tracking gaps over 250 ms,
-mode/owner changes, and rejected motion establish a fresh smoothing reference and clear the angular-velocity estimate.
+mode/owner changes, and rejected motion establish a fresh motion reference.
 Angular speed above 720 degrees/s, translation above 6 palm widths/s, or apparent
 size change above 4.5/s is ignored without replaying that movement.
 Selection accepts a thumb-index gap up to 80% of estimated 3D palm width,
@@ -306,13 +321,16 @@ owner opens its camera. A late stream is stopped before handoff proceeds.
 
 `poseTracking.ts` schedules at most one inference frame at a time and at most 15 Hz,
 skipping duplicate decoded video frames. It transfers one temporary `ImageBitmap`
-to `poseTrackingWorker.ts`, which loads the same pinned local CPU pose/hand models.
+to `poseTrackingWorker.ts`, which loads the pinned local CPU hand model. The
+body model is loaded only on an explicit request from the open comparison panel.
 The worker closes each bitmap after inference; stopping terminates the worker,
 including pending WASM/model loading. No frames are recorded, retained as history,
 or uploaded. Observation timestamps are monotonic inference-input times, not
 physical camera capture times. Pose and hand landmarks/confidence reach the app;
-`FigureOverlay.svelte` applies the existing 0.7 handedness-confidence policy at the
-gesture-consumer boundary. Gesture interpretation stays in `learning-components/`.
+`FigureOverlay.svelte` passes the observations to the gesture controller, which
+applies the 0.7 handedness-confidence policy to continuous motion ownership.
+Palette pinch selection does not require left/right classification. Gesture
+interpretation stays in `learning-components/`.
 
 The worker provides runtime isolation because WebGazer's older FaceMesh WASM and
 Tasks Vision both use Emscripten globals. Loading them in the same window reproduced

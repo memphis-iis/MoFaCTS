@@ -1,5 +1,6 @@
-import { ACTIVE_AUDIT_CATALOG, readAuditCatalog, profileControls } from '../../../../common/securityAudit/catalogRegistry.ts';
+import { ACTIVE_AUDIT_CATALOG, AUDIT_SECTION_IDS, readAuditCatalog, profileControls } from '../../../../common/securityAudit/catalogRegistry.ts';
 import { expectedAuditProducers } from '../../../../common/securityAudit/producerArtifact.ts';
+import { finalizeAuditReport } from '../../../../common/securityAudit/reportV2.ts';
 import { assembleAuditReportV2 } from '../../core/assembleV2.mjs';
 
 export const missingIdentity = { state: 'unavailable', reason: 'not-provided' };
@@ -31,4 +32,19 @@ export async function errorArtifacts(profile = 'full') {
 }
 export async function errorReport(profile = 'full') {
   return assembleAuditReportV2({ ...envelope, reportType: profile, artifacts: await errorArtifacts(profile) });
+}
+
+// A receiver fixture uses the provided registered catalog and performs no acquisition.
+export async function fullReportFixture(coordinates, reportId, clock) {
+  const catalog = await readAuditCatalog(coordinates, 'retained');
+  const controls = profileControls(catalog, 'full');
+  const sections = Object.fromEntries(AUDIT_SECTION_IDS.map(sectionId => [sectionId, {
+    sectionId, status: 'ERROR', controls: controls.filter(row => row.sectionId === sectionId)
+      .map(({ controlId, title, failureSeverity }) => ({ controlId, title, failureSeverity, status: 'ERROR',
+        evidence: { summary: 'Synthetic receiver storage fixture.', category: 'synthetic-contract-qualification' } })),
+  }]));
+  return finalizeAuditReport({ ...envelope, ...coordinates, reportId, schema: 'SecurityAuditReportV2',
+    startedAt: new Date(clock.getTime() - 120_000).toISOString(),
+    completedAt: new Date(clock.getTime() - 60_000).toISOString(),
+    sections, executionErrors: ['synthetic-contract-qualification'] });
 }

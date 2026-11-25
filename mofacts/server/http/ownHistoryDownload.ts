@@ -1,6 +1,8 @@
 import { operationalHistorySelector } from '../../common/historyEnvelope';
 import { Meteor } from 'meteor/meteor';
 import { WebApp } from 'meteor/webapp';
+import { HTTP_FILE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registerProtocolHttpMount } from '../securitySurfaces/registerHttpRoutes.ts';
 import { Histories } from '../../common/Collections';
 import { consumeOwnHistoryDownloadToken } from '../lib/ownHistoryDownloadTokens';
 import { createOwnHistoryDownloadHandler } from '../lib/ownHistoryDownloadHandler';
@@ -8,7 +10,12 @@ import { writeExperimentExportFromHistoryIterable } from '../experiment_times';
 
 const HISTORY_EXPORT_BATCH_SIZE = 500;
 
-WebApp.connectHandlers.use('/data-download/own-history', createOwnHistoryDownloadHandler({
+registerProtocolHttpMount(WebApp, 'connectHandlers', '/data-download/own-history', {
+  surfaceId: 'middleware:own-history-download',
+  policy: Object.freeze({ kind: 'single-use-capability', issuerAuthorization: 'bound-user-exists' }),
+  dataEgress: Object.freeze({ kind: 'learner-history' }),
+  verification: HTTP_FILE_VERIFICATIONS.history,
+}, createOwnHistoryDownloadHandler({
   consumeToken: consumeOwnHistoryDownloadToken,
   userExists: async userId => Boolean(await Meteor.users.findOneAsync(
     { _id: userId }, { fields: { _id: 1 } },

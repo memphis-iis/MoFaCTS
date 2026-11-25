@@ -6,7 +6,8 @@ const Module = require('node:module');
 const originalLoad = Module._load;
 let userWriteRules;
 Module._load = function(request, parent, isMain) {
-  if (request === 'meteor/meteor') return { Meteor: { users: { deny(rules) { userWriteRules = rules; } }, Error: class extends Error {
+  if (request === 'meteor/accounts-base') return { Accounts: {} };
+  if (request === 'meteor/meteor') return { Meteor: { users: { findOneAsync: async () => ({ profile: {} }), deny(rules) { userWriteRules = rules; } }, Error: class extends Error {
     constructor(code, reason) { super(reason); this.error = code; }
   } } };
   if (request === 'meteor/check') return { check() { throw new Error('Unexpected check boundary'); }, Match: {} };

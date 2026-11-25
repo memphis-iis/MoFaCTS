@@ -1,3 +1,4 @@
+import { assertSimulationActivityHistory } from '../common/simulationActivityHistory';
 export { getCourse, getHistory };
 
 function getCourse(course: any) {
@@ -14,6 +15,8 @@ function getCourse(course: any) {
 }
 
 function getHistory(history: any) {
+  const simulationActivity = history.sparc?.simulationActivity;
+  if (simulationActivity !== undefined) assertSimulationActivityHistory(simulationActivity);
   const normalizeOutcome = (value: unknown) => {
     const outcome = typeof value === 'string' ? value.trim() : '';
     if (!outcome) return '';
@@ -59,6 +62,7 @@ function getHistory(history: any) {
   };
 
   const historyOutput = {
+    'CF (Simulation Activity)': simulationActivity?.recordRole === 'activity' ? JSON.stringify(simulationActivity) : '',
     eventId: history.eventId,
     'Selection': inferSelection(),
     'Action': inferAction(),

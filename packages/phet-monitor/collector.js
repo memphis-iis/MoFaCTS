@@ -6,6 +6,8 @@
     if ( options.sampling && options.sampling !== 'object-events' ) { throw new Error( 'Only object-events monitoring is supported' ); }
     var ids = new WeakMap(), metadata = new WeakMap(), registrations = new WeakMap(), sources = new WeakMap(), excludedTypes = new WeakSet();
     var collections = new WeakMap(), disposed = new WeakSet(), excludedCache = new WeakMap();
+    var controls = new WeakMap(), interactions = new WeakMap();
+    var propertyLinks = new WeakMap();
     var active = new Map(), roots = [], rootIds = new Set(), candidates = new Set(), discovery = [], pending = [], records = [];
     var sequence = 0, serial = 0, order = 0, frame = 0, inspections = 0;
     var started = false, stopped = false, complete = true, settling = false;
@@ -294,6 +296,48 @@
         else if ( pending.length < maximum ) { pending.push( event ); }
         else { fail( 'early-event-queue-overflow' ); }
       } ); },
+      registerInteraction: function( control, descriptor ) { guarded( function() {
+        var registered = controls.get( control );
+        if ( registered && descriptor && descriptor.version === 1 && registered.kind === descriptor.kind && registered.property === descriptor.property ) { return; }
+        if ( !control || typeof control !== 'object' || registered || !descriptor || descriptor.version !== 1 ||
+          [ 'value', 'reset' ].indexOf( descriptor.kind ) < 0 || descriptor.kind === 'value' && !registrations.has( canonical( descriptor.property ) ) ) {
+          throw new Error( 'Invalid interaction registration' );
+        }
+        controls.set( control, { kind: descriptor.kind, property: descriptor.property } );
+      } ); },
+      linkInteractionProperties: function( owner, element ) { guarded( function() {
+        owner = canonical( owner ); element = canonical( element );
+        var ownerRegistration = registrations.get( owner ), elementRegistration = registrations.get( element );
+        if ( !ownerRegistration || ownerRegistration.kind !== 'property' || !elementRegistration || elementRegistration.kind !== 'property' ) { return; }
+        var links = propertyLinks.get( owner );
+        if ( !links ) { links = new Set(); propertyLinks.set( owner, links ); }
+        if ( !Array.from( links ).some( function( link ) { return link.deref() === element; } ) ) { links.add( new WeakRef( element ) ); }
+      } ); },
+      interaction: function( control, phase, input ) { guarded( function() {
+        if ( !started ) { return; }
+        var descriptor = controls.get( control );
+        if ( !descriptor || [ 'start', 'complete', 'cancel' ].indexOf( phase ) < 0 ) { throw new Error( 'Unregistered interaction notification' ); }
+        var previous = interactions.get( control );
+        if ( phase === 'start' && previous ) { return; }
+        if ( phase !== 'start' && !previous ) { return; }
+        var property = descriptor.property && canonical( descriptor.property );
+        var current = property ? value( registrations.get( property ).read() ) : null;
+        var properties = [], visited = new Set(), queue = property ? [ property ] : [];
+        while ( queue.length ) {
+          var target = queue.pop();
+          if ( visited.has( target ) || disposed.has( target ) ) { continue; }
+          visited.add( target );
+          properties.push( { id: id( target ), value: value( registrations.get( target ).read() ) } );
+          var links = propertyLinks.get( target );
+          if ( links ) { links.forEach( function( link ) { var linked = link.deref(); if ( linked ) { queue.push( linked ); } else { links.delete( link ); } } ); }
+        }
+        if ( phase === 'start' ) { previous = { before: current, values: Object.create( null ) }; properties.forEach( function( item ) { previous.values[ item.id ] = item.value; } ); interactions.set( control, previous ); }
+        else { interactions.delete( control ); }
+        add( 'interaction', { controlId: id( control ), kind: descriptor.kind, phase: phase,
+          modality: input && [ 'pointer', 'keyboard' ].indexOf( input.modality ) >= 0 ? input.modality : 'programmatic',
+          trusted: !!( input && input.trusted ), propertyId: property ? id( property ) : null,
+          before: previous.before, value: current, properties: properties.map( function( item ) { return { id: item.id, before: Object.prototype.hasOwnProperty.call( previous.values, item.id ) ? previous.values[ item.id ] : null, value: item.value }; } ) } );
+      } ); },
       frame: function() { frame++; settle(); },
       onRecords: function( listener ) { notify = listener; if ( notify && records.length ) { notify(); } },
       drain: function( limit, byteLimit ) {
@@ -320,7 +364,7 @@
       } ); },
       stop: function() {
         stopped = true; notify = null; records = []; pending = []; discovery = []; roots = []; rootIds.clear(); candidates.clear(); active.clear();
-        ids = new WeakMap(); metadata = new WeakMap(); registrations = new WeakMap(); sources = new WeakMap(); excludedTypes = new WeakSet(); collections = new WeakMap(); disposed = new WeakSet(); excludedCache = new WeakMap();
+        ids = new WeakMap(); metadata = new WeakMap(); registrations = new WeakMap(); sources = new WeakMap(); excludedTypes = new WeakSet(); collections = new WeakMap(); disposed = new WeakSet(); excludedCache = new WeakMap(); controls = new WeakMap(); interactions = new WeakMap(); propertyLinks = new WeakMap();
       }
     };
   }

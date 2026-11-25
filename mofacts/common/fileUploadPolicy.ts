@@ -1,3 +1,5 @@
+export const DAILY_LESSON_PACKAGE_LIMIT = 3;
+
 export type DynamicAssetUploadPurpose = 'package' | 'content-media';
 
 export type DynamicAssetUploadMeta = {

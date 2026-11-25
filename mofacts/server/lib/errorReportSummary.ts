@@ -1,8 +1,11 @@
+import { studyOnlyAccount } from '../../common/participantPrivacy';
 type ErrorReportDoc = {
   _id?: unknown;
   user?: unknown;
   page?: unknown;
   time?: unknown;
+  sessionVars?: { loginMode?: string; experimentTarget?: string };
+  currentExperimentState?: { experimentTarget?: string };
   description?: unknown;
   userAgent?: unknown;
 };
@@ -15,7 +18,7 @@ type ErrorReportUserDoc = {
 
 type SendErrorReportSummariesDeps = {
   ErrorReports: {
-    find: (selector: Record<string, unknown>) => { fetchAsync: () => Promise<ErrorReportDoc[]> };
+    find: (selector: Record<string, unknown>, options?: Record<string, unknown>) => { fetchAsync: () => Promise<ErrorReportDoc[]> };
     updateAsync: (
       selector: Record<string, unknown>,
       modifier: Record<string, unknown>,
@@ -67,7 +70,10 @@ function buildSummaryLine(username: string, report: ErrorReportDoc) {
 export async function sendErrorReportSummariesWorkflow(deps: SendErrorReportSummariesDeps) {
   deps.serverConsole('sendErrorReportSummaries');
 
-  const unsentErrorReports = await deps.ErrorReports.find({ emailed: false }).fetchAsync();
+  const unsentErrorReports = await deps.ErrorReports.find({ emailed: false }, { fields: {
+    user: 1, page: 1, time: 1, description: 1, userAgent: 1,
+    'sessionVars.loginMode': 1, 'sessionVars.experimentTarget': 1, 'currentExperimentState.experimentTarget': 1,
+  } }).fetchAsync();
   if (unsentErrorReports.length === 0) {
     deps.serverConsole('no unsent error reports to send');
     return 0;
@@ -89,6 +95,8 @@ export async function sendErrorReportSummariesWorkflow(deps: SendErrorReportSumm
   for (const report of unsentErrorReports) {
     const reportId = String(report._id ?? '').trim();
     const reportUser = usersById.get(String(report.user ?? '').trim());
+    if (!reportUser || studyOnlyAccount(reportUser) || /^\/(?:experiment|prolific\/resume)(?:[/?]|$)/i.test(String(report.page)) || report.sessionVars?.loginMode === 'experiment'
+      || report.sessionVars?.experimentTarget || report.currentExperimentState?.experimentTarget) continue;
     const username = stringifyReportField(reportUser?.username);
     const userEmail = String(reportUser?.emails?.[0]?.address ?? '').trim();
 
@@ -112,6 +120,7 @@ export async function sendErrorReportSummariesWorkflow(deps: SendErrorReportSumm
     }
   }
 
+  if (!summaryLines.length) return 0;
   const summaryText = summaryLines.join('\n');
   for (const admin of deps.adminUsers) {
     try {

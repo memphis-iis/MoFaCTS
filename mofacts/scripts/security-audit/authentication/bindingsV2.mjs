@@ -14,8 +14,7 @@ export function parseAuthorizationBindingsV2(value) {
   const actorNames = [...new Set(AUTHORIZATION_VERIFICATIONS.map(entry => entry.actor).filter(actor => actor !== 'anonymous'))];
   const actors = proofRecord(row.actors, actorNames), ids = new Set(), names = new Set();
   for (const name of actorNames) {
-    const actor = proofRecord(actors[name], ['userId', 'username', 'password']);
-    text(actor.userId, 128); text(actor.username); text(actor.password, 1024);
+    const actor = parseAuthorizationActorBindingV2(actors[name]);
     if (ids.has(actor.userId) || names.has(actor.username)) invalid();
     ids.add(actor.userId); names.add(actor.username);
   }
@@ -40,4 +39,10 @@ export function parseAuthorizationBindingsV2(value) {
   auditReportId(report.reportId);
   if (typeof report.digestSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(report.digestSha256)) invalid();
   return structuredClone({ schema: row.schema, actors, values });
+}
+
+export function parseAuthorizationActorBindingV2(value) {
+  const actor = proofRecord(value, ['userId', 'username', 'password']);
+  text(actor.userId, 128); text(actor.username); text(actor.password, 1024);
+  return structuredClone(actor);
 }

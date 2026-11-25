@@ -2,6 +2,7 @@ import {
   assertCanonicalHistoryEnvelope,
   withCanonicalHistorySchemaVersion,
 } from '../../runtime/historyEnvelope';
+import { simulationHistoryContext } from '../../runtime/simulationActivityHistory';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
 import type {
   SparcCanonicalHistoryExtension,
@@ -48,10 +49,12 @@ export function createSparcStateTransitionHistoryRecord(params: {
 
   assertTransitionWritesStayInSourceDocument(params.transition);
   const sourceAddress = params.transition.event.source;
+  const simulationActivity = simulationHistoryContext(params.transition.event, 'internal');
   const extension: SparcCanonicalHistoryExtension = {
     pageKey: sourceAddress.pageKey,
     sourceAddress,
     stateTransition: params.transition,
+    ...(simulationActivity ? { simulationActivity } : {}),
     ...(params.expectationLogitChanges !== undefined ? { expectationLogitChanges: params.expectationLogitChanges } : {}),
   };
   const record = withCanonicalHistorySchemaVersion({

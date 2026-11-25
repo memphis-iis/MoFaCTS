@@ -60,6 +60,9 @@ These decisions record Phil's explicit answers to the nine-question design revie
 | Shared-tailnet staging2 partition - approved 2026-11-03 | Phil approved replacing the blanket grant with preserved current PC/production IPv4/IPv6 and `tag:ci` connectivity, plus only the verified PC addresses to `tag:staging2` TCP 22. Staging2 receives only that tag and no outgoing grant to the existing group. Preserve existing SSH rules and CI tag ownership. Future identities require explicit rules. This permits the reviewed shared-policy change while retaining the production host exclusion; native policy acceptance and actual host/tag/access verification are separate evidence. |
 | Staging2 Sidecar absence - approved 2026-11-03 | Phil selected keeping the optional database-tooling Sidecar absent and explicitly auditing that condition. Require a protected `MOFACTS_SIDECAR_EXPECTED_STATE=absent`; do not infer absence from missing credentials or skip checks. Retain a reserved Sidecar username for an authenticated absence query, but no password, role or unused service account. Verify no known helper container, reserved endpoint declaration/publication or listener, including stopped/unpublished and loopback cases. Unexpected presence is a finding; unavailable evidence is `ERROR`. The separately selected `configured` policy retains genuine scoped-role/authentication checks and the existing loopback contract without claiming service uptime. No helper service/account is authorized merely to make the audit pass. |
 | 6. Scanner isolation - approved conditional design | Prefer inert V2 development with the active V1 path unchanged. If that is insufficient, use a reviewed immutable scanner checkout with tested selection, update and rollback procedures without reopening the design choice. Workflow publication, dispatch and disable/enable actions retain their operational authorization requirements. |
+| Staging2 disposable authorization fixtures - approved 2026-11-11 | Phil explicitly approved four disposable staging2 accounts (two learners/two teachers), only the two existing teacher-role assignments, reuse of the existing administrator and exact owned cleanup. This is ordinary synthetic qualification within the staging2 mandate; do not ask again for the same reviewed fixture scope. No new admin grant, existing-account reset, production access or provider request is authorized. Follow deploy/security-audit/staging2-authorization-fixtures.md. |
+| Standard verified production release recording - approved 2026-11-12 | Phil selected making the verified post-acceptance record/history/receipt hook standard, with repository-pinned Node as an operator-PC prerequisite. This specifically changes the earlier ordinary command-sheet prerequisite restriction; there is no optional basic-recording branch. Check the runtime before deployment, preserve participant checks and dirty-build semantics, and use the existing authoritative record/history owner. A project-local runtime may be provisioned without changing global PATH/other project runtimes. This approval covers source/procedure integration and the local prerequisite; it does not authorize production execution, deployment or a live production audit. |
+| Staging2 V2 report writer - delegated 2026-11-12 | The prepared staging2-only report-signing binding, separate operator-owned encryption key/public variable and reviewed manual V2 workflow fall within the bounded access delegation below. Proceed after its technical, custody and verification gates; no separate access approval is required. The initial GitHub host-read-only boundary is superseded only for this scoped audit function. Authorization is not an execution claim. See deploy/security-audit/staging2-report-writer-review.md. |
 | 8. Policy review - Phil | Prepare one consolidated list of genuinely ambiguous access classifications and proposed permission changes for Phil. Clear classifications that preserve established behavior may proceed without asking; retain traceable policy review and characterization evidence. Do not infer new permissions, waive required policy review, or automatically classify ambiguous surfaces. |
 | 9. Engineering discretion - approved within boundaries | Resolve routine implementation choices without asking when they follow the approved design and do not change scope, security boundaries, cost, ownership, retention or application behavior. Report failed acceptance checks; never waive them. For a new unavoidable design conflict, report the evidence and recommendation instead of silently deciding. |
 | Staging2 registry publication - approved 2026-11-03 | Phil approved the separate public Docker Hub repository `ppavlikmemphis/mofacts-staging2` using the existing Docker sign-in, with candidate verification before publication and runtime-only credentials/settings. This excludes changing production repository tags/configuration and does not waive exact image/config identity or release qualification. The published `630eabdb` candidate and the containerd identity incompatibility are recorded in status. |
@@ -84,15 +87,120 @@ design. Existing approved staging2 tooling, image construction/publication,
 deployment, synthetic checks and application rollback may proceed when their
 technical prerequisites pass. Preserve the current branch and unrelated work.
 
-Continue until the written acceptance conditions are met or a real decision is
-required. Ask for a consequential change to the approved design, new security-
-sensitive access, new spending, destructive data changes, production operations,
-exhaustion of the ten-run allowance, or a blocker remaining after reasonable
-diagnosis. Existing approved identities and permissions may be reused within
-their scope. The proposed new AWS operator/access remains such a decision.
+Continue until the written acceptance conditions are met, a real decision is
+required, or a concrete blocker prevents all remaining authorized work. Checking
+off an item, passing a test, publishing a batch, and finishing a stage are
+checkpoints. Record the evidence and start the next unchecked item in the same
+work session. If one item is blocked, continue independent work. A remaining
+Meteor allowance is a ceiling. Ask for more runs only when an outstanding
+acceptance check actually needs one and no authorized slot remains. The 2026-11-12 bounded access delegation below permits necessary new
+security-sensitive access within its conditions without per-change approval.
+Ask for a consequential design change, access outside those conditions, new
+spending, destructive data changes, production operations, or help resolving a
+blocker that remains after reasonable diagnosis. Existing
+approved identities and permissions may be reused within their scope. Additional
+AWS/IAM/recovery-store access and protected backup reads remain separately bounded;
+this delegation does not renew a consumed one-use authorization.
 User sign-in, MFA and hardware-key prompts remain user actions. No new package
 or system dependency is currently planned; existing dependency approval rules
 continue to apply if implementation discovers one is required.
+
+#### Bounded access delegation (approved 2026-11-12)
+
+Phil authorized the agent to create or adjust necessary security-sensitive access
+for this project's approved non-production work when **all** conditions below
+hold. This supersedes earlier blanket prohibitions on new access for this scope,
+including the initial GitHub host-read-only boundary. Do not turn an eligible
+change into another approval question. Apply and verify the conditions, record
+the permission delta, and continue under the standing execution mandate.
+
+1. **Necessary work:** the access directly serves a named requirement or acceptance
+   test in the existing written audit plan. Do not create access for speculative
+   convenience, unrelated work or an unapproved architecture/product change.
+2. **Explicit target:** restrict it to staging2, its synthetic fixtures, the existing
+   main-only `staging2-security-audit` GitHub environment, and the approved private
+   Desktop credential folder. Do not extend it to production, original staging,
+   unrelated services/accounts, AWS/IAM or recovery-store permissions, protected
+   backup reads, real learner data or production/provider credentials.
+3. **Minimum authority:** grant only the specific actor, action and resource needed.
+   Prefer existing scoped identities and established application interfaces.
+   No new broad administrator/root/cloud role, unrestricted shell/SSH/sudo access,
+   public management port, blanket network grant or cross-environment credential
+   reuse is delegated. Existing separately approved operator/admin access stays
+   within its original purpose; it does not authorize creating equivalent accounts.
+4. **Credential custody:** use purpose-specific credentials or a necessary scoped
+   deployment copy of an existing staging2 credential. Use approved secret stores
+   and private transfer channels; never log values, pass them in command arguments,
+   commit them or send a whole environment file. Keep operator private encryption
+   keys in the approved Desktop folder; only their public parts may go to GitHub.
+5. **Lifetime and revocation:** use temporary access with expiry where supported,
+   otherwise a bounded owner-controlled job and explicit cleanup/recovery. Never
+   claim automatic expiry that the system does not implement. Persistent access
+   is allowed only for a documented continuing staging2 audit function, with a
+   named owner, minimum resource scope, reason for persistence and a documented
+   revocation procedure verified as part of access qualification. Do not rotate/delete existing working access merely to create a new
+   identity or destroy decryption keys needed by retained encrypted evidence.
+6. **Preparation and verification:** prepare the concrete change, failure recovery
+   and revocation before granting access. Preserve the last usable configuration;
+   verify the actual permission delta and required allowed/denied behavior. Clean
+   up or revoke a failed grant and verify recovery. Do not weaken application
+   authorization or CSP to obtain a passing test, invent evidence or bypass
+   required verification.
+7. **Traceable execution:** record the sanitized identity, purpose, target/resource,
+   permissions, lifetime, owner, cleanup/revocation and actual verification result
+   in the current status/evidence record. Report the access change in progress
+   updates; do not stop merely to obtain approval already delegated here.
+8. **Unchanged exclusions:** no new spending/paid upgrade, destructive durable-data
+   operation, production action or new system/package dependency is authorized
+   by this delegation. Preserve the existing dependency-approval rules, explicit
+   user sign-in/MFA actions and bounded Meteor invocation ledger.
+
+The prepared staging2 report-writer scope qualifies under this delegation:
+copy only the existing staging2 ingestion signing value to its protected GitHub
+report-writer binding; create one separate operator-owned staging2 encryption key
+pair and publish only its public key; enable/test the reviewed manual staging2
+V2 workflow. Follow `deploy/security-audit/staging2-report-writer-review.md`,
+including its preflight, private custody, round-trip verification and revocation.
+No additional permission question is required for that scope. This authorization
+is not evidence that its grant, key generation or acceptance has been executed.
+
+#### Repository security execution without GitHub billing (2026-11-12)
+
+GitHub billing is unavailable, not an operator prerequisite to resolve. The
+standard four-job repository Security gate uses the existing approved operator
+Linux worker and `deploy/security-audit/run-security-checks.mjs`. It retains
+full-history redacted gitleaks, source/surface contracts and both locked
+full/runtime dependency audits with their existing policy checker. Record exact
+committed source and separate job outcomes. The optional hosted Security workflow
+is manual-only to stop repeated blocked push/schedule attempts. Do not dispatch
+it while locked, add spending, or install a persistent self-hosted GitHub runner.
+The staging2 exposure report sequence uses the same existing owners through
+`deploy/security-audit/operator-exposure-v2.md`, with acquisition and signing in
+separate processes and encrypted retention before its single upload. Missing
+evidence keeps the existing final assertion nonzero after storage.
+Operator results remain operator evidence; they do not satisfy a hosted-only
+adapter or create release qualification. Continue the remaining native/staging2
+acceptance work under its existing mandate and keep unexecuted items open.
+#### Offline report key and recurring integrity checks (approved 2026-11-16)
+
+Phil approved the offline-key approach in
+[the archive verification review](../deploy/security-audit/unattended-archive-verification-decision.md).
+Keep the accepted private report key in its approved Desktop custody. No online
+private-key copy or new decryption service is authorized. Existing key setup and
+round-trip acceptance are complete and must not be repeated as setup work.
+
+Every recurring run must validate its report/digest, require the accepted public
+key fingerprint and algorithms, read back saved encrypted bytes and compare their
+checksum, independently read back the ingested report with exact report/catalog/
+digest equality, verify cleanup and enforce retention. Only after these automated
+gates may its owner remove that run's temporary plaintext. Missing required
+evidence remains an execution error; a ciphertext checksum is not decryption proof.
+
+Actual saved-archive decrypt/digest comparison is required during complete release
+qualification, after key or encryption implementation changes, and in recovery
+tests. It is not required on every recurring run. The current full qualification
+still needs its real report round trip. Do not claim each archive was decrypted
+or that complete audit/production acceptance follows from source tests.
 
 #### Execution and verification cycle
 
@@ -123,13 +231,37 @@ continue to apply if implementation discovers one is required.
    one next action and unresolved dependencies, then continue automatically.
    Use progress messages for information and questions for real decisions.
 
+#### P1-D9: one final production cutover (approved 2026-11-12)
+
+The remaining Phase 1 source/staging identity work now has a successful read-only
+production graph observation. Its last live recorder/cutover gate would require
+an actual accepted production release; the older authority must not be backfilled
+from an image label. Phases 1, 2 and 3 currently also require their own production
+acceptance before their exit gates pass.
+
+Approved execution sequence: continue the remaining Phase 2-4 source, local/Meteor, supported
+image and staging2 milestones under the existing mandate, and consolidate only
+their live production gates into one final coordinated cutover/acceptance window.
+Keep P1-04 and each later production gate explicitly pending until that window;
+source/staging completion is not full phase or project completion. Preserve all
+required tests, exact image/source/report bindings, fixture/privacy safeguards,
+provider/access/cost decisions and rollback proof. Do not repeat unchanged proof.
+
+This sequencing approval does not authorize production access, builds/deployment, record
+writes or credential/provider changes. Before final execution, obtain explicit
+approval of the concrete image, receiver/host/scanner pairing, required access,
+synthetic fixtures, rollback and one exposure plus one full report. Those final
+reports must pass every applicable phase's original production criteria with no
+pipeline ERROR. Do not add application startup/build lockouts or waive a gate.
+The per-phase production clauses below are deferred to that final window. Required source/staging gates still apply before advancing implementation; deferred production acceptance remains visibly pending and is not a completed phase/project claim.
 #### Combined remaining milestones
 
 - Phase 1 prepares the V2 presentation/workflow/release wiring, verifies the
   changed source, and joins V2 activation, V1 retirement, staging2 ingestion
   and candidate/previous/candidate rollback in one coordinated qualification
-  sequence. Selected authentication inventory still depends on separately
-  approved protected access. Keep all 17 deliverable IDs as acceptance owners.
+  sequence. Reuse the completed selected inventory and 29-case evidence; do not
+  repeat a protected read from old pending wording. Additional protected reads
+  remain separately authorized. Keep all 17 deliverable IDs as acceptance owners.
 - Phase 2 joins source-owned authorization expectations, typed probe execution
   and its actor/resource scenarios into functional verification milestones.
 - Phase 3 joins runtime registration, policy descriptors, coverage and removal
@@ -701,7 +833,7 @@ acceptance is still distinct from these bounded passing results.
 
 **Cold restore, approved 2026-11-05:** implement and perform the isolated read-only
 fresh-runner check in the [restore review](../deploy/security-audit/recovery-transfer/restore-rehearsal-review.md).
-The approved scope is steps 1�2 only, with no deployment-secret copies or provider
+The approved scope is steps 1�2 only, with no deployment-secret copies or provider
 logins and with access/workflow/environment cleanup. Phil authorized one fresh
 Meteor invocation plus up to ten additional project invocations if needed;
 reserve/count each in the status ledger. Accepted rollback labels, candidate
@@ -806,7 +938,7 @@ Stateful probes run under an environment-scoped concurrency lock and unique run 
 #### Session lifetime
 
 - Require successful login and a parseable expiration.
-- Require `0 < lifetimeDays <= 30.05`.
+- Require `0 < lifetimeDays <= AUTHENTICATION_SESSION_POLICY.maximumLifetimeDays` (currently 30, shared with the accepted source/native validator).
 - A missing, invalid, or already-expired value is `ERROR`, not `PASS` or an inferred vulnerability.
 
 ### 7.4 Behavioral tests
@@ -1228,35 +1360,58 @@ Exit gates:
 - V1 new ingestion and old-format access are unavailable after cutover; existing records are not rewritten/deleted and rollback remains safe.
 - The exact host observation producer passes non-production forced-command qualification and its production install/rollback hashes are recorded.
 - The chosen storage model has passed the previous-image rollback qualification.
-- Local checks, authorized CI, staging, and production cutover gates pass.
+- Local checks, authorized supported Linux/Meteor verification and staging gates pass before advancing implementation. P1-D9 defers production cutover/standard recording acceptance to the final coordinated window; it remains pending.
 - Existing source build, startup, health, login and learner behavior remain unchanged when audit identity/proof is absent; normal build/deploy commands retain their established options and defaults.
 
 Phase 1 may deploy independently. It proves report completeness and evidence shape; P1-D8 additionally requires correct typed outcomes and baselines for the existing selected authorization cases. It does not qualify the remaining authorization scenarios or the current whole-runtime surface checker. Phase 0 should freeze evidence shapes broad enough for the planned Phase 2/3 observations. If either later phase changes a control's claimed property, profile membership, or evidence-contract shape, it requires a new catalog/evidence-contract version and another coordinated receiver/workflow cutover; a scanner-only deploy is allowed only when those contracts remain unchanged. Admin and operator language must preserve these distinctions until phases 2 and 3 finish.
 
 ### Phase 2 — Authorization evidence
+P2-D2 resolved by Phil's requirement clarification on 2026-11-13:
+[preserve progress-backed passwordless experiment return](../deploy/security-audit/passwordless-identity-review.md).
+Learning progress is intentionally permission to return in the laboratory's
+experimental systems. Do not require participant passwords, personal identity
+or additional account markers. The proposed stricter gate is withdrawn, not a
+deferred vulnerability. Audit the established identity/progress/experiment access
+boundaries while preserving that allowed path. Prolific-specific API validation
+is a separate possible improvement for genuine Prolific entry; review the existing
+integration before proposing changes. It does not block this audit or authorize
+provider actions. Accepted items remain closed; no runtime policy or migration
+change was made.
+
+P2-D1 superseded by Phil's explicit direction on 2026-11-13: remove the optional
+IMAP reader and use the existing connected Gmail access. No new mail credential,
+provider grant or recovery read is required or authorized. Follow the
+[connected-mail procedure](../deploy/security-audit/connected-mail.md) for exact
+synthetic-recipient metadata/body selection and private transient handoff.
+Operator-assisted Gmail evidence can qualify live staging2 scenarios; it does
+not establish unattended mailbox acquisition. Keep that operational limitation
+visible without blocking unrelated Phase 2 implementation.
 
 Deliverables:
 
-- Source-controlled authorization entries in the verification catalog with explicit outcomes and baselines.
-- Versioned exact protected fixture-binding contract containing values only.
-- Decomposed transport, scenario, and evaluator modules.
-- Positive baselines paired with denials.
-- Exact policy-denial categories.
-- Scoped publication canaries and store isolation.
-- Token-mint/fetch/content/replay download scenarios.
-- Correct reset/session preconditions and an unused aged-token expiration scenario.
-- Environment lock, unique run namespace, idempotent cleanup, and interrupted-run recovery for every stateful scenario.
-- Positive lower and upper session-lifetime bounds.
-- Exact coverage of the Phase 2 authorization controls, linked to stable surface IDs without claiming whole-runtime completeness.
-- Behavioral tests for every outcome class.
-- Minimal child-process environment exposure.
+- [x] Source-controlled authorization entries in the verification catalog with explicit outcomes and baselines (22 authentication controls/68 source entries; Node and Meteor slot 8 accepted 2026-11-13; acquisition remains separate).
+- [x] Versioned exact protected fixture-binding contract containing values only (P2-02). The exact selected binding set and owned protocol fixtures were exercised by the integrated staging2 run.
+- [x] Decomposed transport, scenario, and evaluator modules for the selected authorization and authentication protocols (P2-03).
+- [x] Positive baselines paired with denials (P2-04, fresh integrated staging2 result).
+- [x] Exact policy-denial categories for the selected cases, protected reset and session verification, passwordless return, comparison and throttling (P2-05).
+- [x] Scoped publication canaries and store isolation (accepted P1-D8 selected progress cases and real-Mongo proof; new registry cases belong to Phase 3).
+- [x] Token-mint/fetch/content/replay download scenarios (accepted selected own-history/admin-report issuance, content and replay proof; no unchanged rerun).
+- [x] Correct reset/session preconditions and an unused aged-token expiration scenario (P2-08, accepted on staging2 with real elapsed-hour expiry and independent cleanup).
+- [x] Environment lock, unique run namespace, idempotent cleanup, and interrupted-run recovery (P2-09, shared protocol contracts and live staging2 cleanup/recovery).
+- [x] Positive lower and upper session-lifetime bounds (source/native and fresh identity-bound live staging2 proof accepted 2026-11-13; report wiring remains separate).
+- [x] Exact coverage of 22 Phase 2 authorization controls in one integrated staging2 run (P2-11, 22 PASS, zero FAIL or ERROR). The matching catalog v2 producer/receiver cutover and retained v1 readback passed on staging2; see the status record.
+- [x] Behavioral tests for authorization outcome classes and exact four-phase coordinator output (P2-12). Pinned Linux focused and source-security suites, application lint and prior owning-runtime Meteor evidence passed.
+- [x] Minimal child-process environment exposure (P2-13, browser and fixture storage profiles with the existing connected mail handoff).
 
 Exit gates:
+
+The staging2 authentication and catalog cutover gates passed on 2026-11-18.
+Production acceptance remains assigned to the coordinated final cutover.
 
 - No domain error, timeout, missing route, 404, unreadable store, or missing canary can pass a denial probe.
 - Every required actor/surface/resource case has one validated scenario binding.
 - The staging-only synthetic tenant, mailbox, and provider bindings complete every Phase 2 authorization scenario and produce a catalog-complete authentication artifact without fixture execution errors.
-- One staged authentication-section qualification and one explicitly authorized manual full production audit validate the new runner; the staged section is not mislabeled as a complete four-section report.
+- The staged authentication-section qualification validates the new runner before advancing implementation; it is not a complete four-section report. Under P1-D9 its explicitly authorized full production audit is joined to the final production window and remains pending until it passes.
 
 ### Phase 3 — Runtime-coupled surface registry
 
@@ -1284,7 +1439,7 @@ Exit gates:
 - Before/after characterization proves allow/deny, invocation context, synchronous collection rules, publication readiness/lifecycle, middleware order/fallthrough and enabled login/provider behavior are preserved.
 - Every protected surface has documented policy review and required verification scenarios; Phil reviews the consolidated ambiguous/proposed-change list, while clear behavior-preserving mappings follow Section 0.
 - The remote runner proves it is testing the sealed registry from the deployed application revision rather than source checkout alone.
-- Full app typecheck, lint, authorized Meteor CI, staging, and a manual full production audit pass without registry or fixture `ERROR` results.
+- Full app typecheck, lint, authorized supported Meteor verification and staging pass without registry or fixture `ERROR` results before advancing implementation. P1-D9 defers the manual full production audit to the final window, with the same no-ERROR criteria and no early completion claim.
 
 ### Phase 4 — Closure and organization
 
@@ -1352,6 +1507,14 @@ Do not weaken HTTPS/origin validation or create a second local application path 
 Original staging remains frozen. Under Section 0, decision 5, staging2 is the default isolated qualification environment with synthetic accounts/resources and may be taken offline, reset and rebuilt as needed for this security work. Keep report-contract, Linux host and authentication/runtime lanes distinct. Validate actual HTTPS origin, host/fixture suitability and exact candidate identity; a selected environment does not prove any lane passed. New environments, paid services, expanded persistent access, security-sensitive permission changes and irreversible data deletion remain separately scoped/authorized. Never substitute production for missing non-production evidence or copy production data/credentials.
 
 ### 14.1 Report-contract harness
+
+For Phase 3, Phil approved testing the catalog v2 receiver first in the existing
+isolated Meteor integration worker. The test composes the receiver with catalog
+v2 using a private loopback listener, a temporary MongoDB collection, and signed
+synthetic reports. Verify v2 ingestion and selection as the latest report, along
+with unchanged readback of stored v2-format reports that used catalog v1. Normal
+application startup and the scanner continue to use the active catalog. The full
+matched staging2 audit in Section 14.3 remains the Phase 3 exit gate.
 
 Add a protected, manual-only staging report-contract harness rather than copying the full production scanner. It uses:
 
@@ -1450,7 +1613,7 @@ Do not delete or rewrite reports to simplify rollback. Any production record rem
 
 Later phases use the same exact-revision, authorized-CI, staging-first discipline:
 
-- **Phase 2:** if the protected fixture schema or values change, obtain applicable operational permissions and disable the production audit workflow. Verify the selected AWS Secrets Manager source contains complete current/candidate documents, their non-secret versions/digests, and a last accepted rollback version pinned by the dedicated retained label; moving `AWSPREVIOUS` alone is insufficient. Confirm account/MFA recovery and staging2-tested restoration of current and retained rollback versions. Publish and pass CI on the exact runner revision, apply the matching candidate as the GitHub environment-secret deployment copy, deploy any required server fixture support, then re-enable and run one authorized manual `full` audit from that revision. Phil remains accountable for recovery. Roll back runner, full binding document and any server support as one unit. If the report/evidence contract changed, repeat the Phase 1 catalog/receiver cutover. No new runtime integration, static credential or automatic rotation is implied.
+- **Phase 2 / P1-D9 final production window:** source and staging2 fixture work may proceed under their existing permissions. Before changing the production protected fixture schema or values, obtain applicable production/recovery permissions and disable the production audit workflow. Verify the selected AWS Secrets Manager source contains complete current/candidate documents, their non-secret versions/digests, and a last accepted rollback version pinned by the dedicated retained label; moving `AWSPREVIOUS` alone is insufficient. Confirm account/MFA recovery and staging2-tested restoration of current and retained rollback versions. Publish and pass CI on the exact runner revision, apply the matching candidate as the GitHub environment-secret deployment copy, deploy any required server fixture support, then re-enable and run one authorized manual `full` audit from that revision. Phil remains accountable for recovery. Roll back runner, full binding document and any server support as one unit. If the report/evidence contract changed, repeat the Phase 1 catalog/receiver cutover. No new runtime integration, static credential or automatic rotation is implied.
 - **Phase 3:** retain active-scanner isolation while preparing/publishing the exact registry/runner revision, passing supported source CI, and using the workstation build-once qualification/push path. Keep dispatch disabled only during the incompatible activation window. Deploy the fully migrated image through the existing script; re-enable to fetch the sealed inventory/bundle and join it to the release receipt, actual scanner checkout, host image mapping and environment evidence in the manual `full` report. Rollback restores the previous matched image/runner/host/receipt contract, including a pre-bundle Phase 2 image when applicable. There is no bundle-based startup enforcement to add or remove. Never mix partial registration wiring or proof from another image.
 
 Neither phase may rely on a production run to discover basic fixture, import, registry, or contract incompatibility; those belong in the non-production lanes first.

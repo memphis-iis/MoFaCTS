@@ -338,7 +338,6 @@ describe('interfaceI18n', function() {
   ] as const;
   const contentEditorKeys = [
     'contentEditor.editTitle',
-    'contentEditor.stimFileInfo',
     'contentEditor.noStimulusData',
     'contentEditor.generateIncorrectResponses',
     'contentEditor.removeAllIncorrectResponses',

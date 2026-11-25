@@ -96,7 +96,6 @@
 
   export let tdfId = '';
   export let initialTdf = null;
-  export let queryParams = {};
   export let onSave = async () => {};
   export let onCancel = () => {};
 
@@ -115,6 +114,7 @@
     'message',
     'credit',
     'model-practice',
+    'history-event',
     'append-node',
     'append-node-if-missing',
     'insert-node',
@@ -160,7 +160,6 @@
 
   $: activeTarget = sparcTargets.find((target) => target.key === activeTargetKey) || sparcTargets[0] || null;
   $: activeDisplay = activeTarget ? sparcPages[activeTarget.pageIndex]?.display : null;
-  $: selectedStimFile = queryParams?.stimFile ? String(queryParams.stimFile) : '';
   $: displayNodes = Array.isArray(activeDisplay?.nodes) ? activeDisplay.nodes : [];
   $: productionRules = Array.isArray(activeDisplay?.productionRules) ? activeDisplay.productionRules : [];
   $: activeProductionRule = productionRules[activeProductionRuleIndex] || productionRules[0] || null;
@@ -681,7 +680,6 @@
   <SparcAuthoringHeader
     {tdfId}
     {initialTdf}
-    {selectedStimFile}
     {sparcTargets}
     bind:activeTargetKey
     bind:showAdvancedEditors

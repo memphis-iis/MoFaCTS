@@ -27,14 +27,15 @@
         scope: context.scope(node.id, node.simulation.buildId),
         status: value => { if (!disposed) status = value; },
         monitoringError: reason => clientConsole(1, '[Simulation] Monitoring stopped:', reason),
-        observation: (facts, evidence) => context.observation(node.id, facts, evidence),
+        observation: (facts, evidence, activity) => context.observation(node.id, facts, evidence, activity),
       });
+      context.registerHost(node.id, host);
       void host.initialize().catch(unavailable);
     } catch { unavailable(); }
   });
-  onDestroy(() => { disposed = true; host?.dispose(); });
+  onDestroy(() => { disposed = true; host?.dispose(); context?.registerHost(node.id, null); });
   $: if (host && signature !== JSON.stringify(node.simulation)) {
-    host.dispose(); host = null; unavailable();
+    host.dispose(); context?.registerHost(node.id, null); host = null; unavailable();
   }
   async function start() {
     if (!host || !['ready', 'stopped'].includes(status)) return;
@@ -54,7 +55,7 @@
       <button type="button" class="btn btn-primary" on:click={start}>{text('simulation.start')}</button>
     {/if}
     <iframe bind:this={iframe} title={node.label} hidden={status !== 'running' && status !== 'starting'}
-      sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe>
+      sandbox="allow-scripts" referrerpolicy="origin"></iframe>
   {/if}
 </section>
 

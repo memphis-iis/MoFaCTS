@@ -1,6 +1,10 @@
+import { LESSON_PROVIDER_KEY_FIELDS } from '../../common/lessonProviderKeys';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { strict as assert } from 'node:assert';
 
-import { getOrBuildCurrentPackageAsset } from './packageExport';
+import { getOrBuildCurrentPackageAsset, collectKnownPackageMediaReferences, rewriteKnownMediaReferencesForPackageExport } from './packageExport';
 
 const JSZip = require('jszip');
 
@@ -28,6 +32,17 @@ function tdfDoc(id: string, lessonName: string, options: { conditions?: string[]
 }
 
 describe('packageExport identity', function() {
+  it('round-trips simulation HTML, JSON catalog and source attachments with launch parameters', () => {
+    const payload = { atomType: 'simulation', simulation: { asset: { url: '/dynamic-assets/html/sim.html?accessibility', sha256: '0'.repeat(64),
+      catalog: { url: '/dynamic-assets/catalog/sim.catalog.json', sha256: '1'.repeat(64) },
+      attachments: [{ url: '/dynamic-assets/source/sim-source.zip', sha256: '2'.repeat(64) }] } } };
+    const deps = { parseLocalMediaReference: (raw: string) => ({ raw, isExternal: false, assetId: raw.split('/')[2], fileName: raw.split('/').at(-1)!.split('?')[0], isLocalMediaLike: false }) } as any;
+    assert.deepEqual([...collectKnownPackageMediaReferences(payload, deps)], ['/dynamic-assets/html/sim.html?accessibility', '/dynamic-assets/catalog/sim.catalog.json', '/dynamic-assets/source/sim-source.zip']);
+    rewriteKnownMediaReferencesForPackageExport(payload, deps);
+    assert.equal(payload.simulation.asset.url, 'sim.html?accessibility');
+    assert.equal(payload.simulation.asset.catalog.url, 'sim.catalog.json');
+    assert.equal(payload.simulation.asset.attachments[0]!.url, 'sim-source.zip');
+  });
   it('exports stable TDF ids and rewrites root condition filenames to exported members', async function() {
     const root = tdfDoc('root-id', 'Root Lesson', {
       conditions: ['child-id.json'],
@@ -47,9 +62,20 @@ describe('packageExport identity', function() {
     (root.rawStimuliFile.setspec as any).clusters = clusters;
     (child.rawStimuliFile.setspec as any).clusters = clusters;
     const docs = [root, child];
+    for (const doc of docs) {
+      Object.assign(doc.content.tdfs.tutor.setspec, Object.fromEntries(
+        LESSON_PROVIDER_KEY_FIELDS.map(field => [field, doc._id + field])
+      ));
+    }
     let zipBuffer: Buffer | null = null;
+    let storedAsset: any = null;
+    let writes = 0;
+    const removedIds: string[] = [];
 
-    await getOrBuildCurrentPackageAsset('root-id', {
+    const directory = await mkdtemp(join(tmpdir(), 'mofacts-export-test-'));
+    try {
+    const dependencies = {
+      storageRoot: directory,
       parseLocalMediaReference() {
         return { raw: '', isExternal: false };
       },
@@ -65,19 +91,20 @@ describe('packageExport identity', function() {
       normalizeCanonicalId(value: unknown) {
         return typeof value === 'string' && value.trim() ? value.trim() : null;
       },
-      decryptData(value: string) {
-        return value;
-      },
       DynamicAssets: {
-        async findOneAsync() {
-          return null;
+        async findOneAsync(_selector: unknown, options?: { fields?: unknown }) {
+          assert.equal(options?.fields, undefined, 'Cached download needs complete FilesCollection metadata');
+          return storedAsset;
         },
-        async writeAsync(data: Buffer) {
-          zipBuffer = data;
-          return { _id: 'export-asset', link: () => '/export.zip' };
+        async addFile(filePath: string, options: any) {
+          zipBuffer = await readFile(filePath); writes++;
+          storedAsset = { _id: 'export-asset-' + writes, name: options.fileName, meta: options.meta, _downloadRoute: '/cdn/storage', _collectionName: 'Assets' };
+          return { _id: storedAsset._id, link: () => '/export.zip' };
         },
-        async removeAsync() {},
-        link() {
+        async removeAsync(selector: any) { removedIds.push(selector._id); },
+        link(file: any) {
+          assert.equal(file._downloadRoute, '/cdn/storage');
+          assert.equal(file._collectionName, 'Assets');
           return '/export.zip';
         },
       },
@@ -93,14 +120,29 @@ describe('packageExport identity', function() {
             },
           };
         },
-        async updateAsync() {},
+        async updateAsync(_selector: unknown, modifier: any) {
+          for (const doc of docs) Object.assign(doc, modifier.$set);
+        },
       },
-    } as any);
+    } as any;
+    await getOrBuildCurrentPackageAsset('root-id', dependencies);
+    delete storedAsset.meta.packageExportFormatVersion;
+    const rebuilt = await getOrBuildCurrentPackageAsset('root-id', dependencies);
+    assert.equal(rebuilt.reusedExisting, false);
+    const cached = await getOrBuildCurrentPackageAsset('root-id', dependencies);
+    assert.equal(cached.reusedExisting, true);
+    assert.equal(cached.link, '/export.zip');
+    assert.equal(writes, 2);
+    assert.deepEqual(removedIds, []);
 
     assert.ok(zipBuffer);
     const zip = await JSZip.loadAsync(zipBuffer!);
     const rootExport = JSON.parse(await zip.file('Root Lesson.json').async('string'));
     const childExport = JSON.parse(await zip.file('Child Lesson.json').async('string'));
+    for (const field of LESSON_PROVIDER_KEY_FIELDS) {
+      for (const exported of [rootExport, childExport]) assert.equal(Object.hasOwn(exported.tutor.setspec, field), false);
+      for (const doc of docs) assert.equal(Reflect.get(doc.content.tdfs.tutor.setspec, field), doc._id + field);
+    }
     assert.equal(rootExport.tdfId, 'root-id');
     assert.equal(childExport.tdfId, 'child-id');
     assert.deepEqual(rootExport.tutor.setspec.conditionTdfIds, ['child-id']);
@@ -111,5 +153,6 @@ describe('packageExport identity', function() {
     assert.equal((root.rawStimuliFile.setspec as any).sparcPages[0].display.workingMemoryFacts.length, suppliedFacts.length);
     assert.deepEqual(stimuliExport.setspec.clusters[0].stims[0].autoTutor, { id: 'script-1' });
     assert.ok(clusters[0]!.stims[0]!.autoTutor.expectationRelationships);
+    } finally { await rm(directory, { recursive: true, force: true }); }
   });
 });

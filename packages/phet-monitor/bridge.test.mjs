@@ -9,7 +9,7 @@ function fixture() {
   let clock = 0, stops = 0, complete = true, serial = 0, notify = null;
   const parent = { postMessage(message, origin) { sent.push({ message: structuredClone(message), origin }); } };
   const window = {
-    parent, phetResearchConfiguration: { buildId: 'test-build', hostOrigins: ['https://host.example'] },
+    parent, document: { referrer: 'https://host.example/lesson' }, phetResearchConfiguration: { buildId: 'test-build', embedding: 'opaque-sandbox-referrer-origin' },
     phetResearchMonitor: {
       drain(limit, bytes) { assert.equal(limit, 4000); assert.equal(bytes, 1024 * 1024); return chunks.shift() || []; },
       status() { return { complete }; }, stop() { stops++; },
@@ -18,11 +18,11 @@ function fixture() {
     addEventListener(name, callback) { handlers.set(name, callback); },
     removeEventListener(name) { handlers.delete(name); },
   };
-  vm.runInNewContext(source, { window, performance: { now: () => clock },
+  vm.runInNewContext(source, { URL, window, performance: { now: () => clock },
     setTimeout(callback, delay) { const id = ++serial; timers.set(id, { callback, at: clock + delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
   });
-  const envelope = { protocol: 'phet-research', version: 2, buildId: 'test-build', sessionId: '12345678-1234-1234-1234-123456789abc' };
+  const envelope = { protocol: 'phet-research', version: 3, buildId: 'test-build', sessionId: '12345678-1234-1234-1234-123456789abc' };
   return {
     sent, chunks, timers, handlers, parent,
     get stops() { return stops; },

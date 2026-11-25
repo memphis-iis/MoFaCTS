@@ -1,10 +1,1990 @@
 # Security Audit Durable Redesign Status
 
 Last baseline with passing CI, Security and image checks: `251022369812dd07417cc4d248e91a1c1f1d8b6a`.
-Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
-auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
+Staging2 application: `dac554f2d0aa136a489f2aa4f8f265022634c967`,
+with `b319e0d4d768b23539dd879d1c1183fb3a418b08` retained for rollback. The
+retained auditor-policy baseline `c7444b4e` has separate evidence and identity.
 
 
+
+## Integrated authentication and catalog v2 staging2 acceptance (2026-11-18)
+
+- [x] Freeze the exact catalog v2 from the accepted 22-control qualification.
+  Its digest remains 00825a1d183e3b1b3d1014273e49c3f1de17c3bd0a8207299e5778d4c44e5ac4.
+  Catalog v1 bytes are preserved. The registry can read v2 for qualification
+  while new ingestion remains on v1 until the coordinated cutover.
+- [x] Wire real reset expiry, login/reset comparisons and logout under one
+  mail-worker lease. Comparisons follow natural expiry so the two earlier
+  reset requests leave the hourly IP budget. The scanner coordinator rejects
+  wrong namespaces, unverified phase cleanup and a changed receiver identity.
+  Full typecheck/lint, Bash-independent diff checks and 23 focused tests passed.
+  The integrated behavior test uses injected phases. No live integrated result
+  or receiver activation follows from it.
+- [x] Run all four protected live phases in a single invocation from
+  `12424179fb91c6630d9024b4ab35e48f5f1592ab` on staging2 app `1c72734b`.
+  The coordinator verified the deployment identity and owned cleanup between
+  phases. An unused reset link was rejected at 3602424 ms. The five login and
+  two reset comparison pairs, session revocation, 29 selected authorization
+  cases, and 12 progress-backed passwordless controls passed. The connection,
+  identifier and IP limits were attributed independently (11th, ninth and
+  21st attempts). The cooldowns elapsed without counter edits.
+  Final authentication artifact: 22 PASS, zero FAIL, zero ERROR. Protected
+  evidence: `integrated-authentication-20261118-f8797b4f0249`. Artifact SHA-256:
+  `773df7465461455d46fdb922a823a5626520324f7115e07c1d4a373d262b5a91`.
+- [x] Reobserve both reset accounts and their reset records as absent through
+  the existing narrow fixture launcher. The first request used noncanonical
+  JSON and was rejected. It passed through the shared canonical encoder.
+  This follow-up verifies the narrower subprocess and independent cleanup
+  without repeating mail delivery or the one-hour expiry test.
+- [x] Recover the run interrupted for the workstation restart. Both owned
+  accounts and reset records were independently absent, operator session
+  cleanup passed, and the stopped worker was absent. Release the exact lease
+  and return the mail connection to idle. The interrupted attempt
+  (connected-integrated-20261118-e60e3a5839e1) is incomplete.
+- [x] Verify the approved audit-only staging2 release from the running
+  `1c72734b` baseline. Branch `codex/staging2-audit-catalog`, commit
+  `93b7d444ba2216cf68c9b930a2e51052f7d022bb`, changes nine catalog, validator
+  and test files. Typecheck, lint, all 172 Linux source checks and Meteor
+  slot 10 passed. Catalog v1 bytes are unchanged. The candidate enables new
+  v2 ingestion and retains v1 readback.
+- [x] Build through Compose, verify the embedded source identity, and publish
+  the exact staging2 candidate. The registry root digest is
+  `sha256:917beee2e46fadf8ef7d0cc71e1503872669f5fa90158811a2b4db07c83d4156`.
+  The linux/amd64 manifest digest is
+  `sha256:c33c875fafe333980da1e48dbd14841d1c2f9d5ccb84250d820f0dbe0d741718`.
+  The staged controller checksum, existing deployment, HTTPS configuration
+  and rollback authority passed the read-only preflight. Protected evidence:
+  `staging2-catalog-cutover-93b7d444`.
+- [x] Activate the paired catalog v2 producer and receiver on staging2.
+  The approved release preserves the running application baseline apart from
+  the catalog/validator change. Normal learner sign-in, reload, role and
+  logout passed. The running-image observation and protected host receipt
+  matched the workstation release record. Receipt record SHA-256:
+  `526ffe3a5e0786bafd0fbbaa60d747407a0e8e80c86bd7880b4b6a4b00cb394f`.
+- [x] Verify signed acceptance and retained report readback. The exact
+  release producer assembled the catalog v2 probe byte-for-byte. The
+  receiver returned 201 for the new v2 report and 400 for the signed new v1
+  submission. Admin list, get and download verified the stored v2 report
+  and a historical v1 report. The receiver probes are marked synthetic,
+  with no measured security results. The separate integrated authentication
+  artifact contains the 22 measured controls.
+- [x] Verify public HTTPS readiness, exact running image and receipt, absence
+  of authentication leases, unchanged HTTPS configuration and other
+  staging2 containers, and retention of the previous app image/configuration
+  and receipt. Both rollout and independent verification passed. The initial
+  prefetch check compared the Docker native ID with the config digest.
+  Registry identity and independent config identity were then verified at
+  their respective boundaries. All ten authorized Meteor invocations are consumed.
+
+Phase 2 staging2 deliverables and acceptance are complete. A complete live
+four-section report, unattended scheduling and the coordinated production
+cutover remain separate gates. The Phase 1 production recording gate (P1-04)
+remains with that production window.
+
+## Phase 3 remaining work (reconciled 2026-11-21)
+
+Use the evidence entries below for individual completed bindings. These are the remaining groups from the Phase 3 deliverables and exit gates.
+
+### Current Phase 3 checklist count
+
+The reconciled checklist has 52 completed top-level items and two open groups. Registration migration and the installed source checks are complete. The remaining groups cover linking the exact release to its protected scanner and fixture evidence, and qualifying the complete matched run on staging2. Count checklist rows as work groups, since their sizes differ.
+
+Resume from the two open groups below. The source-ownership and legacy-manifest checks are complete on `0e8ac483`, the offline archive verifier on `16aea562`, and exact-source Meteor and Dockerfile proof checks on `0dd5da2e`. Reuse slot 106's retained capture and bundle for that exact revision. The accepted staging2 image and its retained browser evidence are still tied to `dac554f2`.
+
+Run `npm run security:surfaces` from `mofacts/` for source registration ownership. Runtime inventories and their classified policies come from the sealed application registry. The historical manual manifest is retained in Git at `2982f477` for interpreting the comparisons below.
+
+| Source inventory at 7b001cfe | Count |
+| --- | ---: |
+| Method names in the old manifest | 244 |
+| Matched application integration-test declarations | 63 |
+| Matched package-owned upload methods | 4 |
+| Names to reconcile | 177 |
+| Named and default publications with matching integration-test declarations | 21 of 21 |
+
+In the existing synthetic experiment/condition fixture, each subscription performs one user lookup, one exact lesson lookup and three lesson collection queries for independent file visibility. A second subscription inside five seconds previously reused the first result; it now repeats those five collection calls and the two role checks. This measures calls for that fixture, not production latency or database load.
+
+Source review of the course module accounts for seven of the 177. Its factory returns 27 properties. In serverComposition.ts, seven are removed before the other 20 are passed to Meteor. The seven are resolveAssignedRootTdfIdsForUser, invalidateCourseSnapshotForUser, invalidateCourseSnapshotsForCourse, invalidateCourseSnapshotsForAssignment, getTdfIdsByOwnerId, getSourceSentences and checkForTDFData. This leaves at most 170 further candidate names, including the 20 course methods. A name without a matching declaration can already have behavior tests. Keep the five exit groups open until their own acceptance criteria pass.
+
+After retiring the two owner lookups and binding stimulus-file access, the source contract lists 218 methods. Of these, 78 match application test declarations and four match package declarations, leaving 136 names to reconcile (down from 177 at slot 60). All 21 publications match declarations.
+
+After slots 78 and 79, the inventory lists 205 methods: 78 matched application declarations, four package declarations and 123 names still to reconcile. Ten formerly callable methods were retired and three entries represented internal names. All 21 publications still match.
+
+After slot 80, the contract lists 200 methods and 21 publications. The five verified retirements reduce the remaining method names to reconcile from 123 to 118. This count tracks declarations, not findings. After slot 82 the same 200 methods include 81 with application declarations and four package declarations, leaving 115 to reconcile. Slot 83 verified two additional application methods. Of 200 names, 83 now have application declarations and four have package declarations, leaving 113 to reconcile. After slot 84 the coverage report counts 84 application methods and four package methods among 200, leaving 112. All 21 publication names have declarations. The five exit groups remain open. Slot 85 checked off 19 more, reducing the verified reconciliation backlog from 112 to 93 (103 application and four package declarations verified among 200). [x] Slot 87 verified the eight personal settings and catalog methods on the corrected source. Of 200 method names, 111 application methods and four package methods are verified, leaving 85 to reconcile.
+
+- [x] Slot 89 verified eight scoped progress reads, roster reimport with an enrolled account and one current news contact per account. The coverage command reports 121 application methods and four package methods among 200. That leaves 75 method names to reconcile. All 21 publication names have declarations. All five Phase 3 exit groups remain open.
+- [x] Operator selected removal of the unused manual error-report form. Preserve automatic timing diagnostics and the private study exclusion. Slot 90 verified the cleanup and the retained diagnostic flow.
+- [x] Slot 90 verified three account-diagnostic methods and fourteen administrator methods. Of 200 registered names, 138 application and four package methods now have verified declarations; 58 remain (54 fewer than the prior 112). Five exit groups remain open. No new manual reporting entry point.
+- [x] Instructor reporting attribution decision: all qualifying practice on a lesson counts for each enrolled learner, including independent and other-course practice. Require that the selected course assigns that lesson. Slot 91 verified the ordinary and progressive assignment cases, including three practice origins, an unenrolled learner and an unassigned lesson.
+- [x] Slot 91 verified 22 methods: one course report, seven personal-account methods, four public account methods, six SPARC lesson methods and four runtime lesson reads. Coverage is now 160 application and four package declarations out of 200 method names, leaving 36 (76 fewer than the original 112). All 21 publications still have declarations; five Phase 3 exit groups remain open.
+- [x] Slot 92 verified the thirteen learner history, dashboard and analytics methods. The account dashboard and history stay account-scoped. Study progress stays limited to the study and its condition lessons. Coverage reached 173 application and four package declarations out of 200; 23 remained.
+- [x] Slot 93 verified public sign-in configuration and active help, single and bulk media removal and owner-only lesson visibility. Coverage reached 178 application and four package declarations out of 200, leaving 18.
+- [x] Operator approved retiring the unused stimulus display cache and its admin control. Source changes remove startup polling, both public reads, the admin rebuild and all refreshes during ingestion and editing. Slot 94 verified absence of all three installed Meteor methods. Coverage is now 177 application plus four package declarations across 197 method names. All 21 publications still have declarations.
+- [x] Slot 95 verified confirmed package deletion, persisted archive processing, and ownership checks for upload confirmation and cancellation. Automatic collaborator-media removal requires a matching lesson target and stimulus-set identity. Shared media, matching names in unrelated uploads, and incomplete upload metadata were covered.
+- [x] Slot 97 verified private-copy isolation, separate on-demand ZIP export, and deletion before or after export. The copied condition family and its referenced media survived original-package deletion. The same run verified three lesson editor/generated-package methods and five OpenRouter methods.
+- [x] Operator approved requiring teachers to have lesson access when using lesson audio keys. Source implementation also checks current lesson access for a teacher with prior practice, while retaining administrator testing and participant access.
+- [x] Slot 98 verified both installed Google audio methods. A teacher with prior practice and no remaining lesson grant was denied before any provider request. Sharing the lesson allowed both operations. Administrator testing and a new experiment participant's audio also passed with stubbed provider responses.
+- [x] Close method-name reconciliation. The source inventory matches all 197 method names to verification declarations, including 193 application methods and four package methods. All 21 publication names match. The five broader Phase 3 exit groups remain open, including the complete startup inventory and exact staging2 qualification.
+
+
+- [x] Reconcile the staging2 condition-root index checkbox with its accepted deployment record. Production preflight stays at cutover.
+- [x] Reconcile the sharing transaction, both accessor reads and recipient resolution with the named passing Meteor cases in slots 38-40.
+- [x] Apply the approved new-recipient rule at the transactional user update. Existing grants can still be retained or revoked.
+- [x] Verify missing-account rollback, stale-entry retention/revocation and the final two lesson-access method bindings in a combined Meteor run.
+- [x] Apply the approved server-authoritative study wait to Prolific and other study sessions. Resolve the saved unit and assigned lesson, use authored condition timing and the server clock, and preserve existing timers and ordinary practice.
+- [x] Verify both enrollment paths in native Meteor, including passwordless reconnect, a condition-specific wait, same-unit resume and denial outside that scope.
+- [x] Delete both remote mail methods, their injected dependencies and contract entries. Internal delivery and scheduled summaries retain their server-owned functions.
+- [x] Confirm both retired names are absent from the installed Meteor registry.
+- [x] Delete remote serverLog and debugLog, both browser sign-in calls, the obsolete log-length constant and the obsolete privacy harness invocation. Server-side SAML logging remains active.
+- [x] Confirm both logging names are absent from the installed Meteor registry.
+- [x] Restrict both preference methods to the signed-in user and practiceTableStatisticsExpanded. Only boolean writes are accepted; the setter no longer logs the value.
+- [x] Verify both installed methods, true/false round trips, user isolation and invalid input/stored values.
+- [x] Implement validation of all nine supported personal audio fields and one atomic update for each supplied patch. The audio screen submits only the edited control fields.
+- [x] Verify first-save initialization, concurrent partial saves and invalid mixed patches in native Meteor.
+- [x] Remove preferences from the audio publication and retain both fields used for session tracking.
+- [x] Verify the exact installed audio projection and dashboard preference read for the same synthetic user.
+- [x] Delete ownedTdfs and pagedTdfsListing and the pagination-only field stripping helper. The admin user list still requires normalizePageRequest.
+- [x] Verify both retired names are absent and the two active listing handlers retain their authenticated cursors and signed-out readiness.
+- [x] Confirm no independent client uses the four remaining obsolete lesson subscriptions. Retire tdfByIds, tdfForEditMetadata, dashboardTdfsListing and contentUploadOwners, their contract entries and dashboard-only resolver code.
+- [x] Verify all six retired subscriptions are absent and the instructor listing still works in native Meteor.
+- [x] Trace the remaining allTdfsListing subscription. Its only tracked client is instructor reporting. It uses the selected lesson for the authored due date when the assignment has none. The existing instructor-scoped assignment query already joins that lesson.
+- [x] Retire allTdfsListing and use the course-scoped assignment result for the effective due date. Assignment date takes precedence over the authored date.
+- [x] Restrict currentTdf to a single normalized lesson ID while retaining course-context, repair and visibility guards.
+- [x] Verify the seven publication retirements, single-lesson runtime behavior and scoped assignment dates in native Meteor.
+- [x] Trace client use of all seven remaining direct named publications in server/publications.ts. Six have active callers. The Assignments publication has no tracked subscriber or client collection reader; learner courses and the assignment editor use scoped snapshot methods.
+- [x] Retire the unused Assignments publication and register the six remaining named publications in server/publications.ts. Each descriptor binds the signed-in async policy, returned data and native verification case. Existing lesson, role and sharing rules remain in their handlers.
+- [x] Verify the installed six registrations, signed-out readiness, asset filtering, editor and shared upload access, target scope and retired Assignments name in Meteor.
+- [x] Trace stored provider-key fields through shared upload details and the owner editor. Both return the lesson settings block. The owner editor copies saved values back on an ordinary save. The server reads encrypted values and also accepts historical plaintext values. This is source evidence; no stored keys or live lessons were inspected.
+- [x] Omit stored provider-key values from both editor/upload detail publications. The owner receives configured field names. Preserve keys on ordinary saves and restrict explicit replacement and clearing to the lesson owner.
+- [x] Verify publication redaction and the owner/shared save contract in native Meteor.
+- [x] Implement owner-only inheritance of lesson provider keys in copyTdf. Non-owner copies also drop the source archive references so a ZIP containing embedded keys does not follow the lesson.
+- [x] Verify all three key fields in owner, shared and administrator copies, denial for an unrelated user, and the original document in native Meteor (slot 53).
+- [x] Adopt the approved rule for new downloads and ownership transfers. Omit all three lesson provider keys on export, including for the owner. Clear the keys from all members in the ownership transaction. A request to transfer to the same owner preserves the keys.
+- [x] Verify key-free exported ZIPs, refusal to reuse older archives, and actual MongoDB family transfers in native Meteor (slot 54).
+- [x] Operator decision: leave existing ZIP links as they are. Historical archive remediation is out of scope. The verified key-removal rules for new exports and changes of ownership still apply.
+- [x] Finish registration migration across application and package/framework owners, including HTTP stacks, publications, methods, and synchronous collection rules. Verify equivalence and explicitly account for remaining guards, data leaving each surface and presentation-only rules.
+  - [x] Remove getTdfsAssignedToStudent from the course implementation and source contract, and remove its developer wiki listing. The course screens use server-owned assignment reads.
+  - [x] Retire the five additional unused course commands from implementation, registration, contracts and current documentation. Fourteen public course handlers remain.
+  - [x] Trace teacher discovery through class selection and invite acceptance. The earlier signed-in teacher list returned the account email fields for every teacher. The dropdown uses the display identifier; the invite path resolves the teacher by ID. The operator approved limiting learner results to instructors of public or enrolled sections and returning only ID and current display label.
+  - [x] Implement the approved learner-directory rule in the server queries, exclude courses without sections from teacher discovery, preserve staff directory membership, and load invite labels after accepting section membership. Register both directory reads with their verification case. Detailed course setup guidance was updated.
+  - [x] Verify in Chromium that a direct invitation enrolls before reading the private section and teacher labels and saving the selected class (slot 63, simulated method responses).
+  - [x] Verify in slot 64 the corrected teacher-directory result, including role membership and exact fields, using the installed methods with MongoDB.
+  - [x] Trace assignment editing: the picker uses teacher ownership or explicit lesson sharing (admins can select any lesson), while the save checks submitted lesson IDs for existence. No learner records inspected. The full-list save also resubmits existing assignments. The operator approved keeping the lesson in its existing assignment after sharing ends, while blocking new use without current access.
+  - [x] Implement assignment identity checks for retained lessons and per-lesson access for new uses. Register the editor snapshot and save against the existing course-management permission.
+  - [x] Verify retained and rejected new assignment uses, progressive launch, and administrator access in slot 64.
+  - [x] Trace the two due-date exception commands to instructor reporting. The report lists students enrolled in a course section. Both server commands validate course management and the assignment but omit the target student’s course membership. The previous handlers also read and replaced the entire user document. The operator approved current enrollment for every edit.
+  - [x] Enforce enrollment for exception adds, changes and removals. Update only the exception array and check its previous value to detect conflicting edits. Local handler tests passed for denial, grant, withdrawal, re-enrollment and preservation of unrelated fields.
+  - [x] Verify the installed due-date handlers with MongoDB on enrollment, withdrawal and re-enrollment (slot 65).
+  - [x] Trace class section editing. The form submits a list of names without section IDs; changing a name creates a new section and removes the old section and its enrollments. Renaming an enrolled section safely requires distinguishing rename from deliberate removal in the edit contract. No existing enrollments were inspected or modified.
+  - [x] Preserve IDs and invitations when renaming an existing section, require explicit deletion, and commit the course and enrollment changes transactionally. The server rejects stale or incomplete lists. Installed server and rendered browser cases passed in slot 65.
+  - [x] Require a newly designated course owner to be an existing teacher or administrator. Preserve teacher self-ownership, existing owners on metadata edits, and administrator transfer away from a former teacher.
+  - [x] Exercise the source owner selector with synthetic account and role lookups: teacher self-ownership, missing and ineligible recipients, existing teachers and administrators, unchanged ownership and transfer from a former teacher.
+  - [x] Trace section enrollment notification handling: the membership is inserted before sending the course assignment email. An email preparation error (for example, an account without an address) therefore rejects a join that already persisted. Repeating the join skips the notification on an existing membership. No live account or notification was used.
+  - [x] Record and verify a successful saved enrollment when confirmation email preparation or delivery fails; registration, anonymous and mismatched-teacher rejection, repeat joins, and sanitized failure diagnostics covered in slot 66.
+  - [x] Bind and verify the last two course commands (slot 68). Course deletion requires the owner or an administrator. Progressive assignments require an ordinary account session on launch and reopen. The resumed passwordless session still reads its study progress. All 14 active course commands now have declarations.
+  - [x] Remove both unused authentication commands and verify their absence, native reset behavior and automatic MongoDB cleanup (slot 69). The link expires at one hour. Its record becomes eligible for deletion two minutes later so the existing audit can verify expiry while it is still present.
+  - [x] Retire installation-wide lesson and asset deletion from the server, Content Manager, settings examples and administrator guidance. Verify individual package deletion and recovery of pending individual image removals (slot 70).
+  - [x] Retire the orphan-upload command, its preview, and its exclusive helpers. Verify registered method absence and selected package deletion (slot 71).
+  - [x] Retire the two installed maintenance commands and unused generated-media repair implementation. Verify all seven retired or internal names are absent from the installed registry and active package methods remain installed (slot 72).
+  - [x] Remove both owner lookup commands and the unused maximum response KC helper; bind the existing owner-or-explicit-accessor download policy and await its decision. Verify active lesson listing, response mapping, and access outcomes in slot 73.
+  - [x] Trace filename collisions in the manual package creator, Anki importer and lesson media editor. Each can remove an existing asset before its replacement upload succeeds. The two package flows select an existing file by owner and filename; the editor scopes the match to the stimulus set. The Canvas importer already uses a distinct archive name and the server package confirmation. Decide how to retain older assets while switching saved references. Source review only.
+  - [x] Preserve existing assets in the manual package creator, Anki importer and lesson media editor. Package replacement, cancellation, rollback and export rebuilding retain previously published files. The editor sets the new URL in the form on successful upload; the lesson save persists it. Full native suite passed in slot 74. The editor field wiring was traced in source.
+  - [x] Trace the separate Content Upload media-list screen. Both the drop zone and file picker call uploadMediaFiles; after overwrite confirmation it deletes a same-name file before DDP upload. This screen chooses a lesson and file, with no selected lesson field to save. Source review only.
+  - [x] Operator approved the duplicate-name behavior for the media-list screen: keep the existing file and direct the author to the lesson editor to replace a specific reference. A separate new attachment can be uploaded under another name.
+  - [x] Implement the approved media-list rule and verify existing, repeated and overlapping filenames, mixed results, scoping and retries in Chromium (slot 75). Drag-and-drop and the file picker use the same batch handler; both entry points were traced in source. Duplicate guidance is present in all ten interface locales.
+  - [x] Trace the separate, explicit Delete Selected operation in Content Upload. The server checks ownership/admin access for the records it finds, then passes every requested ID to deletion. It increments the reported count even when the storage library returns zero for an absent file. The screen does not inspect the result. Reviewed source only.
+  - [x] Trace the owner-scoped filename lookup and upload quota through the manual creator, Anki and Canvas imports, the Content Upload quota display, the DDP upload check and the package counter. The filename lookup filters by the signed-in owner. For regular accounts, the three-per-UTC-day gate checks package and standalone media uploads, but only package processing increments the counter. Teachers and administrators bypass that daily gate. Source review only.
+  - [x] Reconcile eight analytics and stimulus names in committed source at ccd0a39a. The composition removes getHistoryByTDFID, getStimSetFromLearningSessionByClusterList and getUserLastFeedbackTypeFromHistory from the analytics method table before Meteor registration. They are manifest discrepancies, not three public commands to retire. getStimuliSetById is active: contentSurfaceInit.ts calls it when loading lesson stimuli. Preserve that learner path. Source evidence only; the manifest and the 136-name reconciliation count are unchanged.
+  - [x] Trace the other four registered reads: getLastTDFAccessed, getUserRecentTDFs, getNumDroppedItemsByUserIDAndTDFId and getStudentPerformanceForClassAndTdfId. Exact-name searches of the committed application, components, deployment scripts, wiki and config found no shipped caller. Two are exercised by the synthetic study-session test. The same fixture independently verifies getExperimentState for the study root and condition and denies out-of-study reads. No participant data or live service was accessed.
+  - [x] Operator approved retirement of those four analytics reads together. Group all seven registry exclusions in slot 78; retain the active study-session, class-report and stimulus-read workflows.
+  - [x] Verify all seven analytics exclusions in the installed Meteor registry in slot 78. The active stimulus lookup, instructor class report and experiment-state commands were present. The passwordless study-session fixture passed. Source contract now lists 211 methods with 129 names to reconcile (78 matched application declarations, four package declarations). All 21 publications still match.
+  - [x] Trace the next six public commands in committed source. No shipped client caller was found for initializeDashboardCache, refreshDashboardCache, removeTdfFromCache, listManualContentDrafts, toggleCustomTheme or adminCreateOrUpdateUser. The design notes refer to dashboard initialization/refresh. The current home and course screens call ensureDashboardCacheCurrent, and the administrator usage refresh calls initialization internally. Manual authoring saves and reopens a draft by ID, theme selection calls setActiveTheme, and the administrator user-import screen calls insertNewUsers. Keep these active paths. The two compound-interest source reads are separately used by the shipped administrator test runner. No service was invoked.
+  - [x] Operator approved retiring all six direct commands while keeping the internal dashboard rebuild and active workflows. Combined registry and rebuild verification is recorded below.
+  - [x] Verify the six direct retirements in the installed registry at c5b0ef36 (slot 79). Dashboard reads, administrator usage refresh, draft get/save, theme selection and account import remain registered. Administrator refresh tests cover authorization, missing users, per-user locking, rebuild failures and bounded concurrency. No staging deployment in this batch.
+  - [x] Triage the remaining 123 reconciliation names at c5b0ef36 against tracked client and learning-component source, excluding test files. 117 have exact name mentions there; mentions are triage evidence, not proof of invocation or authorization. Review the other six across server composition, tests, scanner catalog, operator tools, wiki and config. No shipped client caller was found for the two older SPARC library lists (listSparcMoveLibrary and listSparcLibraryImages), getLearnerProgressSignals, resetLearnerTdfConfig or the direct setExperimentState method. The unified SPARC browser lists instructional components. State persistence still needs the internal write function, and the study-session regressions need equivalent coverage on active reads and writes. Architecture guidance explicitly retained the old move listing pending a consumer decision.
+  - [x] Identify the sixth method as a current audit dependency. getStudentPerformanceByIdAndTDFIdFromHistory is named in the authentication verification catalog for allowed reads and cross-user denials. Its lack of a shipped client caller is insufficient grounds for removal. Retiring it requires selecting a supported performance read and requalifying the affected scanner controls.
+  - [x] Operator approved removing the five unused direct commands while preserving the shared state writer and the current audit performance method. Slot 80 verified that all five are absent from the installed registry and that the supported study, learner-settings, SPARC and scanner operations remain installed. The exact commit passed all nine focused SPARC access tests. The shared working directory separately failed one observer-expectation test with concurrent SPARC changes.
+  - [x] Compare package and public/private switch behavior in source. Package integration covers private condition children under either root visibility. The owner switch checks the selected lesson for a media-attribution lock and copies its public flag to owned conditions. The operator approved keeping conditions unlisted and preserving the AI creator safeguard on the selected lesson. A condition lock does not block publishing the root. Slot 81 verified owner-only root toggles with a previously listed condition carrying an attribution lock, direct condition rejection and the existing root lock. Public and private root package-upload regressions also passed. No live records were inspected or migrated.
+  - [x] Trace the active manual-authoring draft read, save and delete operations. The editor uses all three. Existing save and delete checked ownership in a read before changing by ID alone and did not check how many records changed. Slot 82 verified all three installed owner bindings with real MongoDB, including creation, anonymous and other-user denials, successful owner save/read/delete, wrong draft type and missing-record results. Typecheck, lint and Linux source-security checks passed.
+  - [x] Operator chose lesson packages only for the regular-account daily allowance. Standalone media retain existing authorization and file-size checks.
+  - [x] Verify the package-only daily gate in native Meteor (slot 77). A package with two lesson results increments the existing counter once. At three, the next package start is denied, authorized standalone media at 10 MiB is admitted, oversized media and a mismatched stimulus set are denied, and the status method reports three used and zero remaining. All ten interface locales name lesson packages. The package count is read at upload start and incremented during processing; this run did not establish a strict cap across simultaneous package starts. Source follow-up located the accounting increment after package post-processing, before the terminal job result. An initial check can admit overlapping packages against the same remaining place. The operator selected the existing soft daily limit. Starts use the recorded count; admitted overlapping uploads can finish. Slot 83 verified two starts admitted at count two, a subsequent start denied at three, and the second admitted package counted at four with zero remaining. The two installed read bindings verified owner-only filename matching, bounded response fields, caller-specific allowance and anonymous denial.
+  - [x] Trace User Admin role removal and the startup/login configuration that re-grants named admin and teacher roles. Self-deletion is blocked, but the role command permits self-demotion. Configuration-backed roles can be cleared in the UI and granted again on login or startup. Operator approved blocking self-demotion and removal of a deployment-granted role. Slot 84 verified the installed method in MongoDB: self-demotion denied, separate configured admin and teacher grants retained, a teacher grant removable after the settings entry was removed, and a successor able to remove the previous admin. The row displays the two denial reasons in all ten interface languages. Interactive staging2 acceptance remains open.
+  - [x] Trace CSV user import. For an existing normal account the server requests a password replacement using the password supplied in that row. Import instructions describe the email and password columns but omit that consequence. Whether to preserve the password and report the existing account as skipped remains a product decision. No roster was imported.
+  - [x] Trace account deletion separately. User Admin blocks self-deletion and checks owned assets, lessons, courses and themes. It can delete a different account that still has a deployment-granted role. Its confirmation omits the removal of learner histories and saved experiment progress. No live account was inspected or deleted. Operator approved blocking deletion of configured accounts and naming permanent history and experiment-progress deletion in the existing confirmation. Slot 85 verified all 19 installed administrative method bindings, anonymous and non-admin denial, preservation of configured accounts and their records, and deletion of eligible synthetic accounts with their history and progress. The existing confirmation names both consequences in ten locales. Interactive staging2 acceptance remains open.
+  - [x] Operator selected full preflight for Delete Selected. A stale selection must leave all remaining files intact and prompt the author to review the refreshed list. Count only confirmed removals.
+  - [x] Implement and verify full-selection checking, permission checks and confirmed counts for Delete Selected. Six native server regressions passed in slot 76, including stale selections, repeated IDs and interruptions after the first deletion. The client clears selection and refreshes its subscribed list. Interactive staging2 verification remains outstanding.
+  - [x] Trace three additional lookup functions. The two registered owner lookups (getTdfOwnersMap and getTdfsByOwnerId) have denial tests but no tracked application, wiki or config caller. They return owner usernames or a lesson list for a specified owner. The internal getMaxResponseKC aggregate also has no tracked caller. Operator approved removal of all three.
+  - [x] Review three maintenance commands together: auditPublicAssetsWithoutSharedTdf reports public files without a shared lesson, repairAiGeneratedPackageMedia can rebuild lesson media references using its package, and generateFaviconsFromLogo exposes an internal routine already used by theme save. No tracked callers of the remote names were found in the app, wiki or config. Retirement approved November 23. Source tracing corrected the initial classification: the media repair was returned by the package factory but never installed by server composition. The active individual and selected-media deletion controls have tracked callers.
+  - [x] Review the separate orphan-upload cleanup command in source. No tracked application or operator-guide caller was found. Its default is a preview. In deletion mode it can remove up to 50,000 assets classified from a snapshot of lesson references, without checking references again before deletion. Operator approved retirement of both preview and deletion. No live cleanup was invoked.
+  - [x] Trace the administrator bulk deletion command from its settings-controlled button through the server and lesson cleanup. The setting controls visibility only. The command checks the administrator role, removes lessons and assets across the installation, removes affected course assignments, and archives associated history and experiment state. No deletion was executed. Operator approved complete retirement on November 23.
+  - [x] Trace two authentication commands selected for review. No tracked application caller uses clearLoginData or cleanupExpiredPasswordResetTokens. The former clears five saved login preferences and records session revocation without revoking a Meteor token. The latter deletes expired reset-request records only on an administrator call. Password reset already rejects expired links and records reset events separately. Automatic expiry cleanup and retirement of both commands approved November 23.
+  - [x] Verify the corrected owner-selection case in native Meteor (slot 67). Slot 66 encountered a missing timezone in the test setup.
+  - [x] Trace course owner selection: teachers create courses for themselves. Administrators may supply another account ID on creation or transfer, and before the repair neither operation verified the proposed owner exists and holds a course-management role. No operator or learner accounts were inspected.
+  - [x] Separate the 19 public course handlers from the course service helpers at their definition. Seven former inventory rows represented internal functions. None of those seven is a newly retired public command.
+  - [x] Bind the learner course snapshot and four instructor reads to their existing authorization functions. Preserve the account-session requirement, instructor scope, administrator access, error ordering, and returned fields.
+  - [x] Verify installed command and helper exclusions, and four instructor reads with synthetic assignments and teacher/admin authorization (slot 61).
+  - [x] Verify the five additional retirements in the installed Meteor registry and the learner course snapshot on both an ordinary account and a real resumed passwordless study session (slot 62).
+  - [x] Trace the Content Upload stimulus filename lookup through both editor routes. The subscription publishes matching Stims IDs and filenames by filename alone. The content editor loads and saves the selected lesson by TDF ID. The SPARC header displays the filename. The condition selector does change the TDF ID. Six content-upload cache and projection regressions passed. No live data inspected.
+  - [x] Remove the stimulus-file selector and filename-based publication lookup with operator approval. Remove the editor query labels, keep the expanded lesson's stimulus details, and advance the browser snapshot format. Six cache/projection tests passed. A focused invocation of the actual click handler verified the root, ordinary condition and SPARC condition routes.
+  - [x] Bind contentUploadMetadata to the named publication registry with the existing asynchronous not-authorized denial, owner/shared lesson scope, and condition/asset metadata. Full typecheck and lint passed (324 surfaces).
+  - [x] Verify the installed contentUploadMetadata binding and its anonymous/owner/shared/unrelated behavior in native Meteor.
+  - [x] Retire direct browser progress inserts/updates and direct site-settings updates by operator decision. Remove the unreachable progress write in client cleanup. Record synchronous server-side denials for account profile updates, direct progress writes and settings updates. Normal progress and administrator settings methods remain active.
+  - [x] Register the SPARC retrieval publication with its existing lesson authorizer, administrator access and vector-only delivery. Add named/default publication and external runtime-config proofs to the common verification catalog.
+  - [x] Verify the installed direct-write denials, normal save and passwordless progress return, and registered SPARC subscription in native Meteor (slot 56).
+  - [x] Remove the five approved remote status commands and their obsolete wiring. Full typecheck and lint pass with 319 surfaces. The startup hash diagnostic remains internal. The help screen reads published Markdown and the active speech settings methods remain registered in source.
+  - [x] Verify the five retirements and retained methods in native Meteor (slot 57).
+  - [x] Remove the provider credential copy from SSO profile completion and bind the existing account-holder/administrator policy. Update the stale Phase 0 synchronous collection test to cover the approved denials.
+  - [x] Verify the installed SSO policy, credential separation, and continued account email synchronization in native Meteor (slot 58). Scope is the profile completion writer. No production records inspected or migrated.
+  - [x] Adopt the operator decision that ordinary private course lessons require a current assignment, including after the learner starts. Saved progress, separately shared access and passwordless experiment return are retained.
+  - [x] Remove course-list grants from login and ignore old account lists when authorizing lesson, dashboard and asset reads. Course-only asset metadata is delivered as a snapshot from current released assignments. No learner-history or account migration.
+  - [x] Verify assignment removal and reassignment, independent lesson sharing, the current course-only asset snapshot and passwordless return in native Meteor on 18fae3b1. Slot 59 had a separate asset failure.
+  - [x] Verify immediate asset sharing on the corrected source in a full native Meteor run (slot 60). Each new subscription resolves independent permissions afresh. Staging2 qualification remains a separate open item.
+  - [x] Move the five creator/lesson OpenRouter bindings into the factory that owns their guards. The guarded handlers and descriptors now share the same policy objects for caller authentication, lesson authorization and demo quota where applicable. The handler IDs, data-egress categories and checks' order are preserved. Full typecheck, lint, 472 Linux source-security tests and nine synthetic lesson-access tests passed. The latter includes the corrected vector-publication fixture for one catalog observer. Verify the resulting installed binding on the next exact-source Meteor run.
+  - [x] Use the same owner/admin removal policy in the single and selected asset handlers and their descriptors. Give lesson visibility its distinct owner-only policy. Use the four actual connection-limit declarations in both DDP registration and the public account descriptors, while preserving the independently applied per-IP/account limits inside the handlers. Full typecheck and lint passed.
+  - [x] Verify the installed OpenRouter, asset deletion, lesson visibility and public-account cases with the full native Meteor suite on `0dd5da2e` (slot 106). These cases cover the four installed connection-limit rules and non-owner administrator denial for lesson visibility. The sealed registry is byte-identical to the registry in slot 105. Its 244 descriptors account for 248 required cases, and all 164 references from the 22 management routes resolve. Existing staging2 and live provider evidence retain their separate scope.
+- [x] Slot 99 verified the installed Accounts lifecycle hooks, native login/logout owner and Google, Microsoft and Memphis SAML account service registrations. The source checker distinguishes browser account notifications from server hooks. Real provider sign-ins remain a staging2 acceptance requirement.
+- [x] Seal the complete startup registration inventory, compute deterministic profile and inventory digests, and expose the bounded deployed inventory. The accepted staging2 image served the same 248-case registry, production-profile digest and embedded bundle through the existing administrator-only method.
+  - [x] Slot 101 verified the startup seal, profile and inventory digests, and bounded administrator-only inventory read in installed Meteor. It checks 19 named and two distinct default publications, 194 application methods, and the installed package and framework owners. The read reports build identity and embedded proof separately. The local test confirmed the absent-bundle observation and denied anonymous and non-admin calls. Exact deployed-image acceptance remains open.
+- [ ] Join the required test catalog, executed source evidence, embedded verification bundle, exact image receipt, scanner revision, fixture bindings and environment evidence.
+  - [x] Verify the shared VerificationBundleV1 schema, canonical digest, exact matching of required passing source IDs, and bounded proof reader with synthetic source tests. The parser refuses fixture bundles as release source evidence.
+  - [x] Bind catalog verification IDs to hashed cases from the retained native Meteor run. The matcher validates the run digest and the source test-module set, and reports missing, pending and ambiguous cases separately. It matched all 248 Meteor integration declarations to passing cases from slot 101, with zero unresolved.
+  - [x] Validate the retained native receipt against its recorded SHA-256, exact test-input identity, isolation and resource observations, test discovery and recomputed outcomes. Verified all 248 cases through this joined path using slot 101. Source tests cover complete bundle composition given an independently declared registry expectation, source mismatch, tampered evidence, missing cases and test-only fixture exclusion. No Meteor invocation was needed for this tooling check.
+  - [x] Add the opt-in capture and build commands for source proof. Focused tests verified exact-source and pinned-profile checks, canonical bytes, fixture exclusion, preservation of ordinary build behavior, and removal of the temporary Compose inputs on success and failure. The actual Docker source-observation stage ran on the exact captured slot 103 revision with no optional proof file.
+  - [x] Implement and test the runtime proof comparison. It recomputes the returned profile, inventory and bundle digests, checks the exact 248-ID set, and rejects inconsistent source, mode, registry or bundle evidence. It does not issue exact-image qualification.
+  - [x] Implement and test exact case-to-surface coverage in both the source projection and runtime comparison. Typecheck, lint, 14 focused checks and 198 Linux source-security cases pass. The projection takes a separately declared production profile and rehashes the audited descriptors retained by the native lane.
+  - [x] Verify the native registry artifact on exact clean source and compose the declared production expectation. Slot 104 bound the actual startup descriptors to the native receipt, accounted for all 248 cases and produced the canonical bundle. The Docker source-observation stage accepted that bundle. The complete application image and deployed comparison remain open.
+  - [x] Verify the staging2 administrator observation adapter in a local browser fixture. It uses the existing typed read, checks the authorized origin and actor across the call, and retains only compact proof results. No live staging2 registry read was needed for the adapter check.
+  - [x] The operator approved using the tested main revision `dac554f2` for staging2, including its newer SPARC and camera behavior. Canonical Compose built the exact slot 104 capture. The complete Linux/amd64 image passed isolated Change Streams boot, HTTP and DDP readiness, anonymous registry denial, synthetic administrator login and exact registry comparison. No additional Meteor invocation.
+  - [x] Publish and accept the same image on staging2. Tag `ppavlikmemphis/mofacts-staging2:phase3-dac554f2-20261125041349`. Registry index `sha256:5b79f789a67472bd9cc176233784251d23662ca8346a88c7d352e901ecec4d86`, platform manifest `sha256:3c5298d97f6b3093522eab2851b464885a8e3428f118cb113fbcbd22f833f5c9`, and configuration `sha256:07cb891affc0e83cda63015e3536de500a7b76a8b1d14ff8f247f5011f249644`. Public HTTPS, health, CSP continuity and WebSocket readiness passed. In Chrome, the ordinary learner retained the same identity and role after reload and both sessions signed out. The administrator read matched the exact profile, bundle and 248-case registry. Protected V2 receipt and local release authority matched digest `b5425f25fbc45104dabda4aa55167df67e35b6f01c25a77baed3d42d2f29422f`. The previous `b319e0d4` image, environment and receipt remain available for rollback. Existing Mongo, Redis and proxy configuration passed the unchanged-state guards. Protected evidence `staging2-phase3-dac554f2`.
+  - [x] Bind the retained browser registry result, canonical bundle, independently observed running configuration and installed host receipt to the exact bytes of the accepted workstation authority. The local verifier produced `registry-release-binding.json` in the protected evidence directory. It rejected mismatched authority bytes, running config, registry and incomplete browser evidence in source tests. This binds release evidence for the later scanner run.
+  - [x] Connect the integrated authentication coordinator to full-report assembly in source. The assembly entry point requires catalog v2 and independently observed application revision and platform image. The coordinator contributes only its current in-process result, and assembly rejects a competing authentication file. With catalog v1 active, the synthetic test verifies refusal before any phase runs. In a disposable source copy with catalog v2 active, all 22 synthetic authentication rows reach the report parser used by the receiver, and the 48 unprovided controls remain `ERROR`. Stale authentication and conflicting image evidence are rejected. This is source evidence with no new Meteor invocation or deployment.
+  - [x] Verify the report assembly batch. Full lint passed. Pinned Linux Node ran the extended source-security suite with 471 passes, four skips and zero failures. The direct Windows attempt hit Linux-only tool and file-mode checks. The Linux test process returned zero, although the PowerShell pipe appended a carriage return to the wrapper's final status propagation.
+  - [x] Verify the offline join from the exact catalog v2 writer report and independent receiver readback to the accepted release record, scanner revision, Linux/amd64 platform manifest and embedded registry proof. The verifier rejects a mismatched receiver copy, application or scanner revision, and use of the registry index or config digest in the platform slot. A matched report with execution errors is still incomplete. The focused Linux suite passed 26 tests. This is synthetic source proof. Fresh staging2 readback, protected fixture and archive evidence remain open.
+  - [x] Include the approved SPARC changes in the next staging2 candidate's source. The combined `main` revision `9ed515de` passed full typecheck, lint, 352 SPARC-related tests and slot 105. The installed startup registry has the same byte digest as the accepted slot 104 inventory. This proves current source and installed test coverage. The deployed release and full report acceptance are separately tracked below.
+  - [x] Re-verify the exact slot 105 capture and compose the source verification bundle for all 248 declared Meteor cases. The projected production inventory SHA-256 remains `1fec1fc446a3f370cb43cbaaa8a4e26a804c9c21689489b045f857fd35d73046`. Bundle SHA-256 `5d72adaf3fbf8555a02d092da13f1c941be39d405c421e2e5eb751e7f8ce586b`. The first composition attempt lacked the host Node dependencies after worker cleanup. The same composer passed using the existing host dependencies and the independently checked exact native capture and receipt. No additional Meteor invocation.
+  - [x] Verify the report readback tooling with full lint, 26 focused Linux tests and the complete Linux source-security V2 suite (471 passes, four skips, zero failures).
+  - [x] Exercise the workstation archive qualification command against a matched synthetic release and receiver report. It requires the writer's archive receipt and independently retained fingerprint, decrypts the saved archive in memory and checks its exact writer bytes. It rejects a different report encrypted to the same key even if the supplied ciphertext hash matches, and preserves the source and readback for separate cleanup. All 29 focused Linux tests, the full Linux V2 source-security suite and full lint passed. No Meteor slot was used. The real archive round trip remains open with the full staging2 report.
+  - [x] Require the independently read-back report to have started at or after the deployment time in the verified host receipt. An earlier run can otherwise match the same revision and image after redeployment. The regression reproduced acceptance of an earlier report before the change. It now rejects reports that precede or cross deployment and accepts one beginning at the recorded deployment time. All 29 focused Linux tests and full lint passed. The Meteor ledger is unchanged.
+  - [x] Compose the exact slot 106 capture's source bundle for all 248 required Meteor cases on `0dd5da2e`. The reverified production projection is `1fec1fc446a3f370cb43cbaaa8a4e26a804c9c21689489b045f857fd35d73046`. The bundle SHA-256 is `38c058c02cc990b6f675fb7895937cd4d9ce754aef5eca7dd3d465ffcc02466e`. The production Dockerfile's source-observation stage accepted the bundle with the exact source identity. Retained stage log SHA-256 `87a2c202214584e671ea3fa26ef63f53d343c0b54dba04efd4412f65dc693f39`. Use the retained workspace in the run ledger. This is the build-input proof for that revision.
+  - [ ] Join the accepted runtime registry proof with the exact scanner revision, protected fixture bindings and a complete environment run. The operational staging2 release selects catalog v1 for new ingestion and retains catalog v2 decoding. Keep that healthy release until the protected driver can use the integrated entry point, the full producer is ready, and a single coordinated rehearsal can verify the accepted image, signed storage and independent readback together. The hosted `full` workflow still emits the selected authorization subset and reports other authentication scenarios as incomplete. Prior staging2 catalog activation and the protected 22-control authentication result stay accepted in their original scope.
+- [x] Verify static bypass detection across active source roots and retire the old manifest and inference checker after parity.
+  - [x] Reconcile the current legacy manifest's categories before retirement. It still checks 198 methods, 21 publications, eight HTTP mounts, four middleware entries, 19 inferred export names, and 22 management-route presentation entries. The eight mounts must be compared as mounts because several catalog endpoint paths are more specific.
+  - [x] Map all 19 legacy export names to exact method or parameterized HTTP integration declarations. The group contains 15 methods and four single-use download mounts. This proves coverage by name and leaves runtime-policy parity open.
+  - [x] Independently compare the old contract with the isolated production-mode registry that staging2 later matched. Exact names agreed for 198 methods, 21 publications, eight mounted paths and four middleware entries. The 19 export labels map to 15 registered methods with data-egress descriptors and four verified download mounts. All 22 client policy names and paths agree. This verifies the set comparison alongside the existing policy tests.
+  - [x] Match all 22 management route names and paths to the existing client presentation policy table. Eleven coarse legacy classifications differ from the precise browser navigation rules. Help is public, Profile and Audio Settings require sign-in with account scope enforced by server operations, and eight other listed routes require sign-in with operation-specific authorization. The browser baseline already asserts the complete table. No route or server permission was changed.
+  - [x] Compare the retained slot 105 method classifications with the legacy labels. All 45 administrator-only entries have an explicit administrator policy, all six public rate-limited entries have installed rate-limit descriptors, and all four generated upload names map to their maintained package owners. The 244 installed descriptors have nonempty policy and egress classifications and close over 248 verification IDs. The typed declarations and tests keep the finer role, lesson and caller scope separate from those coarse historical labels.
+  - [x] Check direct references to Meteor.methods and Meteor.publish in application server JavaScript and TypeScript, including renamed imports, aliases, literal property access and destructuring. Shadowed unrelated names are covered by a source regression. Other roots, dynamically computed dispatch, HTTP and package ownership still need their own checks.
+  - [x] Extend direct Meteor registration checks to JavaScript and TypeScript in client, common and learning-components. Computed Meteor access that cannot be resolved is now reported. Checked 218 server, 380 client, 107 common and 163 learning-component files. Package owners and other registration APIs have separate acceptance checks.
+  - [x] Check direct Meteor method/publication registration across 61 tracked Svelte components. Cover authored typed scripts, module/instance scope, template event expressions and unrelated shadowed names. The full source check still finds 306 declared surfaces.
+  - [x] Extend direct method/publication registration checks to local Meteor packages with package manifests. Require exactly one registration of the upload handler table in the maintained FilesCollection constructor. Reject additional calls and deferred references there and direct registrations in other package sources. Full lint and Linux source-security regressions passed.
+  - [x] Extend the static adapter check to WebApp HTTP stack registrations across the same source roots. Cover renamed and namespace imports, stack aliases, destructuring, unresolved computed properties and unrelated local routers. The maintained FilesCollection HTTP registration is permitted only in its existing owner method. Six focused checker tests, repository lint and the full Linux source-security suite passed. Retirement of the old checker is still open.
+  - [x] Extend the static adapter check to app-owned Accounts hooks and OAuth services. Pin and check both Microsoft package registration owners and the Accounts/OAuth package versions. Verify alias, namespace, shadowing, browser notification scope, and stray-registration cases in source tests.
+  - [x] Check direct allow/deny calls on Meteor users, locally constructed Mongo collections, and imports from the app collection owner. Test aliases, namespace imports, destructuring, and unrelated methods.
+  - [x] Separate the application/package registration-owner check from legacy manifest inference. Both the standalone ownership check and the unchanged legacy/V2 consumers use the same source traversal. Keep the manifest and legacy command until the scanner and release consumers switch to the verified evidence.
+  - [x] Reconcile the remaining manifest consumers before deletion. The V2 repository producer and the CI/local source checks still invoke the inference checker. Two optional recovery inventory commands and retained source tests also read the manifest directly. The manifest remains until their replacement evidence preserves the same scope and the deployed registry check qualifies.
+  - [x] Switch V2 surface coverage to the verified release and installed registry, exact clean scanner checkout, staging2 origin, observed platform manifest, and standalone registration check. Missing, dirty, mismatched or incomplete evidence yields an explicit `ERROR`. GitHub Security and the operator source lane use the standalone ownership check. The normal hosted full workflow needs independent release evidence before this control can pass. The retained accepted staging2 registry binding reproduced exactly.
+  - [x] Remove direct manifest reads from the two optional recovery-inventory commands and the source tests. The read-only formatter's public subject sets exactly match the 198 methods, 21 publications, eight HTTP mounts and 22 presentation routes in the legacy manifest. The two asset mounts now share their existing path values with the actual server registrations. Twenty mock-SDK and formatter tests passed. Local lint retains the old manifest parity check until the full replacement is qualified.
+  - [x] Verify the complete migration batch with full typecheck, full lint and the complete Linux source-security V2 suite. 472 passed, four skipped, zero failed. The previously accepted source evidence and 248-case registry projection remain valid for their exact revisions. No new deployment or Meteor invocation.
+  - [x] Give all 22 management routes references to their server authorization and data owners. The 164 references cover 147 distinct catalog surfaces and all resolve in the retained 244-descriptor slot 105 inventory. Navigation and access rules are preserved. The source test checks the exact catalog IDs and rejects duplicate or empty references.
+  - [x] Retire the manifest and inference command. The final comparison against slot 105's `4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63` inventory confirmed all 198 methods, 21 publications, eight app-owned mounts, four middleware entries, 19 export classifications and 22 presentation routes. The additional Meteor runtime-config mount retains its explicit framework classification. The disabled class download has an installed descriptor with no egress. The retained production projection still matches `1fec1fc446a3f370cb43cbaaa8a4e26a804c9c21689489b045f857fd35d73046`. Local lint and the existing `security:surfaces` command now use the same registration-ownership check as the operator and workflow lanes. Full typecheck, lint, the standalone ownership command and the pinned Linux source-security V2 suite passed (473 passed, four skips, zero failures). No Meteor slot was used. Exact-candidate installed and full staging2 acceptance are tracked separately.
+  - [x] Keep the checker local to each parsed source file by disabling automatic ambient package type discovery. The unchanged lint contract still covers 272 entries. Correct the stale V2 method fixture so a submitted method without a descriptor is tested as a rejection. The expanded V2 suite passed on the native Linux checkout with 468 passing, four environment-specific skips and zero failures. Its real checker comparison finished in 43 seconds across discovery and validation. Typecheck and lint passed. Both corrections concern source tooling and test evidence, so slot 103 remains the installed test for d9a01967.
+- [ ] Qualify the complete matched image and scanner on staging2, including login, ordinary learner behavior and enabled providers. The earlier condition-index cutover covered that specific change only.
+  - The operator is unaware of any complete catalog v2 report and independent readback. The prior 22-control report covers its original authentication scope. Resume at the matched release and environment evidence. The open gate requires current protected fixture and enabled-provider results for the matching v2 candidate, the independently collected complete 70-control report and its separate receiver readback, and the saved archive round trip on the key owner's workstation. Keep the current staging2 catalog active until the coordinated candidate is ready. Any changed source requires distinct exact-source proof at build time.
+  - Candidate review at `cc2429e5` confirmed that current source shares one active catalog selection between report receipt and the scanner. The earlier staging2 v2 branch at `26197f91` predates the current application changes. Reuse its accepted historical results within their recorded scope. Proposed sequence for operator review: qualify a receiver-only v2 candidate from current source in isolation, then use separately collected full report evidence for the coordinated staging2 qualification. Preserve the 70-control acceptance gate. Request a fresh Meteor invocation when an exact candidate is ready for it.
+  - [x] Phil approved receiver-first testing. Select the receiver's accepted catalog in its composition and use that same catalog for signed ingestion, persistence and latest-report selection. The normal application and scanner still use catalog v1. The isolated v2 receiver fixture proves the selected-v2 behavior with synthetic reports, including retained catalog v1 readback. Full typecheck, full lint and 73 focused Linux source tests passed.
+  - [x] Verify exact candidate `946af9ac415b105f1ed7c1fe0c0cf3f73f0410e8` with the existing pinned Docker tool image. All 35 focused receiver and report source tests passed from the candidate's tracked bytes in a disposable network-disabled container using temporary memory storage. Checked that the container was removed. The existing tool image remains reusable for Meteor.
+  - [x] Slot 107 passed on `946af9ac`. Independently matched the new HTTP/MongoDB case to its passing result in the native receipt. The isolated receiver accepted and downloaded a signed 70-control synthetic catalog v2 report, selected it as the latest full report, rejected uploads using the wrong catalog and returned the previously stored catalog v1 report unchanged. This completes the receiver-first rehearsal.
+  - [x] Compose the exact slot 107 source bundle for all 248 required cases. The installed startup registry remains byte-identical to slot 106. The production projection is `1fec1fc446a3f370cb43cbaaa8a4e26a804c9c21689489b045f857fd35d73046` and the new bundle SHA-256 is `4b36885b70952db82f9c6853dec06aa539a7d3ca21159c539c86407224674972`. Reuse this evidence for its exact source. Resume at the matched staging2 release and full-report checks above.
+
+## Phase 3 HTTP characterization started (2026-11-18)
+
+- [x] Confirm the written migration order starts with HTTP. The existing
+  registrations use the normal, raw and handlers stacks. The current source
+  manifest reports 330 surfaces. Runtime coverage remains to be measured.
+- [x] Establish the native baseline for the mounted public health route.
+  The corrected suite exercises the actual Meteor listener for GET, HEAD,
+  mounted suffixes, adjacent paths and unsupported methods. Slot 11 passed.
+- [x] Migrate the mounted public health route through the typed HTTP
+  registration adapter. It uses the catalog-owned GET and HEAD method
+  definitions and links the existing mounted-path and fallthrough evidence.
+  The manifest now records the route as public. The application handler has
+  no rate limiter. Deployment ingress policy remains a separate observation.
+  Full typecheck, lint, Linux source-security and focused catalog tests passed.
+  Slot 12 verified the four pre-migration behaviors again and checked the live
+  policy record. Both native runs passed. The third authorization remains
+  unused and is limited to a retry for this HTTP baseline/migration batch.
+
+- [x] Prepare the paired V2 audit ingestion and report download migration.
+  Both normal-stack mounts bind the original protocol callbacks directly.
+  The registry records signed ingestion, the single-use report capability
+  and the current issuing-administrator check. Full typecheck, lint, Linux
+  source-security and focused regressions passed.
+- [x] Verify the migrated audit pair in Meteor. The mounted listener tests
+  passed for both registry entries, handler-specific 404/405 responses,
+  admin-minted download and replay rejection. The full suite passed on the
+  exact source in slot 15, including signed-ingestion, retained-record and
+  SPARC MongoDB coverage. Slot 14 records the original timeout separately.
+
+- [x] Register the backup and both learner-history download mounts. The
+  original callbacks still own token consumption, issuer authorization, scope,
+  and streaming. Service and data-egress claims are explicit in the registry.
+- [x] Register the two public asset mounts on their actual raw and normal
+  stacks. Both callbacks require the existing public asset marker. The source
+  audit entry for the normal path now reflects that check.
+- [x] Register the SAML, PWA, social-preview and security-header middleware
+  with the original unmounted framework calls and handlers. The source check
+  compares explicit middleware classifications and preserves the producer
+  discovery profile.
+- [x] Run source checks for the nine-owner HTTP batch. Full typecheck, lint
+  (334 classified source entries), Linux source-security and focused tests
+  passed. The adapter test verifies the framework stack and call shape retain
+  the original callback.
+- [x] Verify the nine-owner batch in Meteor (slot 16). All seven listener
+  cases passed, including downloads, retired upload responses, SAML method
+  handling, manifest and crawler dispatch, response headers, and single
+  registration on each original stack.
+- [x] Characterize the canonical CDN ownership in native Meteor (slot 17). A
+  generated missing asset at `/cdn/storage/Assets/:id/original/:filename`
+  returned the raw application handler body. The historical staging2 upload
+  observation also attributed the canonical upload URL to that raw mount,
+  under the deployment tested then.
+- [x] Identify the two application default publications for the next boundary.
+  `serverComposition.ts` publishes the current account fields and
+  `publications.ts` publishes the current user role assignments. Each needs its
+  own descriptor and runtime verification.
+- [x] Decide ownership of HTTP download bytes under the shared CDN prefix.
+  Phil chose the application as the sole Assets download owner. The
+  `disableDownload` setting suppresses the package HTTP binding for Assets
+  while leaving its DDP methods registered. The public marker and the
+  session-owned SPARC figure exclusion now run together on both app mounts.
+- [x] Review the asset URL producers. The package link helper and the app media
+  references generate `/cdn/storage/Assets/:id/original/:filename`.
+  The existing short CDN and `/dynamic-assets/:id` paths use the same
+  stored original. Raw dispatch, storage and filename handling are preserved.
+- [x] Align the static source checker and V2 source-evidence inventory.
+  Discovery had omitted the four classified middleware while the verifier
+  counted them. Both now include the same six categories, with the V2
+  parser requiring the complete inventory and matching total.
+- [x] Verify generated and existing URLs, private-file denial, the retired
+  upload response and DDP continuity in Meteor (slot 18). Real listener
+  checks passed for package-generated and encoded-name links, both short
+  mounts, explicitly private/unmarked assets, and session-owned SPARC
+  figures. The download-disabled test collection has no package HTTP
+  handler, and the registered DDP start/write/finish/abort tests passed.
+- [x] Prepare an exact staging2 candidate from accepted 93b7d444 without
+  bringing over unrelated changes on main. Release branch bd3520f2 applies
+  the sole download owner and keeps the deployed storage and catalog path.
+  Source gates and Meteor slot 19 passed.
+- [x] Verify and accept the staging2-only download release bd3520f2.
+  The canonical captured-source Compose build matched slot 19 in-image.
+  Registry digest sha256:4b6938772851da10920bfff2d1c474fff92ac353dcc33053725f57ca14560298;
+  config digest sha256:90224d4aac9a424856ef9113e55c34f0ffb08773920d07cae0a70c72c757f1a1.
+  Live Chrome completed two synthetic DDP uploads. All four public
+  URL forms returned matching bytes; the four private requests returned
+  404, retired HTTP upload returned 410, and fixture/session cleanup passed.
+  The ordinary learner survived reload with the same identity and role.
+  The first finalization submitted an untagged image value and the saved
+  93b7d444 app/environment/receipt were restored and verified healthy.
+  A corrected record passed preflight; the exact candidate was reapplied
+  after restoration and previously measured browser evidence was reused.
+  Actual running image, protected V2 receipt MATCH, public HTTPS and
+  unchanged Apache configuration and service identities were verified.
+  The new authoritative record digest is 973263c4be589e6f3973818663d7faa9ee61cffc3893bc36f9bb80bc94d511ec.
+  Protected evidence: staging2-assets-bd3520f2. The prior image and
+  protected deployment configuration remain available for rollback.
+- [x] Bind the framework runtime-config hook at its existing awaited
+  startup call. Meteor still owns the script response. The descriptor
+  records external same-origin configuration and the matching listener case.
+- [x] Bind both application default publications to distinct descriptors.
+  The account projection and role assignment selectors keep their existing
+  subscription context, automatic delivery and readiness behavior.
+- [x] Verify these three framework/default bindings in native Meteor (slot
+  20). The listener followed the same-origin runtime-config script. The
+  registered publication callbacks exposed only the current synthetic account
+  projection and role assignments and preserved anonymous behavior.
+  Full typecheck, lint (335 classified source entries) and the affected
+  Linux source-security, catalog and Phase 0 regression tests passed.
+- [x] Identify the four generated Assets DDP names and their source owner.
+  The maintained ostrio:files constructor registers Start, Write, Abort and
+  Remove. Write handles both chunk and finish. The application config
+  disables client Remove and package HTTP downloads; the DDP Remove name
+  is still registered and must be represented as denied.
+- [x] Bind the generated Assets methods to the maintained package owner.
+  The package records the original four handlers after registration. The
+  application compares exact handler identities in Meteor and returns an
+  explicit unavailable result for a mismatch. Client removal continues
+  to be registered but disabled. The source proof tests genuine and
+  mismatched ownership without executing upload handlers.
+- [x] Verify the four generated Assets bindings in native Meteor (slot 28).
+  The real registry contains exactly the four expected handler identities
+  from the maintained package. The registered Remove method still returns
+  405. Typecheck, lint, source-security and ownership/catalog checks passed.
+- [x] Trace the next application method owner. The three V2 admin audit
+  methods use the receiver for administrator authorization before report
+  lookup or download issuance. Its existing native tests cover registered
+  denials, positive report readback and V1 record preservation.
+- [x] Add runtime descriptors for the V2 admin audit method family.
+  All three descriptors carry the shared receiver administrator policy and
+  describe their distinct egress: report list, report summary or single-use
+  download capability. The method adapter retains the exact registered
+  handlers and checks their identity in the live Meteor method table.
+  Typecheck, lint (337 classified surfaces) and source-security checks passed
+  with 441 passes, seven skips and zero failures.
+- [x] Verify the three V2 admin audit method bindings in native Meteor (slot 29).
+  Exact registered handler identity, anonymous and unknown-user denials,
+  successful report readback, single-use download and V1 preservation passed.
+- [x] Trace the deployment-readiness method as a subsequent registration.
+  Its anonymous and non-admin denials use distinct existing error messages
+  and precede deployment diagnostics. Factory tests cover both denials and
+  the admin result. Preserve that ordering and the readiness payload.
+- [x] Bind the deployment-readiness method to its existing administrator policy.
+  Both denial messages and the diagnostics payload are preserved. Typecheck,
+  lint and Linux source-security checks passed (441 passes, seven skips).
+- [x] Verify the readiness binding in native Meteor (slot 30).
+  The actual method identity, distinct authorization denials and existing
+  supported positive diagnostics fixture passed.
+- [x] Trace the eight admin backup methods as the next registration family.
+  The factory owns their shared administrator decision. It precedes argument
+  and confirmation validation, unblocking, job reads and service operations.
+- [x] Bind all eight admin backup methods to the shared factory policy.
+  Preserve validation and unblocking order, actor context, and configuration,
+  job-metadata and one-use download egress. Typecheck, lint and Linux source
+  checks passed (453 passes, seven skips), including Phase 0 ordering parity.
+- [x] Verify the backup bindings and disposable archive fixture in Meteor (slot 31).
+  All eight handler identities and registered denials passed. The synthetic
+  archive exercised authorized configuration, create, list, get, verify,
+  one-use download issuance and deletion. Restore confirmation and the
+  existing synthetic restore-service check passed.
+- [x] Trace the five administrator brand-profile methods as the next family.
+  Keep authorization before reads, JSON parsing, saving and publishing,
+  and retain the existing metadata redaction in exported drafts.
+- [x] Bind the five brand-profile methods to their shared administrator policy.
+  Distinguish draft, published profile and redacted export egress. Typecheck,
+  lint and Linux source checks passed (453 passes, seven skips), including
+  guard order, allowed source fixtures for each operation and export redaction.
+- [x] Verify the brand-profile method bindings and guard behavior (slot 32).
+  All five installed handler identities and corresponding denials passed.
+  A synthetic admin could read and export the draft, and invalid JSON was
+  rejected before storage was changed.
+- [x] Trace the filename TDF reference migration method for the next binding.
+  Authentication and administrator checks precede bounded options validation.
+  Preserve default dry run, explicit write confirmation, fingerprint checking,
+  conflict handling and the bounded report.
+- [x] Bind the filename TDF reference migration method to its administrator
+  policy and bounded report. Typecheck, lint and Linux security source checks
+  passed (453 passes, seven skips).
+- [x] Verify the migration binding and synthetic migration fixtures (slot 33).
+  Exact handler identity and both authorization denials before validation
+  passed. The disposable fixture preserved default dry run, bounded report,
+  reviewed fingerprints, repeat safety and write-conflict rejection.
+- [x] Trace the three condition-count methods as the next owning family.
+  Replacement uses the existing study-access gate and requires owner/admin
+  on the block-allocation path. Increment retains the study-access gate and
+  the exact assigned-condition check for the later block milestone. Reset
+  requires the owner or admin. Existing tests exercise these distinctions.
+- [x] Bind all three condition-count methods to their existing policies.
+  Preserve validation order, study access, owner/admin gates and exact
+  saved-condition enforcement.
+- [x] Bind the four adjacent history-download methods to their current
+  session, ownership and exact study-scope policies. Class export stays
+  disabled and the other methods issue the existing download capabilities.
+  The combined source batch passed typecheck, lint and Linux checks
+  (453 passes, seven skips, zero failures).
+- [x] Verify both analytics families in one exact-source Meteor run (slot 34).
+  All seven installed handlers matched their policies. Assigned-condition
+  acceptance and denial, disabled class export, ownership, ordinary/participant
+  session boundaries, and existing download regression cases passed.
+- [x] Bind the two recoverable-warning methods and five simulation telemetry
+  methods to their existing policies. Preserve study-only diagnostic
+  suppression, projected admin warning reads, exact lesson and package
+  checks, attempt-owner enforcement inside services and admin trace exports.
+  Typecheck, lint, Linux audit source checks (453 passes, seven skips) and
+  all 16 existing simulation source tests passed.
+- [x] Verify the warning and simulation telemetry families together (slot 35).
+  Exact registered handler identity, private participant warning suppression,
+  denial of non-owner attempt writes, and admin-only trace export passed.
+- [x] Trace experiment entry as the next method family. Preserve passwordless
+  progress-backed return, credentialed entry, scoped reconnect and public demo
+  behavior. Record observed DDP limits without adding new study restrictions.
+- [x] Bind four installed experiment entry methods to their existing admission
+  policies. Passwordless progress return, scoped reconnect, the credentialed
+  handoff and public demo retain their current scope, tokens and errors. Share
+  the demo limit (10 per connection per hour) with the actual DDP rule. Record
+  the absence of a dedicated DDP rule for the other three. Typecheck, lint and
+  Linux audit source checks passed (453 passes, seven skips).
+- [x] Verify experiment entry in Meteor (slot 36). The four installed handlers
+  and rate-rule observation passed, as did the existing real-Mongo passwordless
+  return and different-study denial cases.
+- [x] Trace the adjacent Prolific method family. Preserve public participant
+  entry and resume, authenticated completion, and the existing admin/teacher
+  role gate, per-action limits and service-owned study restrictions.
+- [x] Bind all 16 Prolific methods to their existing participant/researcher
+  authorization and preserve the existing projected service results.
+- [x] Retire the unused assignable-lesson method with Phil's approval.
+  The course workflow removed its last tracked caller in 320fbb7e. There were
+  no remaining tracked callers in the app, wiki or config repository. Remove
+  the method and manifest entry together. Typecheck, lint (336 surfaces),
+  Linux audit source checks (453 passes, seven skips) and all 50 synthetic
+  Prolific checks passed.
+- [x] Verify Prolific binding and lookup retirement together (slot 37).
+  All 16 installed handlers retained participant/researcher access boundaries.
+  The retired method was absent from the actual handler table, and the owned
+  lesson and accessor readers remained registered.
+- [x] Apply the approved all-or-nothing lesson-sharing design. The owner check,
+  family validation, authorized lesson changes and user references share one
+  MongoDB transaction. Children belonging to other owners remain excluded.
+- [x] Verify installed sharing-method identity, owner authorization, rollback
+  after a late child write failure, grants and revocations on the Linux worker.
+  Slot 38 passed the named case, including exclusion of a different owner's child.
+- [x] Limit the owner-facing accessor lookup to user ID and display username.
+  Bind both accessor reads to their existing owner check.
+- [x] Verify both installed lookup responses and owner checks on the isolated worker.
+  Slot 39 passed the named case for both methods.
+- [x] Reject the whole recipient lookup for sharing or transfer when a requested
+  identifier matches distinct accounts. Repeated aliases of one account still resolve.
+- [x] Verify the installed owner-only resolver and ambiguous single- and multi-recipient requests. Slot 40 passed the named case including both input orders.
+
+The five-run allowance covered 18 existing administrator methods across five
+owning families. Remaining method and framework bindings, full registry
+coverage, composition sealing and Phase 3 staging qualification remain open.
+
+## Phase 3 named publications (2026-11-19)
+
+- [x] Characterize ten existing named publications in native Meteor (slot 21).
+  Public branding, signed-in dashboard/log/audio, and admin settings/user
+  snapshots kept their existing DDP names, cursor/event shapes, denied
+  readiness, ownership projections and audio initialization.
+- [x] Verify the ten typed bindings and authorization in native Meteor (slot 22).
+  The original three behavior groups and the distinct registration test passed.
+  The equivalent entry guard now runs through the policy descriptor. Existing
+  egress projections, initialization, role checks, and denied readiness match
+  the baseline. Exact-source typecheck and lint passed (335 classified surfaces).
+  Linux source, compatibility and catalog checks passed (633 passes, ten skips).
+
+- [x] Approve requiring a signed-in session at the learner-progress publication.
+  The passwordless return still provisions the existing pseudonymous account
+  session before progress is requested. The change is at the read boundary.
+- [x] Verify logged-out readiness, own progress, and progress-backed return
+  in native Meteor (slot 23). Logged-out requests complete synchronously
+  without a cursor. Four signed-in actors receive their own rows. The
+  multi-lesson case and the existing passwordless provisioning test, extended
+  to read the returned account's saved progress, both passed. Full typecheck,
+  lint and the affected Linux source, compatibility and catalog checks passed.
+
+- [x] Trace the study-bound session added by the participant privacy work.
+  An ordinary account can enter a credentialed study through a separate
+  study-bound connection. The application keeps its existing passwordless
+  return through the participant session binding.
+- [x] Approve the study scope and preserve progress-backed passwordless return.
+  Study sessions are limited to the canonical study and its condition lessons.
+- [x] Implement the bound-study selectors for saved state, recent lessons,
+  progress signals, lesson-level history and state-returning writes.
+  Account-wide dashboard, course summaries and exports require ordinary
+  sessions. A lesson export must also satisfy the existing owner checks.
+  A standalone progress row for a condition shared by multiple roots has no
+  unique study assignment in its stored key. Scope excludes that row and
+  continues to include the bound root and its root-keyed assigned progress.
+- [x] Verify passwordless return, scoped reads and same-user subscription
+  recomputation on a real DDP connection (slot 24). The same synthetic
+  account retained its root and unique condition rows on study sign-in.
+  The active subscription removed out-of-study and shared-condition rows.
+  Direct methods, recent history, state-returning writes and account-wide
+  dashboard/export gating passed. Exact-source typecheck, lint and affected
+  Linux source-security, runtime semantics and catalog checks passed.
+- [x] Confirm that each condition TDF belongs to one study root. Reusing
+  lesson content in another study requires its own condition identity.
+  The defensive read rule covers inconsistent references and does not
+  imply support for shared-condition progress storage.
+- [x] Trace TDF condition writers and their persistence ordering. Both ZIP
+  upload and private-repository import write canonical condition IDs.
+  Per-root revisions cannot serialize writes by two different roots.
+- [x] Implement shared package identity preflight. Reject a child claimed
+  by multiple incoming roots or already referenced by another persisted
+  root. Allow same-root updates and copies with new condition identities.
+  Confirmed ZIP updates rerun the same check before content writes.
+- [x] Verify package preflight and candidate database uniqueness on the
+  isolated Meteor worker (slot 25). A conflicting ZIP was rejected before
+  its mutation job or content writes. Same-root updates and distinct
+  copies passed. In a disposable Mongo collection, the candidate partial
+  unique index permitted only one of two competing root writes and did
+  not install over existing duplicate references. Full typecheck, lint,
+  affected source-security and exact-source Meteor checks passed.
+  Deployment database inventory, end-to-end competing upload recovery,
+  and activation of the database constraint remain open.
+- [x] Approve job-owned rollback followed by staging2 qualification of
+  MongoDB condition-root uniqueness, then a count-only production
+  preflight at cutover. Preserve existing assignments and progress.
+- [x] Verify the focused rollback ownership cases locally. A competing
+  job that reached the same revision is preserved. An owned write is
+  restored only with a matching job ID and revision. Mismatched revisions
+  and legacy interrupted jobs without ownership proof are retained for review.
+- [x] Move the approved condition visibility enforcement into the child
+  TDF write that records the writer job. Preserve both reference checks
+  and the root-based learner access policy. Use the same ownership-aware
+  TDF restore for upload failure and startup recovery. Keep interrupted
+  legacy jobs without write ownership evidence for review.
+- [x] Verify full package rollback and visibility in Meteor (slot 26).
+  The real package-method cases passed against isolated MongoDB for public
+  and private roots in both archive orders. Conditions retained restricted
+  standalone visibility and access through the root. The failure case
+  preserved the competing writer and startup recovery passed. Exact-source
+  typecheck, lint and the affected source-security checks also passed.
+- [x] Verify the operator script in disposable MongoDB. Its read-only run
+  counted a synthetic shared ID, and apply refused without changing the two
+  existing rows. On clean data it installed the index. Two competing
+  inserts produced one success, and standalone lessons remained accepted.
+- [x] Qualify the count-only check and named partial unique index on staging2
+  after rollback integration. See the accepted 26197f91 cutover and protected evidence below. The operator script requires an
+  explicit database name and an explicit apply flag. It refuses to install
+  over shared condition IDs or invalid IDs, without editing the records.
+  Production inventory and any index installation remain at cutover.
+  The accepted staging2 baseline bd3520f2 and the verified main source
+  differ across 372 paths. Preserve the audit-only staging2 release scope
+  and qualify the exact staging candidate separately before deployment.
+- [x] Prepare the scoped staging2 package candidate on the existing
+  audit-only branch. Commit 26197f918218a5dae429de91bc9ab5fe73b623c4
+  backports the upload fixes, tests, classifications and operator index
+  script into bd3520f2. Full typecheck, lint (330 classified surfaces)
+  and source-security/catalog checks passed. The staging Git tree matched
+  the clean Linux source used for those checks.
+- [x] Run the count-only check on the healthy staging2 application database
+  using the existing pinned operator connection. The result was zero shared
+  condition IDs, zero invalid IDs and index absent. Production was outside
+  the operation. Repeat these counts at the index activation window.
+- [x] Verify exact staging2 candidate 26197f91 in native Meteor (slot 27).
+  All public/private package-order, parent visibility, failed-upload
+  ownership and restart recovery cases passed. The pure harness passed
+  26 tests separately. Slot 26 qualified main only.
+- [x] Build and publish staging2-only 26197f91 through canonical Compose.
+  Verified the already-built image against slot 27 source. The first local
+  observer lacked a dependency and the first WSL registry push was denied.
+  Dependency-backed observation and the existing Windows registry sign-in
+  recovered the same image without another build or Meteor invocation.
+  Registry digest sha256:bae0588676e9060b5bd2d343cf3b0d0c0509076b51716b19cb2ac49f43eea7fc;
+  config digest sha256:2ab2e4c29d3b814ebcdfa04ef4379f05a9db0a69c46107bfa0b75d65886c3dcd.
+- [x] Qualify and accept the staging2 application and condition-root index.
+  The first controller invocation stopped before changing the app or data
+  because mongosh returned a display object. The corrected JSON formatting
+  passed in disposable MongoDB before the same guarded cutover resumed.
+  Two live browser upload confirmations competed for the same synthetic
+  condition. One completed, one returned an explicit conflict. The winning
+  root, child, and visibility were correct. The exact fixture namespace and
+  IDs had zero lesson rows, completed assets and pending uploads afterward.
+  The healthy running image, installed index, zero shared/invalid condition
+  IDs, and protected V2 receipt MATCH were verified. The previous image,
+  environment and receipt remain available. Mongo/Redis service identities
+  and Apache/audit configuration were preserved by the controller.
+  The new authoritative record digest is fb966fe10358ca739b15db3683d922709529dba8d6087de0f9f4f1976e1a02d1.
+  Protected evidence: staging2-packages-26197f91.
+- [ ] At production cutover, perform the separately scoped count-only
+  check before considering the index. Preserve any conflicting existing
+  records for review. Production was outside this staging2 operation.
+
+## Staging2 reset-expiry qualification resumed (2026-11-18)
+
+Phil confirmed P1-04 remains at the coordinated production cutover and
+authorized resuming Phase 2 on staging2.
+
+- [x] Transfer and verify the tested 4af84705 connection image and source
+  archives. Install image e7513598... on staging2. The installation receipt
+  confirms health, authentication required, the existing grant preserved,
+  unchanged HTTPS configuration and other containers, and the previous image
+  retained for rollback. Receipt: /opt/mofacts-audit-connection/recovery/expiry-4af84705/outcome.json.
+- [x] Stage the checksum-verified worker and read-only observer from 4af84705.
+  The exact observer confirmed no account or reset records for either synthetic
+  preflight address. An initial noncanonical diagnostic request was rejected.
+  The same read-only observation passed using the canonical payload format.
+- [x] Publish private plugin 0.1.4 after Phil explicitly approved the archive
+  upload and persistent update. Readback confirmed the two-account instructions
+  and existing private audience (release pluginrel_6afdb106be40819187657876624e9396).
+  The earlier automatic review rejection preceded this explicit approval.
+- [x] Recover the first live attempt after the launcher called the earlier
+  cleanup-only observer for the age operation. Verification and reset mail
+  carriage passed. Independent account/reset-state and session cleanup passed.
+  The connection's read-only lease mount rejected release. The scanner recovered
+  the exact lease after proving the worker was absent, and the channel returned
+  to idle. The launcher now calls the age-capable observer. Private failed run:
+  connected-expiry-20261118-08b6bca6d92c.
+- [x] Start the corrected live run and pass normal verification and mail
+  carriage for both disposable accounts. Both fresh age observations showed
+  owned, unused tokens with a 3600000 ms lifetime. Private run:
+  connected-expiry-20261118-d69a2503d8e8.
+- [x] Pass the native elapsed-hour expiry test. The read-only observer confirmed
+  an owned unused token after 3601169 ms, 1169 ms past its stored expiry.
+  The native reset rejected it by policy and the original password still worked.
+  Current reset, replay denial, session revocation and lifetime bounds also passed.
+  Both accounts and their reset records were independently absent. Operator
+  session cleanup passed. Host checks confirmed worker and lease absent, mail
+  connection idle, services healthy, and other containers and HTTPS unchanged.
+  P2-08 is complete. One Meteor invocation remains.
+
+### Passwordless return qualification continuation (2026-11-18)
+
+- [x] Verify staging2 application identity, health and the existing fixture window.
+- [x] Diagnose the first preparation failure. The application's container checksum
+  utility does not accept the GNU-specific quiet flag. The window stopped before
+  any fixture call. Retain the original attempt and its recovery marker.
+- [x] Correct the window to suppress successful output while preserving checksum
+  validation and failure status. The command passed against the exact staged
+  archive and rejected an intentionally wrong checksum on staging2.
+- [x] Recover the original empty window. Its archive also omitted the shared
+  ingestion constant imported by the fixture runner. Verify that exact missing
+  dependency from the recorded revision and independently check the namespace
+  is empty before releasing the original window. Preserve the original archive
+  and failed results. The window now stops on a failed storage subprocess before
+  parsing its output.
+- [x] Qualify passwordless return in a fresh window from 06f10726. All twelve
+  controls passed, with all five positive baselines and verified save/reload.
+  The participant had owned progress and no explicit experiment flag. The
+  assigned target was sealed on native return and a different target was
+  rejected. The two synthetic accounts and fixture records were removed,
+  namespace absence was independently checked, and the window was released.
+  Staging2 remained healthy. Evidence: progress-return-20261118-af01468d8c7f.
+  This supports the next catalog's progress-backed eligibility claim. Keep
+  the historical flag title and published catalog immutable.
+- [x] Qualify the connection-based login throttle on staging2. Source a289bd70
+  reuses the same evaluator for staged and complete results. A fresh anonymous
+  browser connection used distinct synthetic identifiers and received the
+  exact connection-level denial on attempt 10. The positive login baseline,
+  connected transport, namespace absence and window release passed. The
+  protected receipt is connection-throttle-20261118-525df0804a38. Full lint and
+  all five focused source tests passed. No Meteor invocation was used.
+- [x] Qualify the identifier and IP throttles independently on dedicated staging2
+  from cd882d1a. The identifier was denied on attempt 9 with its own lock active
+  and the IP counter still below threshold. After the real cooldown, the IP
+  was denied on attempt 21 with fresh connections and distinct synthetic
+  identifiers. The read-only observer matched the actual test source and
+  confirmed prior attempts aged out without editing throttle state. Both
+  scopes passed, namespace absence was checked, both authentication leases
+  were absent afterward, and the app remained healthy. Protected evidence:
+  identifier-ip-throttle-20261118-8c6ac142868f. All 12 focused tests, observer
+  lint and Bash syntax passed. No Meteor invocation was used.
+- [x] Qualify live login and reset response and timing comparisons on staging2
+  using b363959c. Five login pairs and two reset pairs matched public responses.
+  Paired median gaps were 121.6 ms for login and 67.3 ms for reset, within the
+  approved bounds of 640 ms and 800.7 ms. The owned account and reset records
+  were independently absent. Session cleanup passed, the connection returned
+  to idle, both leases and the worker were absent, and the expected app image
+  remained healthy. Protected receipt: connected-comparison-20261118-af036b05e24c.
+  The earlier launch stopped at operator login during the IP cooldown, before
+  fixture creation. Its observer path also had a syntax error. The corrected
+  observer confirmed both exact identities absent before retry.
+- [x] Assemble and validate the 22-control authentication qualification from
+  eight protected receipts with 39827938. Results: 22 PASS, zero FAIL, zero
+  ERROR. Freeze the candidate v2 catalog in the evidence directory and retain
+  the released v1 catalog and its ingestion behavior. The candidate uses a
+  distinct experiment-eligibility control for the approved progress-based
+  policy and retains the historical literal flag control in v1.
+  Protected evidence: authentication-qualification-20261118.
+  Artifact SHA-256: 87bcf22f63dc24155144b6055154dad6a291d17f8598a54b27304492328e8952.
+  Full lint and 27 focused tests passed. No Meteor invocation was used.
+- [x] Independently qualify the exact catalog-complete authentication section
+  through one integrated staging2 run. The earlier assembled receipts remain
+  historical evidence. The coordinated receiver cutover above is tracked
+  separately from this authentication-section qualification.
+
+## Checklist reconciliation (2026-11-18)
+
+Phase 0 is closed. Phase 1 has 16 of 17 deliverables accepted. Its remaining
+production recording gate (P1-04) belongs to the coordinated final cutover.
+At this review, Phase 2 had five of 13 deliverables checked in the worklist below. Phases 3
+and 4 still await their exit evidence. The November 16 execution stop was in effect at this review. The November 18
+resumption and current gates are recorded above. This review compared committed
+source, dated test results and the
+saved qualification receipt without running a new test.
+
+At this review, P2-08 still needed staging2 evidence of real elapsed-hour expiry
+and independent cleanup. The resumed qualification above records its acceptance. The receipt for the current reset already confirms cleanup
+and explicitly leaves the overall audit incomplete. After the remaining protocol
+families are wired, the authentication report must cover all 22 controls without
+fixture errors. Weekly unattended execution and failure reporting need their own
+evidence. Preserve the accepted progress-backed passwordless return behavior.
+
+## Operator-requested stopping checkpoint (2026-11-16)
+
+Phil explicitly requested a logical stopping point and no further execution.
+No new audit run, installation, permission request or continuation is pending.
+
+- [x] Normal verification and current reset/session live qualification passed,
+  with independent fixture/reset-state/session/lease cleanup and unchanged
+  existing services. Accepted evidence and earlier preparation failures below
+  remain distinct. No live account or audit lease remains from that run.
+- [x] Coupled unused-expiry source is committed/pushed as 4af84705. Full lint,
+  438-case source gate (431 pass, zero failures, seven skips), affected tests
+  and explicit optional lint pass. No Meteor invocation consumed; one remains.
+- [x] Build exact optional candidate e7513598... from 4af84705; all 29 actual-image
+  connection tests pass. Retain the qualified installed d6eb31b8... candidate.
+- [x] Stop the pending public candidate transfer at the operator's request.
+  Its owned upload directory is /var/tmp/mofacts-connection-upload.8tXbWoWB;
+  do not assume a complete archive or transfer acceptance. Existing local
+  checksum/source/image receipts are retained for an explicit future resume.
+- [ ] Optional expiry candidate installation and plugin 0.1.4 publication have
+  not run. The installed plugin remains 0.1.3, with the existing grant preserved.
+- [ ] No real aged-token test has started. The native elapsed-hour gate, remaining
+  protocol families, complete no-ERROR authentication artifact and later phases
+  remain open. Phase 2 and the coordinated production gate are not complete.
+
+Four unrelated untracked production drafts are preserved and excluded. No
+production access or changes, private-key reads, new mail grants or spending.
+Resume only on Phil's direction, using this checkpoint and the sole run ledger.
+## Live tools and scanner-side connection qualification (2026-11-16)
+
+- [x] Inspect the connected native app: exactly one read tool and two mail-handoff
+  tools are listed. Use its supported Try in chat launch with the app attached.
+  Actual cloud execution shows the Auditing Connection Status tool trace and
+  returns state idle, auditExecutionComplete false. The local conversation still
+  lacks those tool definitions; do not infer live execution from an installed skill.
+- [x] Qualify restart of only the installed optional connection image 02d1d42d...,
+  after verifying no active scanner lease or handoff. Health and unchanged grant
+  metadata pass; all five other containers and qualified configuration hashes
+  remain unchanged. Stored metadata shows two refresh records, one spent: actual
+  refresh had occurred. The later post-restart cloud gate is checked off below.
+- [x] Implement scannerClient.mjs with the existing connected-Gmail parser and
+  authentication lease owner. No second lock, mailbox credential or transport
+  permission is introduced. Wait for cloud-reader readiness before invoking a
+  scenario; retain the original delivery deadline and exact namespace. Independent
+  cleanup runs after a scenario error; unverified cleanup retains lease and marker.
+- [x] Sixteen real Unix-socket cases pass on pinned Linux Node 24.22.1, including
+  metadata/body carriage, ownership, readiness, timeout, malformed/oversized peer,
+  foreign target, socket-link denial and lease composition. The full affected
+  connection/mail/reset/lease set passes 54/54. Full application lint/330 surfaces
+  and explicit adapter lint pass. No TypeScript app change or Meteor invocation.
+- [x] Broader source-security passes directly on approved Linux: 172 cases,
+  169 pass, zero failures, three skips. Preserve the restricted Windows failure
+  when its Bash test could not access WSL, and the later execution-tool stall
+  which never started the process. The supported Linux run exited zero.
+- [x] Actual cloud-scheduled status execution passed. The late-displayed result
+  reports idle/false; existing Apache log metadata corroborates successful MCP
+  calls at 16:16:52 UTC (10:16:52 CST), after the restart receipt at 16:03:40 UTC.
+  The nominal 10:15 occurrence was delayed 112 seconds; no on-time SLA is claimed.
+  Refresh state increased from two records/one spent to three/two, confirming
+  renewed access after restart. No token, IP, headers, mail or body retained.
+- [x] Preserve the earlier uncertainty: the result was not initially visible.
+  Run now later displayed the same execution time and is not counted as a second
+  independently verified call. Pause and verify the redundant 10:45 retry; no
+  recurring qualification task or production scheduler is enabled.
+- [x] Build the committed optional candidate 993ade91 with exact engine image
+  0d0e00f0... on Linux/amd64. All 26 actual-image connection/adapter cases pass.
+  The installed connection stays on its qualified 29f7a98a image; this is prepared
+  scanner source, not an application deployment or full scanner acceptance.
+  Private evidence: phase1-20261105/staging2-live-tools-20261116.
+- [ ] Real exact-recipient Gmail carriage, scanner integration, scheduled mail access,
+  failure alerts and complete authentication coverage remain.
+  Preserve progress-backed passwordless access and the coordinated production gate.
+
+### Offline-key policy approved and implementation continued (2026-11-16)
+
+- [x] Phil approves the offline-key approach. Update Section 0 of the written plan,
+  the archive policy and operator/design guidance. The private key stays in its
+  approved Desktop custody; actual decrypt/digest checks remain required at
+  qualification, after key/encryption changes and in recovery tests.
+- [x] Reuse accepted November 12 key evidence. The saved public PEM matches its
+  accepted SPKI-DER SHA-256 fingerprint; no private-key read, key generation or
+  repeat setup test. Reuse established publicKeySha256/reportBytesSha256/
+  encryptedBytesSha256 names rather than adding parallel checksum concepts.
+- [x] Implement pinned archive writes, bounded saved-byte readback, exact receiver
+  comparison and gated cleanup. Archive envelopes opt into a finite larger read
+  bound; ordinary reports retain their existing 2-MiB limit. No offline-key
+  operation is claimed by these recurring receipts.
+- [x] Add the existing-admin protected single-report browser reader. No report
+  listing, new account, endpoint or permission. Check identity, origin, download
+  hash, stream bound and strict V2 report parsing. Failures expose fixed errors.
+- [x] All 30 focused integrity/reader/retention/operator cases pass on Linux,
+  including corrupt archive, wrong pin, missing/foreign readback and refused
+  cleanup. Full lint/330 surfaces passes; the complete V2 source gate has
+  403 passes, zero failures and seven platform skips (410 total).
+- [x] Publish verified source 25e26a42 and qualify one fresh synthetic ERROR
+  report on staging2 through encryption, single upload, actual protected download,
+  exact comparisons and owned plaintext cleanup. This is workflow proof only,
+  not full/exposure security coverage, Gmail carriage or production acceptance.
+  Actual protected JSON download matches the exact source; accepted key pin and
+  saved encrypted bytes verify. Both temporary plaintext files are absent, the
+  encrypted report/receipts remain, and operator logout/context cleanup verifies.
+  No private key was opened. Private evidence: offline-key-20261116-4d948fc20bb4.
+- [x] Correct the tooling preflight: root with capabilities dropped could not
+  traverse the worker's private runtime home and resolved the base image's older
+  Node. That was an operator-profile error, not a stale cached worker. Correct
+  UID-2000 probes on the current local and existing staging2 image verify Node
+  24.22.1 / Playwright 1.60.0. The intervening rebuild was unnecessary; retain its
+  build log and failed root-profile assertion. No permissions were relaxed, no
+  additional dependency was needed and no Meteor integration invocation occurred.
+- [x] Actual anonymous Chromium on staging2 passes with the existing exact image
+  14819297... and documented UID 2000, read-only root, dropped capabilities,
+  768-MiB memory/swap cap, 0.5 CPU and 192 PIDs. Public getAuthClientConfig returns
+  allowPublicSignup true and requireEmailVerification true. No login, account
+  creation, mail request or private-data read in that preflight.
+- [x] Qualify remote browser tooling and real connected-Gmail carriage through
+  the owned scanner lease/channel (accepted live qualification below). Full scanner/protocol integration remains open.
+
+### Maintained reset worker and normal verification prerequisite (2026-11-16)
+
+- [x] Prepare currentResetBrowserV2.mjs: two independent ordinary-account sessions,
+  existing native reset/replay/password probes, both old-session method/resume
+  observations and owned context cleanup. Cloned sessions cannot satisfy baseline;
+  a cleanup failure cannot become verified by repeating close.
+- [x] Prepare connected-reset-worker.mjs with private bounded control frames.
+  Credentials arrive only after the held lease/cloud readiness. Only the ordinary
+  fixture reaches the worker; admin/database/provider/signing keys remain absent.
+  Owned cleanup verification precedes lease/marker release. Malformed/EOF/failed
+  callbacks expose fixed diagnostics and cannot emit a completed lifecycle.
+- [x] Thirteen new worker/browser cases pass. Complete V2 scanner gate: 423 cases,
+  416 pass, zero failures, seven platform skips. Full app lint/330 surfaces and
+  explicit worker lint pass. No app TypeScript/server-surface change or fresh
+  Meteor invocation; the sole allowance still has one invocation available.
+- [x] Prepare concrete review: deploy/security-audit/connected-reset-qualification.md.
+  Actual email-verification-required setting means a new unverified ordinary
+  fixture cannot provide the reset test's positive login baseline. Preserve that
+  setting and progress-backed passwordless behavior. The existing bridge accepts
+  reset mail only; it does not already authorize/validate a verification capability.
+- [x] Fixture policy resolved: normal verification of the exact disposable
+  staging2 fixture is a routine prerequisite covered by standing authorization.
+  Phil explicitly directs proceeding on 2026-11-16 without another test-email
+  question. Preserve global verification and progress-backed passwordless access.
+- [x] Prepare narrow verification-purpose parsing and private carriage, one-way
+  same-recipient verification/reset windows, native Accounts verification with
+  identity/address checks and logout, and content-free worker setup receipts.
+  Full lint/330 surfaces and the V2 source gate pass: 428 cases, 421 pass,
+  zero failures, seven skips. The separate connection/worker set passes 35/35.
+  Correct its test restart race by awaiting the owner's durable scanner-idle
+  event; the initial failed store read is retained in the diagnostic transcript.
+  No app TypeScript/server-surface change or Meteor invocation. Live mail and
+  installation remain pending and are not represented by these source checks.
+- [x] Publish e855b669 and build exact optional connection image d6eb31b8...
+  (Linux/amd64); all 28 actual-image connection tests pass. Install only that
+  service on staging2, preserve the saved grant byte-for-byte, retain previous
+  image/configuration, and verify health, required authentication, unchanged
+  HTTPS configuration and unchanged other containers. Recovery receipt:
+  /opt/mofacts-audit-connection/recovery/verification-e855b669/outcome.json.
+- [x] Update the same private USER plugin to 0.1.3 using the plugin-update skill,
+  preserving its registered app ID, connection, presentation and audience.
+  Read back the saved verification-purpose skill and existing app binding.
+  This is installed tooling, not real Gmail carriage evidence.
+- [x] Prepare a narrow read-only reset-observe operation in the existing root
+  fixture runtime. It checks the exact owned account/time/email tuple and counts
+  only reset records for that ID/address; no password/token document is read.
+  Five focused tests pass. Live cleanup still requires an independent observation.
+- [x] Qualify actual connected Gmail verification and reset carriage directly in
+  this conversation after the registered tools became available. Exactly one
+  metadata-selected full message per purpose passes the original recipient,
+  ingestion-time, MIME, origin and capability checks. No raw body/capability file,
+  IMAP credential, private-key read or application authentication change.
+- [x] Source 86ba0c60, existing remote tool image 14819297... / UID 2000, and
+  installed optional connection image d6eb31b8... complete native verification,
+  all three current-reset cases, new-password login, old-password denial, both
+  independent old-session method/resume denials and fresh lifetime bounds (PASS,
+  29.99998633101852 days). Preserve progress-backed passwordless access.
+- [x] Independently verify the exact disposable account and its reset records
+  absent, operator logout/context cleanup, worker absence, lease absence and
+  direct tool status idle/false. Existing app and connection remain healthy;
+  other containers and qualified HTTPS configuration remain unchanged.
+  Private evidence: connected-verification-20261116-21977f4a08a5.
+- [x] Preserve failed operator preparations: initial entrypoint output parsing,
+  missing Windows executable-resolution variables PATHEXT/ProgramData, and a
+  missing Docker -i on the private worker launch. No account was created in
+  those attempts. The stopped stdin-failed worker retained its lease/marker;
+  explicit recovery passed only after independent empty-state verification.
+  The corrected path then passed; do not relabel the earlier attempts passing.
+- [ ] Integrate the remaining protocol families and produce a complete, no-ERROR
+  authentication artifact. Unused genuinely aged-token expiry, remaining live
+  scenario ownership/recovery, scheduled mail acquisition and failure alerts are
+  separate gates. This operator-assisted current-reset qualification does not
+  close Phase 2, full scanner acceptance or the coordinated production gate.
+### Unused expiry and coupled reset preparation (2026-11-16)
+
+- [x] Prepare the genuine-aging collector: native one-hour lifetime, exact owned
+  unused-record timing only, original private mail capability in memory, bounded
+  waits, coherent clocks and rechecked lease/channel ownership. Used, absent,
+  ambiguous and inconsistent observations cannot qualify expiry; a proven
+  acceptance stays FAIL and unrelated denial stays ERROR.
+- [x] Add the explicit protocol worker scope with separate reset/expiry actors,
+  one held lease, normal verification for both, metadata verification before
+  current-token mutation, bounded second-recipient transitions and private lease
+  confirmation. Heartbeats cannot extend a lease or mail deadline.
+- [x] Reuse the shared minimal Windows environment owner for PATHEXT support;
+  ProgramData was already in that profile. No credential inheritance, dependency,
+  application permission, production action or Meteor invocation is added.
+- [x] Source gate passes 438 cases: 431 pass, zero failures, seven skips.
+  The affected real-channel/root-observer set passes 35/35; explicit optional
+  lint and full app lint/330 surfaces pass. The seven collector tests simulate
+  time only in tests; they are not a live elapsed-hour acceptance claim.
+- [x] Build the optional expiry candidate from 4af84705. All 29 image tests passed.
+- [ ] Complete and verify transfer, install the candidate and publish plugin 0.1.4.
+- [ ] Run the coupled
+  protocol with an actually unused token aged through its native lifetime and
+  independently verify both fixtures/reset records, sessions, lease and channel
+  cleanup. Do not repeat or reopen already accepted standalone current-reset gates.
+## Real connection authorization accepted (2026-11-16)
+
+- [x] User completes fresh approval. Read-only server metadata confirms enrollment
+  consumed, one active grant, one active access record, exactly audit:mail and
+  audit:status, and zero unexpired authorization codes. Actual platform token
+  exchange passed. No credential values were retained.
+- [x] Registered app page offers Try in chat and no Continue connecting action.
+  The accepted package binding is 0.1.2. No app/database/Gmail/production permission
+  was added by this verification.
+- [x] Preserve the intervening expired-code failure: enrollment had zero seconds
+  remaining and zero validation attempts. Reopening the form without checking
+  expiry was an operator error; replace enrollment and pending request together.
+- [x] Live MCP invocation is verified through the native cloud app launch above.
+  Historical local limitation: the three tool names were absent
+  from this conversation's current tool inventory after authorization. Do not
+  extract platform credentials or substitute a host-side request for live ChatGPT
+  execution. No new code or reconnection is indicated by this observation.
+- [ ] Continue exact-recipient Gmail carriage and scanner qualification when the
+  authenticated tools are available. No Gmail search/read, complete audit,
+  unattended execution, production action or fresh Meteor invocation is claimed.
+
+## Accepted code; callback blocked by form policy (2026-11-16)
+
+- [x] Diagnose the next reported fresh-code error using minimized state: enrollment
+  absent, one authorization code issued, zero active grants. The submitted code
+  had been accepted. A repeat submission of its consumed request produced the
+  misleading error; no invalid-code conclusion is claimed.
+- [x] Extend the browser regression through the actual 303. Reproduce its
+  form-action CSP violation. The earlier test replaced 303 with a successful
+  fixture page and therefore missed return navigation; preserve that limitation.
+- [x] Pin only the consent page to the current request's already registered exact
+  callback, obtained from the authorization owner. Unknown/expired requests and
+  other pages stay self-only; no query/body callback, wildcard or new recipient
+  is accepted. Origin/cookie/PKCE checks and the learner app CSP are unchanged.
+- [x] Native Chromium now emits the registered callback request without a policy
+  violation; a denying fixture proxy prevents actual external traffic. Synthetic
+  enrollment consumption and token exchange pass. All 14 Linux connection/lease
+  cases, full lint/330 surfaces and explicit connection lint pass.
+- [x] Qualify and deploy the exact committed connection candidate on staging2,
+  verify its public HTTPS policy and unchanged services, then prepare one new
+  enrollment and platform request. The consumed old code cannot be reused.
+  Source `29f7a98a`, engine image `02d1d42d...`; ten container tests pass.
+  Live public HTTPS has one exact registered-callback policy and strict-origin.
+  All other containers and Apache configuration are unchanged; prior image retained.
+  Protected evidence: `staging2-callback-29f7a98a`. Enrollment preparation follows.
+- [x] Real platform callback exchange and active grant verified in the latest
+  authorization section. Live tool execution remains a separate open gate.
+  No fresh Meteor invocation, Gmail observation or production change occurred.
+
+## Registered package replacement approved and saved (2026-11-16)
+
+- [x] Phil explicitly approved replacing the original private plugin's old
+  connection configuration with its registered staging2 connection.
+- [x] Resolve the actual app identity from the registered native plugin's own
+  .app.json. The first archive's plugin-ID-as-app-ID failed schema validation;
+  preserve that failure. Use the verified app ID without inventing an identity.
+- [x] Publish private USER package 0.1.2 and read it back: original instructions,
+  presentation and PRIVATE audience retained; verified registered-app binding
+  present; mcp.json and .mcp.json absent. No mailbox/shell/database/production
+  authority added. The earlier automatic-review rejection is resolved by the
+  explicit approval; the guarded replacement succeeded.
+- [x] Verify strict-origin through actual public HTTPS as well as the private
+  socket. No callback parameters, cookie or code values retained in evidence.
+- [x] Complete actual browser authorization and acquire live tool execution (accepted in the November 16 qualification above).
+  At the latest read-only check there were no active grants; no Gmail read or
+  complete audit is claimed. This update creates no new Meteor invocation.
+
+## Consent rejection repair (2026-11-16)
+
+The user's code retries exposed a server/browser contract defect, not an
+observed invalid code. A rejected live attempt still had 432 seconds remaining
+and zero code-validation attempts. No active grant or authorization code existed.
+The consent response's no-referrer policy makes native form POST Origin null;
+the exact-origin guard correctly rejected it before reaching the code check.
+
+- [x] Reproduce in Chromium using the actual form/handler with source-issued
+  synthetic request and cookie: cookie present, exact Origin absent, HTTP 400.
+- [x] Repair only the consent response to strict-origin. Preserve its exact-origin
+  and bound-cookie guards, CSP and other responses' no-referrer policy. Native
+  form now sends exact Origin and an origin-only Referer; synthetic consent and
+  token exchange pass. No request query/capability is retained in a referrer.
+- [x] Full app lint/330 surfaces and explicit connection lint pass. All 14 Linux
+  connection/lease cases pass, including null/missing/foreign Origin and missing
+  cookie denial. The separate native browser regression passes. The unchanged
+  entry point took 12.1 seconds through Windows-mounted Linux source; preserve
+  earlier ten-second readiness failures, and use a bounded 25-second readiness
+  window inside its existing 30-second case deadline. No Meteor run consumed.
+- [x] Build/qualify source 5426b01cf4e6eadbc8e7bb3bbe6734e839328b5f: ten
+  exact-image cases pass. Deploy only the connection candidate, engine identity
+  6db2ce134f42b913628d80a52cf4058116b3d3640941b11b91a3c8646498fe9f;
+  previous image retained for rollback. Health, disabled networking/resource limits,
+  HTTPS discovery/unauthenticated denial, unchanged other containers and exact
+  existing HTTPS/config hashes pass. A synthetic live pending request confirms
+  strict-origin on the actual consent response. No values retained.
+  Private evidence: phase1-20261105/staging2-consent-5426b01c.
+- [x] Renew code and platform request after that repair passed. Subsequent user
+  authorization, registered-app package binding and live tool execution are
+  accepted above; complete full-audit acceptance remains separate.
+
+Unrelated production cutover drafts remain preserved and excluded. The learner
+application and its intentional progress-backed passwordless return are unchanged.
+
+
+Historical binding approval was subsequently resolved: the approved 0.1.2
+replacement is saved and verified, as recorded above. It is no longer pending.
+
+## Cloud registration correction (2026-11-15)
+
+The installed private package exposed its skill but not the live MCP tools.
+Earlier advice to click Connect/Try Now or request status was unverified and
+withdrawn. The operator's verbal consent did not complete a platform handshake.
+Official setup requires registering the existing MCP server in ChatGPT before
+binding the registered app into the instruction package.
+
+- [x] Use actual ChatGPT Plugins -> Add -> Add custom MCP server. Public HTTPS
+  discovery succeeds from the cloud; DCR and exactly audit:mail/audit:status are
+  discovered. Create the staging2-only server connection with OAuth retained.
+- [x] Observe the real Connect dialog and reach the server's actual consent form.
+  The form contains One-time connection code and Approve audit connection.
+- [x] Renew the expired enrollment under the stopped service's exclusive lock,
+  save it only to the approved private Desktop file, and reinitiate authorization
+  after restart. The first pending browser request is intentionally discarded;
+  no stale pending request is treated as current.
+- [x] Operator completed code entry; subsequent accepted evidence above proves active grant,
+  live tool discovery, original package's registered-app binding and successful
+  tool execution. Full audit remains open; later Gmail proof is recorded above.
+
+The existing application/passwordless policy, production boundaries and sole
+Meteor allowance are unchanged. Keep credential values and callback parameters
+out of retained evidence.
+
+## Staging2 connection qualification continued (2026-11-15)
+
+- [x] Publish the reviewed connection/mail/lease batch as 2313af2e. Full app
+  lint (330 surfaces), explicit connection lint, 12 connection/lease cases and
+  24 affected mail/transport/reset cases pass. No Meteor invocation consumed.
+- [x] Preserve failed preparation/source-read permissions and config-only image
+  selection records. Both failed closed before HTTPS changes. The Docker engine
+  index and image-config digest are recorded separately, not replaced by a tag.
+- [x] Diagnose actual service startup: systemd reapplied root ownership after
+  pre-start. Use its private UID-2000 scanner child (f2b55766); preserve failures.
+- [x] Remove the unavailable internal-network port mapping without adding egress.
+  Source 0592752bd5b8ffe677a7d2b8eecf63355d8ea35a uses no container network and
+  separate HTTP/scanner Unix sockets. Nine Linux cases and nine exact-image
+  cases pass, including actual serve readiness and clean shutdown.
+- [x] Install and qualify that exact candidate on staging2. Engine index:
+  18f64ab2fb9176eaaa6a6ab07aa346f3ab048d87a835a8e5460c9bed24b21acd.
+  HTTPS resource/authorization discovery, S256 metadata, unauthenticated MCP
+  denial, real systemd restart, resource limits and network_mode=none pass.
+  All five original containers retain IDs/images/start times and remain running;
+  MoFaCTS remains healthy. Apache configuration validated before reload.
+- [x] Verify minimum persistent access: runtime parent root:root 0711; scanner
+  child 2000:2000 0700; HTTP child 2000:www-data 2750 and socket 0660. Apache can
+  reach only the authenticated HTTP interface, not scanner channel or state.
+  No shell/database/Gmail permission, paid service or production change added.
+- [x] Register a private USER-scoped connection package, version 0.1.1. Inspect
+  its stored MCP configuration and bounded mail-handoff skill. It is not yet
+  connected; no live tool or Gmail acquisition is claimed.
+- [ ] User completes the reserved one-time connection consent, then verify live
+  tool discovery, narrowly scoped operations and revocation/refresh behavior.
+- [ ] Qualify real exact-recipient Gmail carriage, full authentication scanner,
+  independent hosted scheduling, missed-run alerts and complete audit acceptance.
+
+Private evidence: phase1-20261105/staging2-connection-0592752b. Host receipt
+SHA-256 f2d92cafa4cd9f56da65bab413f6d65f11df8f3ad6342ace926e188b5ec4c9cd;
+retained host recovery includes original HTTPS config, failed attempts and exact
+qualified config hashes. No accepted historical check is rerun merely to clean
+up this checklist. P2-01/06/07/10 remain closed; overall Phase 2 is still open.
+Progress-backed passwordless access is unchanged. Production/original staging
+remain excluded. Unrelated production cutover drafts are preserved/excluded.
+The following initial offline milestone is historical; this section supersedes
+its then-current statements about installation and registration being absent.
+
+## Complete unattended production migration resumed (2026-11-15)
+**Hosting decision confirmed:** the audit must run with the desktop/app off.
+Phil identified staging2 as the intended server; original staging is excluded.
+Read-only staging2 inventory verified the existing pinned host identity over its
+private route, running systemd, two CPUs, about 2.6 GiB available RAM and 25 GiB
+free disk, healthy MoFaCTS/Mongo/Redis and running unrelated JEDM services.
+No audit timer was listed; host Node/npm and Nmap are absent. No host change ran.
+See deploy/security-audit/staging2-unattended-design.md for the concrete proposed
+cloud handoff, scheduler ownership, failure reporting and acceptance gates.
+Phil explicitly approved qualification of a separate staging2-only cloud audit
+connection on 2026-11-15. This grants no new Gmail permission, shell/database
+access, paid service or production authority. Actual one-time connection consent
+remains required when the verified endpoint is ready. No connection is installed.
+
+Local candidate: deploy/security-audit/connection implements scoped OAuth/PKCE,
+private scanner handoff and explicit interrupted-run recovery. Full app lint,
+connection ESLint and diff checks passed after the recovery correction. Linux
+connection plus authentication lease tests passed 12/12. The rebuilt exact image
+passed 8/8 connection tests with read-only root, no network, dropped capabilities,
+and 256 MiB/0.25 CPU limits. Image config:
+9ea26fe4186b48d38d63893adff943d4487a3e3b82319c9e1320d4a0d72f600a;
+platform manifest: 74ece88b72a0db7e7f41c215adc9e111dd89ffae210d1cbddd5ce114e7567de6.
+These tests use synthetic mail and cleanup callbacks, not real Gmail or fixture
+cleanup. No real mail or complete audit is claimed. No additional Meteor test:ci
+slot was consumed. The user-requested progress report was sent to Review security
+audit status. Source remains uncommitted and no staging service is installed.
+
+Phil requested a complete weekly unattended audit on existing infrastructure,
+without GitHub billing, with real connected-Gmail reset delivery, failure and
+missed-run reporting, and one final approved production cutover. An incomplete
+host-only installation is not authorized. Preserve all controls, encryption,
+retention, exact evidence and cleanup. Retire obsolete GitHub triggers only as
+part of the completed replacement cutover.
+
+Source inspection confirms selected authorization is the only acquired control;
+the other 21 authentication controls remain ERROR. The production workflow still
+schedules its pinned V1 scanner. The canonical production command sheet contains
+its ordinary and Change Streams Compose files and release recorder, but no audit
+receipt overlay. No production command ran here. Earlier November 15 live findings
+remain separate dated evidence in deploy/security-audit/production-operator-cutover.md.
+
+The local automation interface scheduled a bounded capability test of background
+worker execution and exact nonexistent-recipient Gmail metadata search. ID:
+mofacts-unattended-execution-qualification. Creation succeeded; actual scheduled
+execution was not observed during this turn; the test is now PAUSED. No reset request, email-body
+read, production fixture, credential, paid service or recurring production audit
+was created. Interactive Ubuntu-MoFaCTS access succeeds with existing operator
+execution permission; the restricted shell cannot see that distribution. The
+scheduled test has not established unattended access. The operator was asked whether
+production scheduling must work while this computer/app is off. Desktop-task
+documentation requires both to remain running; a desktop-dependent design cannot
+be assumed to satisfy the production availability requirement.
+
+Standing slot 9 was reconciled from original Linux results, without another run.
+Source before/after and saved local-service records are byte-identical. Both new
+progress-backed participant cases pass. Actual isolation and 6-GiB/two-CPU limits
+are recorded; exact job containers, network and named tools volume are absent.
+The receipt remains unqualified for release/image purposes. One Meteor invocation
+remains available; none is reserved here.
+
+Next: qualify scheduled Gmail/worker access, complete Phase 2 protocol acquisition
+and catalog integration, then Phase 3/4 source and staging acceptance. Production
+synthetic-identity scope and final coordinated cutover remain action-time decisions.
+Existing uncommitted mail/host work was preserved. No production host, app,
+mailbox scope or GitHub trigger changed.
+
+## GitHub billing unavailable: standard operator security lane (2026-11-12)
+
+Phil reiterated that GitHub billing cannot be used. Security run `43212891467`
+failed all four jobs before execution with the same billing-lock annotation;
+this is no scanner result. The standard executor is now the existing approved
+operator Linux worker, with an exact-commit private clone, unchanged security
+policies, independent job outcomes and hashed retained evidence. GitHub Security
+is manual-only; no billing change, recurring self-hosted runner, production
+access or Meteor invocation is part of this correction. See
+`deploy/security-audit/operator-security-checks.md`. Local verification passed: full application lint (330 classified surfaces),
+explicit runner lint, three failure/policy contract tests, Linux source gate
+(169 passes, three conditional skips) and expanded V2 gate (305 passes, six
+conditional skips), zero failures. A native Windows source-gate attempt hit the
+sandbox-hidden WSL distribution; supported Linux reruns passed. Committed-source attempt `174125f3` ran all four jobs: gitleaks PASS (868
+commits, no leaks), application dependency policy PASS and Mongo sidecar policy
+PASS. Source contracts failed because the new coordinator inherited umask 077
+into scanner fixtures that require normal 0444 file modes. No real image probe
+was launched by those injected fixtures. The correction retains private 0700
+parents and explicit 0600 evidence, while setting the child checkout/test mask
+to the supported worker normal 022. All 13 affected Linux fixture/runner tests
+and explicit runner lint pass; the failed evidence is retained at the private
+`phase1-20261105/security-174125f3-20261112` directory. The corrected full run against
+`dff28386ec380d298df6e472ec64a41025e5925d` completed with exit 0 on pinned
+Node 24.22.1/npm 11.19.1. All four jobs passed:
+
+- [x] Full-history secret scan: 869 commits, no leaks found.
+- [x] Source/security contracts: 483 reported cases, 474 passes, zero failures,
+  nine conditional skips; classified surfaces passed.
+- [x] Application dependency policy: zero high/critical runtime findings,
+  23 development advisory packages, zero confirmed build exposures.
+- [x] Mongo sidecar dependency policy: zero high/critical runtime findings,
+  zero development advisory packages, zero confirmed build exposures.
+
+Private evidence: `phase1-20261105/security-dff28386-20261112` under the existing
+operator release-evidence root. Summary SHA-256:
+`51172ac2e1e9089001660ceeaaa70e11841a1cc71a1ad980d344f6a9de4be493`.
+The full failed first attempt remains separate. This closes the repository
+Security executor correction, not a Phase 1 deliverable or release qualification.
+No Meteor invocation, production access, image build/deploy or new dependency
+installation occurred. The six remaining Meteor slots are unchanged.
+## Operator exposure workflow continuation (2026-11-12)
+
+P1-08 continues independently of GitHub billing and the pending production-only
+observation. The standard operator exposure coordinator now composes existing
+host carriage, external/host/composite producers, exact assembly, encryption,
+single signed upload and final complete-execution assertion. Acquisition receives
+no signer or private encryption key. Existing evidence ERROR remains ERROR even
+when encryption/storage succeed. New tests cover independent acquisition failure,
+credential separation, saved encryption, single upload, target rejection and
+retention failure before upload. Three focused Windows cases, full lint/330
+surfaces and Linux expanded source gate (308 passes, six conditional skips,
+zero failures) pass. A first test-only RSA KeyObject/PEM mismatch was corrected;
+no runtime crypto change was made. Live committed-source execution/readback is
+next and is not yet accepted. No Meteor invocation is reserved or consumed.
+## Operator workflow acceptance and Phase 1 reconciliation (2026-11-12)
+
+- [x] Source `750523d9` runs the complete exposure file/retention/ingestion
+  sequence against staging2 through existing permissions. An initial private
+  Windows-to-WSL path quoting error stopped before acquisition; its correction
+  reused the same retained fresh host read and did not repeat a scanner/upload.
+- [x] Restricted host carriage and MATCH receipt validated; all eleven internal
+  controls pass. Exact report `staging2-operator-750523d9-20261112` was accepted
+  once (HTTP 201), encrypted and independently recovered with the saved key.
+- [x] Actual admin page/list/get and both guarded downloads pass. Report digest
+  `487daf56e50d316f6be16e501d78519c5d25b2e6136537a1787827a307b89802`;
+  JSON/recovered payload SHA-256
+  `b7bd146447ac58772f176973daf2734b61783c4db1d5e60d80ff307947e19ff2`;
+  HTML SHA-256
+  `e9839d30eec9d408cb2fe381529bbc72cbe5bdbb4bc843c914064084ac0f0c2f`.
+- [x] Encrypted retention SHA-256
+  `98fb1d5451abf3cfb89ad8e0a37f0cedf2d10da346329a270eba18f7eec80f93`.
+  Raw host/producer/report plaintext was removed only after saved-key and admin
+  readbacks passed. Keep encrypted bytes and content-free receipts in private
+  `phase1-20261105/operator-exposure-750523d9-20261112`; workflow acceptance
+  receipt SHA-256 is
+  `44882366c15cdf0d8dd917c510ebc9594b8c9d61dec8fdab377e8ed051f17df2`.
+- [x] Preserve honest incomplete execution: 18 PASS, zero FAIL, five ERROR.
+  Final exit 1 and `executionComplete: false` were expected and retained. UDP
+  lacks conclusive inventory. HTTP redirect/HSTS/CSP/security-header controls
+  timed out; subsequent bounded OS/Node DNS checks confirm worker resolution
+  failure (EAI_AGAIN/ETIMEOUT), not missing served security headers. Windows
+  submission and browser readback succeeded. No application repair or security
+  policy relaxation is indicated by these timeout observations.
+- [x] Reconcile P1-08 as workflow/receiver integrity complete and P1-17 as current
+  operator documentation complete: **16 of 17 deliverables**, with P1-04 and
+  explicit production cutover/acceptance still unexecuted. This does not close
+  Phase 1's production exit gate, qualify all scanner controls, or close the
+  larger audit. Reuse the prior rollback, selected authorization and Meteor
+  proofs; no new Meteor invocation occurred (six remain).
+- [x] Worker DNS recovery: Phil approved restarting only Ubuntu-MoFaCTS. The
+  targeted restart completed; both DNS APIs and OS lookup resolve normally.
+  No DNS configuration, global WSL shutdown, Docker restart or alternate
+  resolver/IP substitution was used. Retained before/after snapshots verify
+  the same Docker engine and unchanged MoFaCTS/Mongo/JEDM API container
+  identities/start times. The JEDM scheduler continued its already-present
+  restart cycle; no JEDM command or configuration change was issued.
+- [x] Recheck only the four affected HTTP controls: redirect, HSTS, CSP and
+  security headers all PASS through the same actual acquisition/evaluator.
+  The full producer and focused recovery now share one HTTP owner; no Nmap,
+  TLS, host or authorization trial was repeated. Retain `http-recovery.json`
+  separately; the original accepted 18 PASS/five ERROR report stays unchanged.
+  Follow-up evidence SHA-256:
+  `d4de46474cfad8caa918fb82f3931e574a8df91f8c8b54492790dac94fba1c2c`.
+  Tested acquisition-module SHA-256:
+  `1798de1625d94173784465dd84a44bd95b383672db9ec21aba2450c3704b4b59`.
+  `http-recovery-source.json` records the actual base commit and intentional
+  working source rather than falsely calling that live probe a clean commit.
+- [x] Verification: all 25 external probe cases pass on Windows, full app lint
+  and the 330-surface contract pass, and the Linux V2 source suite has 309
+  passes, zero failures and six conditional skips. No TypeScript/schema/app
+  runtime changed; no fresh Meteor invocation is needed or consumed.
+- [x] Phil approved the one read-only production image observation on
+  2026-11-12. Initial SSH process startup failed without accepted metadata.
+  A local-only environment matrix reproduced exit 255 with the restricted
+  environment and exit 0 when its standard Windows ProgramData path was retained.
+  The source correction preserves credential exclusion and strict host trust.
+- [x] Corrected Windows helper passes five native observer/recorder tests,
+  including real local OpenSSH configuration expansion; full lint/330 surfaces
+  and Linux V2 suite (309 passes, seven conditional skips, zero failures) pass.
+  No new runtime dependency, application/TypeScript/schema change or Meteor
+  invocation occurred. Six Meteor slots remain.
+- [x] Preserve the initially incomplete image observation (resolved by the
+  approved ten-minute follow-up below). The corrected live
+  diagnostic received valid JSON with exit 0 from both fixed metadata reads,
+  then failed during image streaming/graph validation. It lasted approximately
+  123.27 seconds against the existing 120-second stream deadline; byte counters
+  were not retained, so timeout is a timing-supported inference, not a proven
+  archive failure category. No accepted fingerprint or authority comparison
+  was written. No production service/configuration/data or local release
+  authority was changed; no remaining observer SSH process was found.
+  Private evidence: `phase1-20261105/production-image-observation-a0fab958-20261112`
+  (`authorization.json`, `bounded-retry-trace.json`,
+  `corrected-observer-source.json`, `corrected-observer-bounded-trace.json`).
+- [x] Phil approved one ten-minute image-stream diagnostic on 2026-11-12.
+  Implement the explicit opt-in without changing the two-minute default or the
+  two-GiB/32-MiB/4,096-entry limits. The shared graph owner remains authoritative;
+  no image layer extraction or identity substitution is added.
+- [x] Safe diagnostics now report only byte/elapsed/budget counters, fixed
+  category, exit code and owned-process termination confirmation. Measured
+  streaming preserves backpressure. Timeout-triggered pipe errors cannot mask
+  the deadline category. Tests verify normal identity, default/explicit budget,
+  deadline cleanup, archive rejection, process failure, stderr limit and bad
+  options before launch/SSH. All 18 focused Windows cases and full lint pass;
+  the Linux V2 gate has 313 passes, seven conditional skips and zero failures.
+- [x] The one approved attempt completed from committed source `a8cc2559`.
+  Three metadata reads pass; graph validation receives 379,755,008 bytes in
+  310,803 ms (600,000-ms budget), exit 0, zero stderr and confirmed termination.
+  The final read verifies the same running container. No layers were retained;
+  no extra production read/retry, deployment or authority write followed.
+- [x] Actual accepted source `18677291993b66b890a090e55d65f703b45ff653`,
+  configuration
+  `sha256:214793c9cf7534eb4568934fc83843328b202a23b99d108fc323ead2ceafb697`
+  and Linux/amd64 match the already approved November 5 P1-D2 baseline exactly.
+  The older local `bddd0895`/`c0146b89` record mismatch is already reviewed, not
+  a new rollback-selection decision. Preserve both the older authority and
+  unknown later build/acceptance history. Do not fabricate a replacement record.
+- [x] Private receipt root:
+  `phase1-20261105/production-image-observation-a8cc2559-20261112-10min`.
+  Outcome SHA-256:
+  `ea459d485af913f766798b2fda3b40da2f917ceda105971d3a4966d06185878b`;
+  accepted identity SHA-256:
+  `09b4a087a291ce5143d3a6a76bdf72e2d11951027298ead208adc69b88e55709`.
+  Saved comparison and prior-baseline comparison confirm no authority write.
+  Initial local strict-read stability rejection was followed by stable metadata
+  and successful strict parsing/read; no reader guard or path was substituted.
+  No observer-owned SSH process remains.
+- [x] Finish the standard remote recorder's routine compatibility correction:
+  explicitly select the measured ten-minute budget for post-acceptance remote
+  observation. Shared/local and bare observer defaults remain two minutes;
+  archive/metadata/entry bounds and caller interface are unchanged. Nine focused
+  Windows cases, full lint/330 surfaces and Linux V2 gate (313 passes, seven
+  conditional skips, zero failures) pass. No new Meteor invocation or dependency.
+- [ ] P1-04's production recording/cutover acceptance remains open: the safe
+  read-only identity check is complete, but the standard recorder has not run
+  after an actual production deployment. Phase 1 stays 16/17 and six Meteor
+  slots remain. Phil approved P1-D9 on 2026-11-12: defer the per-phase live production gates
+  to one final coordinated cutover while continuing source/staging2 work. The
+  original acceptance criteria remain; production writes are still excluded.
+## P1-D9 adopted; Phase 2 active queue (2026-11-12)
+
+Phil approved one final production cutover instead of repeated production windows
+at the phase boundaries. The plan now requires each phase's source/staging proof
+before advancing implementation and retains its production criteria as pending
+final acceptance. P1-04 remains 16/17's outstanding operational item; do not rerun
+its accepted graph, receipt, rollback or selected-case proof. Source/staging
+implementation advances to Phase 2. Production access, recovery/provider changes,
+spending and destructive operations retain their explicit permission boundaries.
+
+| ID | Phase 2 deliverable | Current state / next evidence |
+| --- | --- | --- |
+| P2-01 | Source-owned verification intent for all authorization controls | [x] Exact source references for all 22 controls and 68 unique verification entries pass Node and Meteor slot 8. The accepted 29-case subset is unchanged. This closes intent, not live acquisition or whole-runtime coverage. |
+| P2-02 | Exact value-only protected fixture binding contract | [x] Versioned value-only source contract verified in protocolBindingsV2.mjs and the November 13 binding/process tests. It checks the actor set, unique identities, scoped values and exact staging2 target. End-to-end use by every scenario remains under P2-11. |
+| P2-03 | Transport, scenario and evaluator decomposition | [x] Selected method/publication/route/download adapters and separate reset, comparison, session, passwordless and throttle acquisition/evaluation are implemented. The focused 117-test suite passed on pinned Node. Live integrated acceptance is recorded separately. |
+| P2-04 | Positive baselines paired with denials | [x] Positive actor, route, capability, reset/session, passwordless, comparison and throttle baselines passed in the integrated staging2 run. A timeout or unrelated denial cannot satisfy the evidence contract. |
+| P2-05 | Exact policy denial categories | [x] Shared outcome matrix and protocol-specific exact categories pass behavioral tests. Unsupported denials, missing baselines and transport failures stay errors. |
+| P2-06 | Scoped publication canaries/store isolation | [x] Complete for Phase 2: accepted selected own/other/anonymous progress cases and six real-Mongo cases. Reuse proof; new registry scenarios belong to Phase 3. |
+| P2-07 | Download mint/fetch/content/replay | [x] Complete for Phase 2: accepted selected own-history/admin report issuance/content/replay. Reuse these exact capabilities; newly declared registry surfaces belong to Phase 3. |
+| P2-08 | Reset/session preconditions and unused aged token | [x] Complete. Native slot 7 and connected staging2 evidence cover current reset, replay denial, real elapsed-hour rejection of an unused token, session revocation, and independent fixture/lease cleanup. Live evidence: connected-expiry-20261118-d69a2503d8e8. Full authentication report assembly remains P2-11. |
+| P2-09 | Run lock/namespace/idempotent cleanup/recovery | [x] Protocol mutation contracts, exact run namespaces, phase leases and cleanup passed live. Shared recovery prevents new mutations after an interrupted owned window. The interrupted mail run was recovered with both accounts, reset state and sessions verified absent. |
+| P2-10 | Positive lower and upper session-lifetime bounds | [x] Source/native validation and fresh identity-bound live staging2 measurement pass: strictly positive and at most 30 days. Append-only v2 proof is accepted; complete authentication report/catalog wiring remains P2-11. |
+| P2-11 | Exact Phase 2 control coverage | [x] All 22 control results were reproduced in one integrated staging2 invocation with zero errors or failures. The coordinated receiver activation is tracked above. Whole-runtime coverage belongs to Phase 3. |
+| P2-12 | Behavioral tests for all outcome classes | [x] The Section 7.4 outcome classes are covered by the protocol, transport and evaluator suites. New cases exercise comparison browser acquisition and verify the coordinator emits exactly 22 version 2 controls after four clean phases. Pinned Linux focused tests passed 117/117, source-security passed 172/172, and full lint passed. The owning native checks are recorded in the run ledger. |
+| P2-13 | Minimal child environments | [x] Browser and storage subprocess profiles are bounded, and Gmail authority stays in the connected tool. The integrated mail observer had launched the storage helper directly. The standard launcher now runs that observer with storage-only inputs. Both owned fixtures and reset state were independently absent through that launcher. |
+
+Current next milestone: continue protocol acquisition/ownership and live unused
+aged-token expiry under the clarified progress-backed passwordless requirement.
+P2-D2 is resolved: the stricter marker gate is withdrawn. Prolific-specific
+validation is a separate improvement candidate, not an audit prerequisite.
+P2-01/02/06/07/10 are complete. Current reset/replay, both prior-session denials
+and fresh session lifetime are accepted; do not rerun them unchanged. Consult
+the sole standing execution ledger for the remaining Meteor allowance. Full protocol/artifact coverage remains open.
+
+### Phase 2 comparison foundation (2026-11-12)
+
+- [x] Preserve the accepted selected 29-case catalog and add four source-owned
+  login/reset comparison qualifications, one verified-login baseline and a shared
+  five-login/two-reset paired sample vector. This advances P2-01/03/04/05; it
+  does not complete their remaining protocol families.
+- [x] Separate bounded wire-response capture, pure classification and sanitized
+  proof projection. Compare public response equality without retaining messages,
+  identifiers, response bodies or hashes. Rate limits, unrelated domain errors,
+  missing baselines/leases and transport failures cannot prove a successful denial.
+- [x] Reuse the existing robust timing math in a shared Node/Meteor module.
+  Append enumeration/timing v2 evidence contracts with exact per-family sample
+  counts and independently checked timing bounds/direction counts. Existing v1
+  contracts, active catalog version/digest and saved report meanings are unchanged.
+- [x] Focused Windows qualification: 16 cases pass. Initial complete Linux gate
+  found the proof-shape inventory fixture lacked the two appended contracts;
+  extend the fixture rather than exclude it. The corrected complete gate passes:
+  321 passes, zero failures, seven conditional skips. Full typecheck and lint/
+  330 security surfaces pass. See deploy/security-audit/authentication-comparisons.md.
+- [x] Complete exact-source Meteor parity and reconcile standing slot 5: PASS.
+  Source c99de5d9, 1,021 server/1,249 client, zero failures; both new shared
+  comparison cases pass. Source, limits, isolation, cleanup and original local
+  services verified. Five slots remain. No deployment or live mail request.
+- [ ] Connect protocol collection only after qualifying fixture bindings,
+  environment lease, reset/session preconditions and cleanup. Live protocol
+  controls remain explicit ERROR; no mail/provider request or permission change
+  was made by this source foundation.
+
+### Phase 2 live-mail binding decision
+
+The source comparison foundation is accepted, but no live reset/expiry/mailbox
+acceptance is claimed. Existing protected staging2 settings metadata confirms
+email is enabled and its normal SMTP relay is Amazon SES. No SMTP credential
+value was emitted. The approved desktop test-key directory has no dedicated
+staging IMAP binding or inbox credential file. Do not substitute the production
+recovery bundle's mailbox or personal mail. A text question is pending for an
+existing dedicated test inbox and its approved credential location; if none
+exists, prepare a bounded private test-mail design before adding a dependency or
+changing normal staging mail delivery. New provider/recovery access remains
+outside standing authorization. Other source comparison checks are complete and
+must not be repeated merely while this binding decision is pending.
+
+Native slot 5 evidence: phase1-20261105/native-phase2-comparison-c99de5d9.
+Acceptance SHA-256:
+887cb3551cfe233b0ae0bffcc0e0701a3b39d0d5e549c32172b0c79b67a0a36c.
+Native receipt SHA-256:
+a628b24008e625314541f6d1e7377b7704118e3942808fbbe205c79b499be885.
+These are source/runtime proofs, not image qualification or deployment evidence.
+
+### Existing-inbox reuse and bounded delivery inspection (2026-11-12)
+
+Phil approved checking and reusing the existing inbox. The prior pending mailbox
+question is resolved for the operator lane; no new inbox/service or production
+IMAP-password recovery is needed. The existing staging learner credential
+metadata uses plus-recipient aliases of the connected operator Gmail account.
+That inbox is mixed personal mail, not a dedicated testing mailbox. Reuse the
+existing connected mail authorization for narrowly targeted operator acquisition;
+this grants no general background-runner credential copy or new provider access.
+
+- [x] Inspect only profile/configuration and bounded relevant message metadata.
+  No production host/backup access, settings change or existing-account reset.
+- [x] Add a provider-independent reset-mail observation boundary with exact
+  per-run recipient, two-minute request window, ten-message metadata bound,
+  body-read gating, 16-KiB plain-text limit and exact staging2 link checks.
+  Node tests reject unrelated/stale/duplicate/multi-recipient messages and
+  foreign origins, recipients, tokens, extra query parameters and fragments.
+- [x] Qualified source checks: full lint/330 surfaces and the complete Linux
+  V2 source gate pass (325 passes, zero failures, seven conditional skips).
+  No app TypeScript/runtime, package dependency or Meteor invocation changed;
+  five standing Meteor runs remain. The previous Meteor proof remains separate.
+- [x] Execute one temporary ordinary-account mail inspection on staging2 under
+  bounded access delegation. Scope: one unpredictable run-owned recipient,
+  public signUpUser, one requestPasswordReset, no teacher/admin role grant,
+  no content/history/provider changes. Credentials used private stdin and a
+  DPAPI-protected recovery file; the existing admin remained the cleanup owner.
+- [x] Preserve the failed first observation honestly: account creation succeeded,
+  but the operator lookup used the plus address as an unescaped regex. No reset
+  had been requested. Repair the exact-address lookup with RegExp.escape and
+  recover the same recorded account; do not create or reset another account.
+- [x] The recovered same-fixture request succeeded once. Its reset email was
+  selected by exact recipient, provider timestamp within the request window
+  and reset subject. Only that message body was read for acceptance. Check the
+  actual link's staging2 HTTPS origin/path, exact email and 64-hex capability;
+  retain only booleans/counts, never the raw message or capability. Do not follow
+  the link or change a password. The separate verification message body was not read.
+- [x] Guarded userAdminDeleteUser removed only the newly recorded account and
+  its owned reset state. Exact bounded admin publication lookup verified account
+  absence; the DPAPI credential file was removed. No permanent access was added.
+  The test messages remain in the inbox; no mailbox deletion/filter change occurred.
+- [ ] Integrate the qualified mailbox adapter with the complete protocol runner,
+  prepared environment lease, unused aged-token and reset/replay/session cases.
+  This delivery inspection advances P2-02/03/08; it does not close a complete
+  Phase 2 deliverable, turn an unacquired control green, prove token validity,
+  supply unattended mailbox credentials or qualify an application image.
+
+Private receipts: phase1-20261105/mailbox-mofacts_audit_fixture_a148f300d755.
+The failed and recovered request receipts remain separate. Permission lifetime
+was one owner-controlled temporary job, not automatic account expiry. Recovery
+and revocation were completed and verified; no fixture credential remains.
+
+### Phase 2 reset/session source qualification in progress (2026-11-12)
+
+- [x] Reconcile P2-06 and P2-07 against their already accepted selected-case,
+  real-Mongo and content/replay proofs. Check off those two Phase 2 deliverables
+  in both plan and queue; do not reopen them for future Phase 3 registry additions.
+- [x] Trace leakage-check provenance before treating its title as a new decision.
+  Original scanner commits 2d018ee6/0e121478 already read session storage for
+  session tests while checking page text/URL/cookies/console/request metadata
+  for disclosure. The proposed literal browser-visibility interpretation was
+  overbroad and is withdrawn. No evidence establishes that Daybreak was wrong.
+  Preserve original intent; no user approval to weaken a claim is assumed.
+- [x] Add six source-owned reset cases with successful password/current-reset
+  baselines, exact invalid-token denial and shared complete-vector evaluation.
+  Require coherent owned/unused expired-record age and lifespan, fresh owned
+  current-token preconditions, verified bindings and an environment lease.
+  A rejected used token cannot stand in for expired-token evidence.
+- [x] Add positive lower and upper session-duration validation: strictly greater
+  than zero and at most the existing 30-day maximum, from a newly issued,
+  identity-verified session. Append session-lifetime-v2; preserve all v1 meanings
+  and the current catalog version/digest. No application lifetime policy changed.
+- [x] Full local typecheck, lint/330 surfaces and Linux source-security gate pass
+  (331 passes, zero failures, seven conditional skips). Two TypeScript narrowing
+  diagnostics in the new unknown-input parser were corrected; no failure is waived.
+- [ ] Complete one reserved supported Meteor run. The native
+  Accounts/real-Mongo case uses an explicitly aged synthetic reset record in the
+  disposable integration database; it is not live wall-clock/mailbox expiry proof.
+  It verifies unchanged password and unused record on expiry denial, successful
+  current reset, exact same-capability replay denial, native password validity,
+  stored-session-token removal and the configured native session duration.
+- [ ] Wire these source-qualified observations to the complete protocol owner and
+  later versioned catalog/receiver candidate. Live reset/session transport and
+  unused aged mailbox-token acceptance remain open; no new staging mutation,
+  mail request, production access, dependency or image build was made in this batch.
+
+### Reset fixture failure and correction (2026-11-12)
+
+Standing slot 6 is consumed and failed, not accepted or repeated uncounted.
+The registered combined reset test rejected its supposedly current token because
+the test seeded Random.id's mixed-case email while the application correctly
+queried its lowercase canonical identity. The negative expired-token attempt
+alone would have been insufficient; the mandatory successful current-token
+baseline exposed the fixture defect. Correct the test address before seeding,
+assert the created account's canonical identity, then confirm the exact owned,
+unused token record is eligible independently of expiry before attempting it.
+No application reset code or password policy changes; no test is skipped.
+
+The failed run retained 1,023 server passes/one failure and 1,249 client passes,
+zero hook failures, 15/seven existing pending. Its two shared contract cases passed
+and the native token-expiration generator ran; the combined reset case is not accepted.
+The job's containers, network and cache are absent. Do not claim a successful
+source-after/native verification receipt for a failed run. Private meteor-run.json
+SHA-256: ef1743b94aad0e605c64a0dcd947e6812cdd354a0f2bee2a08ea8c228034e5f4.
+
+Full corrected typecheck/lint pass. The working Linux source gate passes 333
+cases with zero failures and seven conditional skips, including two new logout
+adapter cases that remain local until this native correction passes. Reserve
+slot 7 before publishing this correction under the standing retest exception.
+New staging operations remain blocked until the applicable native proof passes.
+
+### Corrected reset/session native acceptance (2026-11-12 local)
+
+- [x] Standing slot 7 passes on efa3bd73: 1,024 server/1,249 client, zero failures
+  or hook failures, 15/seven existing pending. All three required registered
+  cases pass, including the actual registered reset method/native Accounts case.
+  The slot-6 failure remains retained and consumes its own allowance slot.
+- [x] Verify exact committed source before/after, read-only source mounts,
+  capability-free worker, 6-GiB/two-CPU caps, no OOM, removed owned resources
+  and unchanged original local services. Three authorized runs remain.
+- [x] Retain independent acceptance and native receipts under private
+  phase1-20261105/native-phase2-reset-efa3bd73. Acceptance SHA-256:
+  ea2ff0c33bae8a3ef13191d01e375a48e11315aa3591387960ba413cc05c72cd;
+  native receipt SHA-256:
+  7decb3f5cd295cc35f17e7141b363dcaf27120b0ca531fff38cba07807edc31c.
+- [x] Reset source/native qualification is complete for the registered synthetic
+  aged/current/replay/stored-session behaviors. P2-08 and P2-10 still require
+  live transport/fixture/lease observations; do not turn this into mailbox
+  wall-clock expiry, live logout or an application image/deployment claim.
+
+### Logout acquisition prepared; standalone mailbox decision P2-D1
+
+The new operator-only browser adapter owns private original/clone/replay/relogin
+contexts and captures only finite typed outcomes. It requires two positive
+sessions, exact capability cloning, completed logout, a source-reviewed native
+resume denial and an actual guarded-method denial, plus a fresh password login
+afterward. Initialization/cleanup failures block acceptance; neither a timeout
+nor an arbitrary 403 proves revocation. Four focused Node tests and full lint
+pass; the complete Linux source gate passes 335 cases, zero failures, seven skips.
+This does not introduce an application method, alter authentication or require
+another Meteor run for the Node-only transport adapter. The corrected native
+proof remains bound to efa3bd73, not the forthcoming operator-helper commit.
+
+A bounded current staging2 read confirms revision 1c72734b still running. Its
+Docker .Image value is native image ID
+sha256:a3d9bdca33831351a042fc4ba4bbcd466887b4776aea1a214d783b9be630dae9;
+do not call that a verified platform/config digest or repeat graph qualification.
+Only the revision/native-ID metadata was read; no secret settings or learner
+record was retrieved. The new live logout observation remains pending.
+
+P2-D1 is the next concrete dependency decision: the existing connected Gmail
+operator lane proves delivery but does not implement a portable standalone IMAP
+reader. No IMAP client exists in current package/optional-tool lockfiles. The
+retired curl helper mixed sequence SEARCH results with UID fetch and fetched
+whole messages. The recommended maintained client, ImapFlow 2.11.0 (MIT), would
+live only in a separate optional audit-tool package with pinned transitive
+resolution, verified TLS and read-only, exact-recipient selected-body access.
+No dependency is installed and no provider/recovery access is granted by this
+proposal. The former review is preserved in commit 317b3249 and superseded below. Existing root
+rules require explicit approval before adding a dependency; keep that distinct
+from the already approved inbox choice and ordinary staging fixture access.
+
+### Live logout subcase accepted; P2-D1 pending (2026-11-12 local)
+
+- [x] Run committed operator adapter 524aec55 against the reobserved unchanged
+  staging2 application 1c72734b. Bind the existing synthetic learner ID through
+  an exact, escaped, bounded admin publication lookup; never use a guessed ID.
+- [x] Verify the original password session and the exact-capability clone through
+  the real guarded own-settings method. Complete original logout, then observe
+  explicit 401 policy denial on the clone and the reviewed native 403/reason on
+  a separate same-token resume. Verify a new password login still works.
+- [x] Both denial observations pass; all five positive/scope prerequisites are
+  true. Zero domain/transport/inconclusive outcomes. Log out owned sessions,
+  close every private context and browser, and retain no capability/credential.
+  No password, role, account, content, provider or production change occurred;
+  existing synthetic-account normal login timestamps/audit records may advance.
+- [x] Private live receipt: phase1-20261105/live-logout-524aec55/logout-receipt.json;
+  SHA-256: 6c5234c3401e12a7aefced8b704b9060ab9347adc9a47ac060b070800dbd2b15.
+  The native Docker image ID remains a native engine observation, not a newly
+  qualified platform/config digest. No application build/deploy was done.
+- [ ] The complete session-revocation control still needs live password-reset
+  session invalidation; the isolated native test proves stored-token removal,
+  not that live transport subcase. No active report/control was marked green.
+- [ ] P2-D1 dependency approval requested after preparing the complete review.
+  Recommend ImapFlow 2.11.0 only in an optional audit package. No dependency has
+  been installed. Approval would not copy/grant mailbox credentials, read the
+  production recovery backup, change app/mail configuration or add spending.
+
+Current Phase 2 deliverable closure: P2-06/07 complete; other rows retain their
+specific remaining acceptance work. Seven Meteor invocations consumed (including
+one honestly failed fixture run), three remain. No app Goal was recreated.
+
+### P2-D1 approved and optional reader qualified (2026-11-13)
+
+Phil approved the prepared ImapFlow dependency decision. This adds the software
+only; its explicit mailbox/provider/production/recovery-access exclusions remain.
+
+- [x] Install exact ImapFlow 2.11.0 with a separate private package/lockfile,
+  pinned Node 24.22.1/npm 11.19.1, engine enforcement and disabled lifecycle
+  scripts. Twenty-five installed packages include its locked transitive tree.
+  Application dependencies/lockfile are unchanged. Exclude the optional package
+  from the application Docker context, and explicitly capture executable/test
+  files as supplemental test inputs without copying node_modules or credentials.
+- [x] Implement the existing mailbox observation contract using read-only
+  EXAMINE, stable UID SEARCH/FETCH and unchanged UIDVALIDITY. Cap metadata at ten,
+  recheck exact recipient/provider timestamp before body retrieval, then stream
+  only the selected inline plain-text MIME part. Reuse source-owned limits;
+  retain no duplicate policy or raw message representation.
+- [x] Require verified TLS, disabled protocol logs, bounded IMAP responses,
+  acquisition/cleanup deadlines and observed connection closure. Oversize,
+  truncation, unsupported/ambiguous MIME, malformed UTF-8, provider errors and
+  cleanup failures cannot publish a positive receipt. Requests use the unique
+  recipient rather than timezone-dependent SINCE; exact milliseconds are checked
+  afterward. No flag change, deletion, EXPUNGE or mailbox CLOSE operation exists.
+- [x] Optional tests: Windows 13 pass/one explicit OpenSSL-dependent skip; Linux
+  14 pass, zero skips/failures, including a fresh npm ci --ignore-scripts install
+  and real pinned-client TLS/IMAP exchanges on loopback with synthetic mail.
+  Wire proof covers EXAMINE/UID/PEEK, decoded base64, oversized-body rejection,
+  successful logout and rejection of an untrusted certificate. Generated private
+  test certificate/key files were removed after ownership/path checks.
+- [x] Correct initial new-code mailbox-name validation, two explicit lint issues
+  and the synthetic server's missing standard PLAIN challenge exchange. No check,
+  TLS validation or input bound was relaxed. Final explicit tool lint and full
+  application lint pass (330 reviewed surfaces); source-security passes 335
+  cases with zero failures and seven existing conditional skips, including the
+  supplemental input contract. These checks include the uncommitted batch on
+  base bb5d53ae; they are not a clean-commit image qualification.
+- [x] Optional dependency audit: zero advisories in the complete locked runtime
+  dependency tree. No application or Mongo lockfile change. No Meteor invocation,
+  application build/deploy, live mail connection, provider or production access.
+- [ ] Live standalone credential source: filename and field-presence checks found
+  no IMAP credential in the approved Desktop test directory, current staging2
+  settings/env or operator variables. Outbound SMTP is configured, but it is not
+  an inbox-reading credential. The existing connected Gmail tool does not expose
+  its login to this Node process. Ask only for an existing approved vault-item
+  name/path, not a password. Creating a new provider credential or reading the
+  production recovery backup remains a separate approval boundary.
+
+P2-D1 software decision is closed; P2-02/03/08/13 and complete Phase 2 coverage
+remain partially open. The earlier connected-inbox delivery, selected cases,
+native reset and live logout proofs stay accepted. Three Meteor slots remain.
+
+### Connected Gmail selected; IMAP reader removed (2026-11-13)
+
+Phil explicitly rejected IMAP and directed removal of the reader and plan update.
+This supersedes P2-D1's implementation and credential prerequisite above. Historical
+qualification remains a record of what ran, not a reason to retain unused code.
+
+- [x] Remove the complete optional reader, package/lockfile, local installed
+  dependency tree and tests; remove its Docker exclusion and six supplemental
+  input selections. No application dependency or runtime transport is changed.
+- [x] Replace the root-guide and Phase 2 instructions with the existing connected
+  Gmail approach; publish deploy/security-audit/connected-mail.md. Preserve exact
+  recipient/time/body limits and existing accepted delivery/logout/native proofs.
+- [x] Remove the obsolete dependency review; its history remains in 317b3249.
+- [x] Verify affected lint/source checks: full lint passes (330 surfaces); Linux
+  source-security passes 335 cases, zero failures and seven existing skips.
+  Publish the intentional removal and
+  update the canonical wiki. No Meteor run is needed for deleting this optional
+  Node tool and its supplemental selections.
+- [ ] Continue live current-reset/replay/password-reset session invalidation with
+  private connected-Gmail handoff and owned synthetic-account cleanup. This is
+  operator-assisted evidence, not an unattended scanner mailbox qualification.
+
+No new mailbox credential, provider access, production/recovery read or spending
+is proposed. The earlier request for a vault item/path is withdrawn. Three Meteor
+runs remain; full Phase 2 and the final production gates are still open.
+
+### Connected-Gmail current reset and two-session acceptance (2026-11-13)
+
+- [x] Add source-owned current-reset orchestration and the existing connected-tool
+  metadata/body adapter; no new dependency, provider credential or raw-mail path.
+  Ten focused cases cover exact mail gating, timestamp precision, malformed and
+  foreign bodies, successful/reset-replay decisions, failures and redaction.
+- [x] Record the initial one-session observation separately (private suffix a).
+  It passed its current-reset/replay/password/lifetime scope and removed its
+  account; it did not prove the plan's two-independent-session requirement.
+- [x] Extend the scenario to require two independently logged-in sessions and
+  distinct capabilities before mutation, then guarded-method and fresh-token
+  denial for both. The full live suffix-b observation passes all three current
+  reset cases, new-password login, old-password denial and both session denials.
+  Fresh identity-bound remaining lifetime is 29.999981550925927 days (PASS).
+- [x] Check source-owned Gmail ingestion time rather than rounding the request
+  window: the observed internal_date has second precision. One X-Received
+  ingestion timestamp is required. Correct the new adapter's SMTP-id grammar to
+  accept the actual hyphenated identifier, add that fixture and retain the
+  initial metadata rejection honestly. No body was read before metadata passed.
+- [x] Consume and remove the ACL-protected private body/capability handoff; close
+  browser contexts/sessions and remove both new ordinary accounts and owned
+  reset state. A separate fresh admin session independently verifies both exact
+  account identities absent. No existing account password/roles/content changed.
+- [x] P2-10's source/native/live lifetime acceptance is complete. Current reset,
+  replay and password-reset session invalidation subcases are complete; unused
+  genuinely aged-token expiry and full authentication artifact remain open.
+- [x] Add the shared environment-lease/recovery owner and its focused tests:
+  exclusive creation, no time-based stale takeover, exact namespace recovery,
+  previous-job-stopped confirmation and independently verified cleanup. Missing,
+  replaced or malformed ownership cannot release the lease.
+- [x] Final full lint passes (330 reviewed surfaces); the pinned Linux source
+  gate passes 349 cases with zero failures and seven existing conditional skips.
+  Four focused lease cases and ten connected-mail/reset cases pass on Windows.
+  Publish this verified source/lease batch under standing authorization.
+- [ ] Integrate the lease/manifest/minimal-process owner across the remaining
+  protocol families; its source tests do not close every family's live recovery.
+
+Private receipts: phase1-20261105/live-current-reset-20261113-a and -b. The live
+checks ran base b1a47d79 plus these local source additions, not a clean-commit
+image qualification. Suffix-b current-reset receipt SHA-256:
+9ed3309c6b215f9c592f227c82bf3a8f8e9f2e4b9de1c5e065f524441a7d54ed.
+Independent cleanup SHA-256:
+97d23afebc86680d5437474dd73be3ef1b92c21e8f884d28e1305f9ce0520c1e.
+No Meteor invocation, Docker build/deploy, production/recovery access or new
+provider authorization occurred. Three Meteor runs remain. The active report
+still marks unintegrated protocols ERROR; these receipts do not silently turn
+its remaining controls green.
+
+### Remaining protocol source intent and typed evaluation (2026-11-13)
+
+- [x] Extend the sole verification catalog to 68 unique source entries and exact
+  references for all 22 authentication controls. Keep the accepted 29 selected
+  cases unchanged. Catalog membership is source intent, not acquired coverage.
+- [x] Define twelve passwordless controls plus five required positive baselines.
+  Structural observed violations are FAIL; missing identity/store/hooks and
+  transport errors are ERROR. Method denials require exact source-reviewed
+  codes, including experiment-account-restricted for ordinary settings.
+- [x] Remove the unused current boolean passwordless helper; its test imports
+  only the existing immutable V1 historical fixture. There is one current policy
+  owner, not two tables maintained alongside each other.
+- [x] Add five bounded unintended-disclosure channel observations and three
+  exact-code throttle dimensions. No hook-less empty capture can pass. A dirty
+  window, unrelated limiter or incomplete budget cannot prove a throttle.
+  Own login storage/expected handoff are outside unintended-disclosure inputs,
+  consistent with the inspected original scanner; no auth permission changes.
+- [x] Reuse the exact comparison wire classifier and shared private canary parser;
+  share reset-control group membership from the catalog rather than repeating it.
+  Define mutation preconditions/cleanup/recovery for provisioning, logout and
+  throttling. Do not clear unowned limiter state to obtain a passing run.
+- [x] Full application typecheck/lint pass (330 surfaces); pinned Linux source
+  gate passes 359 cases, zero failures and seven existing conditional skips.
+  Twenty affected focused cases pass. Initial new TS narrowing errors were
+  corrected before qualification; no failure is waived.
+- [x] Publish fe08499c and execute the three registered shared-contract cases:
+  slot 8 passes. P2-01 is complete; live passwordless, disclosure,
+  comparison/throttle attribution, aged expiry and full artifact remain open.
+
+No live test, new credential, application permission, dependency, deployment or
+production action is introduced by this source batch. Prepare one clean committed
+source on the existing 6-GiB/two-CPU Linux worker. Do not dispatch hosted Actions.
+
+### Slot 8 accepted; protocol fixture bindings continue (2026-11-13)
+
+- [x] Native full suite on clean committed fe08499c passes: 1,027 server and
+  1,249 client tests, zero failures/hooks, 15/seven existing pending. The three
+  registered passwordless/catalog tests individually passed their required IDs.
+- [x] Verify source before/after equality, actual 6-GiB/two-CPU worker and
+  384-MiB/0.25-CPU Mongo limits, no OOM, read-only/capability-free isolation,
+  unchanged original local services and removal of all owned Docker resources.
+- [x] Retain and byte-verify all 26 proof files in the approved private evidence
+  directory. The Windows UNC copy did not materialize files; explicit Linux-owner
+  copying with exclusive creation/hash verification corrected that transfer.
+  No second Meteor invocation or evidence substitution occurred.
+- [x] P2-01 source intent is closed. P2-06/07 and P2-10 stay closed. Remaining
+  transport/fixture/coverage work must not reopen these unchanged proofs.
+- [ ] Continue the source-only value binding/projection and minimal child-input
+  work. The new parser generates seven scoped credentials, validates eight actor
+  identities including the existing operator, rejects unused/legacy IMAP/policy
+  blocks and projects the accepted selected schema rather than storing two copies.
+  Its three focused Node tests pass; final full checks/integration remain pending.
+
+Native acceptance SHA-256:
+ac1f5445e30a031466ff980900f46dcc97b5031b026fa008ca54f9ad6016d8aa.
+Native receipt SHA-256:
+a5bc9a867196edb7722d2747e5bfd2bdbbaaf10c312b16f67d7850c451e295ed.
+This is supported Meteor/source evidence, not GitHub or release/image acceptance.
+No staging2 account or application change was made by the native run. Two Meteor
+slots remain; no additional run is reserved for the Node-only binding work.
+
+### Protocol binding/process batch complete; P2-D2 decision (2026-11-13)
+
+- [x] Finish the value-only protocol binding contract and selected projection.
+  Eight exact distinct actor IDs/usernames/passwords are required; only seven
+  fresh credentials are generated because the operator already exists. Source
+  owns the two target names, participant ID and per-scope attempt budgets.
+  Policy flags, extra credential blocks and IMAP data are rejected.
+- [x] Project each child to its required actors/values: selected five; comparison
+  learner; reset/expiry pair; passwordless operator/two learners; throttle canary.
+  No mailbox authorization or unrelated provider/signing data enters a child.
+- [x] Extract the existing environment validator into its shared core owner.
+  Linux's allowlist is unchanged; the explicit Windows browser profile adds only
+  required OS/bootstrap paths. Remove the old named export and update all actual
+  callers, rather than leaving a re-export or duplicate validator.
+- [x] Final full lint/330 surfaces and pinned Linux source gate pass: 364 cases,
+  zero failures, seven existing conditional skips. Five focused Windows binding/
+  environment cases pass. Three initial source regressions asserted the old
+  repository-owned environment error text; update them to the new core boundary
+  while preserving exact rejection and no-tool-call assertions. No failure waived.
+- [x] Canonical config/wiki paths verified; bounded dependent public-source search
+  finds no consumer of the new operator schema. No app/TDF field, migration or
+  public-facing control changes. Native slot 8 remains the shared-TS proof;
+  this later Node-only batch needs no additional Meteor invocation.
+- [x] Review the actual passwordless method before live fixture wiring. A source-
+  only injected-factory characterization confirms that an explicitly false
+  account with prior progress reaches token issuance and gets a caller-selected
+  target, whereas the same account without progress is denied. The initial VM
+  harness had a cross-realm String check error, corrected before characterization.
+  No production record was read and no deployed-account prevalence is claimed.
+- [x] P2-D2 resolved by the subsequent laboratory requirement clarification below.
+  The following proposal is historical and withdrawn: replace history-only inference with an explicit
+  experiment marker and stored matching target for existing passwordless resume.
+  Recommend the stricter gate, preserve all histories/accounts, and require
+  explicit operator repair for missing markers. This changes login eligibility,
+  so it is outside routine standing implementation authority. No gate/migration
+  change has been made. Review deploy/security-audit/passwordless-identity-review.md.
+
+Source witness SHA-256:
+7871447731068da1ed9eb1517f9ba8e4d458543d4d162a8d2fb7a50b12f5c183.
+Its four cases use synthetic records/dependency callbacks; they are not native
+Meteor or live login acceptance. The relevant participation grammar excludes @,
+so the specific source risk concerns matching non-email historical usernames.
+Modern ordinary email sign-ins and valid explicitly bound participants are not
+claimed broken. P2-01/06/07/10 stay checked off; complete Phase 2 and final
+production acceptance remain open. Eight Meteor slots consumed, two available.
+
+### P2-D2 resolved: laboratory passwordless requirement (2026-11-13)
+
+- [x] Record Phil's correction: learning progress intentionally grants return
+  access in temporary laboratory experiments. Participants must not need a
+  remembered password or personal identifying information.
+- [x] Withdraw the stricter explicit-marker/target-gate recommendation and its
+  inferred vulnerability label. The source characterization did not establish
+  a defect against this requirement. No gate, account or migration was changed.
+- [x] Correct the normative plan, review, current queue and operator guidance.
+  Missing markers alone are not failed security acceptance. Preserve the
+  progress-backed positive baseline and test the actual intended access bounds.
+- [x] Inspect the existing Prolific start/resume, participation and server API
+  owners. Phil's suggestion is recorded as a separate possible improvement for
+  genuine Prolific entry, not a replacement for general laboratory experiments.
+  No provider call, credential request, account linking or implementation occurs.
+- [ ] Resume the remaining protocol acquisition/ownership/expiry work under this
+  clarified requirement. Accepted P2-01/06/07/10 and native slot 8 remain closed.
+
+This is a documentation correction, with diff/link review only. No Meteor run is
+needed or consumed; two remain. No production action or account-data change.
+
+### Progress-backed return implementation resumed (2026-11-13)
+
+- [x] Add two real-Mongo/Meteor cases for marker-free/password-free progress-backed
+  return, repeated native token issuance with the same participant/progress, and
+  preservation of an already recorded experiment binding against another target.
+  These are tests of current behavior; no login gate is changed.
+- [x] Prepare insert-only source-owned participant/TDF/progress/history fixtures,
+  native learner ownership checks, collision rejection, partial-seed recovery and
+  admin-guarded participant removal with independent absence confirmation.
+- [x] Implement browser acquisition for the twelve passwordless controls and five
+  required baselines, marker-or-owned-progress eligibility, actual reload/resume,
+  typed denials and bounded disclosure capture. Missing/stalled observations stay
+  ERROR; late values cannot turn finished evidence green.
+- [x] Require an actual owning lease callback before acquisition/issuance and after
+  cleanup. No provider or mailbox credential is acquired. Document the required
+  host window, recovery and next-catalog title/claim boundary in
+  deploy/security-audit/progress-return-qualification.md.
+- [x] Full typecheck/lint (330 surfaces) and explicit runtime/launcher lint pass.
+  Linux source gate passes 377 cases, zero failures and seven existing skips;
+  17 focused Windows cases pass. The final Gmail-namespace absence assertion
+  also passes separately. Root host-window bash syntax passes.
+- [x] Publish the intentional source (9accf938) and execute both native cases.
+  Both passed in slot 9, as reconciled against the original receipt in the ledger.
+- [x] Qualify the remote fixture window and live passwordless adapter on staging2. All twelve controls passed on 2026-11-18 with independent cleanup. See the current qualification checkpoint.
+
+Unrelated gaze-tracking/Rspack/harness/docs edits appeared during this work and
+are preserved/excluded. Tests of this working tree can include them; the supported
+native run will use the exact clean committed audit source. P2-01/06/07/10 remain
+closed. The old catalog's literal flag claim is not silently reinterpreted; the
+new observation is gated on the planned next catalog version.
 
 ## Standing execution ledger (2026-11-11)
 
@@ -14,9 +1994,148 @@ invocations including retries on the existing isolated 6 GiB/two-CPU Linux
 worker. Section 0 of the plan defines the standing mandate and real decision
 boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
-records as provenance. The retained Goal objective tracks the remaining written plan.
+records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 10 total, 3 consumed, 0 reserved, 7 available.**
+**Current allowance: 107 total, 106 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+
+Slot 107 passed on exact receiver candidate `946af9ac415b105f1ed7c1fe0c0cf3f73f0410e8` on November 25, 17:05:04–17:07:11 UTC. Server 1,160 passed and 15 pending. Chromium 1,256 passed and seven pending. Zero test or hook failures. The server receiver case ID `de861bceccf65ec6bda886fb03891dee72036aceed922bcfd6c462f6249e468c` passed in the receipt-bound run data. The existing 6 GiB/two-CPU worker checked 266.9 GiB free on C: and 13.7 GiB available guest memory and reused its pinned tool image. Cleanup verified exit 0, absence of job-labelled containers, volumes and network, and removal of generated dependencies and Meteor build state. Retained job `/var/tmp/mofacts-integration.egvE7ZsC`, native receipt SHA-256 `1a1d86ac2c56cb0b93a911973cc6726bc13db9d5d5c06743afb575aecd0f56c2` and startup registry SHA-256 `4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63`. The verified source bundle is in `tmp/mofacts-qualified-build-jhqeIp/verification-bundle.json` under the retained job.
+
+Slot 106 passed on exact published commit `0dd5da2e36fdcee55a3bc4b0d97372029ae1e574`, 14:16:00–14:18:06 UTC November 25, using the existing isolated 6 GiB/two-CPU Linux worker. Server 1,159 passed and 15 pending. Chromium 1,256 passed and seven pending. Zero test or hook failures. Windows had 267 GiB free and the Linux guest reported 13.7 GiB available memory. Use a local Git bundle for the committed checkout if the Windows filesystem ownership check affects direct WSL fetch. The changed package script changed the worker's exact image tag, and the build reused its cached toolchain layers. Retained job `/var/tmp/mofacts-integration.6gIXQUjt`. Native receipt SHA-256 `591813de64bf553aa303ccc43e5357f37763352acc9c12b6a5ea34a97e716c58`. Installed registry SHA-256 `4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63`. Independent cleanup readback confirmed exit 0, no labelled test containers, volumes or network, and removal of installed test dependencies, local Meteor state and generated build files. The capture workspace and results remain. The source composer needs the worker's original `TMPDIR` at `/var/tmp/mofacts-integration.6gIXQUjt/tmp`; with that setting it verified the retained capture and wrote the bundle under `mofacts-qualified-build-JQzJYt`.
+
+Slot 105 passed on exact commit `9ed515de8814cbcff3da9735eb870e6f5a0ced9b` on the existing 6 GiB/two-CPU isolated Linux worker. This commit includes all 26 reviewed SPARC changes and the previously published audit assembly. Server 1,159 and Chromium 1,256 passed, zero failures or failed hooks, 15/seven pending respectively. The tool image was reused and cleanup completed. Worker job `/var/tmp/mofacts-integration.K1SyNsIV`. Its native receipt SHA-256 is `9927e72857b6054983be3874739afb8f0c9639eca8e67607f2c80ed8137736a2`. The bound startup registry SHA-256 `4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63` equals slot 104's retained inventory.
+
+Slot 104 passed on dac554f2. Server 1,164 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. Native startup registry SHA-256 `4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63`, bound by receipt `/var/tmp/mofacts-integration.M2Gpi0Wu/results/native-verification.json` SHA-256 `a660d2befd8fff98a8aa845a587df8546cd6187a047a7b4096c0e681a7df3e3d`. The build command initially rejected digits in its own `--native-receipt-sha256` option. Fixed its parser and reused the exact retained source and receipt for composition. Expected production registry digest `1fec1fc446a3f370cb43cbaaa8a4e26a804c9c21689489b045f857fd35d73046` and canonical composed bundle digest `f4c91227bd42492291f84681e0132977afbfa8700012c3008de02234aea74daa`. The real Docker source-observation stage accepted the bundle without another Meteor invocation. Positive stage log SHA-256 `a616d3f9078e6e914f5cc489c7ac28ea06eb9322b5c5bebcc8f0ad07de2e2c93`.
+
+The operator authorized up to five additional batched Meteor invocations for the remaining audit work (slots 102–106), including retries. Slot 103 passed on d9a01967. Server 1,164 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. The exact retained native receipt and run matched all 248 declared integration cases. The worker reused its tool image and removed the temporary services and cache. Receipt `/var/tmp/mofacts-integration.25Vm4GO3/results/native-verification.json` SHA-256 `ebaaad9aba6917102f390c29ddfc4b95d75ac95df629c124ec97bc1f7e36a9ba`. The actual Docker source-observation stage also passed on that captured commit without an optional proof file. Build-stage log `/var/tmp/mofacts-integration.25Vm4GO3/results/proof-stage.log` SHA-256 `256a5eb106b03cd36ffe21382f6b278f8c2c822d2fc1c0a91a11d7f98d28f961`. A second invocation of the Docker stage with a declared digest and no file correctly refused to embed proof. Log SHA-256 `f3e6df23d41695a59f6a99da21888dd2eead6d17084c0ec21dc11150252203f9`.
+
+Slot 102 consumed on 6ec871ba. The isolated worker reused the tool image, but its synchronous read-only probe failed with `ERR_REQUIRE_ASYNC_MODULE` before application tests started. No passing source receipt was generated. Cleanup completed. Retained log `/var/tmp/mofacts-integration.YwO1UrtQ/results/meteor.log` SHA-256 `18f871109ed255eee4aa2ed9d341c3312956322f01b570088031b7a09c80806e`. The correction makes the new Docker entry point safe to import synchronously and adds a regression for the existing probe.
+
+The operator authorized up to five additional batched local Meteor integration invocations, including retries, for the remaining security-audit work (slots 92–96). Reserve each invocation here before starting the suite and record its outcome afterward.
+
+The operator authorized up to five additional local batched Meteor invocations on 2026-11-24 (slots 97–101), including retries. Slot 101 passed on c57f4f5d. Server 1,164 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. Both installed inventory cases passed, the worker reused its tool image, and cleanup completed. Receipt /var/tmp/mofacts-integration.h9GHPb3Q/results/native-verification.json SHA-256 a866dce8cf139d587eff5224fa121a897c121ddbdc01e9223b7fbc26e98ad7bd. This exhausted the prior general allowance.
+
+Slot 100 ran on ea33327c. Server 1,162 passed, one failed and 15 pending. Chromium 1,255 passed and seven pending. The startup coordinator returned a sealed inventory and matching digests. The test compared 19 named publications to the total of 21, which includes two defaults. Worker cleanup completed. Retained result /var/tmp/mofacts-integration.KwfKPo5Y/results/meteor-run.json SHA-256 88dbbaf4eb8783afff69f40477a76f1d0633aa9ad827c455ae3283f3b0e0a5ba.
+
+Slot 99 passed on f99a5d12. Server 1,160 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. The native Accounts ownership test ran and passed. Tool image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.uzmvSJfk/results/native-verification.json SHA-256 4442205c45cb4891ec463e79d3f6bc3d16e0ba8180d775d76de426dca381f17a.
+
+Slot 98 passed on 6be07c80. Server 1,159 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. Both audio authorization cases passed with stubbed provider responses. The worker reused its image and completed cleanup. Receipt /var/tmp/mofacts-integration.7y8QyG4q/results/native-verification.json SHA-256 5b00d16293eed2878d3eeb820b146a3a98580c81213521641f276df7d032f9c8. An earlier preparation attempt hit a Docker Hub TLS timeout while acquiring MongoDB and cleaned up before invoking Meteor. It did not consume another slot.
+
+Slot 97 passed on f3aaf7f7. Server 1,158 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero failures or hook failures. The corrected copy regression and all targeted method tests passed, and cleanup completed. Receipt /var/tmp/mofacts-integration.s7uyz1Ak/results/native-verification.json SHA-256 937e6c18b815a1bab9c119fb11ab87bb6ff7293e062d00ebbbf4be631bd27bb1.
+
+Slot 96 ran on b515f33b. Server 1,154 passed, one failed and 15 pending. Chromium 1,255 passed and seven pending, zero hook failures. The copied condition family and its shared media survived original-package deletion. The standalone fixture omitted the first copy from later name checks because it deleted that copy inside the loop. Worker cleanup completed. Retained result /var/tmp/mofacts-integration.IvC66HSw/results/meteor-run.json SHA-256 877c85e61538d6aeafcab134675c6890f6f44257296cab74af37c6067f94ac49.
+
+Slot 95 passed on eecebf89. Server 1,154 passed and 15 pending. Chromium 1,255 passed and seven pending. Zero test or hook failures. The worker reused the tool image, completed cleanup and wrote exit status 0. The outer PowerShell wrapper's trailing carriage return affected only its final checksum command. Separate read-back verified receipt /var/tmp/mofacts-integration.4C7RVJkO/results/native-verification.json SHA-256 7428ed0d7c113946768af40cc8229b9074d53b138d8f986e2f31e5a53642215b.
+
+Slot 94 passed on bc2e5d37. Server 1,153 passed and 15 pending; Chromium 1,255 passed and seven pending. Zero failures or hook failures. Same test image as slot 93; cleanup complete. Receipt /var/tmp/mofacts-integration.qvRirbpe/results/native-verification.json SHA-256 b9d679e02d424c35af87a78f903ecafddba2eeab521363149c4a77d139e3e748.
+
+Slot 93 passed on 8909b9d2. Server 1,153 passed and 15 pending; Chromium 1,255 passed and seven pending. Zero failures or hook failures. Cleanup complete. Receipt /var/tmp/mofacts-integration.lhrn28Vi/results/native-verification.json SHA-256 20a285d7588241990e473ba22274f8bdd44343b08ea0a1bb2e488806a897604d.
+
+Slot 92 passed on 8c7b29d5. Server 1,149 passed and 15 pending; Chromium 1,255 passed and seven pending. Zero failures or hook failures. Cleanup complete. Receipt /var/tmp/mofacts-integration.GKsHbSWy/results/native-verification.json SHA-256 5c788df3481609ca1b9862cb763250d12e6ed9978d2628030d24286388b27a84.
+
+Slot 91 passed on 2793fd03. Server 1,148 passed, 15 pending; Chromium 1,255 passed, seven pending. No failures or hook failures. Test image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.03y2PuTt/results/native-verification.json SHA-256 1ae53e7ea50e8363374129a91f732e9eb5e3b9c078f9f3aa98a325c9371163b3. The five-run general allowance is exhausted.
+
+Slot 90 passed on a30c29a2. Server 1,143 passed, 15 pending; Chromium 1,255 passed, seven pending. No failures or hook failures, same tool image as slot 89, cleanup complete. Receipt /var/tmp/mofacts-integration.8Gji2ncw/results/native-verification.json SHA-256 d7ba09913ace171a7dc907422ceef2f2d05debbe592cefec86d5f802643f650d.
+
+The operator authorized five general Meteor invocations (slots 87–91). Slot 87 passed on 3ab1d831 with 1,138 server and 1,255 Chromium passes, zero failures or hook failures and 15/seven pending. Cleanup complete. Receipt /var/tmp/mofacts-integration.VlvKga6d/results/native-verification.json SHA-256 8c076138c0df5ba029917ee9bf64e905ae5cc63f9d9eade530f893bba727e500. CSV account import accepts no course identifier and writes no section membership. Joining a section separately records membership in SectionUserMap. The operator approved skipping existing accounts. Roster changes are pending installed verification. Correction: harrison:papa-parse@1.0.6 installs its parser only in the browser. Slot 88 on fc2cadcf failed the installed import with csv-parser-missing; the earlier ledger description incorrectly assumed a server export. Server 1,140 passed, one failed, 15 pending; Chromium 1,255 passed, zero failed, seven pending. Cleanup complete. Retained meteor.log SHA-256 221a009d6788f7644f929aa58e15ec1945982476fbd9a1cf678d202a97985bb8 at /var/tmp/mofacts-integration.zei1g7SD/results. Hold the roster and progress batch for a passing combined run. The operator selected one current contact per account for admin news drafts; the operator also approved replacing the client-only wrapper with npm papaparse. Slot 89 passed on 890c25ed. Server 1,142 passed, zero failed, 15 pending; Chromium 1,255 passed, zero failed, seven pending. No hook failures. Cleanup complete. Receipt /var/tmp/mofacts-integration.7jQXOHc6/results/native-verification.json SHA-256 8de02e22aec79da31516ae62d21c78306ba0a9451c46ae92812ff71e2fd20b13. The installed importer exercised a quoted comma, duplicate rows, reimport, complete existing-account preservation and section membership.
+
+The operator authorized five additional general Meteor invocations (slots 82–86). Slot 86 failed on 787d3e69. Server 1,107 passed, 31 failed and 15 pending; Chromium 1,255 passed, zero failed and seven pending. Cleanup complete. Retained meteor.log SHA-256 00d7e848766e8838f8143386ad7bd830a9b49430d445eb5d9ac990efce197e41 at /var/tmp/mofacts-integration.W8ukSzXF/results. The catalog binding referenced the ordinary method table; its handler is registered in the asynchronous table. The correction binds all eight to the combined table submitted to Meteor. All eight remain pending runtime verification; a new general run allowance is required. Slot 85 passed on 8a847a07: 1,137 server and 1,255 Chromium passes, zero failures or hook failures, 15/seven pending. Cleanup complete. Receipt /var/tmp/mofacts-integration.s6GQ1Qf8/results/native-verification.json SHA-256 5dfbb6f524e6cd93f702eb0ff9dc48b3bc3fd9695cdd6c44e0942ba982e6b3c3. Slot 84 passed on b4e52539: 1,135 server and 1,255 Chromium passes, zero failures or hook failures, 15/seven pending. Cleanup complete. Receipt /var/tmp/mofacts-integration.hN2KJvZA/results/native-verification.json SHA-256 a1992cfc95622ddda4f5fbf899a9a64cddb92735e68bb79917ffa7e00989225c. Slot 83 passed on 1fba6429: 1,134 server and 1,255 Chromium passes, zero failures or hook failures, 15/seven pending. Cleanup complete. Receipt /var/tmp/mofacts-integration.JOmyC7Hg/results/native-verification.json SHA-256 508f95c153e0b210b2dc1025db3630fbcc232793310716d427ee01961b6d8472. Slot 82 passed on 9482fab8: 1,133 server and 1,255 Chromium cases passed, zero failures or hook failures, 15/seven pending. Cleanup complete. Receipt /var/tmp/mofacts-integration.4hGSjLXg/results/native-verification.json SHA-256 d017f14d6f3d141f85a3282402c99e04d1f7ea82eaecb7d7b00c829cd9c289fc.
+
+The operator authorized five additional general Meteor invocations (slots 77–81). Slot 81 passed on 30747c2c: 1,132 server and 1,255 Chromium passes, zero failures or hook failures, 15/seven pending. Cleanup complete. Retained receipt /var/tmp/mofacts-integration.f7ylj0hv/results/native-verification.json SHA-256 0071a0ef406fd1f27cb08ea66f74481c5eaaa6e696ee60d77705a8d5a5f1fe82. Slot 80 passed on 088e2dd4 for the five direct retirements: 1,131 server and 1,255 Chromium passes, zero failures or hook failures, 15/seven pending. Image reused and cleanup complete. Retained receipt /var/tmp/mofacts-integration.qgxoFVJC/results/native-verification.json SHA-256 4d79161aa7845e6006166e9051e3b270d4e218fa668636dab8fd93c15dea63be. Slot 79 passed on c5b0ef36: 1,133 server and 1,255 Chromium passes, zero failures or hook failures, 15/seven pending. Image reused, cleanup complete. Receipt /var/tmp/mofacts-integration.3GfbBL3v/results/native-verification.json SHA-256 09d6a8c7b57fc0b14a004091360162aa8409420f1e2197f921f9d2020622066c. Slot 78 passed on 4b1fd841: 1,133 server and 1,255 Chromium passes, zero failures or hook failures, 15/seven pending. Image reused, cleanup complete. Receipt /var/tmp/mofacts-integration.1HQGDSJp/results/native-verification.json SHA-256 ac210b203f4fd3bf55595ecbc7550465042af2af6e64fe40e4c9d129fa447b5f. Slot 77 passed on 4bd1d887. Native Meteor recorded 1,132 server and 1,255 Chromium passes, zero failures or hook failures, 15 server and seven client pending. Test image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.XmFwVm6d/results/native-verification.json SHA-256 a142bec1883da75be27e38820452452ec95f6c3d5d9b223ef06ed856fa80877c.
+
+Slot 76 passed on d69a8e43. Native Linux Meteor recorded 1,131 server and 1,255 Chromium passes, zero failures or hook failures, 15 server and seven client pending. All six new bulk deletion cases passed. Image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.mwMXZFwv/results/native-verification.json SHA-256 ab4597cc3409d19bfab6f3a516709052148eeef7b4d46e20260ea80e91a0a18f.
+
+Slot 75 passed on 6eeacab2. Native Linux Meteor recorded 1,125 server and 1,255 Chromium passes with zero failures or hook failures, 15 server and seven client pending. Both new media-list cases passed. Reused the test image; worker cleanup complete. Receipt /var/tmp/mofacts-integration.RzVA8XS8/results/native-verification.json SHA-256 9320c6c33fade091b5387208986f3d84d171251d74c3d5f49f3afcd51198474c. No deployment or live browser acceptance in this batch.
+
+Slot 74 passed on 169d4543. Full local Linux Meteor suite: 1,125 server and 1,253 Chromium passes, zero failures or hook failures, 15 server and seven client pending. The archive tests covered first upload, collision, byte preservation, commit, rollback, cancellation and export rebuilding. Image reused; cleanup complete. Receipt /var/tmp/mofacts-integration.HbRyBP1p/results/native-verification.json SHA-256 6dea8010de4396101c3022dac3b5b8a8096987fc2cfa36341cd3448cfed5b01e. No staging deployment or interactive editor acceptance in this batch.
+
+Slot 73 passed on e0f76f7a. Native Meteor recorded 1,125 server and 1,251 Chromium passes, zero failures or hook failures and 15/seven pending. Verified both owner methods absent, owned-lesson listing, the exact selected lesson response mapping, owner/shared stimulus-file reads and denial for anonymous and unrelated callers. The asynchronous denial regression passed. Image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.0iGWmB7b/results/native-verification.json SHA-256 0983523ccef98c9371acaf5defa6a24207bec85b44e6c184c3eb12633618734a.
+
+Slots 72–76 authorized November 23. Slot 72 passed on 99231f29: 1,124 server and 1,251 Chromium passes, zero failures or hook failures and 15/seven pending. Verified the absence of all three retired names and four package helpers, and presence of active package save, confirm and guarded response lookup methods. The logo-save handler and its internal icon generator also matched their parent revision in a separate source check; no new icon was rendered. Worker image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.Y22oeiXp/results/native-verification.json SHA-256 e694f14badbb014390ccbfbd47b5d47a78989a53b55ea058cf7a379deacd9b87.
+
+Slot 71 passed on 7622470c. Native Meteor recorded 1,123 server and 1,251 Chromium passes, zero failures or hook failures, and 15/seven pending. Both bulk cleanup names were absent. Individual package deletion removed only the expected assets in its synthetic regression. Worker image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.tkx56nQH/results/native-verification.json SHA-256 9bb73f1a0b6dfa1a4252a3f66f5e923ba6b25574bf903aa9b0191d14f2213f7d.
+
+Slot 70 passed on 7a38d92e. 1,124 server and 1,251 Chromium passes, zero failures or hook failures, 15/seven pending. The installed registry omitted deleteAllFiles and retained deletePackageFile. Scoped package deletion preserved unrelated media; pending image removal resumed from its receipt. Worker image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.KLdJFZoI/results/native-verification.json SHA-256 adc62cba42536123705c0cd91093a64cc7afd4d88d685d2c143b35941f447e3e.
+
+Slot 69 passed on 46c0cb4f. Native Meteor recorded 1,124 server and 1,251 Chromium passes, zero failures or hook failures, and 15/seven pending. The two retired commands were absent. MongoDB removed a past-retention record while preserving a current request. Valid reset, expired-link denial and replay checks passed. Worker image reused, cleanup complete. Receipt /var/tmp/mofacts-integration.iYbMEt7v/results/native-verification.json SHA-256 0a4162df7858314d1b7f0b794b52b52cb39b3c04790ff1e29809f19d7dde9edd.
+
+Slot 68 passed on 446105eb. Native Meteor recorded 1,123 server and 1,251 Chromium passes, zero failures or hook failures, and 15/seven pending. Worker image reused, cleanup complete. Receipt /var/tmp/mofacts-integration.5HVtcVts/results/native-verification.json SHA-256 646208492250e65fee3230206e5b9629d5e5c657d79621fd7cecde034637dfdb.
+
+Slot 67 passed on a32c1ddb under the November 22 five-run allowance (slots 67–71). Native Meteor recorded 1,121 server and 1,251 Chromium passes, zero failures or hook failures, and 15/seven pending. Worker image reused. Receipt /var/tmp/mofacts-integration.kKH0E13h/results/native-verification.json SHA-256 f31e29832c721a793af2feb970cec9638e41e0c279bf2c204410fe0c5e7cc469.
+
+Slot 66 ran on 8fc56cde. Both enrollment cases passed: the installed join succeeded with a saved membership and no recipient; a rejected delivery was recorded without private details or a duplicate email on repeat join. Native Meteor reported 1,120 server passes and one failure, 1,251 Chromium passes, 15/seven pending, zero hook failures. The course owner fixture omitted the required course timezone, so its creation/transfer result is unverified. The correction supplies the timezone and asserts the specific rejection reasons. The image was reused and cleanup completed. Receipt: /var/tmp/mofacts-integration.NJkkxrzx/results/meteor-run.json SHA-256 91d0f9af1552191e2095871dd53c3b75fe76e5763dbd852b05c6b89c2ea94f2a.
+
+Slot 65 passed on 1791151a. Native Meteor: 1,118 server and 1,251 Chromium passes, zero failures or hook failures, 15/seven pending. Confirmed the installed due-date enrollment rules, transactional section rename/deletion and stale-edit rollback, reuse of the original invitation IDs, membership and cache handling, and the rendered Blaze editor payload. Image reused and cleanup complete. Receipt: /var/tmp/mofacts-integration.8JGswhjU/results/native-verification.json SHA-256 326c19c452a9b936d87560dfb2754acfe6ce852f5c2ab986aec144e31380d56e.
+
+Slot 64 passed on eef7208f. The installed assignment editor and save, progressive retention and launch, teacher-directory scope and exact fields, and direct invitation all passed. Native Meteor recorded 1,117 server and 1,250 Chromium passes, zero failures and hook failures, and 15/seven pending. Image reused and cleanup complete. Receipt: /var/tmp/mofacts-integration.EM58eIYu/results/native-verification.json SHA-256 5c0ba741659f719336309085a3cf409015f19d63df38e03eb9d7d30fe00756d1.
+
+Slot 63 ran on 3ba206ff on November 22. The direct invitation browser case passed. Native Meteor reported 1,115 server passes and one failure, 1,250 Chromium passes, 15/seven pending and zero hook failures. The genuine teacher-role assignment case failed because alanning:roles 4.0.0 also applied the supplied user projection to the role assignment query, omitting user._id. The corrected call supplies user fields in the separate third argument. A focused test against both installed package functions confirmed the corrected projection with synthetic collection adapters. The directory correction passed in slot 64. The worker reused its image and completed cleanup. Receipt: /var/tmp/mofacts-integration.fKqZrpG6/results/meteor-run.json SHA-256 c8b8dab71a7aa4e04ddc2d686b7dde16b3e53fd219d6cdf2b80afd7d5d21ed28.
+
+Slot 62 passed on e0ff19e6 on November 22. The installed registry excluded all five additional retired commands. The corrected ordinary-account and resumed passwordless study-session cases both passed. Native Meteor recorded 1,115 server and 1,249 Chromium passes, zero failures or hook failures, and 15/seven pending. The existing worker image was reused, the worker exited 0 and cleanup completed. The outer PowerShell-to-Bash launcher reported a trailing carriage return after worker completion; the retained worker status and native verification receipt confirm the result. Receipt: /var/tmp/mofacts-integration.n19jUhUq/results/native-verification.json SHA-256 580e9708e908dfd0243e3e47eeda4e0002df87d5efea30100b94c2dacc2779dd.
+
+Slot 61 ran on 1b793608 on November 22. Native Meteor recorded 1,119 server passes, one server failure, 1,249 Chromium passes, 15/seven pending and zero hook failures. The course command and helper absence case and all four instructor reads passed. The new learner snapshot test manually bound a connection without an Accounts login token, so it was not recognized as a study session. The correction moves the denial assertion to the existing authenticated passwordless DDP session. The correction passed in slot 62. The worker reused its image and cleaned up. Retained failure receipt /var/tmp/mofacts-integration.aAuLRzsn/results/meteor-run.json SHA-256 a91639347dd73b0a4659265f39b781f95d1ea7f78c27d5a8719654026c9b2583.
+
+On November 21 Phil authorized five further general Phase 3 Meteor runs. Reserve only for a committed combined batch.
+
+Five further Phase 3 invocations authorized. Slot 55 consumed and passed on aa9b3a23 on local Linux: 1,110 server and 1,249 Chromium passes, zero failures or hook failures, 15/seven pending. The installed upload metadata test passed, the image was reused and cleanup completed. Receipt /var/tmp/mofacts-integration.8JmdlPj9/results/native-verification.json SHA-256 fbf0d6e5b81b8c67bc9bdddbbe0f08f6dddd52b1392726874283af9446811320. Slot 56 passed on 16e80e31 on November 22. Native Meteor verified 1,114 server and 1,249 Chromium passes, zero test or hook failures and 15/seven pending. The direct settings and progress denials, normal save, passwordless reconnect and SPARC publication cases passed. The worker reused its image and cleanup completed. Receipt /var/tmp/mofacts-integration.L3eVK7aO/results/native-verification.json SHA-256 7fd92f4b46a48d8e678777bf491f3ba0daf46280fe1080ea8e750f39aff83cdc. Slot 57 passed on 942dc38c on November 22. The installed registry omitted all five retired handlers and retained the active help and speech methods. Native verification recorded 1,115 server and 1,249 Chromium passes, 15/seven pending, zero test or hook failures; image reused and cleanup complete. Receipt /var/tmp/mofacts-integration.wT5UTmHu/results/native-verification.json SHA-256 88b14395373b8bea2591d397a26926360c2bae1a62f15f02a24d27045d527433. Slot 58 passed on 1de93329 on November 22. Native Meteor recorded 1,116 server and 1,249 Chromium passes, 15/seven pending and zero test or hook failures. The installed SSO policy and synthetic provider credential separation cases passed, including the account email update. The worker reused its image and cleanup completed. Receipt /var/tmp/mofacts-integration.4dB9SG16/results/native-verification.json SHA-256 1d386f2db9bf1b25c8fce5508522d03dfe4dc9ee7ece39ea5d52aacd171e3eed. Slot 59 ran on 18fae3b1 on November 22. Native Meteor recorded 1,116 server passes, one server failure, 1,249 Chromium passes, 15/seven pending, zero hook failures. Course revocation/reassignment, stale list denial, separate sharing, course asset snapshot and passwordless reconnect passed. A newly shared asset was missing in a subsequent subscription because the independent permission cache still held the preceding result. The worker reused its image and cleaned up. Failure receipt /var/tmp/mofacts-integration.V3RMadWI/results/meteor-run.json SHA-256 4f58498cd21872e42d31c15f5e8af4847cc7e2bc6fcf82145694b6ff03977e99. Slot 60 passed on 32b671dc on November 22. The fresh local Linux run recorded 1,117 server and 1,249 Chromium passes, 15/seven pending, zero test or hook failures. The installed eligible-file, current course-only metadata, course-access lifetime and passwordless return cases all passed. Worker image reused, retained receipt /var/tmp/mofacts-integration.L00dJY9q/results/native-verification.json SHA-256 83ab6eab3741a272c93fbce9d313e9450ac9968053ff9ce605e7bf2b35b6ee59, cleanup complete. No general tests remain authorized. The earlier health-only allowance remains separate.
+
+Slot 54 consumed and passed on 2246fbbd on 2026-11-22, 18:21:30 to 18:22:49 UTC. Native Meteor recorded 1,109 server and 1,249 Chromium passes, zero test or hook failures, and 15/seven existing pending. Both the ZIP-content/cache test and the MongoDB intact-family credential transfer test passed. Identical source observations, retained results and generated-directory cleanup verified. Existing worker image reused. Receipt /var/tmp/mofacts-integration.4dRYQM7h/results/native-verification.json, SHA-256 dc07bd955e7b68358f23a3977b7ba0f88aa7fd84552aa8f805573b605abc3a7d. Full typecheck and lint passed (324 surfaces), as did 369 focused regressions and 172 source-security tests on Linux. Windows source checks could not reach WSL from the restricted process. The Linux run used a process-scoped Git ownership exception for the exact shared checkout.
+
+Slot 53 consumed and passed on e2099adf on 2026-11-22, 18:03:53 to 18:05:15 UTC. The named lesson-copy provider-key regression ran in Meteor. Server 1,108 passed and 15 pending. Chromium 1,249 passed and seven pending. Zero failures and zero hook failures. Both source observations matched. The repaired worker reused image sha256:18975f65e74d445f4a96f49cbafdb00ca7c9895f15a3c4dfe6f96a333d701ca8. C: had 327.48 GiB free before preparation and 323.53 GiB before execution. Full logs, suite evidence and receipt remain in /var/tmp/mofacts-integration.ycRVSZDb/results. Native receipt SHA-256 5cd33cb179d30d23b165049c734c1b730887ef55cf112e0b34011b07f94be80e. Verified removal of the three generated directories and absence of labelled job containers, networks and volumes. The next policy decision covers package exports and ownership transfers.
+
+2026-11-22 local worker storage follow-up. Offline Windows compaction of the Docker and Ubuntu-MoFaCTS disks completed. C: free space rose from 18.78 to 327.53 GiB. The four previously running container identities were verified after restart. Docker listed 27 volumes. The older 15-container inventory differs from the four entries visible after restart. The cause of that inventory change is unverified.
+
+The maintained worker now checks available space before preparation and execution, reuses the tool image by its six build inputs and cleans generated dependencies and build output after failed preparation and terminal runs. The retained image for e2099adf was verified against its original build context and tagged for reuse. Linux lifecycle regression passed for identical and changed inputs, successful execution, setup and execution failures, and low Windows space. Four receipt tests passed. Lifecycle tests used a simulated engine. Slot 53 was still unconsumed at that checkpoint.
+
+Earlier slot 53 reservation for e2099adf. Typecheck, lint and 453 source-security checks passed (seven skipped). Worker preparation stalled before the Meteor invocation with 6 MiB free on the Windows system drive. Stopped this preparation and inspection WSL clients. Guest cleanup was not confirmed. Removing the imported source bundle and five reproducible bundles from completed runs restored 186 MiB at the last check. Native acceptance and publication are pending disk recovery. Follow-up cleanup reclaimed 867 MiB from 29 additional Windows test-source bundles with matching Git identities, published commits and ledger records. Both staging recovery bundles are retained. Windows reported 2,290 MiB free. The Linux filesystem and Docker container-list checks did not return, including a direct Linux-root-directory check. No guest files or Docker objects were removed, no service was restarted, and the Meteor invocation remains reserved.
+
+2026-11-22 follow-up for slot 53: Docker recovered. Removed 41 older local integration tags and five other obsolete local build tags. All 15 containers (four running) and 27 volumes were retained. Docker build cache fell from 73.35 GB to zero and image count from 60 to 15. C: reported 17.78 GiB free afterward; no offline compaction was performed. A read-only staging2 check measured 2 CPUs, 3,836 MiB total RAM, 2,534 MiB available, zero swap and 18 GiB free on the root filesystem. Eight running containers included four JEDM services. The supported worker requires 8 GiB available before invocation. Slots 7 and 8 already recorded staging2 OOM failures. Slot 53 was not invoked on either host and remains reserved pending a suitable remote worker.
+
+Operator resumed local Meteor as the intended future worker; original staging is excluded. Storage recovery before slot 53: removed 174 generated dependency and build directories from 58 completed jobs, each checked against its successful exit record, commit and native receipt. Source snapshots, test receipts, release evidence and the pending job were retained. Free-space increase inside Ubuntu-MoFaCTS was 81.34 GiB. After trim, Docker data VHDX was about 301.66 GiB (41.1 GiB used inside) and the MoFaCTS VHDX about 118.86 GiB (35 GiB used inside). Windows still reported 18.80 GiB available. Offline compaction and service restoration are separate from in-guest cleanup. No Meteor invocation consumed.
+
+Slot 52 consumed on b6483382. Native Meteor passed 12:54:43 to 12:55:52 UTC on 2026-11-22 with 1,107 server and 1,249 Chromium passes, zero failures, 15 and seven pending. Confirmed both named cases for stored-key redaction and owner/shared saves. Source snapshot SHA-256: 958fa0b3c350e66135e60b25526d0fe627b244f88c6990b00c238b653b34f7b4. Full typecheck and lint passed. Source-security checks had 453 passes and seven skips. Wiki 488dd77. Staging2 qualification remains open.
+
+Slot 51 consumed on a371595f. Native Meteor passed 11:59:21 to 12:01:08 UTC on 2026-11-22, with 1,106 server and 1,249 Chromium passes, zero failures and 15 and seven pending. The registry binding, retired subscription, signed-out readiness, runtime lesson, asset metadata, upload/editor permissions and experiment-target cases passed. Source snapshot SHA-256: ec9f79450cda4e98f4b454f4f32debb5072132c1a6017f6321e3527cff9ca123. Typecheck and lint passed; 324 security surfaces. Linux source-security tests: 453 passed and seven skipped. Staging2 qualification remains open.
+
+Slot 50 consumed on 38f1da2e. Native Meteor passed 01:52:29 to 01:53:37 UTC on 2026-11-22, with 1,102 server and 1,249 Chromium passes, zero failures, 15 and seven pending. All three named cases passed: seven retired names, single accessible runtime lesson, and effective due dates scoped to instructor courses. Source snapshot SHA-256: 4f17be0e707f6795144f74a2c4da07fd6105cc76153e6d72d2b82c1f2e8f8557. Typecheck and lint passed; 325 security surfaces. Linux source-security tests: 453 passed, seven skipped. Wiki updated on 1098324.
+
+Slot 49 consumed on 14cdef82. Native Meteor passed 01:40:36 to 01:41:42 UTC on 2026-11-22: 1,100 server and 1,249 Chromium passes, zero failures, 15 and seven pending. The six-name absence and instructor-listing regression passed. Three tests solely for deleted dashboard selector helpers were removed. Source snapshot SHA-256: 35e748467d394675888a321114b48713c544181075ded358f5bb482276137714. Full typecheck and lint passed; 326 security surfaces remain. Source-security suite: 453 passed, seven skipped. Wiki reference updated on 3d43626.
+
+Slot 48 consumed on d65e8e02. The named retirement and retained-listing case passed. Native Meteor passed 23:37:17 to 23:38:37 UTC on 2026-11-21 with 1,103 server and 1,249 Chromium passes, zero failures, and 15 and seven pending respectively. Source snapshot SHA-256: fd04d262c40ffdc7c931a5f90dba3de6219a9ff7d5756b040609e13c67fda14c. Full typecheck and lint passed. Linux source-security checks had 453 passes and seven skips.
+
+Slot 47 consumed on 91d82af1. The exact audio projection and separate dashboard preference read passed. Native integration passed 23:00:20 to 23:01:40 UTC on 2026-11-21 (1,102 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Verified source snapshot SHA-256: e80ff08ac712e5f7cc93906eb46b707749d503fa3df7ddd8c972834a4b0983a7.
+
+Slot 46 consumed on a4df7935. The installed audio save regression passed. Native integration passed 22:22:05 to 22:23:47 UTC on 2026-11-21 (1,102 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: fac9a89c3b4525ca9bca0d27e5eebc3e6149f07496d4aa6cce00aa8b071b744b.
+
+Slot 45 consumed on 25875f14. The installed preference case passed. Native integration passed 22:08:14 to 22:10:15 UTC on 2026-11-21 (1,101 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 54f9232ebaad5e18b142a729f7d5406abc8dddcc19e1defc59386e14ea52912d.
+
+Slot 44 consumed on 9c05b6ee. Both retired logging commands were absent from the installed Meteor registry. Native integration passed 21:53:43 to 21:55:20 UTC on 2026-11-21 (1,100 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: af8f7f62913ed3439d49032b464a2e698ee478deebc32fcb60ce07c1269087c1.
+
+Slot 43 consumed on b319e0d4. Both retired names were absent from the installed Meteor registry. Native integration passed 15:32:40 to 15:34:30 UTC on 2026-11-21 (1,100 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 8d1fcf60a9df972f443b06e427fa1863c2cd3c0317b184f1f86ea6f3ded6f922.
+
+Slot 42 consumed on aecd9d95. Native Linux integration passed 15:05:43 to 15:07:36 UTC on 2026-11-21 (1,100 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Both extended study cases passed. Exact native receipt SHA-256: 8e5bdb55ab3424781b9bc38e889a594d03e5eca021afa5db182a653395db28e3.
+
+Slot 41 consumed on 9d15f8ce. Native Linux integration passed 13:16:38 to 13:18:00 UTC on 2026-11-21 (1,100 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Both named cases passed. Run evidence SHA-256: d83594cdeff15afff3df463b8b9fdd1ec885dd5ae7944119d9bf8e19b0aa2271.
+
+Slot 40 consumed on 16349e26. Native Linux integration passed 11:45:59 to 11:47:09 UTC on 2026-11-21 (1,098 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 7b1e0631dc3f8a3430c1bf9103e53c0958f6dd3ace2edc22182b354ad05937c3.
+
+Slot 39 consumed on 0a8722fc. Native Linux integration passed 21:27:04 to 21:28:20 UTC on 2026-11-20 (1,097 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 31d976888e285e0cb5a317e5f6560ef38f13c3144925a968f009c9aba04f0667.
+
+Slot 38 consumed on 92e3a04d. Native Linux integration passed at 20:04:19 to 20:06:40 UTC on 2026-11-20 (1,096 server and 1,249 Chromium passes, zero failures, 15 and seven pending). Run evidence SHA-256: 2e72ebe6915a5c5a4f46f09ee282a88619ab21feb6a3a6fff019b058ac339ca4.
+
+On November 20 Phil authorized five more Phase 3 Meteor invocations, with fewer
+full runs where related source-checked changes can share one exact-source run.
+
+On November 20 Phil approved five more Phase 3 invocations on the existing
+isolated Linux worker, starting with the V2 admin method bindings.
+
+Phil authorized five additional Phase 3 invocations on the same isolated worker after slot 20.
+
+On November 19 Phil authorized up to five further runs for Phase 3 work, including retries, until an important design decision.
+Phil approved the sole app download owner and continued use of the three remaining runs as needed.
+The original allowance of ten is exhausted. On 2026-11-18 Phil authorized up
+to three additional runs on the same 6 GiB/two-CPU worker for the Phase 3 HTTP
+baseline and first migration, including a retry if needed.
+
 Reserve before invocation. Record the committed source, private receipt
 location, actual start/result and remaining slots here. An exclusive native
 worker invocation marker consumes the slot; a preparation failure or a GitHub
@@ -29,10 +2148,43 @@ within this allowance. Do not import historical invocations into this counter.
 | 1 | bf37152b2771fe7cd3609e7660429c89c14d4c7b | PASS on 2026-11-11. 1,011 server/1,250 client, zero failures/hooks, 15/seven existing pending. Native receipt retained; cleanup passed. |
 | 2 | 7f873ddd4b1d0baf49c6bdd8f24c0270fa019cc8 | FAIL after start 2026-11-11T21:10:00Z: 1,009 server passes/one failed new HTTP test; 1,249 client passes/zero failures, 15/seven pending, zero hook failures. All nine registered admin-denial cases and the V1 record-preservation case pass. The test incorrectly assumed WebApp exposes a Connect stack; corrected to actual HTTP requests against its public listener. Private failed-run evidence retained at phase1-20261105/native-local-v2-activation-7f873ddd. No successful source-after/native receipt is claimed. |
 | 3 | 19334b49b16c6f95944a06a47d3cc743920e640a | PASS 2026-11-11T21:30:44Z-21:32:17Z: 1,010 server/1,249 client, zero failures/hooks, 15/seven existing pending. Exact source before/after, isolation, resource and cleanup checks pass. Private receipt: phase1-20261105/native-local-v2-activation-19334b49. Local service uptime is a separate observation. |
-| 4-10 | Pending | Available. |
+| 4 | 1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140 | PASS 2026-11-11T22:06:49Z-22:08:23Z: 1,018 server/1,249 client, zero failures/hooks, 15/seven existing pending. Shared catalog/outcome cases and all six registered real-Mongo progress-publication cases pass. Exact source/isolation/resources/cleanup pass. Private receipt: phase1-20261105/native-local-authorization-1c72734b. |
+| 5 | c99de5d971ab2595e831af4c4378ffed7930ddbe | PASS 2026-11-12T21:20:06Z-21:21:17Z: 1,021 server/1,249 client, zero failures/hooks, 15/seven existing pending. Both new registered comparison cases pass. Exact source/isolation/resources/cleanup and unchanged local services verified. Private receipt: phase1-20261105/native-phase2-comparison-c99de5d9. |
+| 6 | f3d21e7403cb3bc54db144aec5b729d38956ddc5 | FAIL: 1,023 server passes/one new reset-fixture failure, 1,249 client passes; 15/seven pending, zero hook failures. Mixed-case fixture email did not match the canonical lowercase reset query. Owned resources removed. Failed evidence: phase1-20261105/native-phase2-reset-f3d21e74-failed. |
+| 7 | efa3bd73a75b9df1172e01347498f06a1c5ff3b1 | PASS 2026-11-13T01:25:14Z-01:26:48Z (November 12 local): 1,024 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered reset/session cases pass. Source/isolation/resources/cleanup and unchanged original services verified. Private receipt: phase1-20261105/native-phase2-reset-efa3bd73. |
+| 8 | fe08499c7d3ed4b415d181445b0b05c257a079a2 | PASS 2026-11-13T13:41:02Z-13:42:18Z: 1,027 server/1,249 client, zero failures/hooks, 15/seven existing pending. All three registered passwordless/catalog cases pass. Exact clean source, actual 6-GiB/two-CPU isolation, original-service uptime and owned-resource cleanup verified. Private: phase1-20261105/native-phase2-protocol-fe08499c. |
+| 9 | 9accf938a85d75abdee89ecd821d69ffe7c987b3 | PASS, reconciled 2026-11-15: run 2026-11-13T19:26:12Z to 19:30:30Z; 1,029 server/1,249 client passes, zero failures/hooks, 15/seven existing pending. Both progress-backed return cases pass. Source, isolation/resources, saved service records and exact job resource absence verified. Original receipt: /var/tmp/mofacts-integration.uIoCJYbL/results/native-verification.json; SHA-256 b7119f4c6a525ed05510ac88851bf65d7a424c826a01294702f7ee487915cc53. Native evidence only, not release qualification. |
+| 10 | 93b7d444ba2216cf68c9b930a2e51052f7d022bb | PASS 2026-11-18T19:02:02Z to 19:03:18Z. Server 1,019 passes, client 1,249 passes, zero failures or hook failures, 15/seven existing pending. The v2 active/v1 retained case passed. The exact Linux source gate passed 172/172. Original receipt: /var/tmp/mofacts-integration.f2EE5Wh4/results/native-verification.json. The test environment passed isolation proof. The existing local JEDM scheduler had the same container and image with a later start timestamp, and Docker recorded repeated exit-255 restarts continuing after this run ended without an OOM event in the observed interval. Other existing local service records matched. Native test evidence only. |
+| 11 | 81f3ed29bc2ff20b455c902494ece3a42a277d2d | PASS 2026-11-18T22:10:29Z to 22:11:43Z. 1,041 server, 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. All four mounted health cases passed. No owned containers, cache or network remained. The existing JEDM scheduler continued its exit-255 restarts after this run. Other service records matched. Private receipt: /var/tmp/mofacts-integration.7zzDbZD9/results/native-verification.json. |
+| 12 | 40f4384f60ea6cc95902e7ac49b4a9eb0e598049 | PASS 2026-11-18T22:17:51Z to 22:19:02Z. 1,042 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. All four baseline route cases and the new registered-policy case passed. Source capture, worker isolation, resource limits and owned resource cleanup verified. The pre-existing JEDM scheduler continued its exit-255 restart cycle before and during verification; no OOM event was observed in the checked interval. Other local service records matched. Private receipt: /var/tmp/mofacts-integration.Sd1z4cuc/results/native-verification.json. SHA-256 98f6948e1a48f8c4fcfdef29a2eaf8c6b972ab836fd6be8c7d6dfa1d0a529be0. |
+| 13 | Pending | Unused allowance for retrying the first Phase 3 `/health` batch only. |
+| 14 | 39c6226fbfc9a49a738fdde48a0f991b4a3c20b2 | FAIL 2026-11-19T03:19:51Z to 03:21:00Z (November 18 local). 1,042 server passes, one server failure, 1,249 Chromium passes and zero client failures, 15/seven pending. All activated V2 route tests passed. The existing SPARC instructional-library Mongo test timed out at 2,000 ms while testing interrupted image cleanup. It passed in slots 11 and 12. The worker exited 1 without OOM. Owned resources were removed. The pre-existing JEDM scheduler had a later start time; other service records matched. Private failed-run evidence: /var/tmp/mofacts-integration.blDcnafL/results. |
+| 15 | 39c6226fbfc9a49a738fdde48a0f991b4a3c20b2 | PASS 2026-11-19T12:31:58Z to 12:33:17Z, one authorized retry of the exact slot 14 source. 1,043 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. The migrated audit route cases passed. The previously timed-out SPARC MongoDB test passed in 38 ms. Source identity, isolation and exact cleanup verified. The existing JEDM scheduler had a later start time; other local service records matched. Private receipt: /var/tmp/mofacts-integration.0qJxytYK/results/native-verification.json. SHA-256 9eabc625a205823265b44d2d1ff06ce5b8e25b2183111211c9cd2e4e9d610eef. |
+| 16 | b73e187db6cc345ab2f76a786d279c186a9d649d | PASS 2026-11-19T15:38:53Z to 15:40:16Z. 1,050 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. All seven new HTTP cases passed. Exact source identity, worker isolation and owned-resource cleanup verified. The pre-existing JEDM scheduler had a later start time; other local service records matched. Private receipt: /var/tmp/mofacts-integration.rdRRWcLo/results/native-verification.json. SHA-256 b336bdf7ed765fe465faf7d28a045e0a9cd6d5822b8449a44561affef6e99872. |
+| 17 | d52f75003a2157fbff0d63675590ac102b489eeb | PASS 2026-11-19T15:45:36Z to 15:46:51Z. 1,051 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. The canonical missing CDN asset returned the raw application handler response. Source identity, worker isolation and owned-resource cleanup verified. The pre-existing JEDM scheduler showed a restart; other service records matched. Private receipt: /var/tmp/mofacts-integration.rtsyPget/results/native-verification.json. SHA-256 fce79e96721327df7cc90e8443c32cdac56656e4f480c4647d2030cd0442a35b. |
+| 18 | bf3c9da18a48f4bc6b32613cba9587628d7f5cca | PASS 2026-11-19T18:31:46Z to 18:33:09Z. 1,053 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. Both new Assets and DDP cases passed. Full typecheck/lint and the Linux source-security gate passed (610 passes, 10 existing skips). Exact source, isolation, limits and job cleanup verified. The pre-existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.e1XOu3F0/results/native-verification.json. SHA-256 69801f7de13e8676a37572e00e2912105e493f9a8f692af9b863ab08b42a24fb. |
+| 19 | bd3520f2ef4c368c128cb331ee19aba3af385147 | PASS 2026-11-19T18:58:05Z to 18:59:31Z. Narrow Assets fix over accepted staging2 base 93b7d444. 1,021 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. Typecheck, lint and the exact-revision Linux source gates passed (433 passes, six skips). Earlier source-test attempts used incompatible Windows Git/file modes or a restrictive test umask and did not consume a Meteor slot. Exact capture, isolation, limits and owned cleanup verified; the existing JEDM scheduler record changed during the run. Private receipt: /var/tmp/mofacts-integration.8ASccmum/results/native-verification.json. SHA-256 c28274a39f21169a4488d1c6e423f9e29270d933f14cc8f3f15d9f9ee070ccb6. |
+| 20 | 2cab7a5bb5eb66238f53b139b743d70a5ff3069c | PASS 2026-11-19T19:23:22Z to 19:25:06Z. 1,056 server and 1,249 Chromium passes, zero failures/hooks, 15/seven existing pending. The external runtime-config listener and both default publication tests passed. Exact source, isolation, limits and worker cleanup verified. The pre-existing JEDM scheduler record changed during the run; other existing records matched. Private receipt: /var/tmp/mofacts-integration.bbgnZzS1/results/native-verification.json. SHA-256 a3bf70edb7cd32c4df45cb9a5d1dabc563d961f8846e1abab182eb36a817eda0. |
+| 21 | b7882ab838c514ddd467eff110ad4fc99b382c83 | PASS 2026-11-19T19:42:37Z to 19:44:09Z. 1,059 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. All three baseline groups exercised the ten named publications with existing registrations and guards. Exact source, isolation, limits and job cleanup verified. Existing JEDM scheduler, MoFaCTS app and Mongo replica-init service records changed during the run. Private receipt: /var/tmp/mofacts-integration.eAYZtXrP/results/native-verification.json. SHA-256 686ec08f3a66f139e9f0f2049ffa1d3be124c16c3c94317d20797623e6699ba2. |
+| 22 | 744581b5fc33868e1c47540e2bcfb0ac83a86aa7 | PASS 2026-11-19T19:50:32Z to 19:52:17Z. 1,060 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. All four named-publication cases passed with exact source, limits, isolation and owned-resource cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.ItLdgOrX/results/native-verification.json. SHA-256 f31b65fe763a65a43b9e10da14f408819e97922c1514b205be04c692094a705d. |
+| 23 | 0b9fefa2a3fe2f0cffdb330954989c6229887a97 | PASS 2026-11-19T21:58:14Z to 21:59:51Z. 1,060 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Logged-out readiness, all four own-progress cases, multi-lesson progress and passwordless return passed. Exact source, isolation, limits and owned cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.Q49eKaT8/results/native-verification.json. SHA-256 685f706dc17a355dc082302a5c73664d8b29af1ea1808f74b8dd19a03943853b. |
+| 24 | 748dc6eecbceccab650fd224893f71fef391ddfe | PASS 2026-11-19T22:25:06Z to 22:26:46Z. 1,061 server and 1,249 Chromium passes, no failures/hooks, 15/seven pending. The real-DDP study scope and passwordless return case passed. Exact source, limits, isolation and owned cleanup verified. Existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.YBcb2u3v/results/native-verification.json. SHA-256 3ce5844e97a82a0c8552b4e4e8a4be0c1caceb990e3d295a84ddd47782662371. |
+| 25 | 45b064a79318db7a37a4051ec3be832f5345ee70 | PASS 2026-11-20T00:03:08Z to 00:04:32Z. 1,065 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. All four new package validation and MongoDB concurrency/compatibility cases passed. Exact source, limits, isolation and owned cleanup verified. The existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.lbo94WPE/results/native-verification.json. SHA-256 79a6d76ab0dd3906a8424e50f097bd837154cf6223deb011cd31451a428e7cd1. |
+| 26 | 48cdcaba5a6749871324050ba6d37f06ad5f220f | PASS 2026-11-20T13:05:17Z to 13:06:47Z. 1,073 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. The four real package-method visibility cases, existing root-based access and rollback/recovery cases passed. Exact source, container isolation, resource limits and owned cleanup verified. The existing JEDM scheduler record changed during the run; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.LACeusnk/results/native-verification.json. SHA-256 dfe2f0524e5ba7d5e44db8ac12d8066dcb4241874e68c510184de180a2a95328. |
+| 27 | 26197f918218a5dae429de91bc9ab5fe73b623c4 | PASS 2026-11-20T13:31:15Z to 13:33:10Z. 1,033 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. The package visibility, competing writer and recovery cases passed on the exact staging-only source. Source, isolation, resource limits and owned cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.QG0Yp2YS/results/native-verification.json. SHA-256 9eb4c2cfd9a8fda35b4721e9b4cd4fa546d07bed572381eeb647883f664e565c. |
+| 28 | 343431a9b2ce4d74ba2fe8312c75df53ba2b1825 | PASS 2026-11-20T15:23:19Z to 15:25:18Z. 1,075 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact Assets handlers and disabled client removal verified. Source, worker limits, isolation and owned cleanup verified. The existing JEDM scheduler record changed; other existing service records matched. Private receipt: /var/tmp/mofacts-integration.jdz82r2x/results/native-verification.json. SHA-256 7373ca733be98fdf881efc40138e1bf0da47dc9817499a72b8ddaacbe1a431b3. |
+| 29 | 6ddcf49988ae575190f3227a54b7b0de44518828 | PASS 2026-11-20T16:14:55Z to 16:16:16Z. 1,076 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact admin audit handlers, registered denials, report readback, single-use download and V1 preservation passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.hI4iXRUt/results/native-verification.json. SHA-256 5304aa0f33b965fdb84d95cbc9a6c9da59ebfea6d633dd589887a4bcbf28ed18. |
+| 30 | bc4748ec73678b453f534f97223219465c4e9477 | PASS 2026-11-20T16:25:04Z to 16:26:56Z. 1,077 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact readiness handler identity, distinct logged-out and non-admin denials, and positive diagnostics passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.RkY6DNt1/results/native-verification.json. SHA-256 2e8a1f6c369dfb7762aa104ae905a3ef9004cf8c7b1fc01ad01a222ce29a6d0b. |
+| 31 | 5d664d7496a99b8cf96c077c750c285eb04318a5 | PASS 2026-11-20T16:37:47Z to 16:39:44Z. 1,079 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Eight registered backup bindings and denials, disposable archive workflow, restore confirmation and synthetic restore service passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.1vVqVaIH/results/native-verification.json. SHA-256 50c64fa2dc5345dbc28e6ac2b53821da6fb201520890f899accb887769b1ca16. |
+| 32 | 9f7e662e3dcb11052d690d2a2fdc628702f90d7c | PASS 2026-11-20T16:49:24Z to 16:51:04Z. 1,081 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Five handler identities, administrator denials, draft read, export redaction and invalid-import preservation passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.KIvMELh0/results/native-verification.json. SHA-256 2fb4dad0a170d4dac14ebcc8bdaad2ce2d56c96aa517f99a9bea05df48177485. |
+| 33 | 2e9ae5e2fef8af6226d5197fee3a79ccd37e75f2 | PASS 2026-11-20T16:57:48Z to 16:59:19Z. 1,082 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Exact migration handler and denial precedence, synthetic dry run, pagination, fingerprint and write-conflict checks passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.YfyAG7Va/results/native-verification.json. SHA-256 3be459370e4f6287e1ac17cfe2345b2f5c1febc748c4fcd454282fcbe415d400. |
+| 34 | 715eb02c186edf3490271d239a263c11ce53be95 | PASS 2026-11-20T18:10:58Z to 18:12:34Z. 1,086 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Seven exact handlers, assigned-condition controls and download session/scope regressions passed. Source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.riku5IGJ/results/native-verification.json. SHA-256 e9854f46a0457ffeb792657bc60fe04191f0d943d338ab68b8896deaa0c58691. |
+| 35 | c04cd8e802c17331dc589940c65abc22542e8911 | PASS 2026-11-20T18:22:38Z to 18:24:30Z. 1,091 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Seven registered handlers, private warning suppression, simulation attempt ownership, and admin-only trace export passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.IegOflsU/results/native-verification.json. SHA-256 4ced551f2b85f1372a9213f4ac5714563300ed128692a8e4130f78d3df68bf8d. |
+| 36 | 6d8a42596320b6f4e854c156b27339e8ecb747ae | PASS 2026-11-20T18:33:53Z to 18:35:54Z. 1,093 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. Four installed entries, observed DDP rules, passwordless progress return and cross-study denial passed. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.R2fGsxYi/results/native-verification.json. SHA-256 3ce69678ce90180d010a8650df46c171fa36738662c6ed6fcb09855816311092. |
+| 37 | 82f48c57e1ed8f124b553b61a56bbf7063034755 | PASS 2026-11-20T18:46:00Z to 18:48:01Z. 1,095 server and 1,249 Chromium passes, zero failures/hooks, 15/seven pending. All 16 Prolific bindings and access checks passed. The approved obsolete lookup was absent from the native registry. Exact source, isolation, limits and owned cleanup verified. Private receipt: /var/tmp/mofacts-integration.U0zglv7j/results/native-verification.json. SHA-256 2b698432a7ae99d86f071d056656ac664cc8bfde88a8f76e39872da71c89e625. |
 
-Current result: the V2 admin presentation milestone is published and verified.
-P1-13 is complete. Phase 1 has eleven completed and six open deliverables.
+Historical V2 presentation checkpoint (superseded by the current reconciled tables above): the milestone was published and verified.
+P1-13 is complete. Phase 1 has twelve completed and five open deliverables.
 The approved authentication inventory operation is complete: one successful
 read, sanitized evidence retained, backup labels unchanged and all temporary
 AWS access/environment/workspaces removed. Its 22 selected cases include five
@@ -102,8 +2254,8 @@ The 17-row Phase 1 table below remains the sole deliverable queue.
   zero failures and eight unchanged conditional skips; final browser cleanup,
   cross-user-success and stale-session regressions pass separately. No live
   authentication/provider request was made by these source/model checks.
-- [ ] Run new shared-contract parity and six real-Mongo registered-publication
-  cases in the next authorized full Meteor milestone. Keep actual browser/DDP
+- [x] Run new shared-contract parity and six real-Mongo registered-publication
+  cases: slot 4 passed on 1c72734b. Keep actual browser/DDP
   staging proof separate from deterministic browser models.
 - [ ] Complete the rest of the authentication producer, exact full fixture
   composition and V2 workflow. Do not change production's pinned V1 fixture or
@@ -381,20 +2533,88 @@ that actually needs another check.
 | P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [x] Candidate 70/23 catalog and direct shared imports pass pinned Windows/Linux Node and actual Meteor server parity, including the fixed digest. This completes the source contract, not V2 cutover. |
 | P1-02 | Active/append-only catalog and evidence-contract registries | [x] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators pass mutation tests and shared-runtime checks. Initial catalog remains unreleased until coordinated cutover; released entries/validators are append-only. |
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
-| P1-04 | Integrated build identity/host-release comparison | [ ] Protected receipt loading, independent image comparison and staging2 mount/restoration passed. Wire the permanent release hook and verify the integrated release and receiver identity in the coordinated rollout. |
+| P1-04 | Integrated build identity/host-release comparison | [ ] Integrated staging2 release/receiver identity and rollback passed. The permanent post-acceptance hook source now composes actual running configuration, immutable registry mapping and the existing authority/history/receipt owner; its focused tests pass. Phil selected standard verified recording on 2026-11-12. The canonical procedure now checks the pinned project-local runtime before deployment and uses the verified owner after participant acceptance; old engine-reference assignment/direct authority overwrite are removed. Syntax, actual local preflight and existing-record compatibility pass. Unrelated procedure edits are preserved. Read-only production graph/final-container verification now passes under the approved ten-minute observation and matches the existing P1-D2 baseline. The standard recorder explicitly uses the measured remote budget; defaults/bounds elsewhere remain unchanged. Live post-deployment production recording/cutover is still unexecuted, so this item stays open. Approved P1-D9 defers that operational gate to the final coordinated production window while source/staging work proceeds; no record backfill or production write is authorized. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
-| P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. P1-14 remains open only for staging report ingestion/rollback. Active V1 is restored and unchanged. |
+| P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. The later live V2 application/host/receipt qualification and rollback/restoration close P1-14; staging2 now runs the accepted V2 pair. Reuse that proof instead of repeating the earlier V1-restoration checkpoint. |
 | P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |
-| P1-08 | V2-only new-ingestion endpoint | [ ] V2 receiver/admin source activation is implemented with one composition and one private V2 collection registration; actual registered-handler Meteor proof is next. Production scanner source remains pinned to its matching V1 receiver. Complete the source-owned authentication intent/adapters/baselines and V2 scanner workflow; implement the approved five progress-privacy replacements and their executed positive baselines. |
+| P1-08 | V2-only new-ingestion endpoint | [x] V2 registered-handler, real-Mongo storage, selected authorization and runtime activation passed their recorded Meteor proof. The 29-case live selected authorization proof is accepted; other 21 protocol controls remain Phase 2 ERROR. Fresh operator workflow source 750523d9 now proves actual restricted host/receipt carriage, exact exposure assembly, saved-key encrypted retention, one signed HTTP-201 ingestion, visible admin list/get and exact JSON/HTML download readback. It truthfully retains 18 PASS/five ERROR and exits 1: four HTTP timeout controls were traced to Linux resolver EAI_AGAIN/ETIMEOUT, plus the known incomplete UDP inventory. This completes workflow/receiver integrity, not scanner execution completeness or release qualification. GitHub billing is not required. Production remains independently pinned to V1; no additional Meteor invocation or access grant was made. |
 | P1-09 | Summary projections, indexes and read-time integrity | [x] Bounded history, independent latest queries, exact-ID summaries and read-time validation are implemented. Real Mongo created the indexes and enforced nonce uniqueness. Tests cover retained V1 exclusion, digest integrity and rejected corrupt records. P1-16 owns the full previous-image rollback trial. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [x] V1 runtime readers, methods, collection registration, admin template and ingestion registration are removed from the candidate. Exact-source Meteor slot 3 passes actual V2 HTTP/admin registrations, V1 get/download exclusion and unchanged complete synthetic V1 storage. No deployed database migration/deletion occurred; staging image round-trip remains P1-14/16. |
 | P1-11 | Truthful temporary security-surface manifest update | [x] V2 replaces V1 in the application HTTP registration and reviewed signed-ingestion classification. Existing admin method/download policies are unchanged. Full typecheck/lint pass; the surface verifier covers 330 surfaces. Actual registered-handler Meteor proof is included in this activation batch. |
-| P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Remove the duplicate control tables and V1 ingestion path with the coordinated V2 replacement. |
+| P1-12 | Remove duplicate control tables and V1 ingestion | [x] Remove ten superseded V1 Node scanner/assembly/upload files and duplicate control/format builders from current source; active V2 uses the shared catalog. Immutable Git-backed test-only fixtures preserve old defect witnesses, with no old network/browser producer executable. The production workflow retains its independently reviewed historical checkout; the separately owned V1 host installation/recovery baseline remains until production cutover. The current app V1 ingestion route was already removed/proven under P1-10/11. Full lint and combined Node/source gate pass (843 passes, 12 conditional skips, zero failures). |
 | P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [x] Split source suites and actual Meteor server/client coverage pass. The five V2 Blaze cases passed on bf37152b with 1,011 server/1,250 client passes, zero failures/hooks. P1-08/14 own activation and staging2 acceptance; P1-16 owns image rollback. |
-| P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Staging2 passed protected host collector installation, acquisition and restoration. Prove V2 report ingestion, existing-record exclusion and rollback on the coordinated staging2 candidate. |
+| P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [x] Live paired V2 application/receipt/host qualification passes on 2026-11-11: actual signed report ingestion, admin UI/get/JSON+HTML downloads, V1 rollback exclusion and restored V2 matching hashes. Audit storage remained unchanged, both fixture attempts independently absent, all eleven host controls PASS and receipt MATCH. No SSH/sudo/ACL grant changed. Exposure report truthfully retains one UDP evidence-incomplete ERROR. See live evidence below; the separate sealed P1-16 trial supplies positive V1 and V2 record coverage. |
 | P1-15 | Exact host install/rollback procedure and hashes | [x] Reviewed nine-file cohort, pinned source/controller/baseline hashes, bounded root controller and independent recovery documented/tested. Actual staging2 installation and exact restoration passed; Phase 0 production baseline is retained. No production installation is implied. |
-| P1-16 | Previous-production-image qualification with V2 records | [ ] The actual previous image read and downloaded V1 reports with V2 records in separate storage. Run the full candidate/previous/candidate sequence and verify list, latest and download behavior across the rollback. |
-| P1-17 | Updated operator documentation | [ ] Development and temporary-operator procedures are documented. Finish the operator instructions for the qualified V2 workflow, production cutover and rollback. |
+| P1-16 | Previous-production-image qualification with V2 records | [x] Full sealed staging2 candidate/previous/candidate trial passes on 2026-11-11 using candidate 1c72734b and the selected immutable previous production image. All three phases verify real DDP/admin access, list/latest/get/downloads, other-generation exclusion and unchanged V1/V2 bytes. Candidate/restored download hashes match. Independent cleanup and unchanged original MoFaCTS/JEDM services pass. Exact evidence: phase1-20261105/rollback-roundtrip-1c72734b/attempt1, independent readback SHA-256 8a03c93db239d44081002a478d486361940a5beb6537f9c60b3da2317594fe70. P1-14 still owns live V2 ingestion/cutover. |
+| P1-17 | Updated operator documentation | [x] Current public guide, code-local README, operator Linux repository/exposure procedures, staging2 baseline, standard release-record owner and production cutover/rollback guidance are reconciled. Remove superseded inert/V1-restored claims; preserve immutable historical production setup and dated proof in the ledger. Wiki guidance carries the actual workflow result and DNS limitation. Production execution and complete scanner evidence remain explicitly unverified, not documentation work silently reopened. |
+
+### Release identity hook and candidate preparation (2026-11-11)
+
+- [x] Add the opt-in V2 release-record hook using the existing atomic record/history owner. It rejects missing acceptance or running-image evidence and mismatched source/configuration/platform before writing; receipt readback uses the exact accepted canonical bytes.
+- [x] Add a root deployment-owner image observation without granting the audit account another command. Root permission/identity/replacement/rollback fixtures pass.
+- [x] Add read-only immutable-registry graph observation, preserving root/platform/config identities, and share the existing bounded embedded-source reader without creating CI qualification.
+- [x] Full app typecheck/lint, 46 focused Node cases and the complete security-audit Node regression suite pass (508 passes, eight existing conditional skips, zero failures). The root receipt fixture passes separately. An initial shell exit-code wrapper failed after the tests passed; the corrected wrapper and suite passed. Production commands and deployed receipts are unchanged.
+- [x] Build the exact Meteor-accepted 1c72734b source through supported captured-source Compose. The initial caller omitted the captured TMPDIR and failed before compilation; corrected workspace verification and separate attempt 2 pass. Actual embedded source matches clean identity/snapshot 911feaddc44746834bfce3eb43bd3a7a372f34b5ddf8cd7342eff32a09e11311. The engine reference is sha256:a3d9bdca33831351a042fc4ba4bbcd466887b4776aea1a214d783b9be630dae9; independently resolved configuration is sha256:82da247e1a5f45178d44717ec710e664f3265f684dbc0952a7929b6a40413f39. These distinct identities are not substituted for one another. Bounded private evidence: phase1-20261105/candidate-image-1c72734b.
+- [x] Publish the exact verified candidate after the operator restored Docker sign-in. The second push succeeds. The shared read-only registry observer independently verifies index sha256:a3d9bdca33831351a042fc4ba4bbcd466887b4776aea1a214d783b9be630dae9, Linux/amd64 platform manifest sha256:1e8503c49c1ba74fb7a3832384f6bbd3c0f0dbf39fab121ea101a6ac78609ace and configuration sha256:82da247e1a5f45178d44717ec710e664f3265f684dbc0952a7929b6a40413f39. Original insufficient-scope failure is retained. Publication alone is not release qualification.
+- [x] Bind selected-browser acquisition to the approved target origin before credential entry, on cached sessions and after route navigation. All six browser-model tests pass, including foreign-redirect rejection and failed-cleanup refusal. This is scanner source proof, not live staging authorization acceptance.
+- [x] Install Nmap in MoFaCTS WSL under explicit 2026-11-11 approval. Signed Ubuntu package 7.94+git20230807.3be01efb1+dfsg-3build2 and its required libraries installed; zero existing packages upgraded, no recommended extras installed. Version 7.94SVN verified. No server package/configuration change occurred.
+- [x] Execute and independently verify the sealed candidate/previous/candidate trial: all three phases pass, operation/cleanup exits zero, exact V1/V2 preservation and matching restored downloads, original MoFaCTS and unrelated JEDM services unchanged. Owned containers/network/Mongo directory independently absent. P1-16 is closed; do not repeat this unchanged gate.
+- [x] Complete the one external V2 acquisition against staging2: all eleven applicable external controls PASS, including complete TCP scans, redirects, TLS/certificate/ciphers, secure WebSocket, HSTS/CSP/security headers. UDP observation carriage is present for the independent composite evaluator. Exact bounded evidence is retained at phase1-20261105/external-v2-20261111; external artifact SHA-256 fcaa894c5da5162c50f6af3bf70f4359e7ec2370f58adbff84ad07ba6bb8398b. This is not an ingested full report or host/authentication qualification.
+- [x] Prepare the coordinated V2 restricted-host carriage and access checker. The wrapper returns frozen raw host measurements plus the existing shared V2 receipt through the same no-argument root forced command; no sudo/SSH/ACL grant is added. The Node validator splits only validated canonical bytes. The V2 checker independently evaluates its eleven catalog-derived exposure controls and requires exact receipt MATCH. Current deployed V1 host remains paired with its immutable b69d096d checker selection; neither the host nor application has been cut over.
+- [x] Verify the source batch: full lint/330-surface contract and shell syntax pass; the complete Node audit suite passes 513 cases with nine conditional skips and zero failures. The new root forced-command fixture passes separately (permissions, arguments, symlink and byte bounds). Initial access-test mutations named the wrong Redis field and were corrected to the descriptor owner; the combined root run hit repository Git ownership, so the normal-user suite and root-only fixture are correctly separated. No failed required test remains.
+- [x] Record explicit 2026-11-11 approval for four disposable staging2 actors, two existing teacher-role assignments, reuse of the existing admin and exact cleanup. The operator clarified this is ordinary approved staging2 synthetic work; do not ask again for that scope. No account/grant was created during source preparation.
+- [x] Implement and locally qualify the native insert-only fixture helpers, exact namespace/owner/runtime fencing, seven-row seed/cleanup and source-derived known export bytes. The optional storage subprocess is not an application endpoint. The full Node audit suite passes 525 cases, nine conditional skips, zero failures; full lint passes (330 surfaces). The existing pinned Windows Node and installed private headless Chromium are usable; no dependency installation is needed. Hash-only profile comparison confirms that only four public image fields differ; no credential values were transferred.
+- [ ] Execute the coordinated V2 ingestion/receipt/live selected-case qualification. The local credential inventory has no teacher bindings; do not infer absence or reset existing users. Use native insert-only account creation and the reviewed owned cleanup contract. Source recipe: deploy/security-audit/staging2-authorization-fixtures.md.
+
+### Live staging2 V2 window (2026-11-11, in progress)
+
+- [x] Push reviewed host/fixture sources through 385f6a2d; preserve unrelated SPARC/PhET work. No new Meteor invocation; standing ledger remains four consumed and six available.
+- [x] Activate the exact previously Meteor-accepted candidate 1c72734b using canonical Compose plus the public read-only receipt overlay. Independent running configuration/revision matches the retained registry graph. Existing Mongo, Redis and unrelated JEDM containers remain unchanged. Root-private exact configuration/tooling backups and bounded automatic restoration are active; final acceptance is not yet recorded.
+- [x] Create four native insert-only fixture accounts, grant teacher only to the two teacher fixtures, seed seven owned records, verify exact known own-history export/own progress and reload identity, then remove all four accounts and seven rows. First 29-case run: 28 PASS, one ERROR (anonymous profile redirect sampled before DDP reconnect), zero permission failures. Independent diagnosis observes the correct login page, absent profile and anonymous identity both before/after reconnect. Preserve this failed observation.
+- [x] Correct only the scanner's route wait to require DDP connection, with a behavioral reconnect regression. Full lint/330 surfaces and complete Node suite pass: 526 passes, nine conditional skips, zero failures. The application image/permissions remain unchanged.
+- [x] Publish the ordinary accepted eight-field staging2 release record through the existing history owner and project the credential-free V2 receipt; no ReleaseQualification proof is invented. Record SHA-256 c2d6e598ee57d3bf9c3ed4811e9a40c2cedad38d3f475db1c761fd055730fb71. Protected host receipt MATCH and eleven actual restricted-channel host controls PASS. Arbitrary-command/PTY denial remains intact; no SSH/sudo/ACL change or fresh tagged-runner execution is claimed.
+- [x] Assemble and successfully ingest the truthful 23-control V2 exposure report. Report staging2-v2-exposure-1c72734b-20261112, digest c5df500caab113f1320364be3565c09bcf58b5248f4ec9e03f393602722e7ee4: 22 PASS and one UDP ERROR/evidence-incomplete. All seven external UDP results were inconclusive; silence is not closure. This is neither a confirmed exposure nor an all-green security result. Private evidence: phase1-20261105/live-v2-1c72734b.
+- [x] Corrected source c79735ff passes 29/29 selected cases, zero inconclusive/domain/transport results. Both four-account/two-teacher attempts and their seven rows are cleaned; independent account/role/data absence passes. Actual V2 UI/get/JSON+HTML downloads pass, followed by live V1 restoration and V2 exclusion, then candidate/V2 restoration with identical downloads and unchanged stored records. V1 storage is empty in this live dataset; the separate sealed trial proves positive V1/V2 coverage. The intentional rollback trigger records operation exit 1/restoration 0 with its explicit operator-requested marker; final candidate window exits 0/restoration 0/accepted true. Existing Mongo/Redis/JEDM services remain unchanged. Workstation authority was exactly restored to previous hash 5090b3fa162cffe158cd5ec3dbb27de1a160875bbbe14c1ad22d1585b39552e6 and then candidate hash c2d6e598ee57d3bf9c3ed4811e9a40c2cedad38d3f475db1c761fd055730fb71 through the history owner. Desktop synchronization changes only four public image fields; previous credential-bearing bytes stay in the approved Desktop backup folder. P1-14 closes: 13 of 17 Phase 1 deliverables complete, four remain.
+
+### Bounded access delegation amendment (2026-11-12)
+
+- [x] Apply the user's instruction to let the agent make necessary new security-sensitive access changes within project constraints. Section 0 now delegates minimum scoped staging2/synthetic-fixture/GitHub audit access with explicit purpose, target, credential custody, lifetime, owner, verification and revocation gates. Eligible grants proceed without per-change approval; excluded production/original-staging, broad privilege, AWS/recovery, cost, dependency and destructive-data boundaries remain.
+- [x] The already prepared staging2 report-writer signing binding and separate Desktop-held encryption key fall within that delegation. Reconcile the current checklist, root guide and active procedure references; preserve the earlier pending decision as superseded history, not an execution claim.
+- [x] Execute the delegated report-writer setup under those conditions: the later 2026-11-12 checkpoint records private key custody, exact binding delta, withdrawal, round trip and HTTPS signer checks. Fresh hosted report acceptance remains separately open because GitHub cannot start jobs. No credential grant, key generation or workflow dispatch occurred during this policy/documentation amendment. Phase 1 remains 13/17; the Meteor ledger is unchanged (four consumed, six available).
+
+### Standard verified recording integration (2026-11-12)
+
+- [x] Record the user's selection of standard verified recording. Prepare one public PowerShell wrapper and exact-runtime resolver, both using the existing Node record/history/receipt owner; no second authority or optional recording path.
+- [x] Install Node 24.22.1 only under the operator's local MoFaCTS tools directory, from the official Windows x64 archive. SHA-256 d2046d28c2c3dcd211ac5145c0bf30e2047ef9dfb306693c8c6e2eccd8b95fa5 and Windows Authenticode Valid verified. Global PATH and other project runtimes are unchanged.
+- [x] Wire only the intentional canonical production-procedure hunks: runtime/helper/SSH-trust preflight before configuration/deployment, then six-field candidate plus standard verified recording after existing participant/readiness checks. Remove direct authority overwrite and native engine-reference imageId assignment. Preserve unrelated working edits using an independently staged HEAD-based patch.
+- [x] All three PowerShell sources parse without errors. Execute only the extracted local preflight: pinned Node/helper/trust file pass. The existing local production record parses under the same owner; it was not rewritten. Seven focused Windows tests pass, including version mismatch, missing participant acceptance, classic/containerd identity, replacement/source mismatch and history/receipt behavior. No production connection, app request, image build or deployment occurred.
+- [x] Final source verification passes: full lint/330 surfaces; combined complete Linux audit/source-security gate has 843 PASS, zero failures and 18 conditional skips (including the six Windows-only executions covered by the seven focused Windows passes above). Existing supplemental capture explicitly carries both public PowerShell helpers. Source/procedure whitespace checks pass. No app TypeScript, schema or authentication-boundary change; no Meteor rerun required for these Node/PowerShell workflow changes.
+- [ ] Live use of the standard recorder against production remains unexecuted and needs production authorization. P1-04 remains open for its remaining live acceptance, not for the resolved prerequisite decision. Hosted report acceptance remains separately blocked by GitHub billing. Meteor allowance is unchanged: four consumed, six available.
+
+### V1 source retirement and release-hook preparation (2026-11-12)
+
+- [x] Finish P1-12: retire the ten superseded current V1 scanner/assembler/upload executables/helpers and remove unused V1 control/count/report builders from the shared utility. Existing V2 canonical/command, parsing, crypto and optional recovery-binding consumers remain intact. Frozen Phase 0 defect witnesses obtain exact source from 09f0c32fc2af6d220c699dd805133df3c0507c2e in private test-only temporary files; only their synthetic file assembler is executable. Current source retirement cannot change production's independently pinned historical checkout. Earlier Node source files match that retained revision before removal.
+- [x] Add real fixture-input wiring: V2 workflow/access/wrapper sources belong to the existing supplemental test-input contract, and CI retains full Git history for immutable source witnesses. No network-fetch or substitute-source recovery is used. Retained app/CI proofs keep their original source/input digest; this change does not retroactively qualify new inputs.
+- [x] Prepare observeDeploymentImage.mjs and recordDeploymentRelease.mjs: strict owner SSH/host trust, shared bounded Docker archive graph resolution, same-container recheck, immutable registry mapping, explicit participant acceptance and existing atomic record/history/V2 receipt publication. Classic/containerd, replacement/source mismatch, option injection, acceptance and history/readback cases pass. Canonical production procedure remains unmodified, preserving its unrelated edits; no production SSH, app request, build or deployment ran.
+- [x] Verify final source: full lint/330 surfaces and combined complete Node audit plus expanded V2 source-security gate pass: 843 PASS, 12 existing conditional skips, zero failures. An earlier Windows source invocation could not access its WSL bridge; the supported explicit Linux run passed. Whitespace checks pass. No new app TypeScript, dependency or Meteor invocation. Four Meteor slots consumed, six remain.
+- [x] Independently verify the new signing value against staging2 without accepting a report: correctly signed deliberately invalid body reaches report validation (400); wrong signer is denied (401). This proves the local signing value matches staging2, not that a GitHub job loaded its opaque copy. Private signing-acceptance receipt is retained with setup evidence.
+- [x] Resolve the P1-04 integration choice on 2026-11-12: Phil selected standard verified recording with pinned Node as an operator-PC prerequisite; the following checkpoint owns implementation/verification. No optional basic-recording branch is retained. At that pre-integration checkpoint the procedure recorded Docker's native engine reference as imageId, which is not always a configuration digest; the standard hook now resolves that source ambiguity. No current production engine/record defect is asserted without access. Source and procedure review: deploy/security-audit/release-records.md. Phase 1 is now 14/17 complete; P1-04, P1-08 and P1-17 remain. Hosted acceptance is separately blocked before execution by GitHub billing.
+
+### Report-writer setup execution (2026-11-12)
+
+- [x] Revalidate the existing staging2 GitHub environment's sole main-branch policy, original six SSH/Tailscale secrets and denied-peer variable. Staging2 is healthy on accepted 1c72734b, matching workstation/root receipt digest c2d6e598ee57d3bf9c3ed4811e9a40c2cedad38d3f475db1c761fd055730fb71. Private Desktop folder ACL excludes broad user groups.
+- [x] Create the separate operator-held RSA-3072 report pair in the approved Desktop folder; public SPKI SHA-256 97333d673b88ae8ef32adea7a7bc45514d9adb387bc2ce7c984d61a9a528c17c. The first attempt saved keys then stopped on a string/buffer comparison before any GitHub binding; the corrected explicit resume reused the same pair. Saved-key encryption/decryption of the retained accepted report passes. No private key leaves operator custody.
+- [x] Publish only the existing staging2 ingestion value through private gh stdin, plus the public encryption-key variable. Create/delete/read-back absence/recreate rehearses binding withdrawal before workflow dispatch. Read back only names and public fingerprint; preserve the original environment bindings. Phil owns the continuing scoped staging2 report function. Private finite receipts: phase1-20261105/report-writer-20261112.
+- [x] Activate the reviewed manual-only workflow source and update source/guide references. Full lint and complete Node audit suite pass: 535 PASS, nine conditional skips, zero failures. No app TypeScript/dependency change or Meteor invocation. This source activation is not hosted acceptance.
+- [ ] Hosted exposure acceptance: latest existing CI run 43212891415 did not start; GitHub annotation says account locked due to billing. Do not dispatch the authorized exposure attempt into that known block or change billing. No fresh audit workflow or Meteor test ran. Continue independent source work; retain hosted acceptance as unexecuted.
+
+### Remaining workflow permission boundary (2026-11-11)
+
+- [x] Complete the selected-authentication producer, real-case vector revalidation, file CLI owners and independent protected-receipt metadata composition. Complete owned artifacts never turn missing Phase 2 protocols into PASS. Metadata records completion after acquisition and scanner source still comes from the actual Git checkout.
+- [x] Prepare the complete manual-only staging2 V2 workflow as deploy/security-audit/staging2-v2-workflow.yml.review, outside active workflows. Its tested contracts isolate signing to the uploader, use the public encryption key as a variable, retain only encrypted reports, clean plaintext/SSH material and fail incomplete execution after truthful storage/retention. Exposure and full source contracts remain exact; full is not qualified until its deferred acquisition owners finish.
+- [x] Final verification: full lint/330 surfaces passes; complete Node audit suite 535 PASS, nine conditional skips, zero failures; the actual expanded V2 source-security gate 298 PASS, three existing conditional skips, zero failures. No app TypeScript, Meteor packages or dependencies changed in this scanner/documentation batch. Exact accepted app Meteor proof on 1c72734b is reused; standing allowance remains four consumed, six available.
+- [x] Inspect staging2 GitHub secret/variable names only. Existing environment has six SSH/Tailscale secrets and one denied-peer variable, with no ingestion signing binding or encryption-public-key variable. The earlier explicit identity grant excludes report ingestion. No production query, credential value readback, new secret, key generation, hosted dispatch or spend occurred.
+- [x] Access decision superseded on 2026-11-12: the user delegated necessary scoped staging2 audit access under Section 0 conditions, including this prepared report writer and separate operator-owned encryption key. No further access approval is required for that eligible scope; technical execution remains open. Concrete source review: deploy/security-audit/staging2-report-writer-review.md. The current accepted staging2 deployment remains usable. P1-04, P1-08, P1-12 and P1-17 remain the four current deliverables; this is not Phase 1 or overall audit completion.
 
 ### Worklist reconciliation (2026-11-10, historical)
 
@@ -6715,7 +8935,7 @@ An initial TypeScript syntax error in the new contract was caught by both Node a
 Unrelated pre-existing app-repository CI/test-harness edits were preserved, including the existing package lint/test-artifact edits; the new phase0 and capture test script entries are scoped additions to that file. The config command sheet, production overlay, private settings and environment files were not edited. The public capture guide documents the new opt-in commands and their limitations. Existing production/wiki procedures remain unchanged until actual qualification and command-sheet integration.
 
 
-## 2026-11-05 � approved storage-retention rehearsal, verification reservation
+## 2026-11-05 � approved storage-retention rehearsal, verification reservation
 
 Phil approved one byte-identical candidate/current-pointer rehearsal in the
 existing optional AWS recovery store. Conditional Meteor slot **1 of 10 is
@@ -6729,12 +8949,12 @@ Provider validity, accepted operational rollback and staging2 consumer recovery
 remain separate. Phase 0 remains open.
 
 
-## 2026-11-05 � retention reader verified; one-shot activation
+## 2026-11-05 � retention reader verified; one-shot activation
 
 Implementation `a983d97eacc5f0afadea3683441e8a47dc1768cb` passed full CI
 [42034704576](https://github.com/memphis-iis/MoFaCTS/actions/runs/42034704576)
 and Security [42034704430](https://github.com/memphis-iis/MoFaCTS/actions/runs/42034704430).
-Meteor conditional slot **1/10 used/passed** (13:24:35Z�13:25:34Z, attempt 1,
+Meteor conditional slot **1/10 used/passed** (13:24:35Z�13:25:34Z, attempt 1,
 exit 0): server 975 passed/15 pending, client 1,237 passed/7 pending, zero
 failures/hook failures. Nine slots remain. Both full typechecks, lint, native
 source/capture checks, Compose build, exact source-to-image comparison, ABI,
@@ -6757,7 +8977,7 @@ activation changes no tested helper source and uses `[skip ci]` to avoid another
 Meteor invocation. Retire workflow/access/environment on either result.
 
 
-## 2026-11-05 � approved read-only confirmation; second conditional slot reserved
+## 2026-11-05 � approved read-only confirmation; second conditional slot reserved
 
 Phil accepted publishing the failed observation and verified cleanup, and approved
 one read-only confirmation of the two existing versions. Cleanup was published
@@ -6778,13 +8998,13 @@ workflow and empty environment on either result. The previous mutation verifier
 remains unqualified for reuse; this confirmation makes no mutation.
 
 
-## 2026-11-05 � confirmation reader verified; one-shot read-only activation
+## 2026-11-05 � confirmation reader verified; one-shot read-only activation
 
 Reader `60dfd6f09057530d0b1049e76c37f8610675a7a2` passed full CI
 [42048015246](https://github.com/memphis-iis/MoFaCTS/actions/runs/42048015246)
 and Security [42048015262](https://github.com/memphis-iis/MoFaCTS/actions/runs/42048015262).
 Conditional Meteor **2/10 used/passed; eight remain**. This invocation ran
-14:49:52Z�14:50:54Z, attempt 1, exit 0: server 975 passed/15 pending, client
+14:49:52Z�14:50:54Z, attempt 1, exit 0: server 975 passed/15 pending, client
 1,237 passed/7 pending, zero failures/hook failures. Full lint, both typechecks,
 source/capture/native checks, canonical Compose build, image/source equality,
 ABI, topology rejection, Change Streams startup, protection and cleanup passed.

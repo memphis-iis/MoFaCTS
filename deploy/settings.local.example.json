@@ -51,8 +51,7 @@
       }
     },
     "systemName": "MoFaCTS",
-    "forceSSL": false,
-    "enableDeleteAllButton": false
+    "forceSSL": false
   },
   "debug": false
 }

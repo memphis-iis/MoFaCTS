@@ -1,44 +1,36 @@
+import { registerDirectWriteDenial } from '../../../server/securitySurfaces/registerDirectWriteDenial.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import fs from 'node:fs';
 import { sourceFile, oneNode, evaluateNode, namedFunction, ts } from './helpers/sourceWitnesses.mjs';
 import { canAccessContentUploadTdf, canDownloadOwnedTdfData, canViewDashboardTdf } from '../../../server/lib/contentAccessPolicy.ts';
+import { registerPublicHttpMount } from '../../../server/securitySurfaces/registerHttpRoutes.ts';
+import { HTTP_HEALTH_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 
 function registration(source, expression) {
   return oneNode(source, (node) => ts.isCallExpression(node) && node.expression.getText(source) === expression);
 }
 
-test('Phase 0 manifest: reviewed brand and progressive surfaces retain explicit classifications', () => {
-  const manifest = JSON.parse(fs.readFileSync(new URL('../../../security-surface-contract.json', import.meta.url), 'utf8'));
-  for (const name of ['exportDeploymentBrandProfile', 'getDeploymentBrandProfileDraft',
-    'importDeploymentBrandProfileDraft', 'publishDeploymentBrandProfile', 'saveDeploymentBrandProfileDraft']) {
-    assert.deepEqual(manifest.methods.filter((entry) => entry.name === name), [{ name, access: 'admin-only' }]);
-  }
-  assert.deepEqual(manifest.methods.filter((entry) => entry.name === 'getProgressiveAssignmentLaunch'), [{
-    name: 'getProgressiveAssignmentLaunch',
-    access: 'authenticated-self',
-    notes: 'Cached course availability is not authorization. Before returning member lesson content, the server verifies the current course, current owner/admin status or live section enrollment, course dates and assignment release.',
-  }]);
-  for (const [kind, name, access] of [
-    ['publications', 'deploymentBrandProfile', 'public'],
-    ['exports', 'method:exportDeploymentBrandProfile', 'admin-only'],
-  ]) assert.deepEqual(manifest[kind].filter((entry) => entry.name === name), [{ name, access }]);
-});
-
 test('Phase 0 compatibility: all brand methods authorize before reading, parsing or writing drafts', async () => {
   const source = sourceFile('server/methods/deploymentBrandProfileMethods.ts');
   const calls = [];
   const denied = new Error('Synthetic admin denial');
-  const factory = namedFunction(source, 'createDeploymentBrandProfileMethods', {
+  const factory = namedFunction(source, 'createDeploymentBrandProfileRegistration', {
     Meteor: { Error },
+    BRAND_PROFILE_METHOD_VERIFICATIONS: {},
     readDeploymentBrandProfileDraft: async () => { calls.push('read'); return { updatedAt: 'synthetic', updatedBy: 'synthetic' }; },
     saveDeploymentBrandProfileDraft: async (value, userId) => { calls.push(['save', value, userId]); return value; },
     publishDeploymentBrandProfile: async (userId) => { calls.push(['publish', userId]); return 'published'; },
   });
-  const methods = factory({ requireAdminUser: async (id) => {
+  const registration = factory({ requireAdminUser: async (id) => {
     calls.push(['authorize', id]);
     if (id !== 'synthetic-admin') throw denied;
   } });
+  const { methods, methodBindings } = registration;
+  assert.deepEqual(Array.from(methodBindings, binding => binding.handler), Object.values(methods));
+  assert.ok(methodBindings.every(binding => binding.policy === methodBindings[0].policy));
+  assert.equal(methodBindings[0].policy.kind, 'role');
+  assert.equal(methodBindings[0].policy.role, 'admin');
+  assert.equal(methodBindings.find(binding => binding.handler === methods.exportDeploymentBrandProfile).dataEgress, 'redacted-brand-profile-export');
   for (const method of Object.values(methods)) {
     for (const userId of [null, 'synthetic-learner']) {
       calls.length = 0;
@@ -66,9 +58,9 @@ test('Phase 0 compatibility: all brand methods authorize before reading, parsing
 test('Phase 0 compatibility: anonymous brand publication selects the published key, not the draft', async () => {
   const source = sourceFile('server/publications.ts');
   const call = oneNode(source, (node) => ts.isCallExpression(node)
-    && node.expression.getText(source) === 'Meteor.publish' && node.arguments[0]?.text === 'deploymentBrandProfile');
+    && node.expression.getText(source) === 'registerNamedPublication' && node.arguments[1]?.text === 'deploymentBrandProfile');
   const events = [];
-  const callback = evaluateNode(call.arguments[1], source, {
+  const callback = evaluateNode(call.arguments[3], source, {
     ensurePublishedDeploymentBrandProfile: async () => { events.push('ensure'); },
     DEPLOYMENT_BRAND_PROFILE_KEY: 'synthetic-published-key',
     DynamicSettings: { find: (query) => { events.push(JSON.parse(JSON.stringify(query))); return 'synthetic-cursor'; } },
@@ -84,12 +76,14 @@ test('Phase 0 compatibility: progressive launch uses caller snapshot and denies 
   }
   let snapshot = { assignedCourses: [], publicCourses: [] };
   const callers = [];
-  const launch = namedFunction(source, 'getProgressiveAssignmentLaunch', {
+  const authorize = namedFunction(source, 'authorizeProgressiveLaunch', {
     Meteor: { Error: SyntheticMeteorError },
     requireAuthenticatedUser: (id) => { if (!id) throw new SyntheticMeteorError(401, 'Synthetic authentication denial'); return id; },
+    requireAccountProgressSession: () => {},
     deps: { normalizeCanonicalId: (id) => id, Assignments: { findOneAsync: () => assert.fail('Denied launch must not query assignments') } },
     getCourseSnapshotCache: () => ({ ensureLearnerCoursesSnapshot: async (id) => { callers.push(id); return snapshot; } }),
   });
+  const launch = namedFunction(source, 'getProgressiveAssignmentLaunch', { progressiveLaunchPolicy: { authorize } });
   await assert.rejects(launch.call({ userId: null }, 'assignment', 'endpoint'), (error) => error.error === 401);
   assert.deepEqual(callers, []);
   await assert.rejects(launch.call({ userId: 'synthetic-learner' }, 'assignment', 'endpoint'), (error) => error.error === 403);
@@ -101,10 +95,11 @@ test('Phase 0 compatibility: progressive launch uses caller snapshot and denies 
 test('Phase 0 compatibility: publication denial remains ready(), not a new exception', () => {
   const source = sourceFile('server/publications.ts');
   const call = oneNode(source, (node) => ts.isCallExpression(node)
-    && node.expression.getText(source) === 'Meteor.publish' && node.arguments[0]?.kind === ts.SyntaxKind.NullKeyword);
+    && node.expression.getText(source) === 'registerDefaultPublication'
+    && node.arguments[1]?.text === 'publication:default:role-assignments-self');
   let readyCalls = 0;
   let query;
-  const callback = evaluateNode(call.arguments[1], source, {
+  const callback = evaluateNode(call.arguments[3], source, {
     getRoleAssignment: () => ({ find: (value) => { query = value; return 'synthetic-cursor'; } }),
   });
   assert.equal(callback.call({ userId: null, ready() { readyCalls++; return 'synthetic-ready'; } }), 'synthetic-ready');
@@ -120,9 +115,10 @@ test('Phase 0 compatibility: backup authorization, validation, unblock and actor
   class SyntheticMeteorError extends Error {
     constructor(code, reason) { super(reason); this.error = code; }
   }
-  const factory = namedFunction(source, 'createBackupMethods', {
+  const verification = Object.freeze({ method: 'admin.backups.verify', surfaceId: 'method:admin.backups.verify' });
+  const factory = namedFunction(source, 'createBackupMethodRegistration', {
     Meteor: { Error: SyntheticMeteorError },
-    requireAdmin: namedFunction(source, 'requireAdmin'),
+    BACKUP_METHOD_VERIFICATIONS: { 'admin.backups.verify': verification },
     actorFromContext: namedFunction(source, 'actorFromContext'),
     runExclusiveBackupOperation: (work) => work(),
     verifyBackupJob: async (_deps, actor, id) => { calls.push(['verify', actor.userId, actor.connection.clientAddress, id]); return 'synthetic-result'; },
@@ -131,7 +127,11 @@ test('Phase 0 compatibility: backup authorization, validation, unblock and actor
     calls.push(['authorize', id]);
     if (id !== 'synthetic-admin') throw new SyntheticMeteorError('not-authorized', 'Synthetic denial');
   } };
-  const method = factory(deps)['admin.backups.verify'];
+  const registration = factory(deps);
+  const method = registration.methods['admin.backups.verify'];
+  const binding = registration.methodBindings.find(entry => entry.verification === verification);
+  assert.equal(binding.handler, method);
+  assert.equal(binding.policy.role, 'admin');
   const context = { userId: 'synthetic-admin', connection: { clientAddress: '192.0.2.1' }, unblock() { calls.push(['unblock']); } };
   assert.equal(await method.call(context, ' synthetic-job '), 'synthetic-result');
   assert.deepEqual(calls, [['authorize', 'synthetic-admin'], ['unblock'], ['verify', 'synthetic-admin', '192.0.2.1', 'synthetic-job']]);
@@ -143,21 +143,15 @@ test('Phase 0 compatibility: backup authorization, validation, unblock and actor
   assert.deepEqual(calls, [['authorize', null]]);
 });
 
-test('Phase 0 compatibility: current synchronous collection mutation rules stay synchronous', () => {
-  const source = sourceFile('common/Collections.ts');
-  const rule = (name, bindings = {}) => {
-    const call = registration(source, `${name}.allow`);
-    const property = oneNode(call.arguments[0], (node) => ts.isPropertyAssignment(node) && node.name.getText(source) === 'update');
-    return evaluateNode(property.initializer, source, bindings);
-  };
-  const owned = rule('GlobalExperimentStates');
-  assert.equal(owned('synthetic-owner', { userId: 'synthetic-owner' }, [], {}), true);
-  assert.equal(owned('synthetic-other', { userId: 'synthetic-owner' }, [], {}), false);
-  const admin = rule('DynamicSettings', { Meteor: { roleAssignment: { findOne: (query) =>
-    query['user._id'] === 'synthetic-admin' && query['role._id'] === 'admin' ? {} : undefined } } });
-  assert.equal(admin('synthetic-admin'), true);
-  assert.equal(admin('synthetic-other'), false);
-  assert.equal(rule('DynamicSettings', { Meteor: {} })('synthetic-admin'), false);
+test('Phase 0 compatibility: direct progress and settings denials stay synchronous', () => {
+  for (const [name, operations] of [['progress', ['insert', 'update']], ['settings', ['update']]]) {
+    let installed;
+    registerDirectWriteDenial({ deny(rules) { installed = rules; } }, name);
+    assert.deepEqual(Object.keys(installed).sort(), operations);
+    for (const operation of operations) {
+      assert.equal(installed[operation](), true);
+    }
+  }
 });
 
 test('Phase 0 compatibility: public/shared/owned content routes retain different intentional permissions', () => {
@@ -172,8 +166,14 @@ test('Phase 0 compatibility: public/shared/owned content routes retain different
 
 test('Phase 0 compatibility: health GET/HEAD stay public and other methods fall through', () => {
   const source = sourceFile('server/http/health.ts');
-  const call = registration(source, 'WebApp.connectHandlers.use');
-  const callback = evaluateNode(call.arguments[1], source, { buildHealthPayload: () => ({ status: 'ok' }) });
+  const call = registration(source, 'registerPublicHttpMount');
+  assert.equal(call.arguments[0].getText(source), 'WebApp.connectHandlers');
+  assert.equal(call.arguments[1].text, '/health');
+  assert.equal(call.arguments[2].properties[0].initializer.getText(source), 'HTTP_HEALTH_VERIFICATIONS');
+  const respond = evaluateNode(call.arguments[3], source, { buildHealthPayload: () => ({ status: 'ok' }) });
+  let callback;
+  registerPublicHttpMount({ use(_path, handler) { callback = handler; } }, '/health',
+    { verification: HTTP_HEALTH_VERIFICATIONS, dataEgress: { kind: 'public-operational-metadata' } }, respond);
   for (const method of ['GET', 'HEAD', 'POST', 'OPTIONS']) {
     const events = [];
     callback({ method }, { writeHead: (status) => events.push(status), end: () => events.push('end') }, () => events.push('next'));
@@ -183,7 +183,9 @@ test('Phase 0 compatibility: health GET/HEAD stay public and other methods fall 
 
 test('Phase 0 compatibility: PWA middleware falls through without touching theme storage for other paths/methods', async () => {
   const source = sourceFile('server/http/pwa.ts');
-  const callback = evaluateNode(registration(source, 'WebAppAny.handlers.use').arguments[0], source, {
+  const call = registration(source, 'registerHttpMiddleware');
+  assert.equal(call.arguments[1].text, 'handlers');
+  const callback = evaluateNode(call.arguments[3], source, {
     URL, APPLE_TOUCH_ICON_ROUTE: '/apple-touch-icon.png', APPLE_TOUCH_ICON_PRECOMPOSED_ROUTE: '/apple-touch-icon-precomposed.png',
     PWA_ICON_ROUTE_PREFIX: '/theme-install-icon/', DEPLOYMENT_BRAND_SOCIAL_IMAGE_ROUTE: '/synthetic-social-image',
   });
@@ -198,8 +200,9 @@ test('Phase 0 compatibility: both asset stacks consume the already-stripped moun
   const source = sourceFile('server/runtime/dynamicAssetsRoute.ts');
   const observed = [];
   for (const stack of ['rawConnectHandlers', 'connectHandlers']) {
-    const call = registration(source, `WebApp.${stack}.use`);
-    const callback = evaluateNode(call.arguments[1], source, {
+    const call = oneNode(source, node => ts.isCallExpression(node)
+      && node.expression.getText(source) === 'registerProtocolHttpMount' && node.arguments[1]?.text === stack);
+    const callback = evaluateNode(call.arguments[4], source, {
       deps: {}, getFirstPathSegment: namedFunction(source, 'getFirstPathSegment'),
       serveDynamicAssetById: async (_deps, _res, id) => { observed.push([stack, id]); },
     });
@@ -211,7 +214,9 @@ test('Phase 0 compatibility: both asset stacks consume the already-stripped moun
 test('Phase 0 compatibility: SAML wrong-method 405 and unmatched-path fallthrough remain distinct', () => {
   const source = sourceFile('server/lib/memphisSaml.ts');
   const events = [];
-  const callback = evaluateNode(registration(source, 'WebAppCompat.connectHandlers.use').arguments[0], source, {
+  const call = registration(source, 'registerHttpMiddleware');
+  assert.equal(call.arguments[1].text, 'connectHandlers');
+  const callback = evaluateNode(call.arguments[3], source, {
     getPathname: (req) => req.url,
     MEMPHIS_SAML_LOGIN_PATH: '/synthetic-login', MEMPHIS_SAML_ACS_PATH: '/synthetic-acs', MEMPHIS_SAML_METADATA_PATH: '/synthetic-metadata',
     writeTextResponse: (_res, status) => events.push(status),

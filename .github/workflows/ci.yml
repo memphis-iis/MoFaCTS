@@ -18,6 +18,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # Source-security fixtures resolve the immutable historical scanner;
+          # a shallow checkout cannot satisfy that existing evidence contract.
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v6

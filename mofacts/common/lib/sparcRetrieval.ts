@@ -27,10 +27,9 @@ export function parseSparcRetrievalCategory(value: unknown): SparcRetrievalCateg
     || (record.supportKind !== undefined && record.supportKind !== 'written' && record.supportKind !== 'visual')) {
     throw new Error('Invalid retrieval category');
   }
-  // Type/format and the explicit orientation-ownership contract partition indexes.
+  // Only type and question format partition indexes.
   // Descriptive labels remain embedding context rather than eligibility filters.
   return { kind: record.kind as SparcPrimitiveContext['kind'],
-    ...(record.orientationOwned === true ? { orientationOwned: true as const } : {}),
     responseFormat: record.kind === 'question' ? record.responseFormat : 'text' };
 }
 

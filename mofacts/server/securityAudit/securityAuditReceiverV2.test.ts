@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import crypto from 'node:crypto';
 import { auditReportsV2Fixture as reports } from '../../tests/fixtures/securityAuditReportsV2.ts';
 import { collectionMongoName } from '../../common/collectionOwnership.ts';
+import { ACTIVE_AUDIT_CATALOG } from '../../common/securityAudit/catalogRegistry.ts';
 import { auditDigest, canonicalAuditJson } from '../../common/securityAudit/canonicalReport.ts';
 import { errorReport } from '../../scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
 import { signAuditRequestV2 } from './securityAuditIngestionV2.ts';
@@ -15,6 +16,7 @@ const unavailable = { state: 'unavailable', reason: 'not-provided' } as const;
 const secret = 'synthetic-Meteor-receiver-signing-material';
 let identityReads = 0;
 const receiver = createSecurityAuditReceiverV2({
+  catalog: ACTIVE_AUDIT_CATALOG,
   createReports(name) {
     expect(name).to.equal('security_audit_reports_v2');
     expect(name).not.to.equal(collectionMongoName('SecurityAuditReports'));
@@ -41,7 +43,7 @@ describe('V2 isolated receiver composition on real MongoDB', function() {
       includedUncommittedLocalChanges: false, image: releaseFixture.image, tag: releaseFixture.tag,
       digest: releaseFixture.digest, imageId: releaseFixture.qualification.runningImage.configDigest,
       publishedImage: releaseFixture.qualification.publishedImage };
-    const service = createSecurityAuditReceiverV2({ createReports: () => reports,
+    const service = createSecurityAuditReceiverV2({ catalog: ACTIVE_AUDIT_CATALOG, createReports: () => reports,
       async requireAdminUser(userId) { if (userId !== 'synthetic-admin') throw new Error('Synthetic denial'); },
       loadBuildIdentity: build, platformIdentity: createAuditReceiverPlatformIdentity(build,
         async () => { reads++; return Buffer.from(JSON.stringify(receipt)); }, 'linux/amd64'),

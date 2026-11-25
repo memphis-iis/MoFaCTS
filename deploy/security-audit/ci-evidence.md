@@ -1,5 +1,11 @@
 # Optional CI evidence acquisition
 
+The standard repository Security checks now use the
+[operator Linux executor](operator-security-checks.md), because GitHub billing is
+unavailable. This optional adapter acquires actual hosted evidence only; it does
+not convert operator results into GitHub results or require billing to continue
+the project's supported local verification.
+
 `deploy/collect-ci-evidence.ps1` uses the existing stored GitHub CLI sign-in to
 download bounded source-test evidence. This dependency was approved on
 2026-11-02. Use the Node version in `mofacts/package.json`, installed application

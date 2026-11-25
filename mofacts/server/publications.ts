@@ -1,3 +1,5 @@
+import { publishLessonEditorFields } from './lib/publishLessonEditorFields';
+import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
 import { Roles } from 'meteor/alanning:roles';
 import { Meteor } from 'meteor/meteor';
 import {
@@ -8,6 +10,7 @@ import {
 import {
     createTdfPublicationAccessResolver,
     normalizeIdList,
+    normalizeStimSetIds,
     normalizeOptionalStringId,
 } from './lib/tdfPublicationAccess';
 import { createLessonFamilyResolver } from './lib/tdfLessonFamilyResolver';
@@ -15,23 +18,27 @@ import {
     createExperimentTargetFamilyResolver,
     normalizeExperimentTarget,
 } from './lib/experimentTargetFamilyResolver';
+import { collectionMongoName } from '../common/collectionOwnership';
+import { enrolledCourseLessonIds } from './lib/enrolledCourseLessons';
 import { DynamicSettings } from '../common/Collections';
 import { CLIENT_VERBOSITY_SETTING } from '../common/loggingSettings';
 import { themeRegistry } from './lib/themeRegistry';
 import { ensurePublishedDeploymentBrandProfile } from './lib/deploymentBrandProfileRegistry';
 import { DEPLOYMENT_BRAND_PROFILE_KEY } from '../common/deploymentBrandProfile';
-import { assignmentMemberTdfIds } from '../common/progressiveAssignments';
 import { publishAdminUserPage } from './lib/adminUserPagePublication';
+import { DEFAULT_PUBLICATION_VERIFICATIONS, NAMED_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
+import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
+import { registerNamedPublication } from './securitySurfaces/registerNamedPublication.ts';
+import { participantProgressLessonIds } from './lib/participantProgressScope';
+import { participantConnectionRoot } from './lib/participantSession';
+
+const publicBranding = Object.freeze({ kind: 'public', applicationRateLimit: 'none' } as const);
+const adminPublication = Object.freeze({ kind: 'role', role: 'admin' } as const);
 
 // Use Meteor.roleAssignment — set unconditionally by alanning:roles v4 at
 // package load time. The named export RoleAssignmentCollection resolves to
 // undefined in the webpack bundle due to module loading order.
 const getRoleAssignment = () => (Meteor as any).roleAssignment;
-
-function fieldsWithoutId(document: Record<string, any>) {
-    const { _id, ...fields } = document;
-    return fields;
-}
 
 function normalizePageRequest(page: unknown, limit: unknown, maximumLimit = 200) {
     const normalizedPage = Number(page);
@@ -57,7 +64,7 @@ function buildFilteredUsersSelector(filter: unknown) {
 
 // Auto-publish the current user's role assignments so client-side
 // minimongo is populated for synchronous role checks in roleUtils.ts.
-Meteor.publish(null, function() {
+registerDefaultPublication(Meteor, 'publication:default:role-assignments-self', DEFAULT_PUBLICATION_VERIFICATIONS.roles, function publishCurrentRoleAssignments() {
   if (!this.userId) return this.ready();
   return getRoleAssignment().find({'user._id': this.userId});
 });
@@ -95,18 +102,9 @@ export const TDF_RUNTIME_SECRET_EXCLUSION_FIELDS = {
 // ===== Admin user-page snapshots =====
 // User membership is a page snapshot: Change Streams cannot represent a moving
 // skip/limit window without polling. Role assignments stay live for those IDs.
-Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50) {
-    // Security check - must be admin
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-
-    if (!isAdmin) {
-        return this.ready();
-    }
-
+registerNamedPublication(Meteor, 'filteredUsers', {
+    policy: adminPublication, dataEgress: 'admin-user-page', verification: NAMED_PUBLICATION_VERIFICATIONS.filteredUsers,
+}, async function(filter = '', page = 0, limit = 50) {
     const pageRequest = normalizePageRequest(page, limit);
     if (!pageRequest) return this.ready();
     const query = buildFilteredUsersSelector(filter);
@@ -122,18 +120,9 @@ Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50
 });
 
 // Publish total count for pagination UI
-Meteor.publish('filteredUsersCount', async function(filter = '') {
-    // Security check - must be admin
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-
-    if (!isAdmin) {
-        return this.ready();
-    }
-
+registerNamedPublication(Meteor, 'filteredUsersCount', {
+    policy: adminPublication, dataEgress: 'admin-user-count', verification: NAMED_PUBLICATION_VERIFICATIONS.filteredUsersCount,
+}, async function(filter = '') {
     const query = buildFilteredUsersSelector(filter);
 
     // Use Counts package pattern - publish to a virtual collection
@@ -147,16 +136,10 @@ Meteor.publish('filteredUsersCount', async function(filter = '') {
     // No reactivity needed - count updates on re-subscribe
 });
 
-Meteor.publish('userAdminDashboardUsage', async function(userIds: any[] = []) {
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-    if (!isAdmin) {
-        return this.ready();
-    }
-
+registerNamedPublication(Meteor, 'userAdminDashboardUsage', {
+    policy: adminPublication, dataEgress: 'admin-dashboard-usage', verification: NAMED_PUBLICATION_VERIFICATIONS.userAdminDashboardUsage,
+}, async function(userIds: any[] = []) {
+    if (participantConnectionRoot(this)) return this.ready();
     const normalizedUserIds = normalizeIdList(userIds).slice(0, 100);
     if (normalizedUserIds.length === 0) {
         return this.ready();
@@ -178,18 +161,22 @@ Meteor.publish('userAdminDashboardUsage', async function(userIds: any[] = []) {
 // ===== PHASE 1.5 OPTIMIZATION: Theme Publication =====
 // Publish theme settings reactively instead of using method calls
 // This allows clients to get automatic updates when theme changes
-Meteor.publish('theme', async function() {
-    // Theme is public data - available to all users (even unauthenticated)
-    // This is safe because theme only contains visual styling, no sensitive data
+registerNamedPublication(Meteor, 'theme', {
+    policy: publicBranding, dataEgress: 'theme-settings', verification: NAMED_PUBLICATION_VERIFICATIONS.theme,
+}, async function() {
     await themeRegistry.ensureActiveTheme();
     return DynamicSettings.find({key: 'customTheme'});
 });
 
-Meteor.publish('themeLibrary', function() {
+registerNamedPublication(Meteor, 'themeLibrary', {
+    policy: publicBranding, dataEgress: 'theme-settings', verification: NAMED_PUBLICATION_VERIFICATIONS.themeLibrary,
+}, function() {
     return DynamicSettings.find({key: 'themeLibrary'});
 });
 
-Meteor.publish('deploymentBrandProfile', async function() {
+registerNamedPublication(Meteor, 'deploymentBrandProfile', {
+    policy: publicBranding, dataEgress: 'deployment-brand-profile', verification: NAMED_PUBLICATION_VERIFICATIONS.deploymentBrandProfile,
+}, async function() {
     await ensurePublishedDeploymentBrandProfile();
     return DynamicSettings.find({ key: DEPLOYMENT_BRAND_PROFILE_KEY });
 });
@@ -197,13 +184,11 @@ Meteor.publish('deploymentBrandProfile', async function() {
 // ===== PHASE 2: Dashboard Cache Publication =====
 // Publish user's pre-computed dashboard statistics
 // This provides O(1) dashboard loading instead of N queries
-Meteor.publish('dashboardCache', function() {
-    // Security check - must be authenticated
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    // Only publish user's own cache
+registerNamedPublication(Meteor, 'dashboardCache', {
+    policy: { kind: 'authenticated-self', delivery: 'sync' },
+    dataEgress: 'own-dashboard-cache', verification: NAMED_PUBLICATION_VERIFICATIONS.dashboardCache,
+}, function() {
+    if (participantConnectionRoot(this)) return this.ready();
     return UserDashboardCache.find(
         { userId: this.userId },
         {
@@ -220,13 +205,33 @@ Meteor.publish('dashboardCache', function() {
     );
 });
 
-Meteor.publish('files.assets.all', async function () {
-    // Security: Filter assets based on user role and ownership
-    if (!this.userId) {
-        return this.ready(); // No data for unauthenticated users
-    }
+registerNamedPublication(Meteor, 'files.assets.all', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'accessible-asset-metadata',
+    verification: NAMED_PUBLICATION_VERIFICATIONS['files.assets.all'],
+}, async function() {
 
-    const accessibleStimSetIds = await tdfPublicationAccess.resolveAssetStimuliSetIds(this.userId);
+    const accessibleStimSetIds = await tdfPublicationAccess.resolveAssetStimuliSetIds(this.userId as string);
+    // Course-only metadata is delivered once per subscription. A later file
+    // change must not be streamed under a grant that may already have ended.
+    const assigned = await resolveAssignedRootTdfIdsForUser(this.userId as string);
+    const snapshotIds: string[] = [];
+    if (assigned.length) {
+        const fields = { stimuliSetId: 1, 'content.tdfs.tutor.setspec.condition': 1, 'content.tdfs.tutor.setspec.conditionTdfIds': 1 };
+        const roots = await Tdfs.find({ _id: { $in: assigned } }, { fields }).fetchAsync();
+        const children = await lessonFamilyResolver.findConditionChildrenForRoots(roots, { stimuliSetId: 1 });
+        const independent = new Set(accessibleStimSetIds);
+        const courseSets = normalizeStimSetIds([...roots, ...children].map(tdf => tdf.stimuliSetId)).filter(id => !independent.has(id));
+        if (courseSets.length) {
+            const files = await DynamicAssets.collection.find(
+                { userId: { $ne: this.userId }, 'meta.stimuliSetId': { $in: courseSets } },
+                { fields: DYNAMIC_ASSET_PUBLICATION_FIELDS }
+            ).fetchAsync();
+            for (const { _id, ...metadata } of files) {
+                this.added(collectionMongoName('DynamicAssets'), _id, metadata);
+                snapshotIds.push(_id);
+            }
+        }
+    }
     const assetQuery = accessibleStimSetIds.length > 0
         ? {
             $or: [
@@ -236,14 +241,14 @@ Meteor.publish('files.assets.all', async function () {
         }
         : { userId: this.userId };
 
-    return DynamicAssets.collection.find(assetQuery, { fields: DYNAMIC_ASSET_PUBLICATION_FIELDS });
+    const liveQuery = snapshotIds.length ? { ...assetQuery, _id: { $nin: snapshotIds } } : assetQuery;
+    return DynamicAssets.collection.find(liveQuery, { fields: DYNAMIC_ASSET_PUBLICATION_FIELDS });
 });
 
-Meteor.publish('assets', async function(ownerId: any, stimSetId: any) {
-    // Security: Require authentication to access stimulus assets
-    if (!this.userId) {
-        return this.ready();
-    }
+registerNamedPublication(Meteor, 'assets', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'stimulus-set-asset-metadata',
+    verification: NAMED_PUBLICATION_VERIFICATIONS.assets,
+}, async function(ownerId: any, stimSetId: any) {
     if (!stimSetId) {
         return this.ready();
     }
@@ -290,97 +295,53 @@ Meteor.publish('assets', async function(ownerId: any, stimSetId: any) {
     );
 });
 
-Meteor.publish('userExperimentState', function(tdfId: any) {
-    if (tdfId && typeof tdfId === 'object') {
-        const normalizedIds = normalizeIdList(tdfId);
-        if (!normalizedIds.length) {
-            return this.ready();
-        }
-        return GlobalExperimentStates.find({userId: this.userId, TDFId: {$in: normalizedIds}});
-    } else if (tdfId !== null && tdfId !== undefined) {
-        const normalizedTdfId = normalizeOptionalStringId(tdfId);
-        if (!normalizedTdfId) {
-            return this.ready();
-        }
-        return GlobalExperimentStates.find({userId: this.userId, TDFId: normalizedTdfId});
+registerNamedPublication(Meteor, 'userExperimentState', {
+    policy: { kind: 'authenticated-self', delivery: 'sync' },
+    dataEgress: 'own-experiment-progress', verification: NAMED_PUBLICATION_VERIFICATIONS.userExperimentState,
+}, function(tdfId: any) {
+    const multiple = tdfId && typeof tdfId === 'object';
+    const lessonId = multiple ? null : normalizeOptionalStringId(tdfId);
+    const requested = multiple ? normalizeIdList(tdfId) : lessonId ? [lessonId] : [];
+    if (!requested.length) return this.ready();
+    const userId = this.userId;
+    const scope = participantProgressLessonIds(this, Tdfs);
+    if (!scope) {
+        return GlobalExperimentStates.find({ userId, TDFId: multiple ? { $in: requested } : lessonId });
     }
-    return this.ready();
+    return scope.then(allowed => {
+        const visible = requested.filter(id => allowed.includes(id));
+        if (!visible.length) return this.ready();
+        return GlobalExperimentStates.find({ userId, TDFId: { $in: visible } });
+    });
 });
 
-async function publishRuntimeTdfsByIds(publication: any, tdfIdOrIds: any) {
-    if (!publication.userId) {
-        return publication.ready();
-    }
+registerNamedPublication(Meteor, 'currentTdf', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'runtime-lesson',
+    verification: NAMED_PUBLICATION_VERIFICATIONS.currentTdf,
+}, async function(tdfId: unknown) {
+    const id = normalizeOptionalStringId(tdfId);
+    if (!id) return this.ready();
 
-    const assignedRootIds = new Set<string>(await resolveAssignedRootTdfIdsForUser(publication.userId as string));
-    const assignedConditionIdsPromise = lessonFamilyResolver
-        .resolveConditionChildIdsForRootIds(Array.from(assignedRootIds))
-        .then((ids: string[]) => new Set(ids));
-    const requestedTdfRequiresCourseContext = async (requestedId: string) => {
-        if (assignedRootIds.has(requestedId)) {
-            return true;
-        }
-        const assignedConditionIds = await assignedConditionIdsPromise;
-        return assignedConditionIds.has(requestedId);
-    };
-    const canAccessRequestedTdf = async (requestedId: string) => {
-        const tdf = await Tdfs.findOneAsync(
-            { _id: requestedId },
-            { fields: { _id: 1, ownerId: 1, accessors: 1, tdfAvailability: 1, 'content.tdfs.tutor.setspec.userselect': 1 } }
-        );
-        if (!tdf) {
-            return false;
-        }
-        if (tdf.tdfAvailability === 'repair-required') {
-            return false;
-        }
-        if (await requestedTdfRequiresCourseContext(requestedId)) {
-            return false;
-        }
-        return canViewDashboardTdf(publication.userId, tdf);
-    };
-
-    if (tdfIdOrIds && typeof tdfIdOrIds === 'object') {
-        const normalizedIds = normalizeIdList(tdfIdOrIds);
-        if (!normalizedIds.length) {
-            return publication.ready();
-        }
-        const allowedIds: string[] = [];
-        for (const requestedId of normalizedIds) {
-            if (await canAccessRequestedTdf(requestedId)) {
-                allowedIds.push(requestedId);
-            }
-        }
-        if (!allowedIds.length) {
-            return publication.ready();
-        }
-        return Tdfs.find({ _id: { $in: allowedIds } }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
-    }
-
-    const normalizedTdfId = normalizeOptionalStringId(tdfIdOrIds);
-    if (!normalizedTdfId) {
-        return publication.ready();
-    }
-    if (!await canAccessRequestedTdf(normalizedTdfId)) {
-        return publication.ready();
-    }
-    return Tdfs.find({ _id: normalizedTdfId }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
-}
-
-Meteor.publish('currentTdf', async function(tdfId: any) {
-    return publishRuntimeTdfsByIds(this, tdfId);
-});
-
-Meteor.publish('tdfByIds', async function(tdfIds: any) {
-    if (!Array.isArray(tdfIds)) {
+    const tdf = await Tdfs.findOneAsync(
+        { _id: id },
+        { fields: { _id: 1, ownerId: 1, accessors: 1, tdfAvailability: 1, 'content.tdfs.tutor.setspec.userselect': 1 } }
+    );
+    if (!tdf || tdf.tdfAvailability === 'repair-required' || !await canViewDashboardTdf(this.userId, tdf)) {
         return this.ready();
     }
-    return publishRuntimeTdfsByIds(this, tdfIds);
+
+    const assignedRoots = await resolveAssignedRootTdfIdsForUser(this.userId as string);
+    if (assignedRoots.includes(id)) return this.ready();
+    const assignedConditions = await lessonFamilyResolver.resolveConditionChildIdsForRootIds(assignedRoots);
+    if (assignedConditions.includes(id)) return this.ready();
+    return Tdfs.find({ _id: id }, { fields: TDF_RUNTIME_SECRET_EXCLUSION_FIELDS });
 });
 
 // Publication for content/TDF editor - returns TDF with full content for editing
-Meteor.publish('tdfForEdit', async function(tdfId: any) {
-    if (!this.userId) return this.ready();
+registerNamedPublication(Meteor, 'tdfForEdit', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'owner-editor-content',
+    verification: NAMED_PUBLICATION_VERIFICATIONS.tdfForEdit,
+}, async function(tdfId: any) {
     if (!tdfId) return this.ready();
 
     // Fields needed for both content editor (stimuli) and TDF editor (full content)
@@ -402,78 +363,8 @@ Meteor.publish('tdfForEdit', async function(tdfId: any) {
         throw new Meteor.Error('not-authorized', 'Only owner can edit this TDF');
     }
 
-    return Tdfs.find({ _id: tdfId }, { fields: editFields });
+    return publishLessonEditorFields(this, { _id: tdfId, ownerId: tdf.ownerId }, editFields, true);
 });
-
-// Lightweight publication for editor initial load - excludes full stimuli array
-// Use this for faster initial page load, then fetch stimuli separately if needed
-Meteor.publish('tdfForEditMetadata', async function(tdfId: any) {
-    if (!this.userId) return this.ready();
-    if (!tdfId) return this.ready();
-
-    // Metadata fields only - excludes large stimuli array (~90% payload reduction)
-    const metadataFields = {
-        stimuliSetId: 1,
-        stimulusFileName: 1,
-        ownerId: 1,
-        accessors: 1,
-        'content.fileName': 1,
-        'content.tdfs.tutor.setspec': 1,
-        // Include rawStimuliFile structure info but not full data
-        'rawStimuliFile.setspec.clusters': 1,
-        'rawStimuliFile.setspec.sparcPages': 1
-        // Explicitly EXCLUDES: stimuli (large array)
-    };
-
-    const tdf = await Tdfs.findOneAsync({ _id: tdfId }, { fields: { ownerId: 1, accessors: 1 } });
-    if (!tdf) {
-        throw new Meteor.Error('not-found', 'TDF not found');
-    }
-    if (!isTdfOwner(this.userId, tdf)) {
-        throw new Meteor.Error('not-authorized', 'Only owner can edit this TDF');
-    }
-
-    return Tdfs.find({ _id: tdfId }, { fields: metadataFields });
-});
-
-// ===== LIGHTWEIGHT TDF LISTING PUBLICATION =====
-// For dashboard/listing pages - excludes large 'unit' arrays (50-70% bandwidth savings)
-// Use this for pages that only need TDF metadata, not full content
-const TDF_LISTING_FIELDS = {
-    _id: 1,
-    tdfAvailability: 1,
-    stimuliSetId: 1,
-    ownerId: 1,
-    accessors: 1,
-    conditionCounts: 1,
-    'content.fileName': 1,
-    'content.isMultiTdf': 1,
-    'content.tdfs.tutor.setspec.lessonname': 1,
-    'content.tdfs.tutor.setspec.duedate': 1,
-    'content.tdfs.tutor.setspec.tags': 1,
-    'content.tdfs.tutor.setspec.contentLanguage': 1,
-    'content.tdfs.tutor.setspec.recommendedUiLocales': 1,
-    'content.tdfs.tutor.setspec.translationStatus': 1,
-    'content.tdfs.tutor.setspec.condition': 1,
-    'content.tdfs.tutor.setspec.conditionTdfIds': 1,
-    'content.tdfs.tutor.setspec.userselect': 1,
-    'content.tdfs.tutor.setspec.experimentTarget': 1,
-    'content.tdfs.tutor.setspec.showPageNumbers': 1,
-    'content.tdfs.tutor.setspec.speechIgnoreOutOfGrammarResponses': 1,
-    'content.tdfs.tutor.setspec.srfilterclose': 1,
-    'content.tdfs.tutor.setspec.speechOutOfGrammarFeedback': 1,
-    'content.tdfs.tutor.setspec.audioPromptMode': 1,
-    'content.tdfs.tutor.setspec.audioInputEnabled': 1,
-    'content.tdfs.tutor.setspec.audioInputSensitivity': 1,
-    'content.tdfs.tutor.setspec.audioPromptFeedbackSpeakingRate': 1,
-    'content.tdfs.tutor.setspec.audioPromptQuestionSpeakingRate': 1,
-    'content.tdfs.tutor.setspec.audioPromptVoice': 1,
-    'content.tdfs.tutor.setspec.audioPromptQuestionVolume': 1,
-    'content.tdfs.tutor.setspec.audioPromptFeedbackVolume': 1,
-    'content.tdfs.tutor.setspec.audioPromptFeedbackVoice': 1,
-    'content.tdfs.tutor.unit.learningsession': 1,
-    // Includes only runtime markers from units; still excludes full unit content.
-};
 
 const TDF_CONTENT_UPLOAD_DETAIL_FIELDS = {
     _id: 1,
@@ -489,75 +380,23 @@ const TDF_CONTENT_UPLOAD_DETAIL_FIELDS = {
     'content.tdfs.tutor.setspec': 1
 };
 
-async function resolveAssignedRootTdfIdsForUser(userId: string) {
-    const enrollmentRows = await SectionUserMap.find(
-        { userId },
-        { fields: { sectionId: 1 } }
-    ).fetchAsync();
-    const sectionIds = enrollmentRows
-        .map((row: any) => normalizeOptionalStringId(row?.sectionId))
-        .filter((id: string | null): id is string => !!id);
-    if (sectionIds.length === 0) {
-        return [];
-    }
-
-    const sections = await Sections.find(
-        { _id: { $in: sectionIds } },
-        { fields: { courseId: 1 } }
-    ).fetchAsync();
-    const courseIds = sections
-        .map((section: any) => normalizeOptionalStringId(section?.courseId))
-        .filter((id: string | null): id is string => !!id);
-    if (courseIds.length === 0) {
-        return [];
-    }
-
-    const assignmentRows = await Assignments.find(
-        { courseId: { $in: [...new Set(courseIds)] } },
-        { fields: { assignmentType: 1, TDFId: 1, memberTdfIds: 1, releaseAt: 1 } }
-    ).fetchAsync();
-    return assignmentRows
-        .flatMap((row: any) => {
-            const releaseAt = row.assignmentType === 'progressive' && row.releaseAt ? new Date(row.releaseAt) : null;
-            if (releaseAt && Number.isFinite(releaseAt.getTime()) && releaseAt.getTime() > Date.now()) return [];
-            return assignmentMemberTdfIds(row);
-        })
-        .map((id: string) => normalizeOptionalStringId(id))
-        .filter((id: string | null): id is string => !!id);
+function resolveAssignedRootTdfIdsForUser(userId: string) {
+    return enrolledCourseLessonIds({ SectionUserMap, Sections, Courses, Assignments }, userId, true);
 }
 
 const tdfPublicationAccess = createTdfPublicationAccessResolver({
     tdfs: Tdfs as any,
     users: Meteor.users as any,
-    roles: Roles,
-    resolveAssignedRootTdfIdsForUser
+    roles: Roles
 });
 const lessonFamilyResolver = createLessonFamilyResolver({ tdfs: Tdfs as any });
 const resolveExperimentTargetFamily = createExperimentTargetFamilyResolver({ Tdfs: Tdfs as any });
 
-Meteor.publish('allTdfsListing', async function() {
-    // Security: Filter TDFs based on user role and access permissions
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const selector = await tdfPublicationAccess.resolveListingSelector(this.userId);
-    return Tdfs.find(selector, { fields: TDF_LISTING_FIELDS });
-});
-
-// ===== DASHBOARD TDF LISTING =====
-// Like allTdfsListing, but only shows condition TDFs when their parent is accessible.
-Meteor.publish('dashboardTdfsListing', async function() {
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const selector = await tdfPublicationAccess.resolveDashboardSelector(this.userId);
-    return Tdfs.find(selector, { fields: TDF_LISTING_FIELDS });
-});
-
-Meteor.publish('tdfForContentUploadDetails', async function(tdfId: any) {
-    if (!this.userId || !tdfId || typeof tdfId !== 'string') {
+registerNamedPublication(Meteor, 'tdfForContentUploadDetails', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'owner-or-shared-upload-details',
+    verification: NAMED_PUBLICATION_VERIFICATIONS.tdfForContentUploadDetails,
+}, async function(tdfId: any) {
+    if (!tdfId || typeof tdfId !== 'string') {
         return this.ready();
     }
     const tdf = await Tdfs.findOneAsync(
@@ -567,90 +406,13 @@ Meteor.publish('tdfForContentUploadDetails', async function(tdfId: any) {
     if (!tdf || !(isTdfOwner(this.userId, tdf) || hasSharedTdfAccess(this.userId, tdf))) {
         return this.ready();
     }
-    return Tdfs.find({ _id: tdfId }, { fields: TDF_CONTENT_UPLOAD_DETAIL_FIELDS });
+    return publishLessonEditorFields(this, { _id: tdfId, $or: [{ ownerId: this.userId }, { 'accessors.userId': this.userId }] }, TDF_CONTENT_UPLOAD_DETAIL_FIELDS, false);
 });
 
-Meteor.publish('contentUploadOwners', async function(ownerIds: any[] = []) {
-    if (!this.userId || !Array.isArray(ownerIds) || ownerIds.length === 0) {
-        return this.ready();
-    }
-
-    const requestedIds = ownerIds.filter((id: any) => typeof id === 'string');
-    if (requestedIds.length === 0) {
-        return this.ready();
-    }
-
-    const allowedOwnerIds = (await Tdfs.find(
-        {
-            ownerId: this.userId
-        },
-        { fields: { ownerId: 1 } }
-    ).fetchAsync())
-        .map((tdf: any) => tdf.ownerId)
-        .filter((id: any) => typeof id === 'string' && id.length > 0) as string[];
-
-    const uniqueOwnerIds = [...new Set(allowedOwnerIds)];
-    if (uniqueOwnerIds.length === 0) {
-        return this.ready();
-    }
-
-    return Meteor.users.find(
-        { _id: { $in: uniqueOwnerIds } },
-        {
-            fields: {
-                username: 1,
-                'profile.displayName': 1,
-                'profile.avatarType': 1,
-                'profile.avatarIconId': 1,
-                'profile.avatarImageData': 1
-            }
-        }
-    );
-});
-
-Meteor.publish('ownedTdfs', async function(ownerId: any) {
-    // Security: Only allow users to query their own TDFs or if they're admin
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    // Users can only query their own TDFs unless they're admin
-    // METEOR 3 FIX: await the async Roles.userIsInRoleAsync() call
-    if (ownerId !== this.userId && !(await Roles.userIsInRoleAsync(this.userId, ['admin']))) {
-        return this.ready(); // Return empty result
-    }
-
-    return Tdfs.find({ ownerId }, { fields: TDF_LISTING_FIELDS });
-});
-
-Meteor.publish('pagedTdfsListing', async function(page: any = 0, limit: any = 50) {
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    const pageRequest = normalizePageRequest(page, limit);
-    if (!pageRequest) return this.ready();
-
-    const options = {
-        fields: TDF_LISTING_FIELDS,
-        sort: { 'content.tdfs.tutor.setspec.lessonname': 1, 'content.fileName': 1, _id: 1 },
-        skip: pageRequest.page * pageRequest.limit,
-        limit: pageRequest.limit
-    };
-
-    const selector = await tdfPublicationAccess.resolveListingSelector(this.userId);
-    const tdfs = await (Tdfs.find(selector, options) as any).fetchAsync();
-    for (const tdf of tdfs) {
-        this.added('tdfs', tdf._id, fieldsWithoutId(tdf));
-    }
-    this.ready();
-});
-
-Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any) {
-    // Security: Require authentication
-    if (!this.userId) {
-        return this.ready();
-    }
+registerNamedPublication(Meteor, 'tdfByExperimentTarget', {
+    policy: { kind: 'authenticated', delivery: 'async' }, dataEgress: 'experiment-lesson-family',
+    verification: NAMED_PUBLICATION_VERIFICATIONS.tdfByExperimentTarget,
+}, async function(experimentTarget: any) {
 
     const normalizedTarget = normalizeExperimentTarget(experimentTarget);
     if (!normalizedTarget) {
@@ -671,16 +433,12 @@ Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any) {
     } else if (!isAdmin) {
         const user = await (Meteor.users as any).findOneAsync(
             this.userId,
-            { fields: { accessedTDFs: 1, profile: 1 } },
+            { fields: { 'profile.experimentTarget': 1 } },
         );
-        const accessedTDFs = normalizeIdList(user?.accessedTDFs || []);
         const profileTarget = normalizeExperimentTarget(user?.profile?.experimentTarget);
-        if (profileTarget !== normalizedTarget && accessedTDFs.length === 0) {
-            return this.ready();
+        if (profileTarget !== normalizedTarget) {
+            rootAccessSelector = { $or: [{ ownerId: this.userId }, { 'accessors.userId': this.userId }] };
         }
-        rootAccessSelector = profileTarget === normalizedTarget
-            ? {}
-            : { _id: { $in: accessedTDFs } };
     }
 
     const family = await resolveExperimentTargetFamily(normalizedTarget, rootAccessSelector);
@@ -691,64 +449,16 @@ Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any) {
     );
 });
 
-Meteor.publish('Assignments', async function(courseId: any) {
-    // Security: Require authentication to access course assignments
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    if (typeof courseId !== 'string' || !courseId.trim()) {
-        return this.ready();
-    }
-
-    // Verify user has access to this course
-    const course = await Courses.findOneAsync({ _id: courseId });
-    if (!course) {
-        return this.ready();
-    }
-
-    // Check if user is teacher of this course, enrolled student, or admin
-    const isTeacherForCourse = String((course as any).teacherUserId || '') === this.userId;
-    const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-    let isEnrolledStudent = false;
-    if (!isAdmin && !isTeacherForCourse) {
-        const sectionIds = (await Sections.find(
-            { courseId },
-            { fields: { _id: 1 } }
-        ).fetchAsync()).map((section: any) => section._id);
-        if (sectionIds.length > 0) {
-            const enrollment = await SectionUserMap.findOneAsync({
-                sectionId: { $in: sectionIds },
-                userId: this.userId
-            });
-            isEnrolledStudent = !!enrollment;
-        }
-    }
-
-    if (!isTeacherForCourse && !isEnrolledStudent && !isAdmin) {
-        return this.ready();
-    }
-
-    return Assignments.find({courseId: courseId}, { fields: {
-        courseId: 1, assignmentType: 1, TDFId: 1, title: 1, memberTdfIds: 1,
-        order: 1, releaseAt: 1, dueAt: 1, required: 1, createdAt: 1, updatedAt: 1,
-    } });
-});
-
-Meteor.publish('settings', async function() {
-    // Security: Only admins should see system settings
-    // METEOR 3 FIX: await the async Roles.userIsInRoleAsync() call
-    if (!this.userId || !(await Roles.userIsInRoleAsync(this.userId, ['admin']))) {
-        return this.ready();
-    }
+registerNamedPublication(Meteor, 'settings', {
+    policy: adminPublication, dataEgress: 'system-settings', verification: NAMED_PUBLICATION_VERIFICATIONS.settings,
+}, function() {
     return DynamicSettings.find();
 });
 
-Meteor.publish('clientRuntimeSettings', function() {
-    if (!this.userId) {
-        return this.ready();
-    }
-
+registerNamedPublication(Meteor, 'clientRuntimeSettings', {
+    policy: { kind: 'authenticated', delivery: 'sync' },
+    dataEgress: 'client-log-setting', verification: NAMED_PUBLICATION_VERIFICATIONS.clientRuntimeSettings,
+}, function() {
     return DynamicSettings.find(
         { _id: CLIENT_VERBOSITY_SETTING.id },
         { fields: { key: 1, value: 1 } }
@@ -756,26 +466,13 @@ Meteor.publish('clientRuntimeSettings', function() {
 });
 
 // Publish user's audio settings
-Meteor.publish('userAudioSettings', async function() {
-    if (!this.userId) {
-        return this.ready();
-    }
-
+registerNamedPublication(Meteor, 'userAudioSettings', {
+    policy: { kind: 'authenticated-self', delivery: 'async' },
+    dataEgress: 'own-audio-settings', verification: NAMED_PUBLICATION_VERIFICATIONS.userAudioSettings,
+}, async function() {
     const user = await (Meteor.users as any).findOneAsync({ _id: this.userId }, { fields: { audioSettings: 1, audioPromptMode: 1, audioInputMode: 1 } });
 
     if (!user.audioSettings) {
-        const DEFAULT_AUDIO_SETTINGS = {
-            audioPromptMode: 'silent',
-            audioPromptQuestionVolume: 0,
-            audioPromptQuestionSpeakingRate: 1,
-            audioPromptVoice: 'en-US-Standard-A',
-            audioPromptFeedbackVolume: 0,
-            audioPromptFeedbackSpeakingRate: 1,
-            audioPromptFeedbackVoice: 'en-US-Standard-A',
-            audioInputMode: false,
-            audioInputSensitivity: 60,
-        };
-
         const initialSettings = {
             ...DEFAULT_AUDIO_SETTINGS,
             audioPromptMode: user.audioPromptMode || DEFAULT_AUDIO_SETTINGS.audioPromptMode,
@@ -784,20 +481,17 @@ Meteor.publish('userAudioSettings', async function() {
 
         // Save initialized settings
         await (Meteor.users as any).updateAsync(
-            { _id: this.userId },
+            { _id: this.userId, audioSettings: null },
             { $set: { audioSettings: initialSettings } }
         );
     }
 
-    // IMPORTANT: Include roles and preferences fields to prevent flash/issues
-    // When this subscription merges with client minimongo, it needs to preserve
-    // essential fields like roles and preferences, otherwise helpers will temporarily fail
+    // Session helpers read both session fields from the signed-in user.
     return Meteor.users.find(
-        { _id: this.userId },
+        { _id: this.userId! },
         {
             fields: {
                 audioSettings: 1,
-                preferences: 1,
                 lastSessionId: 1,
                 lastSessionIdTimestamp: 1
             }

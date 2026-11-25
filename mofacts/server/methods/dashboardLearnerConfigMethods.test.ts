@@ -11,6 +11,7 @@ describe('learner settings access', function() {
     let saved: any;
     const reads: any[] = [];
     const methods = createDashboardLearnerConfigMethods({
+      requireSessionLesson: async () => undefined,
       Meteor: { Error: class extends Error { constructor(code: string, reason: string) { super(`${code}: ${reason}`); } } },
       getAccessibleTdf: async (userId, tdfId, options) => {
         expect(userId).to.equal('enrolled-learner');
@@ -57,7 +58,6 @@ describe('learner settings access', function() {
     for (const call of [
       () => f.methods.getLearnerTdfConfig.call({}, 'lesson'),
       () => f.methods.saveLearnerTdfConfig.call({}, 'lesson', {}),
-      () => f.methods.resetLearnerTdfConfig.call({}, 'lesson'),
     ]) {
       try { await call(); expect.fail('Expected authentication failure'); }
       catch (error: any) { expect(error.message).to.include('Must be logged in'); }

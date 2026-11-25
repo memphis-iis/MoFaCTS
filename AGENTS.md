@@ -29,6 +29,8 @@ Resolve competing instructions in this order:
 - Do not add compatibility fallback paths unless explicitly requested.
 - Docker builds, pushes, deployments, and production-affecting commands require explicit requests. Local Meteor CLI workflows cannot substitute for supported Docker Compose release verification.
 - The optional [CI evidence acquisition helper](deploy/security-audit/ci-evidence.md) may use the GitHub CLI and the operator's existing stored sign-in (explicitly approved). It requires the repository-pinned Node runtime and PowerShell 7; it performs read-only acquisition and cannot issue release qualification or run CI.
+- Security-audit reset-mail observations use the existing connected Gmail access for exact synthetic recipients. No IMAP reader, new mail credential or unattended mailbox grant is authorized. Follow the [connected-mail procedure](deploy/security-audit/connected-mail.md); distinguish operator-assisted evidence from unattended scanner qualification.
+- GitHub billing is unavailable. Run the four repository Security checks through the [standard operator Linux executor](deploy/security-audit/operator-security-checks.md); the optional GitHub Security workflow is manual-only. Keep operator, hosted CI and release-qualification evidence distinct. Do not require billing or repeatedly dispatch blocked hosted jobs.
 - Align Meteor, Node/npm, CI assertions, and Docker runtime pins. Use the release's official DDP/Rspack packages; superseded local copies or dependency replacements must not shadow upstream security fixes.
 
 ## User Intent And Permissions
@@ -43,6 +45,8 @@ Resolve competing instructions in this order:
 - Never revert user or unrelated working changes without explicit instruction.
 - Commit/push only when explicitly requested; include intentional files only and state verification. For direct commit-and-push requests, use plain Git and existing credentials. Open a PR only when explicitly requested; require `gh` only for an explicitly requested PR or another operation that needs it.
 - The security-audit standing authorization approved 2026-11-11 covers intentional commits/pushes and the agreed staging2 build/deploy/rollback work throughout the remaining written plan. Follow its [execution mandate](docs-developer/security-audit-durable-redesign-plan.md#standing-execution-authorization-approved-2026-11-11) and sole [run ledger](docs-developer/security-audit-durable-redesign-status.md#standing-execution-ledger-2026-11-11). Continue within that scope without per-batch approval. Preserve the explicit production, access, cost and data boundaries.
+- Approved P1-D9 (2026-11-12) consolidates the phase-specific production gates into one final coordinated cutover. Continue Phase 2-4 implementation after the required source/staging gates, keeping production acceptance visibly pending. This does not authorize production actions or waive any acceptance criterion.
+- The security-audit [bounded access delegation](docs-developer/security-audit-durable-redesign-plan.md#bounded-access-delegation-approved-2026-11-12), approved 2026-11-12, permits necessary new staging2 audit access when all its target, least-privilege, custody, lifetime, verification and revocation conditions hold. Record and verify eligible changes without another permission question. It does not authorize production/original-staging access, broader administrator privileges, new AWS/recovery access, spending or destructive data changes.
 
 ## Common Commands
 
@@ -52,7 +56,7 @@ Run app commands from `mofacts/`:
 - `npm run lint`
 - `npm run generate:schemas`
 
-Lint includes the security surface contract. Changes to server methods, publications, HTTP handlers, exports, or management routes require authorization review and a matching update to `mofacts/security-surface-contract.json`; never automatically classify discovered surfaces.
+Lint checks direct security registrations against their source owners. Changes to server methods, publications, HTTP handlers or exports require authorization review and corresponding updates to the owning registration descriptor and verification catalog. Management route policies reference the registered server surfaces that enforce their data and actions. Review those references when changing a page's server calls. Keep presentation and server authorization separate.
 
 ## Repo Map
 
@@ -68,8 +72,8 @@ Lint includes the security surface contract. Changes to server methods, publicat
 - Keep Meteor routing, collections, publications, methods, app shell, persistence, logging, and migrations in `mofacts/`; unit engines and pedagogical extensions in `learning-components/`.
 - New unit types should use the unit-engine registry with explicit lifecycle methods. Keep `mofacts/client/views/experiment/unitEngine.ts` an app dependency facade, without duplicating legacy behavior.
 - Learning components use explicit runtime dependency/context interfaces. Avoid deep Meteor imports unless a documented, behavior-preserving temporary facade already exists.
-- SPARC must not deliver previously used instructional content to the same user in a new turn, across lessons/sessions. This covers every explanation, written support, question, feedback, other tutor utterance, image, and video, including generated output and components embedded in matched instructions. Restoring a saved turn preserves its accepted output. Prior-content links and fresh library IDs do not satisfy no-repeat. See `docs/sparc-instructional-cycle.md` for the approved requirement and implementation status.
-- SPARC retrieval and embedding caches belong to the browser. Search uses the single maximum cosine similarity among eligible unseen content in the requested category; images/videos compete in one local search at 0.95. Independent generation calls must not coordinate through locks, polling, or shared in-flight work.
+- SPARC can reuse saved instructional content across turns, sessions, lessons, and orientation modes, including for the same learner. Restoring a saved turn preserves its accepted output. See `docs/sparc-instructional-cycle.md`.
+- SPARC retrieval and embedding caches belong to the browser. Search uses the highest cosine similarity among usable content in the requested category; images/videos compete in one local search at 0.95. Independent generation calls must not coordinate through locks, polling, or shared in-flight work.
 - Server image/library services own persistence, exact-ID reads, authorization, and secret-bearing provider calls. Administrative deletion preserves learner decisions and model/history records, removes catalog content/media, and leaves content-free receipts that render "Administrative removal" on reload. See `docs/sparc-instructional-cycle.md`.
 - Name intentional alternate runtime paths by their domain behavior; do not call them fallbacks. Recovery must obey Critical Invariants.
 
@@ -146,7 +150,7 @@ Helper ownership is documented in `deploy/hotfix/README.md`.
 ## Server Method Design
 
 - Minimize server work. Add methods only for database access, authentication/authorization, encryption, secrets, or external API calls unsafe for the client. Keep pure computation client-side where safe, and avoid server reshaping of data the client already holds.
-- SPARC explanation and requested support form one matched instruction under the no-repeat contract. Persist composition before media resolution; accept both display nodes before generating the question.
+- SPARC explanation and requested support form one matched instruction. Persist composition before media resolution; accept both display nodes before generating the question.
 - Practice history saves must not rebuild dashboard/course summaries. On dashboard entry, apply newly committed history to changed lessons; reconstruct fully only at initialization or explicit repair. Persist last-used unit and resume state during practice. See `docs/architecture.md`.
 - Lint enforces that production server modules cannot directly/transitively import learner-executable `learning-components/models/` or `learning-components/units/` code; type-only server-interface imports are excluded.
 - Keep pure-compute methods out of server method modules. Prefer batched queries/aggregations over N+1 round-trips. Do not return full collection scans. Rate-limit public/unauthenticated methods.

@@ -3,7 +3,7 @@ import { Mongo } from 'meteor/mongo';
 import { Roles } from 'meteor/alanning:roles';
 import { FilesCollection } from 'meteor/ostrio:files';
 import { collectionMongoName } from './collectionOwnership';
-import { contentMediaStimuliSetId, validateDynamicAssetUpload, type DynamicAssetUploadMeta } from './fileUploadPolicy';
+import { DAILY_LESSON_PACKAGE_LIMIT, contentMediaStimuliSetId, validateDynamicAssetUpload, type DynamicAssetUploadMeta } from './fileUploadPolicy';
 
 /*
  * Collection declarations are the persistence boundary for MoFaCTS.
@@ -101,8 +101,7 @@ const DynamicAssets = new FilesCollection({
       throw new Meteor.Error('file-too-large', 'File size must be 10MB or less');
     }
 
-    // Regular users: check daily quota (3 uploads per day)
-    const DAILY_LIMIT = 3;
+    if (meta.uploadPurpose === 'content-media') return true;
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const quota = await (UserUploadQuota as any).findOneAsync({
       userId: this.userId,
@@ -110,9 +109,9 @@ const DynamicAssets = new FilesCollection({
     });
 
     const currentCount = quota?.uploadCount || 0;
-    if (currentCount >= DAILY_LIMIT) {
+    if (currentCount >= DAILY_LESSON_PACKAGE_LIMIT) {
       throw new Meteor.Error('quota-exceeded',
-        `Daily upload limit reached (${DAILY_LIMIT}/day). Try again tomorrow.`);
+        `Daily lesson package limit reached (${DAILY_LESSON_PACKAGE_LIMIT}/day). Try again tomorrow.`);
     }
 
     return true;
@@ -150,27 +149,4 @@ Object.assign(globalThis, {
   DynamicAssets,
 });
 
-export { Tdfs, GlobalExperimentStates, Histories, DynamicSettings, UserDashboardCache, CourseLearnerSnapshotCache, StimulusCrowdStats, BackupJobs, TdfMutationJobs };
-
-GlobalExperimentStates.allow({
-  update: function(userId: string, doc: unknown, _fieldNames: string[], _modifier: any) {
-    return userId === (doc as { userId?: string }).userId;
-  },
-  insert: function(userId: string, doc: unknown) {
-    return userId === (doc as { userId?: string }).userId;
-  }
-});
-
-DynamicSettings.allow({
-  update: function(userId: string) {
-    // allow/deny rules must be synchronous; use Meteor.roleAssignment which is
-    // set unconditionally by alanning:roles v4 at package load time.
-    const col = (Meteor as any).roleAssignment;
-    if (!col) return false;
-    const assignment = col.findOne({
-      'user._id': userId,
-      'role._id': 'admin'
-    });
-    return !!assignment;
-  }
-});
+export { Courses, Sections, SectionUserMap, Tdfs, GlobalExperimentStates, Histories, DynamicSettings, UserDashboardCache, CourseLearnerSnapshotCache, StimulusCrowdStats, BackupJobs, TdfMutationJobs };

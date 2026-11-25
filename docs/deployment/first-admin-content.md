@@ -11,7 +11,7 @@ Self-hosted first-admin setup uses settings, not a separate bootstrap endpoint.
 
 The existing startup/login role-assignment flow grants admin to matching users. If the configured account does not exist yet, readiness reports that clearly.
 
-Teachers cannot grant roles. Role management remains admin-only.
+Only administrators can manage roles. For an administrative handoff, grant the successor the admin role and have them remove yours. For a role granted by site settings, first update the deployment configuration, then remove the role in User Admin. The site owner also receives the admin role at startup. Remove deployment role settings before deleting the configured account. Deleting an eligible account permanently removes its learner history and saved experiment progress.
 
 Beginner content smoke path:
 

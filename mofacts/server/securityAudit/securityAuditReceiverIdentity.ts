@@ -10,7 +10,7 @@ const MAX_BYTES = 8192;
 
 // The path argument permits isolated filesystem contract tests. Runtime loading
 // always uses IMAGE_SOURCE_FILE; it does not accept a request/configuration path.
-export async function readEmbeddedSourceBytes(file: string): Promise<Buffer | undefined> {
+export async function readEmbeddedSourceBytes(file: string, maxBytes = MAX_BYTES): Promise<Buffer | undefined> {
   let before;
   try { before = await fs.lstat(file); }
   catch (error) {
@@ -18,7 +18,7 @@ export async function readEmbeddedSourceBytes(file: string): Promise<Buffer | un
     throw new Error('Embedded audit identity is unreadable');
   }
   if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1
-    || before.size < 1 || before.size > MAX_BYTES) throw new Error('Invalid embedded audit identity file');
+    || before.size < 1 || before.size > maxBytes) throw new Error('Invalid embedded audit identity file');
   // Nonblocking/no-follow closes the FIFO/symlink race on the Linux runtime.
   // Windows tests still compare the actual opened file and bounded bytes.
   const flags = process.platform === 'linux'
@@ -30,7 +30,7 @@ export async function readEmbeddedSourceBytes(file: string): Promise<Buffer | un
       || opened.size !== before.size || opened.mtimeMs !== before.mtimeMs || opened.ctimeMs !== before.ctimeMs) {
       throw new Error('Embedded audit identity changed during acquisition');
     }
-    const bytes = Buffer.alloc(MAX_BYTES + 1);
+    const bytes = Buffer.alloc(maxBytes + 1);
     let size = 0;
     while (size < bytes.length) {
       const result = await handle.read(bytes, size, bytes.length - size, null);
@@ -38,7 +38,7 @@ export async function readEmbeddedSourceBytes(file: string): Promise<Buffer | un
       size += result.bytesRead;
     }
     const after = await handle.stat();
-    if (size !== before.size || size > MAX_BYTES || after.size !== before.size
+    if (size !== before.size || size > maxBytes || after.size !== before.size
       || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs) {
       throw new Error('Embedded audit identity changed during acquisition');
     }

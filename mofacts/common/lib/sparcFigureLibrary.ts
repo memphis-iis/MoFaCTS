@@ -13,7 +13,6 @@ export const SPARC_FIGURE_LIBRARY_SETTINGS = Object.freeze({
 export type SparcLibraryImage = Readonly<{
   assetId: string; description: string; createdAt: string; model: string;
 }>;
-export type SparcLibraryImagePage = Readonly<{ images: SparcLibraryImage[]; nextCursor: string | null }>;
 
 export function sparcFigureMinimumSimilarity(value: unknown): number {
   if (value === undefined) return SPARC_FIGURE_LIBRARY_SETTINGS.minimumSimilarity;

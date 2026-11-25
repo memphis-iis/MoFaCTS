@@ -7,12 +7,16 @@ import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { localDockerInvoker } from './localDockerBuilder.mjs';
 import { collectTestInputs, supplementalDigest, TEST_INPUTS } from './testInputs.mjs';
+import { readBuildVerificationBundle, validateBuildVerificationBundle, verificationBundleHash } from './imageVerificationBundle.mjs';
 import { parseBuildIdentity } from '../../../common/securityAudit/buildIdentity.ts';
 import { extractSnapshot, inspectSnapshotTree, sha256, snapshotPath, invalidSnapshot } from './sourceSnapshot.mjs';
 
 const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 const workspacePrefix = 'mofacts-qualified-build-';
 const maxControlBytes = 1024 * 1024;
+const verificationSecret = 'mofacts_verification_bundle';
+const verificationHashArg = 'MOFACTS_VERIFICATION_BUNDLE_SHA256';
+const carryVerification = 'RUN --mount=type=secret,id=mofacts_verification_bundle node /captured-source/mofacts/scripts/security-audit/qualification/imageVerificationBundle.mjs /source-observation.json /captured-source/mofacts/.meteor/release /run/secrets/mofacts_verification_bundle /verification-artifacts "$MOFACTS_VERIFICATION_BUNDLE_SHA256"';
 
 /** Bounded relative-path metadata only; never source contents or absolute paths. */
 export function capturedSourceDifferences(before, after) {
@@ -56,7 +60,7 @@ export function captureRoots(recipe) {
       stages.add(stage);
       continue;
     }
-    if (/^ADD\b/i.test(line) || /--mount[= ]/i.test(line)) invalidSnapshot();
+    if (/^ADD\b/i.test(line) || (/--mount[= ]/i.test(line) && !(stage === 'source_observation' && line.replace(/\s+/g, ' ') === carryVerification))) invalidSnapshot();
     if (stage === 'source_inputs') {
       if (line === 'COPY ./Dockerfile ./.dockerignore /') {
         if (captureMetadata) invalidSnapshot();
@@ -84,6 +88,8 @@ export function captureRoots(recipe) {
     'ARG MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES=',
     'COPY --from=source_inputs / /captured-source/',
     'RUN node /captured-source/mofacts/scripts/security-audit/qualification/imageSourceObservation.mjs /captured-source /source-observation.json "$MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256" "$MOFACTS_SOURCE_REVISION" "$MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES"',
+    'ARG MOFACTS_VERIFICATION_BUNDLE_SHA256=',
+    carryVerification,
   ])) invalidSnapshot();
   return roots;
 }
@@ -382,37 +388,86 @@ export async function prepareCapturedTestInputs(builder, baseCommit, dirty, depe
   }
 }
 
-export async function buildCapturedSource(workspace, builder, envFile, dependencies = {}) {
+export async function buildCapturedSource(workspace, builder, envFile, dependencies = {}, verificationBundleFile) {
   const invoke = dependencies.docker ?? docker;
   const checked = await verifyCapture(workspace, builder, dependencies);
   const composePath = path.join(dependencies.repositoryRoot ?? repoRoot, 'deploy/docker-compose.yml');
   const compose = ['compose', '--env-file', path.resolve(envFile), '-f', composePath];
   const qualified = [...compose, '-f', path.join(checked.root, 'compose.capture.json')];
   const baseline = JSON.parse(await invoke([...compose, 'config', '--format', 'json']));
-  const effective = JSON.parse(await invoke([...qualified, 'config', '--format', 'json']));
-  assertSourceBoundBuildChange(baseline, effective, checked.candidate, checked.identity);
   if (baseline.services.mofacts.build.args?.MOFACTS_SOURCE_REVISION !== checked.identity.baseCommit) invalidSnapshot();
-  // Source compilation remains Compose-owned. No push, test:ci, SSH or deployment.
-  await invoke([...qualified, 'build', '--builder', builder, '--no-cache', 'mofacts'], {
-    timeout: 60 * 60 * 1000, consume: async (stream) => { for await (const chunk of stream) void chunk; },
-  });
-  if ((await inspectSnapshotTree(checked.candidate)).digestSha256 !== checked.receipt.localTreeDigestSha256) invalidSnapshot();
-  return { state: 'built-unqualified', identity: checked.identity,
-    reason: 'Source-test bundle, exact-image smoke and published/running proof are not yet integrated' };
+  let proofDirectory;
+  let bundleDigestSha256;
+  try {
+    let expectedBuildSecrets;
+    let expectedSecrets;
+    if (verificationBundleFile !== undefined) {
+      const proofBytes = await readBuildVerificationBundle(verificationBundleFile);
+      const release = (await readControl(path.join(checked.candidate, 'mofacts/.meteor/release'))).toString('utf8').trim();
+      await validateBuildVerificationBundle(proofBytes, checked.identity, release);
+      bundleDigestSha256 = verificationBundleHash(proofBytes);
+      const baseBuild = baseline.services.mofacts.build;
+      if (Object.hasOwn(baseline.secrets ?? {}, verificationSecret) || Object.hasOwn(baseBuild.args ?? {}, verificationHashArg)
+        || (baseBuild.secrets ?? []).some(secret => (secret.target ?? secret.source) === verificationSecret)) {
+        invalidSnapshot();
+      }
+      proofDirectory = await fs.mkdtemp(path.join(checked.root, 'verification-'));
+      const file = path.join(proofDirectory, 'bundle.json');
+      const override = path.join(proofDirectory, 'compose.json');
+      await fs.writeFile(file, proofBytes, { flag: 'wx', mode: 0o600 });
+      const descriptor = { source: verificationSecret, target: verificationSecret };
+      const secret = { name: verificationSecret, file };
+      expectedBuildSecrets = [...(baseBuild.secrets ?? []), descriptor];
+      expectedSecrets = { ...baseline.secrets, [verificationSecret]: secret };
+      await fs.writeFile(override, JSON.stringify({
+        secrets: { [verificationSecret]: secret },
+        services: { mofacts: { build: { secrets: [descriptor], args: { [verificationHashArg]: bundleDigestSha256 } } } },
+      }), { flag: 'wx', mode: 0o600 });
+      qualified.push('-f', override);
+    }
+    const effective = JSON.parse(await invoke([...qualified, 'config', '--format', 'json']));
+    if (proofDirectory) {
+      const build = effective.services?.mofacts?.build;
+      if (build?.args?.[verificationHashArg] !== bundleDigestSha256
+        || !isDeepStrictEqual(build.secrets, expectedBuildSecrets) || !isDeepStrictEqual(effective.secrets, expectedSecrets)) {
+        invalidSnapshot();
+      }
+      delete build.args[verificationHashArg];
+      if (baseline.services.mofacts.build.secrets === undefined) delete build.secrets;
+      else build.secrets = baseline.services.mofacts.build.secrets;
+      if (baseline.secrets === undefined) delete effective.secrets;
+      else effective.secrets = baseline.secrets;
+    }
+    assertSourceBoundBuildChange(baseline, effective, checked.candidate, checked.identity);
+    // Source compilation remains Compose-owned. No push, test:ci, SSH or deployment.
+    await invoke([...qualified, 'build', '--builder', builder, '--no-cache', 'mofacts'], {
+      timeout: 60 * 60 * 1000, consume: async (stream) => { for await (const chunk of stream) void chunk; },
+    });
+    if ((await inspectSnapshotTree(checked.candidate)).digestSha256 !== checked.receipt.localTreeDigestSha256) invalidSnapshot();
+    return bundleDigestSha256 === undefined ? { state: 'built-unqualified', identity: checked.identity }
+      : { state: 'built-unqualified', identity: checked.identity, bundleDigestSha256 };
+  } finally {
+    if (proofDirectory) {
+      await fs.rm(path.join(proofDirectory, 'bundle.json'), { force: true });
+      await fs.rm(path.join(proofDirectory, 'compose.json'), { force: true });
+      await fs.rmdir(proofDirectory);
+    }
+  }
 }
 
 export async function main(argv) {
   const [action, ...rest] = argv;
   const args = new Map();
   for (let i = 0; i < rest.length; i += 2) {
-    if (!/^--[a-z-]+$/.test(rest[i]) || !rest[i + 1] || args.has(rest[i])) invalidSnapshot();
+    if (!/^--[a-z][a-z0-9-]*$/.test(rest[i]) || !rest[i + 1] || args.has(rest[i])) invalidSnapshot();
     args.set(rest[i], rest[i + 1]);
   }
   const allowed = { prepare: ['--builder', '--base-commit', '--dirty'],
     'prepare-tests': ['--builder', '--base-commit', '--dirty'], verify: ['--builder', '--workspace'],
     'collect-tests': ['--builder', '--workspace'],
     'verify-tests': ['--builder', '--workspace'],
-    build: ['--builder', '--workspace', '--env-file'], cleanup: ['--workspace'] }[action];
+    'compose-proof': ['--builder', '--workspace', '--native-results', '--native-receipt-sha256', '--registry'],
+    build: ['--builder', '--workspace', '--env-file', ...(args.has('--verification-bundle') ? ['--verification-bundle'] : [])], cleanup: ['--workspace'] }[action];
   if (!allowed || allowed.length !== args.size || allowed.some((key) => !args.has(key))) invalidSnapshot();
   const builder = args.get('--builder');
   if (builder !== undefined && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(builder)) invalidSnapshot();
@@ -426,9 +481,18 @@ export async function main(argv) {
     const { identity } = await verifyCapture(args.get('--workspace'), builder, dependencies);
     return { state: 'capture-verified-unqualified', identity };
   }
-  if (action === 'build') return buildCapturedSource(args.get('--workspace'), builder, args.get('--env-file'), dependencies);
+  if (action === 'build') return buildCapturedSource(args.get('--workspace'), builder, args.get('--env-file'), dependencies, args.get('--verification-bundle'));
   if (action === 'collect-tests') return collectCapturedTestInputs(args.get('--workspace'), builder, dependencies);
   if (action === 'verify-tests') return verifyCapturedTestInputs(args.get('--workspace'), builder, dependencies);
+  if (action === 'compose-proof') {
+    const root = await requireWorkspace(args.get('--workspace'));
+    const expectedTestInputs = await verifyCapturedTestInputs(root, builder, dependencies);
+    const { writeCapturedVerificationBundle } = await import('./composeVerificationBundle.mjs');
+    return writeCapturedVerificationBundle({
+      root, expectedTestInputs, resultsDirectory: args.get('--native-results'),
+      expectedReceiptSha256: args.get('--native-receipt-sha256'), registryFile: args.get('--registry'),
+    });
+  }
   await removeWorkspace(args.get('--workspace'));
   return { state: 'temporary-capture-removed' };
 }

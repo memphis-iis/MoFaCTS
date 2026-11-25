@@ -19,7 +19,6 @@ export interface ContentSurfaceLifecycleRuntimeOptions {
   readonly setState: (snapshot: ContentRuntimeMachineSnapshot) => void;
   readonly shouldStartReadyRuntime: () => boolean;
   readonly startDisplayTimeoutClock: () => void;
-  readonly stopStimDisplayTypeMapVersionSync: (reason: string) => void;
   readonly testMode: () => boolean;
   readonly testPerformance: () => unknown;
   readonly testSnapshot: () => unknown;
@@ -77,7 +76,6 @@ export function createContentSurfaceLifecycleRuntime(options: ContentSurfaceLife
       options.clearTimeoutCountdown();
       options.clearDisplayTimeoutClock();
       if (!options.testMode()) {
-        options.stopStimDisplayTypeMapVersionSync('svelte card destroy');
         options.completeCleanup();
         options.cleanupAudioRecorder();
       }

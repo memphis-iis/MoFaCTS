@@ -1,4 +1,5 @@
 import { auditDigest } from '../../../../common/securityAudit/canonicalReport.ts';
+import { ACTIVE_AUDIT_CATALOG } from '../../../../common/securityAudit/catalogRegistry.ts';
 import { createAuditReportStoreV2 } from '../../../../server/securityAudit/securityAuditReportStoreV2.ts';
 
 const clock = new Date('2026-11-05T12:02:00.000Z');
@@ -35,6 +36,6 @@ export function database(initial = []) {
     },
     rawCollection:()=>({async createIndex(keys,options){indexes.push({keys,options});}}),
   };
-  return {rows,calls,indexes,store:createAuditReportStoreV2(reports,()=>new Date(clock))};
+  return {rows,calls,indexes,store:createAuditReportStoreV2(reports,()=>new Date(clock),ACTIVE_AUDIT_CATALOG)};
 }
 export const stored = report => ({...report,_id:'synthetic-id',ingestNonce:'synthetic-opaque-nonce-0001',ingestedAt:clock,expiresAt:new Date(clock.getTime()+90*86400000)});

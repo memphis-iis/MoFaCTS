@@ -1,3 +1,4 @@
+import { requireAccountProgressSession } from '../lib/participantProgressScope';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
 import type {
   GetLearnerLessonAnalyticsHistoryPageRequest,
@@ -221,6 +222,7 @@ export function createLearnerAnalyticsMethods(deps: LearnerAnalyticsDeps) {
   return {
     getLearnerAnalyticsOverview: async function(this: any): Promise<LearnerAnalyticsOverview> {
       if (!this.userId) throw new deps.Meteor.Error('not-authorized', 'Must be logged in');
+      requireAccountProgressSession(this);
       return buildLearnerAnalyticsOverview(await deps.getPracticeDashboardSnapshot(this));
     },
 
@@ -228,6 +230,7 @@ export function createLearnerAnalyticsMethods(deps: LearnerAnalyticsDeps) {
       this: any, request: GetLearnerLessonAnalyticsSourceRequest,
     ): Promise<LearnerLessonAnalyticsSource> {
       if (!this.userId) throw new deps.Meteor.Error('not-authorized', 'Must be logged in');
+      requireAccountProgressSession(this);
       const rootTdfId = requireRootTdfId(request?.rootTdfId, deps.Meteor);
       const userId = String(this.userId);
       const authorized = await authorizeLesson(deps, this, rootTdfId);
@@ -250,6 +253,7 @@ export function createLearnerAnalyticsMethods(deps: LearnerAnalyticsDeps) {
       this: any, request: GetLearnerLessonAnalyticsHistoryPageRequest,
     ): Promise<LearnerAnalyticsHistoryPage> {
       if (!this.userId) throw new deps.Meteor.Error('not-authorized', 'Must be logged in');
+      requireAccountProgressSession(this);
       const rootTdfId = requireRootTdfId(request?.rootTdfId, deps.Meteor);
       let cursor: HistoryCursor;
       try {

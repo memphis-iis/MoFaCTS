@@ -3,7 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseAuditIdentity } from '../../../common/securityAudit/reportIdentity.ts';
 import { readCiFile, realDirectory } from '../qualification/collectCiEvidence.mjs';
-import { runRepositoryCommandV2, repositoryToolEnvironmentV2 } from './commandV2.mjs';
+import { runRepositoryCommandV2 } from './commandV2.mjs';
+import { auditToolEnvironmentV2 } from '../core/childEnvironmentV2.mjs';
 import { parseGitleaksRepositoryObservationV2, parseNpmRepositoryObservationsV2,
   parseTrivyRepositoryObservationV2 } from './observationsV2.mjs';
 
@@ -18,7 +19,7 @@ const invalid = () => { throw new Error('Repository acquisition did not complete
 export async function acquireRepositoryToolObservationsV2({ repositoryDirectory, environment,
   runtimeImage, developmentExposurePolicy }, dependencies = { run: runRepositoryCommandV2 }) {
   if (!dependencies || Object.keys(dependencies).length !== 1 || typeof dependencies.run !== 'function') invalid();
-  const toolEnvironment = repositoryToolEnvironmentV2(environment);
+  const toolEnvironment = auditToolEnvironmentV2(environment);
   const root = await realDirectory(repositoryDirectory), observations = {};
   const temporary = await fs.mkdtemp(path.join(await fs.realpath(os.tmpdir()), 'mofacts-repository-v2-'));
   const identity = await fs.lstat(temporary, { bigint: true });

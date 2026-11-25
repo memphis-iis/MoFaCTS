@@ -19,6 +19,7 @@ import { pipeline } from 'node:stream/promises';
  * @const {function} noop - No Operation function, placeholder for required callbacks
  */
 const noop = function noop () {};
+const ddpUploadRegistrations = new WeakMap();
 
 /**
  * Create (ensure) index on MongoDB collection, catch and log exception if thrown
@@ -686,6 +687,15 @@ class FilesCollection extends FilesCollectionCore {
     };
 
     Meteor.methods(_methods);
+    ddpUploadRegistrations.set(this, Object.freeze(Object.entries(this._methodNames).map(([operation, name]) =>
+      Object.freeze({ operation, name, handler: _methods[name] })
+    )));
+  }
+
+  // Server-side observation only. No method handlers are replaced or invoked.
+  observeDdpUploadRegistration() {
+    const methods = ddpUploadRegistrations.get(this);
+    return methods ? Object.freeze({ collectionName: this.collectionName, allowClientCode: this.allowClientCode, methods }) : null;
   }
 
   _registerHttpHandlers() {
@@ -1361,10 +1371,11 @@ class FilesCollection extends FilesCollectionCore {
     const files = this.find(selector);
     const count = await files.countDocuments();
 
+    let removed = 0;
     if (count > 0) {
       if (this.onAfterRemove) {
         const docs = await files.fetchAsync();
-        await this.collection.removeAsync(selector);
+        removed = await this.collection.removeAsync(selector);
 
         if (!(await this.onAfterRemove(docs))) {
           let i = 0;
@@ -1376,11 +1387,11 @@ class FilesCollection extends FilesCollectionCore {
         await files.forEachAsync(async (file) => {
           await this.unlinkAsync(file);
         });
-        await this.collection.removeAsync(selector);
+        removed = await this.collection.removeAsync(selector);
       }
     }
 
-    return count;
+    return removed;
   }
 
   /**

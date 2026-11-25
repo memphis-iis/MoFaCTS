@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
 import test from 'node:test';
 import { ciEvidenceFixture } from './helpers/ciEvidenceFixture.mjs';
-import { observeCiImage, writeCiImageObservation } from '../qualification/observeCiImage.mjs';
+import { observeCiImage, readEmbeddedImageSource, writeCiImageObservation } from '../qualification/observeCiImage.mjs';
 import { parsePostBuildImageObservation } from '../../../common/securityAudit/postBuildImageObservation.ts';
 import { dockerImageFixture } from './helpers/dockerImageArchiveFixture.mjs';
 import { readDockerArchiveIdentity } from '../qualification/imageArchiveIdentity.mjs';
@@ -37,6 +37,15 @@ function fixture(change = () => {}) {
   } };
   return { input, dependencies, calls, inspected, embedded };
 }
+
+test('shared embedded-source read proves only exact immutable-image metadata and creates no CI evidence', async () => {
+  const value = fixture();
+  const result = await readEmbeddedImageSource(value.input.imageReference, value.embedded.identity, value.dependencies.command);
+  assert.deepEqual(result, value.embedded); assert.equal(value.calls.length, 1);
+  assert.equal(Object.hasOwn(result, 'ci'), false); assert.equal(Object.hasOwn(result, 'sourceEvidenceDigestSha256'), false);
+  await assert.rejects(readEmbeddedImageSource('registry.example/app:latest', value.embedded.identity, value.dependencies.command));
+  assert.equal(value.calls.length, 1);
+});
 
 test('actual inspect and isolated embedded read produce only a bounded CI image observation', async () => {
   const { input, dependencies, calls } = fixture();

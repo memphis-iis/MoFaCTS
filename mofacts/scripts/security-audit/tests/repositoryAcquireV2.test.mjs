@@ -97,7 +97,7 @@ test('V2 repository acquisition rejects secret-bearing or filtering environments
   const { options, run, calls } = await fixture(t);
   for (const environment of [{ ...options.environment, AUDIT_AUTH_FIXTURES_JSON: 'PRIVATE' },
     { ...options.environment, NODE_OPTIONS: '--test-name-pattern=one' }]) {
-    await assert.rejects(acquireRepositoryToolObservationsV2({ ...options, environment }, { run }), /Invalid repository command configuration/);
+    await assert.rejects(acquireRepositoryToolObservationsV2({ ...options, environment }, { run }), /Invalid audit child environment/);
   }
   assert.equal(calls.length, 0);
 });

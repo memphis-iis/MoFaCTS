@@ -1,3 +1,4 @@
+import { acceptClassInvite } from './acceptClassInvite';
 import {meteorCallAsync} from '..';
 import { SavedAdaptiveUnitSequenceError } from '../../common/adaptiveUnitSequence';
 import { haveMeteorUser } from './userIdentity';
@@ -234,37 +235,6 @@ function clearPendingClassInvite(): void {
   } catch (error: unknown) {
     clientConsole(1, '[ROUTER] Failed to clear pending class invitation:', getErrorMessage(error));
   }
-}
-
-async function acceptClassInvite(teacherId: string, sectionId: string): Promise<void> {
-  const userId = Meteor.userId();
-  if (!userId) {
-    throw new Error('Class invitation requires a signed-in learner.');
-  }
-
-  const [teachers, sections] = await Promise.all([
-    meteorCallAsync('getAllTeachers') as Promise<any[]>,
-    meteorCallAsync('getAllCourseSections') as Promise<any[]>,
-  ]);
-  const teacher = Array.isArray(teachers)
-    ? teachers.find((row: any) => normalizeRouteParam(row?._id) === teacherId)
-    : null;
-  const curClass = Array.isArray(sections)
-    ? sections.find((row: any) => normalizeRouteParam(row?.sectionId) === sectionId)
-    : null;
-
-  await meteorCallAsync('addUserToTeachersClass', teacherId, sectionId);
-  const assignedTdfIds = await meteorCallAsync('getTdfsAssignedToStudent', userId, sectionId);
-  await meteorCallAsync(
-    'setUserLoginData',
-    'section-invite',
-    Session.get('loginMode') || 'password',
-    teacher || { _id: teacherId },
-    curClass || { sectionId, teacherUserId: teacherId },
-    assignedTdfIds
-  );
-  Session.set('curTeacher', teacher || { _id: teacherId });
-  Session.set('curClass', curClass || { sectionId, teacherUserId: teacherId });
 }
 
 function consumePendingClassInvite(controller: any = null): boolean {

@@ -1,3 +1,4 @@
+import { versionedAssetFileName } from '../../../common/lib/versionedAssetFileName';
 import { createContentUpdateConfirmation, saveEditedContent } from '../../lib/contentUpdateWarningsClient';
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
@@ -218,9 +219,6 @@ Template.contentEdit.helpers({
         });
     },
 
-    stimFileSummary(stimFileInfo: any) {
-        return contentEditorText('contentEditor.stimFileInfo', { filename: stimFileInfo?.filename ?? '' });
-    },
 
     conditionInfo() {
         const tdfId = (Template.instance() as any).tdfId;
@@ -243,18 +241,6 @@ Template.contentEdit.helpers({
             index: index + 1,  // 1-based for display
             total: conditions.length
         };
-    },
-
-    stimFileInfo() {
-        // Check if specific stim file was selected via query params
-        const params = FlowRouter.current().queryParams;
-        if (params.stimFile) {
-            return {
-                filename: params.stimFile,
-                stimId: params.stimId
-            };
-        }
-        return null;
     },
 
     hasChanges() {
@@ -1260,19 +1246,10 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
         if (!tdf?._id || tdf.stimuliSetId === undefined || tdf.stimuliSetId === null) {
             throw new Error('The content media target is unavailable. Reload the editor and try again.');
         }
-        // Check for existing file with same name
-        const existingFile = (globalThis as any).DynamicAssets.findOne({
-            name: file.name,
-            'meta.stimuliSetId': tdf.stimuliSetId,
-        });
-        if (existingFile) {
-            // Remove existing file before uploading new one
-            await meteorCallAsync('removeAssetById', existingFile._id);
-        }
-
         const upload = (globalThis as any).DynamicAssets.insert({
             transport: 'ddp',
             file: file,
+            fileName: versionedAssetFileName(file.name),
             chunkSize: 'dynamic',
             meta: {
                 uploadPurpose: 'content-media',

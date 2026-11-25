@@ -412,8 +412,7 @@
     line-height: 1.2;
 }
 
-.condition-tdf-selector,
-.stim-file-selector {
+.condition-tdf-selector {
     font-size: calc(var(--app-font-size-base) * 0.85);
     width: 100%;
 }
@@ -536,9 +535,6 @@
     gap: var(--app-space-2);
 }
 
-.content-upload-danger-icon {
-    color: var(--feedback-error-color);
-}
 
 .action-buttons-row {
     display: flex;

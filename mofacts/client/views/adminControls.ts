@@ -11,11 +11,6 @@ import {
     SERVER_VERBOSITY_SETTING,
 } from '../../common/loggingSettings';
 import {
-    createAsyncCommandController,
-    type AsyncCommandController,
-    type AsyncCommandState,
-} from '../lib/adminUi/asyncCommandState';
-import {
     rejectLoad,
     resolveLoad,
     startLoad,
@@ -35,7 +30,7 @@ declare const DynamicSettings: {
     findOne(query: { _id: string }): { value: unknown } | undefined;
 };
 
-type MessageScope = 'load' | 'cache' | 'server-verbosity' | 'client-verbosity';
+type MessageScope = 'load' | 'server-verbosity' | 'client-verbosity';
 
 type AdminControlsInstance = Blaze.TemplateInstance & {
     serverStatusPresentation: ReactiveVar<LoadableState<AdminServerStatus>>;
@@ -46,8 +41,6 @@ type AdminControlsInstance = Blaze.TemplateInstance & {
     serverVerbositySaving: ReactiveVar<boolean>;
     clientVerbositySaving: ReactiveVar<boolean>;
     adminMessages: ReactiveVar<Partial<Record<MessageScope, AdminMessage>>>;
-    cacheCommandState: ReactiveVar<AsyncCommandState<void>>;
-    cacheCommand: AsyncCommandController<void>;
     serverStatusLifetime: TemplateLifetime;
     nextServerStatusRequestId: number;
 };
@@ -137,8 +130,6 @@ Template.adminControls.onCreated(function (this: AdminControlsInstance) {
     this.serverVerbositySaving = new ReactiveVar(false);
     this.clientVerbositySaving = new ReactiveVar(false);
     this.adminMessages = new ReactiveVar({});
-    this.cacheCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
-    this.cacheCommand = createAsyncCommandController((state) => this.cacheCommandState.set(state));
     this.serverStatusLifetime = createTemplateLifetime();
     this.nextServerStatusRequestId = 0;
 
@@ -161,13 +152,9 @@ Template.adminControls.onCreated(function (this: AdminControlsInstance) {
 
 Template.adminControls.onDestroyed(function (this: AdminControlsInstance) {
     this.serverStatusLifetime.destroy();
-    this.cacheCommand.destroy();
 });
 
 Template.adminControls.helpers({
-    cacheMessage(): AdminMessage | null {
-        return (Template.instance() as AdminControlsInstance).adminMessages.get().cache || null;
-    },
     serverVerbosityMessage(): AdminMessage | null {
         return (Template.instance() as AdminControlsInstance).adminMessages.get()['server-verbosity'] || null;
     },
@@ -211,9 +198,6 @@ Template.adminControls.helpers({
         return !instance.loggingSettingsReady.get()
             || instance.clientVerbosity.get() === null
             || instance.clientVerbositySaving.get();
-    },
-    cacheCommandBusy(): boolean {
-        return (Template.instance() as AdminControlsInstance).cacheCommandState.get().status === 'pending';
     },
 });
 
@@ -276,20 +260,5 @@ Template.adminControls.events({
                 );
             })
             .finally(() => instance.clientVerbositySaving.set(false));
-    },
-    'click #updateStimDisplayTypeMap'(event: Event, instance: AdminControlsInstance) {
-        event.preventDefault();
-        setAdminMessage(instance, null, 'info', 'cache');
-        void instance.cacheCommand.run(async () => {
-            await meteorCallAsync('updateStimDisplayTypeMap');
-        }, {
-            getErrorMessage: (err) => adminText('admin.displayCacheRebuildFailed', { error: formatError(err) }),
-            onSuccess: () => {
-                setAdminMessage(instance, adminText('admin.displayCacheRebuilt'), 'success', 'cache');
-            },
-            onFailure: (err) => {
-                setAdminMessage(instance, adminText('admin.displayCacheRebuildFailed', { error: formatError(err) }), 'error', 'cache');
-            },
-        });
     },
 });

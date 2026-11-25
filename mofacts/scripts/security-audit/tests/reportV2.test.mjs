@@ -29,7 +29,7 @@ test('V2 report: exact synthetic ERROR profiles remain recordable without build 
 test('V2 report: reject membership, order, profile, catalog and metadata mutations even with a recomputed digest', async () => {
   for (const mutate of [
     r => { r.schema = 'SecurityAuditReportV1'; },
-    r => { r.catalogVersion += 1; },
+    r => { r.catalogVersion = 2; },
     r => { r.catalogDigestSha256 = '1'.repeat(64); },
     r => { r.sections.external.controls[0].controlId = 'external.unexpected'; },
     r => { r.sections.external.controls[1] = structuredClone(r.sections.external.controls[0]); },

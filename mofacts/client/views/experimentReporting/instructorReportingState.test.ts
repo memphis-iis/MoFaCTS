@@ -3,7 +3,6 @@ import {
   findAssignmentForTdf,
   getReportingTotals,
   normalizePerformanceBuckets,
-  resolveSelectedDueDate,
   toDateInputValue,
   toDateMillis,
 } from './instructorReportingState';
@@ -19,17 +18,11 @@ describe('instructorReportingState', function() {
     expect(buckets.notMet.map((row) => row.userId)).to.deep.equal(['u2']);
   });
 
-  it('finds assignment due dates before TDF fallback dates', function() {
+  it('finds the selected course assignment and its effective due date', function() {
     const assignment = findAssignmentForTdf({
       course1: [{ assignmentId: 'a1', TDFId: 'tdf1', dueAt: '2026-02-03' }],
     }, 'course1', 'tdf1');
-    const fallbackTdf = {
-      _id: 'tdf1',
-      content: { tdfs: { tutor: { setspec: { duedate: '2026-03-04' } } } },
-    };
-
-    expect(resolveSelectedDueDate(assignment, fallbackTdf)).to.equal('2026-02-03');
-    expect(resolveSelectedDueDate(null, fallbackTdf)).to.equal('2026-03-04');
+    expect(assignment?.dueAt).to.equal('2026-02-03');
   });
 
   it('formats date input values and rejects invalid dates', function() {

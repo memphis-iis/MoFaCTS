@@ -99,13 +99,30 @@ config digests. The first accepted run's original receipt used misleading
 `*ImageConfig` labels; it is preserved with a separate metadata correction, not
 rewritten. The corrected writer is covered by bounded regression tests.
 
-The run's EXIT handler removes only exact ownership-labelled test/setup/Mongo
-containers, their anonymous database volumes, the job's network and Meteor cache.
-It preserves the source, tooling image and results for review. If preparation or
-the operator shell is interrupted, inspect the job's matching labels before any
-cleanup. Never use a global Docker prune or delete deployed volumes. Job source
-and logs are private operator artifacts and must not be committed. Collect a
-post-cleanup inventory and confirm existing staging services remain healthy.
+On WSL, prepare and run each measure free space on the Windows C: mount before
+starting Docker build or test work. Each requires 20 GiB free and records the
+measurement in results. Both stages also require 10 GiB free on the Linux job filesystem. These are start thresholds, not disk quotas.
+
+Jobs reuse one locally tagged tooling image for identical Dockerfile, Meteor
+manifests and npm manifests. The first job with new inputs builds it. Each job
+records the immutable image ID and uses that ID during execution. A maintainer can seed the hash tag from an existing image after verifying its
+job label and all six original build inputs against the new context. Application dependencies are still installed into a fresh test copy.
+
+A successful prepare keeps the files needed by run. Failed preparation and
+terminal runs remove the job's labelled containers, anonymous database volumes,
+network and Meteor cache, then remove node_modules, .meteor/local and _build
+from the writable test copy. Logs, exit status, capture, receipts and source
+remain available. Check results/cleanup-status for completion. Start a new job
+after a terminal attempt. A host power loss or forced kill can prevent cleanup.
+Never use global pruning to recover a job.
+
+Run the worker lifecycle regression on Linux with Bash. It simulates Docker and
+covers image reuse and invalidation, successful execution and failures in setup
+and execution.
+
+```sh
+bash deploy/meteor-integration/worker.test.sh
+```
 
 Before using a changed receipt writer, run its bounded rejection regressions
 with the pinned Node runtime:

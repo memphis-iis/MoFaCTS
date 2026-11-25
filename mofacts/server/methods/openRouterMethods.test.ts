@@ -1,7 +1,12 @@
 import { expect } from 'chai';
+import { Meteor } from 'meteor/meteor';
+import { OPENROUTER_CALL_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
 import sinon from 'sinon';
-import { createOpenRouterMethods } from './openRouterMethods';
+import { createOpenRouterRegistration } from './openRouterMethods';
 import { openRouterSessionCorrelationId } from '../lib/openRouterPrefixCaching';
+
+const createOpenRouterMethods = (...args: Parameters<typeof createOpenRouterRegistration>) => createOpenRouterRegistration(...args).methods;
 
 function adminDeps(isAdmin = true, openRouterPrefixCachingEnabled?: boolean) {
   return {
@@ -40,6 +45,22 @@ function adminDeps(isAdmin = true, openRouterPrefixCachingEnabled?: boolean) {
 }
 
 describe('openRouterMethods Admin Tests configuration', function() {
+  it('registers creator and lesson OpenRouter calls with an authenticated caller boundary', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw Error(observed.reason);
+    for (const verification of OPENROUTER_CALL_VERIFICATIONS) {
+      const row: typeof observed.surfaces[number] | undefined = observed.surfaces.find(entry => entry.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      const handler = (Meteor as any).server.method_handlers[verification.method];
+      try {
+        await handler.call({ userId: null });
+        expect.fail('An anonymous caller cannot request a provider operation');
+      } catch (error: any) {
+        expect(error.error).to.equal(401);
+      }
+    }
+  });
+
   it('rejects unauthorized dynamic instruction before resolving a lesson key', async function() {
     const methods = createOpenRouterMethods(adminDeps(false) as any);
     const unblock = sinon.spy();

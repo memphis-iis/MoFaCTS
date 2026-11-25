@@ -1,6 +1,10 @@
 import { Meteor } from 'meteor/meteor';
 import { resolvePreferredApiKey, type ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 
+export const audioProviderPolicy = Object.freeze({
+  kind: 'audio-provider', operation: 'lesson-or-personal-audio', authorize: resolvePreferredApiKey,
+} as const);
+
 type MethodContext = {
   userId?: string | null;
   unblock?: () => void;
@@ -75,13 +79,12 @@ export function createSpeechMethods(deps: SpeechMethodsDeps) {
       try {
         deps.serverConsole('[TTS] makeGoogleTTSApiCall called:', {
           TDFId,
-          message,
           audioPromptSpeakingRate,
           audioVolume,
           selectedVoice,
           languageCode,
         });
-        const keyResolution = await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), {
+        const keyResolution = await audioProviderPolicy.authorize(deps.getApiKeyResolutionDeps(), {
           userId: this.userId,
           tdfId: TDFId,
           kind: 'tts',
@@ -164,7 +167,7 @@ export function createSpeechMethods(deps: SpeechMethodsDeps) {
         answerGrammarCount: Array.isArray(answerGrammar) ? answerGrammar.length : undefined,
       });
 
-      const keyResolution = await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), {
+      const keyResolution = await audioProviderPolicy.authorize(deps.getApiKeyResolutionDeps(), {
         userId: this.userId,
         tdfId: TDFId,
         kind: 'speech',

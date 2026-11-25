@@ -1,3 +1,4 @@
+import { participantActivity } from '../../lib/participantPrivacy';
 import { checkpointProlificLockout, finalizeProlificSession, showParticipationSaveError, isProlificAccount, participationSaveFailed } from '../../lib/prolificParticipation';
 import {currentUserHasRole} from '../../lib/roleUtils';
 import { SavedAdaptiveUnitSequenceError } from '../../../common/adaptiveUnitSequence';
@@ -316,14 +317,14 @@ async function lockoutKick() {
       startLockoutInterval(initialLockoutEndTime);
     };
     try { await persistLockout(); } catch (error) {
-      if (isProlificAccount()) showParticipationSaveError(persistLockout);
+      if (participantActivity()) showParticipationSaveError(persistLockout);
       else clientConsole(1, 'Failed to persist lockout timestamp on server', error);
     }
     return
   }
   logLockout(lockoutminutes);
   const hasExistingLockout = checkForExistingLockout();
-  if (hasExistingLockout && await checkpointProlificLockout()) return;
+  if (hasExistingLockout && await checkpointProlificLockout(lockoutKick)) return;
   const doDisplay = (display.minSecs > 0 || display.maxSecs > 0);
   const doLockout = (!lockoutInterval && currLockOut() > 0);
   // No lockout and no display timeout: enable Continue immediately.
@@ -545,7 +546,7 @@ async function instructContinue() {
       await leavePage(navigationTarget);
     };
     try { await persistAndNavigate(); } catch (error) {
-      if (!isProlificAccount()) throw error;
+      if (!participantActivity()) throw error;
       finishLaunchLoading('prolific-instruction-save-failed');
       showParticipationSaveError(persistAndNavigate);
     }
@@ -980,7 +981,7 @@ async function handleInstructionContinueAction(forceBypassLockout = false) {
     await recordAndContinue();
   } catch (error) {
     finishLaunchLoading('instruction-continue-action-failed');
-    if (isProlificAccount()) { showParticipationSaveError(recordAndContinue); return; }
+    if (participantActivity()) { showParticipationSaveError(recordAndContinue); return; }
     clientConsole(1, '[Instructions] Continue action failed', error);
     Session.set('uiMessage', {
       variant: 'danger',

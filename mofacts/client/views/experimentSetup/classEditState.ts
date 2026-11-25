@@ -18,6 +18,8 @@ export type CourseSection = {
   sections?: string[];
 };
 
+export type ExistingSectionDraft = { sectionId: string; originalName: string; sectionName: string; remove: boolean };
+
 export type EditableCourse = {
   courseId: string | undefined;
   courseName: string;
@@ -28,6 +30,7 @@ export type EditableCourse = {
   timezone: string;
   visibility: CourseVisibility;
   sections: string[];
+  existingSections?: ExistingSectionDraft[];
 };
 
 export type SectionLink = {
@@ -114,12 +117,13 @@ export function buildCourseManagementData(
         timezone: courseSection.timezone || fallbackTimezone,
         visibility: courseSection.visibility === 'public' ? 'public' : 'private',
         sections: [],
+        existingSections: [],
       };
     }
     const sectionId = String(courseSection.sectionId || '').trim();
     const sectionName = String(courseSection.sectionName || '').trim();
     if (sectionId && sectionName) {
-      coursesById[courseSection.courseId]!.sections.push(sectionName);
+      coursesById[courseSection.courseId]!.existingSections!.push({ sectionId, originalName: sectionName, sectionName, remove: false });
       sectionLinks.push({
         sectionId,
         courseName: courseSection.courseName,

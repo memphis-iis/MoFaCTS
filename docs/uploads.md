@@ -57,3 +57,13 @@ cookie absence after login/reload/reconnect, and existing CSP, public/private
 assets, learner resume, Anki analysis, hosted fonts and YouTube playback. A WAV
 response alone does not establish successful playback. Keep production and the
 older staging installation outside this qualification batch.
+
+## Replacing lesson files
+
+The manual creator and Anki importer upload a separate archive before asking for confirmation of a lesson update. The lesson editor uploads media to a new URL. Saving the lesson commits that URL. Cancelling an update, abandoning an edit, or failing to upload leaves the original available.
+
+Replacing a file does not grant permission to delete every copy with the same name. The application retains previously published files when it cannot establish that all references have been removed. Repeated replacements can therefore increase storage usage.
+
+In the Content Upload media list, dropping files and using the file picker both skip names already present in the lesson. Other files in the selection continue uploading. Use the lesson editor to replace a specific media reference, or give the new file another name to keep both.
+
+Regular accounts have a soft daily limit of three lesson packages, reset at midnight UTC. A new upload can start while the recorded count is below three. Packages already in progress can finish, so overlapping uploads can take the count above three. Standalone lesson media do not use the package allowance and can still be uploaded after it is reached. The 10 MiB per-file limit and lesson access checks still apply. Teachers and administrators are exempt from the daily allowance.

@@ -78,6 +78,28 @@ async function removeFailedProbe(command, probe) {
   }
 }
 
+// Shared bounded read only. This establishes embedded source equality, never
+// source-test execution, GitHub coordinates or complete image qualification.
+export async function readEmbeddedImageSource(imageReference, expectedSource, command = evidenceCommand) {
+  const requestedImage = imageDigest(imageReference), source = parseBuildIdentity(expectedSource);
+  const owner = randomUUID(), probe = { name: `mofacts-ci-image-probe-${owner}`, owner };
+  try {
+    const embedded = parseCiEvidenceJson(await command('docker', [
+      '--context', 'default', 'run', '--rm', '--name', probe.name, '--label', `${probeOwnerLabel}=${probe.owner}`,
+      '--pull', 'never', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+      '--security-opt', 'no-new-privileges:true', '--entrypoint', 'node', requestedImage, '-e', embeddedRead,
+    ], maximumObservationBytes), maximumObservationBytes);
+    proofRecord(embedded, ['schema', 'state', 'identity']);
+    if (embedded.schema !== 'MoFaCTSImageSourceObservationV1' || embedded.state !== 'source-matched-unqualified'
+      || !isDeepStrictEqual(parseBuildIdentity(embedded.identity), source)) invalid();
+    return embedded;
+  } catch {
+    // Killing docker's CLI does not necessarily stop its daemon-side run.
+    await removeFailedProbe(command, probe);
+    invalid();
+  }
+}
+
 /** Actual immutable-image reads, never a caller-supplied successful command flag. */
 export async function observeCiImage(input, dependencies = {}) {
   try {
@@ -87,23 +109,7 @@ export async function observeCiImage(input, dependencies = {}) {
     const command = dependencies.command || evidenceCommand;
     const inspected = parseImageObservation(await observeDockerImage(requestedImage, dependencies));
     if (inspected.platform !== 'linux/amd64') invalid();
-    const owner = randomUUID();
-    const probe = { name: `mofacts-ci-image-probe-${owner}`, owner };
-    try {
-      const embedded = parseCiEvidenceJson(await command('docker', [
-        '--context', 'default', 'run', '--rm', '--name', probe.name, '--label', `${probeOwnerLabel}=${probe.owner}`,
-        '--pull', 'never', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
-        '--security-opt', 'no-new-privileges:true', '--entrypoint', 'node', requestedImage, '-e', embeddedRead,
-      ], maximumObservationBytes), maximumObservationBytes);
-      proofRecord(embedded, ['schema', 'state', 'identity']);
-      if (embedded.schema !== 'MoFaCTSImageSourceObservationV1' || embedded.state !== 'source-matched-unqualified'
-        || !isDeepStrictEqual(parseBuildIdentity(embedded.identity), source)) invalid();
-    } catch {
-      // Killing docker's CLI does not necessarily stop its daemon-side run.
-      // Cleanup verifies this invocation's label and removes only its immutable ID.
-      await removeFailedProbe(command, probe);
-      invalid();
-    }
+    await readEmbeddedImageSource(requestedImage, source, command);
     return parsePostBuildImageObservation({
       schema: 'PostBuildImageObservationV1', state: 'observed-unqualified', lane: 'ci-test-image',
       source, image: inspected, sourceEvidenceDigestSha256: hash(input.sourceEvidenceBytes), ci: input.ci,

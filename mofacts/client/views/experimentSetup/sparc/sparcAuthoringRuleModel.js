@@ -75,6 +75,7 @@ export function ruleTypeFromCatalogEntry(entryId) {
   if (entryId === 'rule.effect.classify') return 'effect:classify';
   if (entryId === 'rule.effect.credit') return 'effect:credit';
   if (entryId === 'rule.effect.model-practice') return 'effect:model-practice';
+  if (entryId === 'rule.effect.history-event') return 'effect:history-event';
   if (entryId === 'rule.effect.terminate-production-phase') return 'effect:terminate-production-phase';
   if (entryId === 'rule.effect.progressive-node-operation') return 'effect:append-node';
   return 'effect:classify';

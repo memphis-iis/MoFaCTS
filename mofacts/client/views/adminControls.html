@@ -38,33 +38,6 @@
             </div>
         </div>
 
-        <!-- Stimulus display cache refresh section -->
-        <div class="admin-section">
-            <div class="card admin-card admin-maintenance-card">
-                <div class="card-body">
-                    <div class="admin-maintenance-row">
-                        <div class="admin-maintenance-copy">
-                            <div class="admin-section-heading admin-section-heading-compact">
-                                <i class="fa fa-refresh admin-section-icon"></i>
-                                <h5>{{t 'admin.stimulusDisplayCache'}}</h5>
-                            </div>
-                            <p class="admin-maintenance-description">
-                                {{t 'admin.stimulusDisplayCacheDescription'}}
-                            </p>
-                        </div>
-                        <div class="admin-maintenance-action">
-                            <button type="button" id="updateStimDisplayTypeMap" class="btn btn-primary" disabled="{{cacheCommandBusy}}" aria-busy="{{#if cacheCommandBusy}}true{{else}}false{{/if}}">
-                                <i class="fa fa-refresh"></i> {{t 'admin.rebuildDisplayCache'}}
-                            </button>
-                        </div>
-                    </div>
-                    {{#if cacheMessage}}
-                    <div class="admin-inline-feedback admin-form-row-top">{{> adminStatus variant=cacheMessage.level text=cacheMessage.text urgent=(equals cacheMessage.level "error")}}</div>
-                    {{/if}}
-                </div>
-            </div>
-        </div>
-
         <!-- Server Verbosity Level Section -->
         <div class="admin-section">
             <div class="card admin-card admin-verbosity-card">

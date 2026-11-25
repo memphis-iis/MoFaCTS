@@ -1,13 +1,91 @@
 # Security audit code and tests
 
-The active scanner and receiver still use `SecurityAuditReportV1`. Production setup is documented in [the operator guide](../../../docs/deployment/security-audit.md). Target architecture and progress are in [the plan](../../../docs-developer/security-audit-durable-redesign-plan.md) and [status record](../../../docs-developer/security-audit-durable-redesign-status.md).
+Staging2 runs the qualified V2 application/receipt/host pair; production retains
+its immutable V1 scanner/receiver selection. See the [staging2 baseline](../../../deploy/security-audit/staging2-v2-operations.md),
+[production operator guide](../../../docs/deployment/security-audit.md),
+[plan](../../../docs-developer/security-audit-durable-redesign-plan.md) and
+[current status](../../../docs-developer/security-audit-durable-redesign-status.md).
 
-## Inert V2 file pipeline
+The selected authorization adapter passes all 29 live cases. Its authentication
+producer validates the complete finite case vector and emits its catalog-owned
+22-control subset: only the selected authorization control can pass from that
+proof; the other 21 protocol scenarios remain explicit Phase 2 ERROR results.
+`run-selected-authorization-v2.mjs` accepts canonical private value-only bindings
+and writes canonical finite observations after browser cleanup.
+`emit-authentication-producer-v2.mjs` consumes only those finite observations.
+Phase 2 source intent now references all 22 authentication controls through
+`AUTHENTICATION_CONTROL_CASES` in the same verification catalog (68 unique
+verification entries, including baselines). This does not change the active
+producer's selected-only boundary. The current reset/two-session and lifetime
+subcases have live staging2 acceptance through the existing
+[connected Gmail procedure](../../../deploy/security-audit/connected-mail.md).
+The passwordless evaluator distinguishes observed violations from missing facts
+and exact method denials from unrelated errors. Material observation requires all
+five installed/complete channel hooks; throttle evaluation requires independent
+fresh-scope attribution. These source helpers grant no access and acquire no
+provider credentials. Live remaining protocols, complete fixture/lease ownership,
+new evidence-contract catalog activation and a complete authentication artifact
+remain pending. The immutable historical boolean helper is test-only.
+
+`authentication/expiredResetV2.mjs` prepares unused-token expiry acquisition with
+the real source-owned lifetime, timing-only record metadata, bounded lease checks
+and private socket liveness. The optional connected reset worker's `protocol`
+scope couples separate current/expiry actors under one lease. Its source tests
+do not establish live aging or a complete authentication artifact. Follow the
+[owned reset qualification](../../../deploy/security-audit/connected-reset-qualification.md)
+for the accepted current branch, preparation boundaries and cleanup contract.
+
+`authentication/protocolBindingsV2.mjs` owns the value-only
+`MoFaCTSAuditProtocolBindingsV1` preparation/validation and child projections.
+It generates seven fresh scoped credentials, accepts the existing operator as
+the eighth actor, rejects policy/role/unused IMAP blocks and projects the accepted
+selected schema. A credential plan does not create an account or establish its
+server ownership/role; the fixture owner must verify both before acquisition.
+`core/childEnvironmentV2.mjs` owns the shared explicit Linux-tool and Windows-
+browser environment profiles. Repository callers use the unchanged Linux
+allowlist; authentication children receive only their scenario's actor/value
+subset through private input, with no provider, signing or mailbox credential.
+Unknown variables and Node injection/filter flags fail at that shared boundary.
+
+P2-D2's [passwordless requirement correction](../../../deploy/security-audit/passwordless-identity-review.md)
+preserves progress-backed return as an intentional laboratory experiment path.
+Do not require passwords, identifying information or new account markers. The
+stricter-gate proposal is withdrawn. Prolific-specific validation is a separate
+possible improvement using its existing integration, not an audit prerequisite.
+
+The repository and metadata entry points share the existing V2 owners. Metadata
+completion is stamped after acquisition; no environment revision or tag replaces
+a missing/mismatched protected receipt.
+
+The manual-only staging2 workflow is maintained at
+[staging2-security-audit-v2.yml](../../../.github/workflows/staging2-security-audit-v2.yml).
+Its report-writing binding and separate operator-owned encryption key are now
+authorized by Section 0's bounded access delegation of 2026-11-12; follow the
+[report-writer procedure](../../../deploy/security-audit/staging2-report-writer-review.md)
+without another approval question when its technical and custody gates pass.
+Its one signing binding and operator-held RSA pair are installed and verified;
+GitHub billing is unavailable. The standard
+[operator exposure sequence](../../../deploy/security-audit/operator-exposure-v2.md)
+uses the same owners without hosted execution; actual report acceptance is
+recorded independently. No production action has been performed. Missing tools,
+canaries and protocol acquisitions remain ERROR,
+and the final completion assertion runs after signed storage/encrypted retention.
+
+Current source no longer contains the superseded V1 scanner/assembler/upload
+executables or duplicate control tables. Production remains on its immutable
+historical checkout until separately authorized cutover. Test-only Phase 0
+witnesses retrieve that exact Git revision and run only its synthetic file
+assembler; no old network/browser acquisition is exposed by the fixture owner.
+Shared canonical JSON/command, scanner parsing and recovery-binding helpers
+remain where V2 and recovery code actually consume them.
+
+## V2 file pipeline
 
 The V2 HTTP/admin composition passes supported Meteor verification on
 `603c1233`: 990 server and 1,237 client cases passed, zero failures/hooks.
-That proves the tested source, including the shared test-only collection owner;
-it does not activate a route or qualify a release/deployment.
+That historical checkpoint proves the tested source, including the shared
+test-only collection owner. Later staging2 activation/rollback passed on the
+accepted 1c72734b image; its exact evidence remains in the current worklist.
 
 `core/producerFilesV2.mjs` owns file carriage for the existing producer/report
 contracts. Producers call `writeAuditProducerFileV2` to validate their entire
@@ -24,8 +102,8 @@ files are never replaced.
 `assembleAuditReportFilesV2({ artifactDirectory, outputPath, envelope, env })`
 accepts the existing report envelope fields except `target` and derives that
 field exclusively from required `env.AUDIT_TARGET` (default `process.env`). The
-selected protected environment owns this fixed HTTPS origin. The future workflow
-must supply the actual scanner checkout revision in `scannerSourceRevision`;
+selected protected environment owns this fixed HTTPS origin. Workflow assembly
+supplies the actual scanner checkout revision in `scannerSourceRevision`;
 event metadata is not evidence of the checked-out scanner source. This module
 does not acquire release identity or assert authenticity of input observations.
 
@@ -57,12 +135,11 @@ the store projection, separate freshness windows and HTML/JSON export rendering.
 The prepared Meteor browser cases cover rendered cards, empty history, rejected
 responses, exact download selection, duplicate clicks, focus and view cleanup.
 
-The coordinated cutover must replace the V1 route loader/template and controller
-with this V2 presentation and remove their superseded source, then verify the
-rendered page against the V2 receiver. The V2 template has no registered route
-or automatic network activity until it is rendered. Its import in browser tests
-uses synthetic method responses. Keep its browser execution evidence separate
-from the already accepted V1 page and earlier V2 receiver tests.
+The current application has replaced the V1 route loader/template and controller
+with this V2 presentation and removed their superseded source. Its rendered
+page, actual get/downloads and previous-image exclusion/restoration passed on
+staging2. Browser unit tests still use synthetic method responses; their proof
+is separate from live acceptance. Production retains its pinned V1 pairing.
 
 The host emitter reads the current host envelope and the composite evaluator's
 existing three-count UDP observation input. It writes `internal.json` and

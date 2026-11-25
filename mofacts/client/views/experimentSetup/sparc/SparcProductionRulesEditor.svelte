@@ -307,6 +307,8 @@
                   KC
                   <input value={effect.kc || ''} on:input={(event) => onUpdateEffectField(effect, 'kc', event.currentTarget.value)} />
                 </label>
+              {:else if effect.type === 'history-event'}
+                <p class="sparc-muted">{sparcText('sparc.useRuleJsonForEffect')}</p>
               {:else if effect.type === 'model-practice'}
                 <label>
                   {sparcText('sparc.outcome')}

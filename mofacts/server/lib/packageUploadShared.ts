@@ -91,7 +91,6 @@ export type ProcessPackageUploadDeps = {
   callOpenRouterEmbeddings?: (options: OpenRouterEmbeddingOptions) => Promise<OpenRouterEmbeddingResult>;
   legacyTrim: (value: unknown) => string;
   upsertPackage: (record: any, owner: string) => Promise<any>;
-  updateStimDisplayTypeMap: (stimuliSetIds: Array<string | number>) => Promise<unknown>;
   getStimuliSetIdByFilename: (stimFileName: string) => Promise<string | number | undefined>;
   saveMediaFile: (
     media: UploadedPackageFile,

@@ -27,6 +27,7 @@ export function createPoseTracking() {
   let worker: Worker | null = null;
   let animationFrame: number | null = null;
   let cancelInitialization: (() => void) | null = null;
+  let bodyTracking = false;
 
   function stop(): void {
     generation++;
@@ -87,7 +88,7 @@ export function createPoseTracking() {
         busy = true;
         void createImageBitmap(video).then(bitmap => {
           if (token !== generation) { bitmap.close(); return; }
-          const request: PoseWorkerRequest = { type: 'frame', bitmap, timestamp, width: bitmap.width, height: bitmap.height };
+          const request: PoseWorkerRequest = { type: 'frame', bitmap, timestamp, width: bitmap.width, height: bitmap.height, bodyTracking };
           try { created.postMessage(request, [bitmap]); }
           catch (error) { bitmap.close(); fail(error); }
         }).catch(fail);
@@ -96,5 +97,5 @@ export function createPoseTracking() {
     }
     animationFrame = requestAnimationFrame(frame);
   }
-  return { start, stop };
+  return { start, stop, setBodyTracking: (enabled: boolean): void => { bodyTracking = enabled; } };
 }

@@ -1,4 +1,6 @@
 import { requireSparcLessonAccess } from '../lib/sparcLessonAccess';
+import { OPENROUTER_CALL_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import type { MeteorMethodBinding } from '../securitySurfaces/registerMeteorMethods';
 import { isSparcAdminPolicy, isSparcCategorizedPolicy, SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
@@ -615,10 +617,47 @@ async function executeAdminOpenRouterRequest(
   }
 }
 
-export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
-  return {
+export function createOpenRouterRegistration(deps: OpenRouterMethodsDeps) {
+  const capabilityPolicy = {
+    kind: 'provider-access', operation: 'lesson',
+    authorize: (userId: MethodContext['userId']) => requireAuthenticatedUser(userId, 'Must be logged in to read OpenRouter capability', 401),
+  } as const;
+  const creatorPolicy = {
+    kind: 'provider-access', operation: 'creator',
+    authorize: (userId: MethodContext['userId']) => requireAuthenticatedUser(userId, 'Must be logged in to create AI content', 401),
+  } as const;
+  const lessonJsonPolicy = {
+    kind: 'provider-access', operation: 'lesson',
+    async authorize(context: MethodContext, params: unknown) {
+      const userId = requireAuthenticatedUser(context.userId, 'Must be logged in to call OpenRouter', 401);
+      await deps.assertPublicDemoAiQuota(userId, String(context.connection?.clientAddress || 'unknown'));
+      if (!isRecord(params) || (!isSparcAdminPolicy(params.policyId) && params.policyId !== SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID)) {
+        return { userId, releaseQueue: false };
+      }
+      if (isSparcCategorizedPolicy(params.policyId) || params.policyId === SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID) {
+        await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), userId, params.tdfId);
+      } else {
+        await requireUserWithRoles(deps.getMethodAuthorizationDeps(), { userId, roles: ['admin'], forbiddenMessage: 'Retired instructional policies require administrator access' });
+      }
+      return { userId, releaseQueue: true };
+    },
+  } as const;
+  const embeddingPolicy = {
+    kind: 'provider-access', operation: 'lesson',
+    async authorize(context: MethodContext, params: unknown) {
+      const userId = requireAuthenticatedUser(context.userId, 'Must be logged in to call OpenRouter embeddings', 401);
+      await deps.assertPublicDemoAiQuota(userId, String(context.connection?.clientAddress || 'unknown'));
+      check(params, Match.ObjectIncluding({ input: Array }));
+      const data = params as UnknownRecord;
+      const resolverDeps = deps.getApiKeyResolutionDeps();
+      const tdfId = normalizeString(data.tdfId) || null;
+      await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), userId, tdfId);
+      return { userId, data, resolverDeps, tdfId };
+    },
+  } as const;
+  const methods = {
     getOpenRouterCapability: async function(this: MethodContext, tdfId?: string | null) {
-      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to read OpenRouter capability', 401);
+      const userId = capabilityPolicy.authorize(this.userId);
       return resolveOpenRouterCapability(deps, userId, tdfId);
     },
 
@@ -633,23 +672,14 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
     },
 
     getAiContentOpenRouterCapability: async function(this: MethodContext) {
-      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to create AI content', 401);
+      const userId = creatorPolicy.authorize(this.userId);
       return resolveOpenRouterCapability(deps, userId, null, 'admin');
     },
 
     callResolvedOpenRouterJson: async function(this: MethodContext, params: unknown) {
-      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to call OpenRouter', 401);
-      await deps.assertPublicDemoAiQuota(userId, String(this.connection?.clientAddress || 'unknown'));
-      if (isRecord(params) && (isSparcAdminPolicy(params.policyId) || params.policyId === SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID)) {
-        if (isSparcCategorizedPolicy(params.policyId) || params.policyId === SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID) {
-          await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), userId, params.tdfId);
-        } else {
-          await requireUserWithRoles(deps.getMethodAuthorizationDeps(), { userId, roles: ['admin'], forbiddenMessage: 'Retired instructional policies require administrator access' });
-        }
-        // Independent feedback and instruction requests share one DDP connection.
-        // Release its method queue only after the account/policy checks succeed.
-        this.unblock?.();
-      }
+      const { userId, releaseQueue } = await lessonJsonPolicy.authorize(this, params);
+      // Independent feedback and instruction requests share one DDP connection.
+      if (releaseQueue) this.unblock?.();
       return executeResolvedOpenRouterJson(deps, userId, params, 'json');
     },
 
@@ -674,22 +704,14 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
     },
 
     callAiContentOpenRouterRequest: async function(this: MethodContext, request: unknown) {
-      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to create AI content', 401);
+      const userId = creatorPolicy.authorize(this.userId);
       if (!isRecord(request)) throw new Meteor.Error(400, 'AI Content OpenRouter request must be an object');
       assertAiContentOpenRouterRequest(request);
       return executeAdminOpenRouterRequest(deps, userId, request);
     },
 
     callResolvedOpenRouterEmbeddings: async function(this: MethodContext, params: unknown) {
-      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to call OpenRouter embeddings', 401);
-      await deps.assertPublicDemoAiQuota(userId, String(this.connection?.clientAddress || 'unknown'));
-      check(params, Match.ObjectIncluding({
-        input: Array,
-      }));
-      const data = params as UnknownRecord;
-      const resolverDeps = deps.getApiKeyResolutionDeps();
-      const tdfId = normalizeString(data.tdfId) || null;
-      await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), userId, tdfId);
+      const { userId, data, resolverDeps, tdfId } = await embeddingPolicy.authorize(this, params);
       const keyResolution = await resolvePreferredApiKey(resolverDeps, {
         userId,
         tdfId,
@@ -725,4 +747,16 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
       }
     },
   };
+  const policies = {
+    getOpenRouterCapability: [capabilityPolicy, 'provider-capability'],
+    getAiContentOpenRouterCapability: [creatorPolicy, 'provider-capability'],
+    callAiContentOpenRouterRequest: [creatorPolicy, 'provider-result'],
+    callResolvedOpenRouterJson: [lessonJsonPolicy, 'provider-result'],
+    callResolvedOpenRouterEmbeddings: [embeddingPolicy, 'embedding-vectors'],
+  } as const;
+  const methodBindings: MeteorMethodBinding[] = OPENROUTER_CALL_VERIFICATIONS.map(verification => {
+    const [policy, dataEgress] = policies[verification.method];
+    return { verification, policy, dataEgress, handler: methods[verification.method] };
+  });
+  return { methods, methodBindings };
 }

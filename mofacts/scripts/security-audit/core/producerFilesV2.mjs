@@ -2,8 +2,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ACTIVE_AUDIT_CATALOG, readAuditCatalog } from '../../../common/securityAudit/catalogRegistry.ts';
 import { expectedAuditProducers, parseAuditProducerArtifact } from '../../../common/securityAudit/producerArtifact.ts';
-import { canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
-import { auditTargetOrigin } from '../../../common/securityAudit/reportV2.ts';
+import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
+import { auditTargetOrigin, auditTimestamp } from '../../../common/securityAudit/reportV2.ts';
+import { parseAuditIdentity } from '../../../common/securityAudit/reportIdentity.ts';
 import { AUDIT_V2_MAX_BODY_BYTES } from '../../../server/securityAudit/securityAuditIngestionV2.ts';
 import { assembleAuditReportV2 } from './assembleV2.mjs';
 
@@ -11,10 +12,14 @@ const invalid = () => { throw new Error('Invalid V2 audit file input'); };
 
 // These files belong to a private per-run directory. Bound reads even when a
 // producer crashes, changes its file, emits a device, or exceeds its contract.
-export async function readAuditFileV2(file) {
+export async function readAuditFileV2(file, maximumBytes = AUDIT_V2_MAX_BODY_BYTES) {
+  // Encrypted envelopes can exceed their 2-MiB plaintext after base64 encoding.
+  // Report/producer callers keep the original bound; archive readers opt into
+  // an explicit finite bound, never more than twice that maximum.
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1 || maximumBytes > 2 * AUDIT_V2_MAX_BODY_BYTES) invalid();
   const before = await fs.lstat(file, { bigint: true });
   if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n
-    || before.size > BigInt(AUDIT_V2_MAX_BODY_BYTES)) invalid();
+    || before.size > BigInt(maximumBytes)) invalid();
   const handle = await fs.open(file, fs.constants.O_RDONLY
     | (process.platform === 'linux' ? fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK : 0));
   try {
@@ -22,7 +27,7 @@ export async function readAuditFileV2(file) {
     for (const key of ['ino', 'dev', 'mode', 'nlink', 'size', 'mtimeNs', 'ctimeNs']) {
       if (before[key] !== opened[key]) invalid();
     }
-    const buffer = Buffer.alloc(AUDIT_V2_MAX_BODY_BYTES + 1);
+    const buffer = Buffer.alloc(maximumBytes + 1);
     let count = 0;
     while (count < buffer.length) {
       const { bytesRead } = await handle.read(buffer, count, buffer.length - count, null);
@@ -34,7 +39,7 @@ export async function readAuditFileV2(file) {
     for (const key of ['ino', 'dev', 'mode', 'nlink', 'size', 'mtimeNs', 'ctimeNs']) {
       if (before[key] !== after[key] || before[key] !== final[key]) invalid();
     }
-    if (count > AUDIT_V2_MAX_BODY_BYTES || BigInt(count) !== before.size) invalid();
+    if (count > maximumBytes || BigInt(count) !== before.size) invalid();
     return buffer.subarray(0, count);
   } finally { await handle.close(); }
 }
@@ -65,21 +70,38 @@ export async function writeAuditProducerFileV2({ file, artifact, catalog, profil
 // AUDIT_TARGET is supplied by the selected protected environment. Callers cannot
 // override it through metadata or a CLI target option. Active V1 never imports
 // this module; activation belongs to the coordinated receiver/producer cutover.
-export async function assembleAuditReportFilesV2({ artifactDirectory, outputPath, envelope, env = process.env }) {
+export async function assembleAuditReportFilesV2({ artifactDirectory, outputPath, envelope,
+  integratedAuthentication, env = process.env }) {
   const target = auditTargetOrigin(env.AUDIT_TARGET);
   if (!envelope || Object.hasOwn(envelope, 'target')) invalid();
   const catalog = await readAuditCatalog(ACTIVE_AUDIT_CATALOG, 'ingestion');
   const producers = expectedAuditProducers(catalog, envelope.reportType);
+  const artifacts = [];
+  if (integratedAuthentication !== undefined) {
+    const { runtime, startedAt, completedAt, artifact } = integratedAuthentication;
+    const revision = parseAuditIdentity(envelope.deployedApplicationRevision, 'revision');
+    const image = parseAuditIdentity(envelope.deployedImageDigest, 'platform-image');
+    if (envelope.reportType !== 'full' || target !== runtime.target
+      || revision.state !== 'observed' || revision.value !== runtime.applicationRevision
+      || image.state !== 'observed' || image.value.split('@')[1] !== runtime.platformImageDigest
+      || auditTimestamp(startedAt) < auditTimestamp(envelope.startedAt)
+      || auditTimestamp(completedAt) < startedAt || completedAt > auditTimestamp(envelope.completedAt)
+      || await auditDigest(integratedAuthentication.catalog) !== ACTIVE_AUDIT_CATALOG.catalogDigestSha256) {
+      throw new Error('Integrated authentication does not match this report run and active catalog');
+    }
+    artifacts.push({ producerId: 'authentication',
+      artifact: parseAuditProducerArtifact(artifact, catalog, 'full', 'authentication') });
+  }
   const directory = path.resolve(artifactDirectory);
   const stat = await fs.lstat(directory, { bigint: true });
   if (!stat.isDirectory() || stat.isSymbolicLink() || await fs.realpath(directory) !== directory) invalid();
   const names = new Set();
   const stream = await fs.opendir(directory);
   for await (const entry of stream) {
-    if (names.size >= producers.length || !producers.some(id => entry.name === `${id}.json`)) invalid();
+    if (names.size >= producers.length || !producers.some(id => entry.name === `${id}.json`)
+      || (integratedAuthentication !== undefined && entry.name === 'authentication.json')) invalid();
     names.add(entry.name);
   }
-  const artifacts = [];
   for (const producerId of producers) {
     const name = `${producerId}.json`;
     if (!names.has(name)) continue;

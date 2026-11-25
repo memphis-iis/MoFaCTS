@@ -72,22 +72,31 @@ export function createServerUtilityHelpers(deps: ServerUtilityDeps) {
     return info;
   }
 
-  function sendEmail(to: string, from: string, subject: string, text: string) {
+  function deliveryOptions(to: string, from: string, subject: string, text: string) {
     const deliveryFrom = from === deps.ownerEmail ? deps.emailFrom : from;
-    deps.serverConsole('sendEmail', to, deliveryFrom, subject, '[body redacted, length=' + (text?.length || 0) + ']');
     const emailEnabled = Meteor.settings.enableEmail ?? deps.isProd;
     if (emailEnabled) {
       check([to, deliveryFrom, subject, text], [String]);
-      Email.send({
+      return {
         to,
         from: deliveryFrom,
         ...(deps.emailReplyTo ? { replyTo: deps.emailReplyTo } : {}),
         subject,
         text,
-      });
+      };
     } else {
       deps.serverConsole('sendEmail SKIPPED (enableEmail is false and prod is false)');
     }
+  }
+
+  function sendEmail(to: string, from: string, subject: string, text: string) {
+    const options = deliveryOptions(to, from, subject, text);
+    if (options) Email.send(options);
+  }
+
+  async function sendEmailAsync(to: string, from: string, subject: string, text: string) {
+    const options = deliveryOptions(to, from, subject, text);
+    if (options) await Email.sendAsync(options);
   }
 
   async function sendErrorReportSummaries() {
@@ -108,6 +117,7 @@ export function createServerUtilityHelpers(deps: ServerUtilityDeps) {
     getDiskUsageInfo: getLoggedDiskUsageInfo,
     buildDiskUsageStatus,
     sendEmail,
+    sendEmailAsync,
     sendErrorReportSummaries,
   };
 }

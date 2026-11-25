@@ -1,4 +1,10 @@
 import { Meteor } from 'meteor/meteor';
+import { strict as assert } from 'node:assert';
+import { Roles } from 'meteor/alanning:roles';
+import { Random } from 'meteor/random';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
+import { Histories, GlobalExperimentStates, SectionUserMap } from '../../common/Collections';
+import { ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
 import { expect } from 'chai';
 import { createAdminMethods } from './adminMethods';
 
@@ -12,6 +18,7 @@ function createAdminDeps(
 ) {
   let dynamicSettingsDoc: any = null;
   return {
+    isValidEmailAddress: (value: string) => value.includes('@'),
     serverConsole: () => undefined,
     usersCollection: {
       find: () => ({ fetchAsync: async () => [] }),
@@ -89,11 +96,8 @@ function createAdminDeps(
     sendVerificationEmailForUser: async () => false,
     getUserDisplayIdentifier: (user: any) => String(user?.username || user?._id || ''),
     syncUsernameCaches: () => undefined,
-    deleteTdfRuntimeData: async () => undefined,
-    removeUploadedAsset: async () => undefined,
     removeSparcFigureUserDecisions: async () => undefined,
     removeSimulationResearchUserRecords: async () => undefined,
-    clearStimDisplayTypeMap: () => undefined,
     encryptData: (value: string) => `encrypted:${value}`,
     openRouterModelCatalogService: {
       getCatalog: async () => catalog,
@@ -103,25 +107,6 @@ function createAdminDeps(
 }
 
 describe('adminMethods', function() {
-  it('delegates bulk asset removal to its owner without deleting learner decisions', async function() {
-    const removedAssets: string[] = [];
-    const deps = createAdminDeps();
-    const methods = createAdminMethods({
-      ...deps,
-      DynamicAssets: {
-        ...deps.DynamicAssets,
-        find: () => ({ countAsync: async () => 2, fetchAsync: async () => [{ _id: 'teaching-image' }, { _id: 'uploaded-file' }] }),
-        removeAsync: async () => { throw new Error('Bulk removal must use the asset owner'); },
-      },
-      removeUploadedAsset: async id => { removedAssets.push(id); },
-      removeSparcFigureUserDecisions: async () => { throw new Error('Bulk content removal must preserve learner decisions'); },
-      removeSimulationResearchUserRecords: async () => { throw new Error('Bulk content removal must preserve research traces'); },
-    });
-
-    expect(await methods.deleteAllFiles.call({ userId: 'admin-user' })).to.equal(2);
-    expect(removedAssets).to.deep.equal(['teaching-image', 'uploaded-file']);
-  });
-
   it('lists only uploaded SPARC pages compatible with the compound-interest evaluation', async function() {
     const compatibleDisplay = {
       unitType: 'sparc-autotutor-dialogue',
@@ -204,6 +189,207 @@ describe('adminMethods', function() {
       pageId: 'compound-page',
       display,
     });
+  });
+
+  it('requires an administrator for installed site management operations', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed administrative operations');
+    const args = {
+      initializeCustomTheme: ['Default'],
+      createThemeFromBase: [{ name: 'Synthetic' }],
+      duplicateTheme: [{ sourceThemeId: 'synthetic', name: 'Copy' }],
+      importThemeFile: [{}],
+      exportThemeFile: ['synthetic'],
+      deleteTheme: ['synthetic'],
+      renameTheme: [{ themeId: 'synthetic', newName: 'Renamed' }],
+      setActiveTheme: ['synthetic'],
+      setCustomHelpPage: ['Synthetic help'],
+      removeCustomHelpPage: [],
+      getServerStatus: [],
+      setVerbosity: [1],
+      setClientVerbosity: [1],
+      getAdminTestSparcCompoundInterestSource: ['synthetic', 'page'],
+      getAdminTestSparcCompoundInterestSources: [],
+      getAdminApiKeyAlternativeMetadata: [],
+      saveAdminApiKeyAlternative: ['openrouter', {}],
+      deleteAdminApiKeyAlternative: ['openrouter'],
+      userAdminDeleteUser: ['synthetic'],
+      userAdminNewsEmailRecipients: [],
+      getAdminTestOpenRouterCapability: [],
+      callAdminTestResolvedOpenRouterJson: [{}],
+      callAdminTestOpenRouterRequest: [{}],
+      setCustomThemeProperty: ['themeName', 'Test'],
+      refreshUserAdminUsageCaches: [[]],
+      getSparcVideoCatalogTargets: ['synthetic'],
+      prepareSparcVideoCatalogTarget: ['synthetic', 'target'],
+      saveSparcVideoCatalogPassages: ['synthetic', 'target', []],
+      deleteSparcInstructionalComponent: ['synthetic'],
+      getSparcLibraryClusters: [],
+      listSparcInstructionalComponents: [{}],
+      replaceSparcLibraryImage: [{}],
+      reviseSparcPrimitive: ['synthetic', {}],
+      insertNewUsers: ['roster.csv', 'email,password'],
+    };
+    for (const verification of ADMIN_OPERATION_VERIFICATIONS) {
+      const method = verification.method;
+      const rows: typeof observed.surfaces = observed.surfaces.filter(row => row.name === method);
+      assert.equal(rows.length, 1, method);
+      assert.equal(rows[0]?.verification, verification);
+      assert.deepEqual(rows[0]?.policy, { kind: 'role', role: 'admin' });
+      const handler = (Meteor as any).server.method_handlers[method];
+      for (const userId of [null, Random.id()]) {
+        await assert.rejects(() => handler.apply({ userId }, args[method]),
+          (err: any) => (userId ? [403, 'unauthorized', 'not-authorized'] : [401, 403, 'not-logged-in', 'unauthorized', 'not-authorized']).includes(err.error), method);
+      }
+    }
+  });
+
+  it('preserves an enrolled account and creates only new accounts through the installed roster import', async function() {
+    const actor = Random.id(), learner = Random.id(), sectionId = Random.id();
+    const email = learner.toLowerCase() + '@example.invalid';
+    const newEmail = Random.id().toLowerCase() + '@example.invalid';
+    const settings = Meteor.settings as any, original = settings.auth;
+    const run = () => (Meteor as any).server.method_handlers.insertNewUsers.call({ userId: actor }, 'roster.csv',
+      ['email,password', email + ',', newEmail + ',"' + Random.secret() + ',quoted"', newEmail + ','].join('\n'));
+    try {
+      settings.auth = { ...original, requireEmailVerification: false };
+      await Roles.createRoleAsync('admin', { unlessExists: true });
+      await Roles.addUsersToRolesAsync(actor, 'admin');
+      await Meteor.users.insertAsync({ _id: learner, username: email, emails: [{ address: email, verified: true }],
+        services: { password: { bcrypt: 'synthetic-existing-hash' } } } as any);
+      await SectionUserMap.insertAsync({ userId: learner, sectionId });
+      const before = await Meteor.users.findOneAsync(learner);
+      assert.deepEqual(await run(), { created: 1, skippedRows: [2, 4], errors: [] });
+      assert.deepEqual(await run(), { created: 0, skippedRows: [2, 3, 4], errors: [] });
+      assert.deepEqual(await Meteor.users.findOneAsync(learner), before);
+      assert.equal(await SectionUserMap.find({ userId: learner, sectionId }).countAsync(), 1);
+      const created = await Meteor.users.findOneAsync({ username: newEmail });
+      assert.ok(created);
+      assert.equal(await SectionUserMap.find({ userId: created._id }).countAsync(), 0);
+    } finally {
+      if (original === undefined) delete settings.auth; else settings.auth = original;
+      await SectionUserMap.removeAsync({ userId: learner, sectionId });
+      await Meteor.users.removeAsync({ username: { $in: [email, newEmail] } });
+      await Roles.setUserRolesAsync(actor, []);
+    }
+  });
+
+  it('uses one current contact per account for the news draft and deduplicates shared addresses', async function() {
+    const accounts = [
+      { email_canonical: 'Current@example.invalid', emails: [{ address: 'other@example.invalid' }] },
+      { emails: [{ address: 'CURRENT@example.invalid' }, { address: 'second@example.invalid' }] },
+      { emails: [{ address: 'primary@example.invalid' }] },
+      { username: 'username@example.invalid', email_original: 'old@example.invalid' },
+    ];
+    const deps = createAdminDeps();
+    const methods = createAdminMethods({ ...deps, usersCollection: { ...deps.usersCollection,
+      find: () => ({ fetchAsync: async () => accounts }),
+    } });
+    assert.deepEqual(await methods.userAdminNewsEmailRecipients.call({ userId: 'admin' }), {
+      emails: ['current@example.invalid', 'primary@example.invalid'], count: 2,
+    });
+  });
+
+  it('skips existing roster accounts before password validation and reports rows on reimport', async function() {
+    const accounts = new Set(['existing@example.invalid']);
+    const created: string[] = [];
+    const csvRows = [
+      ['email', 'password'], ['EXISTING@example.invalid', ''], ['new@example.invalid', Random.secret()],
+      ['new@example.invalid', ''], [''],
+    ];
+    const deps = {
+      ...createAdminDeps(),
+      findNormalAccountUserByCanonicalEmail: async (email: string) => accounts.has(email) ? { _id: email } : null,
+      assertStrongPassword: (password: string) => assert.ok(password),
+      createUserWithRetry: async (email: string) => {
+        accounts.add(email);
+        created.push(email);
+        return email;
+      },
+    };
+    const handler = createAdminMethods(deps).insertNewUsers;
+    const run = () => handler.call({ userId: 'admin' }, 'roster.csv', csvRows.map(row => row.join(',')).join('\n'));
+    assert.deepEqual(await run(), { created: 1, skippedRows: [2, 4], errors: [] });
+    assert.deepEqual(await run(), { created: 0, skippedRows: [2, 3, 4], errors: [] });
+    assert.deepEqual(created, ['new@example.invalid']);
+  });
+
+  it('protects configured accounts before cleanup and removes eligible learner progress', async function() {
+    const actor = Random.id(), target = Random.id();
+    const email = target.toLowerCase() + '@example.invalid';
+    const settings = Meteor.settings as any, original = settings.initRoles;
+    const remove = () => (Meteor as any).server.method_handlers.userAdminDeleteUser.call({ userId: actor }, target);
+    try {
+      await Meteor.users.insertAsync({ _id: actor, username: actor } as any);
+      await Meteor.users.insertAsync({ _id: target, username: target, emails: [{ address: email, verified: true }] } as any);
+      await Roles.createRoleAsync('admin', { unlessExists: true });
+      await Roles.addUsersToRolesAsync(actor, 'admin');
+      await Histories.insertAsync({ userId: target } as any);
+      await GlobalExperimentStates.insertAsync({ userId: target } as any);
+      for (const key of ['admins', 'teachers']) {
+        settings.initRoles = { [key]: [email] };
+        await assert.rejects(remove, (err: any) => err.error === 'delete-user-configured');
+        assert.ok(await Meteor.users.findOneAsync(target));
+        assert.ok(await Histories.findOneAsync({ userId: target }));
+        assert.ok(await GlobalExperimentStates.findOneAsync({ userId: target }));
+      }
+      settings.initRoles = {};
+      assert.equal((await remove()).RESULT, 'SUCCESS');
+      assert.ok(!await Meteor.users.findOneAsync(target));
+      assert.ok(!await Histories.findOneAsync({ userId: target }));
+      assert.ok(!await GlobalExperimentStates.findOneAsync({ userId: target }));
+    } finally {
+      if (original === undefined) delete settings.initRoles; else settings.initRoles = original;
+      await Roles.setUserRolesAsync(actor, []);
+      await Histories.removeAsync({ userId: target });
+      await GlobalExperimentStates.removeAsync({ userId: target });
+      await Meteor.users.removeAsync({ _id: { $in: [actor, target] } });
+    }
+  });
+
+  it('protects self and configured roles while permitting ordinary administrator handoff', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed admin role change');
+    const rows = observed.surfaces.filter(row => row.name === 'userAdminRoleChange');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]?.verification, ADMIN_ROLE_CHANGE_VERIFICATION);
+    const handler = (Meteor as any).server.method_handlers.userAdminRoleChange;
+    const admin = Random.id(), successor = Random.id();
+    const email = successor.toLowerCase() + '@example.invalid';
+    const alias = admin.toLowerCase() + '@example.invalid';
+    const settings = Meteor.settings as any;
+    const initRoles = settings.initRoles;
+    const change = (actor: string, target: string, action: string, role: string) =>
+      handler.call({ userId: actor }, target, action, role);
+    try {
+      await Meteor.users.insertAsync({ _id: admin, username: admin } as any);
+      await Meteor.users.insertAsync({ _id: successor, username: successor, emails: [
+        { address: email, verified: true }, { address: alias, verified: true },
+      ] } as any);
+      for (const role of ['admin', 'teacher']) await Roles.createRoleAsync(role, { unlessExists: true });
+      await Roles.addUsersToRolesAsync(admin, 'admin');
+      await assert.rejects(change(successor, admin, 'remove', 'admin'), (e: any) => e.error === 'not-authorized');
+      await assert.rejects(change(admin, admin, 'remove', 'admin'), (e: any) => e.error === 'admin-self-demotion');
+      await change(admin, successor, 'add', 'admin');
+      await change(admin, successor, 'add', 'teacher');
+      settings.initRoles = { admins: [email.toUpperCase()], teachers: [alias] };
+      for (const role of ['admin', 'teacher']) {
+        await assert.rejects(change(admin, successor, 'remove', role), (e: any) => e.error === 'role-granted-by-settings');
+        assert.equal(await Roles.userIsInRoleAsync(successor, role), true);
+      }
+      settings.initRoles = { admins: [email], teachers: [] };
+      await change(admin, successor, 'remove', 'teacher');
+      assert.equal(await Roles.userIsInRoleAsync(successor, 'teacher'), false);
+      await change(successor, admin, 'remove', 'admin');
+      assert.equal(await Roles.userIsInRoleAsync(admin, 'admin'), false);
+    } finally {
+      if (initRoles === undefined) delete settings.initRoles;
+      else settings.initRoles = initRoles;
+      for (const id of [admin, successor]) {
+        await Roles.setUserRolesAsync(id, []);
+        await Meteor.users.removeAsync(id);
+      }
+    }
   });
 
   it('does not let a non-admin caller grant roles', async function() {

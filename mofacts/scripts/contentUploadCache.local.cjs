@@ -73,7 +73,6 @@ async function session() {
     const tdfIndexes = await db.collection('tdfs').indexes();
     assert.ok(tdfIndexes.some(index => index.name === 'perf_owner_lessonname_id'));
     assert.ok(tdfIndexes.some(index => index.name === 'perf_accessors_user_lessonname_id'));
-    assert.ok((await db.collection('stim_files').indexes()).some(index => index.key['meta.fileName'] === 1));
     assert.ok((await db.collection('Assets').indexes()).some(index => index.key['meta.stimuliSetId'] === 1));
     const root = { _id: prefix, ownerId: first.userId, stimuliSetId: setId, conditionCounts: [0],
       content: { fileName: `${prefix}.json`, tdfs: { tutor: { setspec: { lessonname: 'Cache integration fixture',
@@ -94,11 +93,9 @@ async function session() {
     await until(() => sessions.every(s => s.docs.get(`count:string:${setId}`)?.data.count === 1), 'asset insert');
     await db.collection('Assets').deleteOne({ _id: prefix });
     await until(() => sessions.every(s => s.docs.get(`count:string:${setId}`)?.data.count === 0), 'asset removal');
-    await db.collection('stim_files').insertOne({ _id: prefix, meta: { fileName: `${prefix}.stim.json` } });
-    await until(() => sessions.every(s => s.docs.has(`stim:${prefix}`)), 'stimulus insert');
     await db.collection('tdfs').updateOne({ _id: prefix }, { $set: { ownerId: `${prefix}-other` } });
     await until(() => sessions.every(s => !s.docs.has(`tdf:${prefix}`)
-      && !s.docs.has(`tdf:${fixtures[2]}`) && !s.docs.has(`stim:${prefix}`)), 'access revocation and dependency removal');
+      && !s.docs.has(`tdf:${fixtures[2]}`)), 'access revocation and dependency removal');
     await db.collection('tdfs').updateOne({ _id: fixtures[1] }, { $set: { accessors: [{ userId: first.userId }] } });
     await until(() => sessions.every(s => s.docs.has(`tdf:${fixtures[1]}`)), 'shared access grant');
     second.socket.close(); sessions.pop();
@@ -115,7 +112,6 @@ async function session() {
     if (db) {
       await db.collection('tdfs').deleteMany({ _id: { $in: fixtures } });
       await db.collection('Assets').deleteOne({ _id: prefix });
-      await db.collection('stim_files').deleteOne({ _id: prefix });
     }
     await client.close();
   }

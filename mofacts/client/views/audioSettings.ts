@@ -159,12 +159,13 @@ function setAudioSettingsMessage(
 
 async function saveSettings(
   instance: AudioSettingsInstance,
-  nextSettings: AudioSettingsForm,
+  changes: Partial<AudioSettingsForm>,
   scope: 'tts' | 'speech-input',
   onActivated?: () => void,
 ): Promise<void> {
   const previousSettings = readySettings(instance);
   if (!previousSettings) return;
+  const nextSettings = { ...previousSettings, ...changes };
 
   setAudioSettingsMessage(instance, scope, null);
   await instance.settingsCommandRegistry.run(scope, async () => {
@@ -172,7 +173,7 @@ async function saveSettings(
     applyRuntimeAudioSettings(nextSettings);
     onActivated?.();
     await (Meteor as typeof Meteor & { callAsync: (name: string, ...args: unknown[]) => Promise<void> })
-      .callAsync('saveAudioSettings', nextSettings);
+      .callAsync('saveAudioSettings', changes);
   }, {
     getErrorMessage: settingSaveError,
     onFailure: (error: unknown) => {
@@ -321,7 +322,7 @@ Template.audioSettings.events({
     const current = readySettings(instance);
     if (!current) return;
     const nextMode = promptModeFromToggles(!promptQuestionEnabled(current), promptFeedbackEnabled(current));
-    void saveSettings(instance, { ...current, audioPromptMode: nextMode }, 'tts', () => {
+    void saveSettings(instance, { audioPromptMode: nextMode }, 'tts', () => {
       if (nextMode !== 'silent') void warmupGoogleTTS();
     });
   },
@@ -331,7 +332,7 @@ Template.audioSettings.events({
     const current = readySettings(instance);
     if (!current) return;
     const nextMode = promptModeFromToggles(promptQuestionEnabled(current), !promptFeedbackEnabled(current));
-    void saveSettings(instance, { ...current, audioPromptMode: nextMode }, 'tts', () => {
+    void saveSettings(instance, { audioPromptMode: nextMode }, 'tts', () => {
       if (nextMode !== 'silent') void warmupGoogleTTS();
     });
   },
@@ -341,7 +342,7 @@ Template.audioSettings.events({
     const current = readySettings(instance);
     if (!current) return;
     const audioInputMode = !current.audioInputMode;
-    void saveSettings(instance, { ...current, audioInputMode }, 'speech-input', () => {
+    void saveSettings(instance, { audioInputMode }, 'speech-input', () => {
       if (audioInputMode) void warmupGoogleSpeechRecognition();
     });
   },
@@ -358,7 +359,6 @@ Template.audioSettings.events({
     if (!current) return;
     const value = Number.parseFloat((event.currentTarget as HTMLInputElement).value);
     void saveSettings(instance, {
-      ...current,
       audioPromptQuestionVolume: value,
       audioPromptFeedbackVolume: value,
     }, 'tts');
@@ -369,7 +369,6 @@ Template.audioSettings.events({
     if (!current) return;
     const value = Number.parseFloat((event.currentTarget as HTMLSelectElement).value);
     void saveSettings(instance, {
-      ...current,
       audioPromptQuestionSpeakingRate: value,
       audioPromptFeedbackSpeakingRate: value,
     }, 'tts');
@@ -380,7 +379,6 @@ Template.audioSettings.events({
     if (!current) return;
     const value = (event.currentTarget as HTMLSelectElement).value;
     void saveSettings(instance, {
-      ...current,
       audioPromptVoice: value,
       audioPromptFeedbackVoice: value,
     }, 'tts');
@@ -397,7 +395,7 @@ Template.audioSettings.events({
     const current = readySettings(instance);
     if (!current) return;
     const value = normalizeAudioInputSensitivity((event.currentTarget as HTMLInputElement).value);
-    void saveSettings(instance, { ...current, audioInputSensitivity: value }, 'speech-input');
+    void saveSettings(instance, { audioInputSensitivity: value }, 'speech-input');
   },
 
   'input #speechAPIKey'(event: Event, instance: AudioSettingsInstance) {

@@ -42,15 +42,16 @@ describe('Instructional library curation Mongo contract', () => {
       removedAssets.push(id);
     });
 
-    await owner.removeImageAsset(assetId);
+    await owner.remove(assetId);
 
     assert.deepEqual(removedAssets, [assetId]);
     assert.deepEqual(Object.keys((await SparcInstructionalRemovals.findOneAsync(assetId))!).sort(), ['_id', 'removedAt']);
     assert.equal(await library().countDocuments({ _id: { $in: ['curationTestUnrelatedText', 'curationTestUnrelatedVideo'] } }), 2);
     for (const { name, row } of retained) assert.deepEqual(await db().collection(collectionMongoName(name)).findOne({ _id: row._id }), row);
   });
-  it('journals an uncatalogued image before media removal and resumes interrupted cleanup', async () => {
+  it('resumes pending image cleanup when its catalog entry is already gone', async () => {
     const assetId = 'curationTestUncataloguedImage';
+    await SparcInstructionalRemovals.insertAsync({ _id: assetId, removedAt: new Date(), cleanupKind: 'image', removeAsset: true });
     let fail = true;
     let attempts = 0;
     const owner = createSparcLibraryCuration(async id => {
@@ -60,25 +61,20 @@ describe('Instructional library curation Mongo contract', () => {
       if (fail) throw new Error('Synthetic storage failure');
     });
 
-    await assert.rejects(owner.removeImageAsset(assetId), /Synthetic storage failure/);
+    await assert.rejects(owner.remove(assetId), /Synthetic storage failure/);
     const pending = await SparcInstructionalRemovals.findOneAsync(assetId);
     assert.equal(pending?.cleanupKind, 'image');
     assert.equal(pending?.removeAsset, true);
     fail = false;
-    await owner.removeImageAsset(assetId);
+    await owner.remove(assetId);
     const receipt = await SparcInstructionalRemovals.findOneAsync(assetId);
     assert.equal(attempts, 2);
     assert.deepEqual(Object.keys(receipt!).sort(), ['_id', 'removedAt']);
     assert.equal(receipt!.removedAt.getTime(), pending!.removedAt.getTime());
   });
-  it('rejects image removal when the catalog identity belongs to another content kind', async () => {
-    await library().insertOne({ _id: 'curationTestConflictingImage', kind: 'question', content: { text: 'Question' } });
-    let removed = false;
-    const owner = createSparcLibraryCuration(async () => { removed = true; });
-    await assert.rejects(owner.removeImageAsset('curationTestConflictingImage'), /conflicting instructional content kind/);
-    assert.equal(removed, false);
-    assert.equal(await SparcInstructionalRemovals.findOneAsync('curationTestConflictingImage'), undefined);
-    assert.ok(await library().findOne({ _id: 'curationTestConflictingImage' }));
+  it('requires a catalog entry or an existing removal receipt', async () => {
+    const owner = createSparcLibraryCuration(async () => { throw new Error('Unexpected media removal'); });
+    await assert.rejects(owner.remove('curationTestMissingEntry'), /Instructional component not found/);
   });
   it('deletes old exclusions and retires old image copies while retaining only the current item', async () => {
     await library().insertMany([

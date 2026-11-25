@@ -1,4 +1,8 @@
 import { strict as assert } from 'node:assert';
+import { Meteor } from 'meteor/meteor';
+import { Random } from 'meteor/random';
+import { GENERATED_PACKAGE_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
 import { AI_CONTENT_CONTRACT_VERSION, type AiContentSaveContract } from '../../common/aiContentContract';
 import type { UploadedPackageFile } from '../lib/packageParser';
 import { prepareAiGeneratedPackage } from './packageGeneratedContentMethods';
@@ -41,6 +45,27 @@ function generatedFiles(options: { mode?: 'learning' | 'test'; includeMedia?: bo
 }
 
 describe('AI generated package ingestion policy', function() {
+  it('requires a signed-in creator and a stored package they can use', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw Error(observed.reason);
+    assert.equal(observed.surfaces.find(row => row.name === 'saveAiGeneratedPackageContent')?.verification,
+      GENERATED_PACKAGE_VERIFICATION);
+    const save = (Meteor as any).server.method_handlers.saveAiGeneratedPackageContent;
+    const assets = (globalThis as any).DynamicAssets.collection;
+    const owner = Random.id(), creator = Random.id(), archive = Random.id();
+    const request = { contract: imageContract(), packageAssetId: archive };
+    try {
+      await Meteor.users.insertAsync({ _id: creator, profile: { displayName: 'Synthetic creator' } });
+      await assets.insertAsync({ _id: archive, name: 'synthetic.zip', userId: owner, meta: { uploadPurpose: 'package' } });
+      await assert.rejects(save.call({ userId: null }, request), { error: 401 });
+      await assert.rejects(save.call({ userId: creator }, request), { error: 403 });
+      assert.equal((await assets.findOneAsync(archive))?.userId, owner);
+    } finally {
+      await assets.removeAsync(archive);
+      await Meteor.users.removeAsync(creator);
+    }
+  });
+
   it('accepts one reviewed image package and applies the generated-media visibility lock', function() {
     const files = generatedFiles();
     const prepared = prepareAiGeneratedPackage(files, imageContract(), true);

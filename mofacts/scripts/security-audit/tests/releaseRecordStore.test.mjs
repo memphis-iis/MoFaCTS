@@ -7,13 +7,14 @@ import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import fixture from '../../../common/securityAudit/fixtures/release-record.fixture.json' with { type: 'json' };
-import { writeReleaseRecord, readReleaseBytes, parseReleaseBytes, projectReleaseReceipt } from '../qualification/releaseRecordStore.mjs';
-import { parseReleaseReceipt, compareReleaseReceipt } from '../../../common/securityAudit/releaseReceipt.mjs';
+import { writeReleaseRecord, writeReleaseRecordWithReceiptV2, readReleaseBytes, parseReleaseBytes, projectReleaseReceipt, main } from '../qualification/releaseRecordStore.mjs';
+import { parseReleaseReceipt, parseReleaseReceiptV2, compareReleaseReceipt } from '../../../common/securityAudit/releaseReceipt.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 const record = () => ({ ...structuredClone(fixture), imageId: fixture.qualification.runningImage.configDigest,
   acceptance: 'operator-confirmed readiness and participant smoke checks' });
 const encoded = value => Buffer.from(JSON.stringify(value));
+const running = () => structuredClone(fixture.qualification.runningImage);
 
 async function setup(t) {
   const temporary = await fs.realpath(os.tmpdir());
@@ -50,6 +51,61 @@ test('record replacement preserves exact historical bytes, current fields, and b
   }
   await writeReleaseRecord(file, encoded(record()));
   assert.equal((await fs.readdir(file + '.history')).length, 2);
+});
+
+test('V2 deployment hook validates before writing and projects exact accepted bytes with retained history', async t => {
+  const { file } = await setup(t), prior = encoded({ ...record(), deployedAtUtc: '2025-01-01T00:00:00.000Z' });
+  await fs.writeFile(file, prior);
+  const candidate = encoded(record()), publication = fixture.qualification.publishedImage;
+  const receipt = parseReleaseReceiptV2(await writeReleaseRecordWithReceiptV2(file, candidate, publication, running()));
+  const accepted = await readReleaseBytes(file);
+  assert.deepEqual(parseReleaseBytes(accepted), record());
+  assert.equal(receipt.recordDigestSha256, digest(accepted)); assert.equal(receipt.imageId, record().imageId);
+  assert.deepEqual(receipt.publishedImage, publication); assert.equal(Object.hasOwn(receipt, 'qualification'), false);
+  assert.deepEqual(await fs.readFile(path.join(file + '.history', digest(prior) + '.json')), prior);
+  assert.deepEqual(await fs.readFile(path.join(file + '.history', digest(accepted) + '.json')), accepted);
+});
+
+test('V2 deployment hook rejects a wrong publication before changing current/history or allocating files', async t => {
+  const { file, root } = await setup(t), prior = encoded(record()); await fs.writeFile(file, prior);
+  await assert.rejects(writeReleaseRecordWithReceiptV2(file, prior,
+    { ...fixture.qualification.publishedImage, configDigest: 'sha256:' + '0'.repeat(64) }, running()));
+  assert.deepEqual(await readReleaseBytes(file), prior); assert.deepEqual(await fs.readdir(root), ['release.json']);
+});
+
+test('V2 deployment hook cannot return successful receipt after writer/readback failure', async t => {
+  const { file } = await setup(t), candidate = encoded(record());
+  await assert.rejects(writeReleaseRecordWithReceiptV2(file, candidate, fixture.qualification.publishedImage, running(),
+    { checkpoint(phase) { if (phase === 'before-replace') throw new Error('Synthetic publication interruption'); } }), /publication interruption/);
+  await assert.rejects(fs.stat(file), { code: 'ENOENT' });
+  const names = await fs.readdir(file + '.history'); assert.equal(names.length, 1);
+  const archived = await fs.readFile(path.join(file + '.history', names[0]));
+  assert.equal(names[0], digest(archived) + '.json'); assert.deepEqual(parseReleaseBytes(archived), record());
+});
+
+test('write-v2 CLI composes the exact private record/candidate/publication paths and rejects extra operands', async t => {
+  const { file, root } = await setup(t), candidate = path.join(root, 'candidate.json'), publication = path.join(root, 'publication.json'), observed = path.join(root, 'running.json');
+  await fs.writeFile(candidate, encoded(record())); await fs.writeFile(publication, JSON.stringify(fixture.qualification.publishedImage));
+  await fs.writeFile(observed, JSON.stringify(running()));
+  const receipt = await main(['write-v2', file, candidate, publication, observed]); assert.equal(receipt.schema, 'MoFaCTSReleaseReceiptV2');
+  await assert.rejects(main(['write-v2', file, candidate, publication, observed, 'unexpected']));
+  await assert.rejects(main(['write', file, candidate, publication]));
+  await assert.rejects(main(['write-v2', file, candidate]));
+});
+
+test('V2 deployment hook binds independently observed running source/config and never infers an absent observation', async t => {
+  const { file, root } = await setup(t), candidate = record();
+  for (const observation of [undefined, { ...running(), baseCommit: 'f'.repeat(40) },
+    { ...running(), configDigest: 'sha256:' + 'f'.repeat(64) }, { ...running(), platform: 'linux/arm64' }]) {
+    await assert.rejects(writeReleaseRecordWithReceiptV2(file, encoded(candidate), fixture.qualification.publishedImage, observation));
+    assert.deepEqual(await fs.readdir(root), []);
+  }
+  const { imageId: _old, acceptance: _acceptance, ...incomplete } = candidate; void _old; void _acceptance;
+  await assert.rejects(writeReleaseRecordWithReceiptV2(file, encoded(incomplete), fixture.qualification.publishedImage, running()));
+  assert.deepEqual(await fs.readdir(root), []);
+  const receipt = await writeReleaseRecordWithReceiptV2(file, encoded(candidate), fixture.qualification.publishedImage, running());
+  assert.equal(receipt.imageId, running().configDigest);
+  assert.equal(parseReleaseBytes(await readReleaseBytes(file)).imageId, running().configDigest);
 });
 
 test('incomplete V2 evidence is retained without inventing workstation proof or changing receipt identity', async t => {

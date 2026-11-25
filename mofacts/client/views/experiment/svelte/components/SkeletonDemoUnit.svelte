@@ -70,13 +70,13 @@
       cameraIds = capture.cameraIds;
       currentCameraId = capture.deviceId;
       mirrored = capture.mirrored;
-      status = 'Loading body and finger tracking…';
+      status = 'Loading hand and finger tracking…';
       await tracking.start(videoElement, (frame, _edges, handEdges) => {
         if (token !== generation) return;
         observation = frame;
         handConnections = handEdges;
         const control = figureSurface.update(frame, mirrored);
-        const detection = frame.landmarks.length ? 'Body detected' : 'No body detected';
+        const detection = frame.hands.length ? `${frame.hands.length === 1 ? 'Hand' : 'Hands'} detected` : 'No hands detected';
         status = `${detection} · ${control.selection ? 'Figure selected.' : control.state === 'ignored' ? 'Fast movement ignored.'
           : control.selectionHint ? control.selectionHint
           : control.mode === 'rotation' ? 'Turn your palm to rotate the figure.'
@@ -86,7 +86,7 @@
       if (token !== generation) return;
       starting = false;
       active = true;
-      status = 'Looking for a person…';
+      status = 'Looking for hands…';
     } catch (cause) {
       if (token === generation) {
         fail();
@@ -175,5 +175,5 @@
     <FigureOverlay bind:this={figureSurface} onReady={() => { if (!figureFailed) figureReady = true; }} onError={figureUnavailable} />
   </PoseCameraPreview>
   <p class="skeleton-demo-privacy">Processed on this device. Nothing recorded or uploaded.</p>
-  <PoseMatcherComparison {observation} />
+  <PoseMatcherComparison {observation} on:bodyTracking={event => tracking.setBodyTracking(event.detail)} />
 </section>

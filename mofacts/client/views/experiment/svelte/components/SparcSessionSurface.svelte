@@ -83,15 +83,19 @@
   export let authoringSelectOnly = false;
 
   let activeNodeId = '';
+  const simulationActivities = new Map();
+  const simulationHosts = new Map();
   setContext(SIMULATION_HOST_CONTEXT, {
+    registerHost(nodeId, host) { if (host) simulationHosts.set(nodeId, host); else { simulationHosts.delete(nodeId); simulationActivities.delete(nodeId); } },
     scope(nodeId, buildId) {
       const current = currentSparcControllerDisplay('[Simulation]');
       if (isSparcAutoTutorDisplay(current) || !Array.isArray(current.productionRules)) throw new Error('Simulation pilot requires authored SPARC production rules');
-      return { tdfId, pageKey: current.pageKey, nodeId, buildId };
+      return { tdfId, pageKey: current.pageKey, nodeId, buildId, history: { sessionID: attemptId, levelUnit: Number(levelUnit) } };
     },
-    async observation(nodeId, facts, evidence) {
+    async observation(nodeId, facts, evidence, activity) {
+      simulationActivities.set(nodeId, activity);
       await handleSparcAction({ eventType: 'simulation-observation', triggeredBy: nodeId,
-        submittedNodes: { [nodeId]: { facts, evidence } }, timestamp: Date.now() });
+        submittedNodes: { [nodeId]: { facts, evidence, activity } }, timestamp: Date.now() });
     },
   });
   let feedbackFadeElement;
@@ -122,6 +126,7 @@
   let observedAutoTutorDialogueSignature = '';
   let mounted = false;
   let startedDialogueScope = '';
+  let dialogueLifetime = new AbortController();
   let dialogueInitialized = false;
   let checkedContentIds = new Set(), removedContentIds = new Set(), removalSignature = '', removalError = '';
   let figureReadyKeys = new Set();
@@ -187,11 +192,12 @@
   }
   onMount(() => {
     mounted = true;
-    return () => { mounted = false; };
+    return () => { mounted = false; dialogueLifetime.abort(); };
   });
 
   async function startCategorizedDialogue(currentDisplay, scope) {
     if (dialogueSubmitPending && startedDialogueScope === scope) return;
+    const signal = dialogueLifetime.signal;
     startedDialogueScope = scope;
     dialogueInitialized = false;
     dialogueSubmitPending = true;
@@ -206,31 +212,32 @@
       const provider = createSparcDialogueOpenRouterProvider({
         personas: parseSparcPersonas({ student: Meteor.user()?.profile?.sparcPersona, teacher: engine.curUnit.sparcsession.teacherPersona }),
         contentLanguage: Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.contentLanguage,
-        readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: activity => { if (mounted && dialogueScope === scope) reportDialogueActivity(activity); }, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
+        readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: activity => { if (!signal.aborted && mounted && dialogueScope === scope) reportDialogueActivity(activity); }, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
         tdfId, sessionId: openRouterSession.sessionIdForScope({ tdfId, attemptId, pageKey: currentDisplay.pageKey }) });
       await provider.prepareAssessment(currentDisplay);
-      const result = await commitSparcAutoTutorDocumentLoad({ engine, currentDisplay, tdfId, userId, attemptId, levelUnit,
+      signal.throwIfAborted();
+      const result = await commitSparcAutoTutorDocumentLoad({ signal, engine, currentDisplay, tdfId, userId, attemptId, levelUnit,
         scoreLearnerResponse: provider.scoreLearnerResponse, generateTutorUtterance: provider.generateTutorUtterance,
         generateOrientation: provider.generateOrientation,
         onNodeValues: async values => {
-          if (!mounted || dialogueScope !== scope) return;
+          if (signal.aborted || !mounted || dialogueScope !== scope) return;
           dispatchSparcNodeValues(values, timestamp); await tick();
         },
       });
-      if (!mounted || dialogueScope !== scope) return;
+      if (signal.aborted || !mounted || dialogueScope !== scope) return;
       dispatch('runtimewatchedstatechanged');
       dispatchSparcNodeValues(result.sparcNodeValues, timestamp);
       dialogueInitialized = true;
     } catch (error) {
-      if (!mounted || dialogueScope !== scope) return;
+      if (signal.aborted || !mounted || dialogueScope !== scope) return;
       dispatchSparcNodeValues(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit,
         pageKey: currentDisplay.pageKey, display: currentDisplay }).nodeValues, timestamp);
       dialogueSubmitError = platformText('sparc.serviceError');
       dialogueSubmitErrorDetail = dialogueSubmissionErrorDetail(error);
       clientConsole(1, '[SPARC][Dialogue] initialization failed', { detail: dialogueSubmitErrorDetail });
     } finally {
-      if (mounted && dialogueScope === scope) dialogueSubmitPending = false;
-      if (mounted && dialogueScope === scope) {
+      if (!signal.aborted && mounted && dialogueScope === scope) dialogueSubmitPending = false;
+      if (!signal.aborted && mounted && dialogueScope === scope) {
         await tick();
         const nextControl = surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
           || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
@@ -528,10 +535,7 @@
     ) {
       return false;
     }
-    const learnerText = String(value ?? '').trim();
-    if (!learnerText) {
-      return true;
-    }
+    const learnerText = String(value ?? '');
     nodeValues = {
       ...nodeValues,
       [nodeId]: learnerText,
@@ -648,7 +652,20 @@
     return resolvedDisplay;
   }
 
+  function withSimulationActivity(detail) {
+    if (detail?.eventType !== 'simulation-observation' && simulationActivities.size === 1) {
+      const activity = [...simulationActivities.values()][0];
+      detail = { ...detail, simulationActivity: { ...activity, origin: 'input', eventName: 'host-action', sourceEventId: `${activity.attemptId}:host:${crypto.randomUUID()}` } };
+    }
+    return detail;
+  }
+
+  function markCompletedSimulations(attempts) {
+    for (const [nodeId, activity] of simulationActivities) if (attempts.includes(activity.attemptId)) simulationHosts.get(nodeId)?.complete();
+  }
+
   async function handleSparcAction(detail) {
+    detail = withSimulationActivity(detail);
     const scope = dialogueScope;
     if (subsetKind !== 'question' && detail?.eventType !== 'simulation-observation') {
       return;
@@ -666,7 +683,7 @@
     if (!sparcResult) {
       throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC action received for non-SPARC display'));
     }
-    const { sparcNodeValues } = await commitSparcProductionRuleAction({
+    const { sparcNodeValues, completedSimulationAttempts = [] } = await commitSparcProductionRuleAction({
       engine,
       currentDisplay,
       sparcResult,
@@ -675,6 +692,7 @@
       attemptId,
       levelUnit,
     });
+    markCompletedSimulations(completedSimulationAttempts);
     if (!mounted || dialogueScope !== scope) return;
     dispatch('runtimewatchedstatechanged');
     dispatchSparcNodeValues(sparcNodeValues, sparcResult.timestamp);
@@ -682,6 +700,7 @@
 
   async function commitSparcSubmitProductionRules(detail, submissionPresentation) {
     const scope = dialogueScope;
+    const signal = dialogueLifetime.signal;
     if (subsetKind !== 'question') {
       return { canSubmit: true };
     }
@@ -713,6 +732,7 @@
       let result;
       try {
         result = await commitSparcAutoTutorSubmit({
+          signal,
           submissionPresentation,
           engine,
           currentDisplay,
@@ -754,6 +774,7 @@
     if (!sparcResult) {
       throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC submit received for non-SPARC display'));
     }
+    Object.assign(sparcResult, withSimulationActivity(sparcResult));
     const triggeredBy = typeof sparcResult.triggeredBy === 'string' ? sparcResult.triggeredBy : '';
     const submittedNodes = triggeredBy && Object.prototype.hasOwnProperty.call(sparcResult.submittedNodes, triggeredBy)
       ? { [triggeredBy]: sparcResult.submittedNodes[triggeredBy] }
@@ -771,6 +792,7 @@
       levelUnit,
     });
     dispatch('runtimewatchedstatechanged');
+    markCompletedSimulations(result.completedSimulationAttempts || []);
     dispatchSparcNodeValues(result.sparcNodeValues, sparcResult.timestamp);
     return {
       canSubmit: result.classifications.includes('correct'),
@@ -802,6 +824,13 @@
 
   async function submitAutoTutorDialogue(detail) {
     if (dialogueSubmitPending) {
+      return;
+    }
+    // Submit and Enter share the same empty-response boundary. Menu and
+    // multiple-choice buttons carry their own bindings and bypass this guard.
+    if (detail?.triggeredBy === 'learner-response-submit'
+      && !String(detail?.submittedNodes?.['learner-response-input'] ?? '').trim()) {
+      focusDialogueControl(surfaceElement?.querySelector('[data-node-id="learner-response-input"]'));
       return;
     }
     const submissionScope = dialogueScope;
@@ -1048,6 +1077,9 @@
   $: categorizedDialogue = autoTutorDialogueMode && isSparcCategorizedPolicy(sparcDisplay?.instructionalController?.policyId);
   $: dialogueScope = JSON.stringify([userId, tdfId, attemptId, levelUnit, sparcDisplay?.pageKey]);
   $: if (readinessScope !== dialogueScope) {
+    dialogueLifetime.abort();
+    dialogueLifetime = new AbortController();
+    dialogueSubmitPending = false;
     readinessScope = dialogueScope;
     figureReadyKeys = new Set();
     figureFailedKeys = new Set();

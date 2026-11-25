@@ -10,8 +10,32 @@ candidate. No database migration or record deletion accompanies activation.
 This is source activation, not evidence that an image has been deployed or a
 scanner has completed against it. The status ledger separately tracks native
 Meteor proof, staging2 ingestion and candidate/previous/candidate qualification.
-Five protected publication selections remain unidentified and must not be
-guessed, silently replaced or treated as passing authorization evidence.
+The operator approved replacing the five unidentified publication selections
+with explicit progress-privacy cases. Their source-owned intent, successful
+own-user baselines and six registered real-Mongo publication cases are verified;
+live staging2 selected-case qualification still requires protected synthetic
+bindings. See [authorization verification](authorization-verification.md).
+
+Staging2 subsequently qualified the 1c72734b V2 image, matching protected receipt
+and raw-measurement host wrapper on 2026-11-11. All 29 selected authorization
+cases pass; both disposable fixture attempts are independently cleaned. A real
+23-control exposure report was ingested and read/downloaded through the visible
+admin UI. It contains 22 PASS and one honest UDP evidence-incomplete ERROR.
+Live candidate/previous/candidate rollback preserved the exact accepted record
+and JSON/HTML hashes; the previous V1 app could not read the V2 record.
+Production and its scheduled scanner remain unchanged. See the
+[staging2 operating procedure](staging2-v2-operations.md).
+
+The current checkout now contains only V2 producer/assembly/ingestion entry
+points. The ten superseded V1 scanner files and their duplicate control
+tables are removed. Shared parsing, recovery-binding validation and crypto
+utilities retain their actual V2/recovery owners; they are not V1 ingestion.
+Phase 0 defect witnesses load the exact immutable V1 Git source in private
+test-only temporary files. They cannot launch the old network/browser producers,
+and cleanup removes their synthetic assembler support. This preserves historical
+evidence without a maintained V1 runtime copy or old-report reader.
+The production workflow still checks out its full reviewed historical source;
+removing files from the current checkout does not alter that pinned execution.
 
 ## Production selection
 

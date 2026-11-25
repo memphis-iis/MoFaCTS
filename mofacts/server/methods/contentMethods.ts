@@ -1,11 +1,13 @@
+import { DAILY_LESSON_PACKAGE_LIMIT } from '../../common/fileUploadPolicy';
 import { Meteor } from 'meteor/meteor';
-import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
+import { normalizeTdfIdentity, validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
 import {
   hasUserRole,
   requireAuthenticatedUser,
   requireUserMatchesOrHasRole,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
+import { buildParentRootSelector } from '../lib/tdfLessonFamilyResolver';
 import type { createStorageBoundary } from '../lib/storageBoundary';
 import { requireContentCreatorDisplayName } from '../lib/contentCreatorIdentity';
 import { createContentAssetMaintenanceMethods } from './contentAssetMaintenanceMethods';
@@ -52,13 +54,14 @@ type ContentMethodsDeps = {
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
   Tdfs: {
-    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]>; countAsync?: () => Promise<number> };
+    find: (selector: UnknownRecord, options?: UnknownRecord) => {
+      fetchAsync: () => Promise<any[]>;
+      countAsync?: () => Promise<number>;
+      forEachAsync: (visit: (lesson: UnknownRecord) => void) => Promise<void>;
+    };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
-  };
-  Stims: {
-    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
   };
   DynamicAssets: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]>; countAsync: () => Promise<number> };
@@ -88,7 +91,8 @@ type ContentMethodsDeps = {
   isPlainRecord: (value: unknown) => value is UnknownRecord;
   cloneJsonLike: <T>(value: T) => T;
   normalizeCanonicalId: (value: unknown) => string | null;
-  canAccessContentUploadTdf: (userId: string, tdf: any) => boolean | Promise<boolean>;
+  stimulusFilePolicy: { authorize: (userId: string, tdf: any) => boolean | Promise<boolean> };
+  storageRoot: string;
   getOrBuildCurrentPackageAsset: (
     tdfId: string,
     deps: any
@@ -97,11 +101,7 @@ type ContentMethodsDeps = {
   extractSrcFromHtml: (htmlString: string) => string[];
   getStimuliSetIdCandidates: (stimuliSetId: string | number | null | undefined) => Array<string | number>;
   findDynamicAssetsScopedBatch: (params: any) => Promise<unknown>;
-  decryptData: (value: string) => string;
   deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
-  updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
-  rebuildStimDisplayTypeMapSnapshot: (deps: any) => Promise<unknown>;
-  getStimDisplayTypeMapDeps: () => any;
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
 };
 
@@ -145,85 +145,54 @@ function summarizeManualDraftState(state: UnknownRecord, currentStep: number, dr
   };
 }
 
-async function getOwnedManualContentDraft(
-  deps: ContentMethodsDeps,
-  userId: string,
-  draftId: string,
-  fields: UnknownRecord = {}
-) {
-  return await deps.ManualContentDrafts.findOneAsync(
-    {
-      _id: draftId,
-      ownerId: userId,
-      draftType: 'manual-content-creator',
-    },
-    Object.keys(fields).length > 0 ? { fields } : undefined
-  );
-}
+export const uploadReadPolicy = Object.freeze({
+  kind: 'upload-read', operation: 'self',
+  authorize: (userId: string | null | undefined, code: 401 | 'not-authorized') =>
+    requireAuthenticatedUser(userId, 'Must be logged in', code),
+} as const);
+
+export const manualDraftPolicy = Object.freeze({
+  kind: 'manual-draft', operation: 'owner',
+  authorize: (userId: string | null | undefined) => requireAuthenticatedUser(userId, 'Must be logged in', 401),
+  selector: (ownerId: string, draftId: string) => ({ _id: draftId, ownerId, draftType: 'manual-content-creator' }),
+} as const);
+
+export const packageDownloadPolicy = Object.freeze({
+  kind: 'content-maintenance', operation: 'lesson-package-owner-or-admin', authorize: hasUserRole,
+} as const);
+
+export const lessonVisibilityPolicy = Object.freeze({
+  kind: 'content-maintenance', operation: 'lesson-owner',
+  authorize: (deps: MethodAuthorizationDeps, actingUserId: string | null | undefined, ownerId: string | undefined) =>
+    requireUserMatchesOrHasRole(deps, {
+      actingUserId,
+      subjectUserId: ownerId,
+      notLoggedInMessage: 'Must be logged in',
+      notLoggedInCode: 'not-authorized',
+      forbiddenMessage: 'Only owner can change public/private setting',
+      forbiddenCode: 'not-authorized',
+    }),
+} as const);
 
 export function createContentMethods(deps: ContentMethodsDeps) {
   const assetMaintenanceMethods = createContentAssetMaintenanceMethods(deps);
   return {
     ...assetMaintenanceMethods,
 
-    listManualContentDrafts: async function(this: MethodContext) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-
-      const drafts = await deps.ManualContentDrafts.find(
-        {
-          ownerId: this.userId,
-          draftType: 'manual-content-creator',
-        },
-        {
-          fields: {
-            lessonName: 1,
-            currentStep: 1,
-            summary: 1,
-            updatedAt: 1,
-            createdAt: 1,
-          },
-          sort: { updatedAt: -1 },
-          limit: 25,
-        }
-      ).fetchAsync();
-
-      return drafts.map((draft: any) => {
-        const currentStep = normalizeManualDraftStep(draft?.currentStep, 1);
-        const summary = deps.isPlainRecord(draft?.summary) ? draft.summary : {};
-        return {
-          _id: String(draft?._id || ''),
-          lessonName: typeof draft?.lessonName === 'string' && draft.lessonName.trim()
-            ? draft.lessonName.trim()
-            : (typeof summary.lessonName === 'string' && summary.lessonName.trim() ? summary.lessonName.trim() : 'Untitled draft'),
-          currentStep,
-          stepLabel: typeof summary.stepLabel === 'string' ? summary.stepLabel : getManualDraftStepLabel(currentStep),
-          status: typeof summary.status === 'string' ? summary.status : getManualDraftStepLabel(currentStep),
-          promptType: typeof summary.promptType === 'string' ? summary.promptType : null,
-          responseType: typeof summary.responseType === 'string' ? summary.responseType : null,
-          updatedAt: draft?.updatedAt || null,
-          createdAt: draft?.createdAt || null,
-        };
-      });
-    },
-
     getManualContentDraft: async function(this: MethodContext, draftId: string) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
+      const ownerId = manualDraftPolicy.authorize(this.userId);
       if (!draftId || typeof draftId !== 'string') {
         throw new Meteor.Error(400, 'Draft id required');
       }
 
-      const draft = await getOwnedManualContentDraft(deps, this.userId, draftId, {
+      const draft = await deps.ManualContentDrafts.findOneAsync(manualDraftPolicy.selector(ownerId, draftId), { fields: {
         lessonName: 1,
         currentStep: 1,
         state: 1,
         draftLessons: 1,
         updatedAt: 1,
         createdAt: 1,
-      });
+      } });
       if (!draft) {
         throw new Meteor.Error(404, 'Draft not found');
       }
@@ -240,9 +209,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
     },
 
     saveManualContentDraft: async function(this: MethodContext, payload: UnknownRecord = {}) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
+      const ownerId = manualDraftPolicy.authorize(this.userId);
       if (!deps.isPlainRecord(payload)) {
         throw new Meteor.Error(400, 'Invalid draft payload');
       }
@@ -256,16 +223,8 @@ export function createContentMethods(deps: ContentMethodsDeps) {
       const now = new Date();
 
       if (draftId) {
-        const existingDraft = await getOwnedManualContentDraft(deps, this.userId, draftId, {
-          _id: 1,
-          createdAt: 1,
-        });
-        if (!existingDraft) {
-          throw new Meteor.Error(404, 'Draft not found');
-        }
-
-        await deps.ManualContentDrafts.updateAsync(
-          { _id: draftId },
+        const updated = await deps.ManualContentDrafts.updateAsync(
+          manualDraftPolicy.selector(ownerId, draftId),
           {
             $set: {
               lessonName,
@@ -278,6 +237,8 @@ export function createContentMethods(deps: ContentMethodsDeps) {
           }
         );
 
+        if (!updated) throw new Meteor.Error(404, 'Draft not found');
+
         return {
           draftId,
           lessonName,
@@ -285,9 +246,9 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         };
       }
 
-      await requireContentCreatorDisplayName(deps.usersCollection, this.userId);
+      await requireContentCreatorDisplayName(deps.usersCollection, ownerId);
       const insertedId = await deps.ManualContentDrafts.insertAsync({
-        ownerId: this.userId,
+        ownerId,
         draftType: 'manual-content-creator',
         lessonName,
         currentStep,
@@ -306,19 +267,13 @@ export function createContentMethods(deps: ContentMethodsDeps) {
     },
 
     deleteManualContentDraft: async function(this: MethodContext, draftId: string) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
+      const ownerId = manualDraftPolicy.authorize(this.userId);
       if (!draftId || typeof draftId !== 'string') {
         throw new Meteor.Error(400, 'Draft id required');
       }
 
-      const draft = await getOwnedManualContentDraft(deps, this.userId, draftId, { _id: 1 });
-      if (!draft) {
-        throw new Meteor.Error(404, 'Draft not found');
-      }
-
-      await deps.ManualContentDrafts.removeAsync({ _id: draftId });
+      const removed = await deps.ManualContentDrafts.removeAsync(manualDraftPolicy.selector(ownerId, draftId));
+      if (!removed) throw new Meteor.Error(404, 'Draft not found');
       return { deleted: true };
     },
 
@@ -344,7 +299,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         }
       );
 
-      const isAdmin = await deps.getMethodAuthorizationDeps().userIsInRoleAsync(this.userId, ['admin']);
+      const isAdmin = await packageDownloadPolicy.authorize(deps.getMethodAuthorizationDeps(), this.userId, ['admin']);
       if (!tdf || (tdf.ownerId !== this.userId && !isAdmin)) {
         throw new Meteor.Error(404, 'Package unavailable');
       }
@@ -356,9 +311,9 @@ export function createContentMethods(deps: ContentMethodsDeps) {
           getStimuliSetIdCandidates: deps.getStimuliSetIdCandidates,
           findDynamicAssetsScopedBatch: deps.findDynamicAssetsScopedBatch,
           normalizeCanonicalId: deps.normalizeCanonicalId,
-          decryptData: deps.decryptData,
           DynamicAssets: deps.DynamicAssets,
           storageBoundary: deps.storageBoundary,
+          storageRoot: deps.storageRoot,
           Tdfs: deps.Tdfs,
         });
         return { link: result.link };
@@ -402,7 +357,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
       if (!tdf) {
         throw new Meteor.Error(404, 'TDF not found');
       }
-      if (!deps.canAccessContentUploadTdf(this.userId, tdf)) {
+      if (!await deps.stimulusFilePolicy.authorize(this.userId, tdf)) {
         throw new Meteor.Error(403, 'Not authorized to download this stimulus file');
       }
       if (!tdf.rawStimuliFile) {
@@ -421,16 +376,14 @@ export function createContentMethods(deps: ContentMethodsDeps) {
     },
 
     getUserAssetByName: async function(this: MethodContext, fileName: string) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
+      const ownerId = uploadReadPolicy.authorize(this.userId, 401);
       if (!fileName || typeof fileName !== 'string') {
         throw new Meteor.Error(400, 'Invalid filename');
       }
 
       const asset = await deps.DynamicAssets.findOneAsync(
         {
-          userId: this.userId,
+          userId: ownerId,
           $or: [
             { name: fileName },
             { fileName },
@@ -450,78 +403,8 @@ export function createContentMethods(deps: ContentMethodsDeps) {
       };
     },
 
-    getTdfOwnersMap: async function(this: MethodContext, ownerIds: string[]) {
-      const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
-      if (!Array.isArray(ownerIds)) {
-        throw new Meteor.Error(400, 'Invalid owner id list');
-      }
-      const uniqueOwnerIds = [...new Set(
-        ownerIds
-          .filter((id) => typeof id === 'string')
-          .map((id) => id.trim())
-          .filter(Boolean)
-      )];
-      if (uniqueOwnerIds.length > 100) {
-        throw new Meteor.Error(400, 'Too many owner ids requested');
-      }
-      const canReadAnyOwner = await hasUserRole(deps.getMethodAuthorizationDeps(), actingUserId, ['admin']);
-      const allowedOwnerIds = new Set<string>();
-      if (canReadAnyOwner) {
-        for (const ownerId of uniqueOwnerIds) {
-          allowedOwnerIds.add(ownerId);
-        }
-      } else {
-        const tdfs = await deps.Tdfs.find(
-          { ownerId: { $in: uniqueOwnerIds } },
-          { fields: { _id: 1, ownerId: 1, accessors: 1, 'content.tdfs.tutor.setspec.userselect': 1 } }
-        ).fetchAsync();
-        for (const tdf of tdfs) {
-          if (tdf?.ownerId && await deps.canAccessContentUploadTdf(actingUserId, tdf)) {
-            allowedOwnerIds.add(tdf.ownerId);
-          }
-        }
-      }
-      const ownerMap: Record<string, string> = {};
-      for (const id of allowedOwnerIds) {
-        const foundUser = await deps.usersCollection.findOneAsync({ _id: id });
-        if (typeof foundUser !== 'undefined') {
-          ownerMap[id] = foundUser.username;
-        }
-      }
-      return ownerMap;
-    },
-
-    getTdfsByOwnerId: async function(this: MethodContext, ownerId: string) {
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
-        subjectUserId: ownerId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Can only read your own TDF list',
-        forbiddenCode: 403,
-      });
-      const tdfs = await deps.Tdfs.find(
-        { ownerId },
-        {
-          fields: {
-            _id: 1,
-            ownerId: 1,
-            accessors: 1,
-            stimuliSetId: 1,
-            conditionCounts: 1,
-            'content.fileName': 1,
-            'content.tdfs.tutor.setspec.lessonname': 1,
-            'content.tdfs.tutor.setspec.userselect': 1,
-            'content.tdfs.tutor.setspec.condition': 1,
-          },
-        }
-      ).fetchAsync();
-      return tdfs || [];
-    },
-
     getUploadQuotaStatus: async function(this: MethodContext) {
-      const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 'not-authorized');
+      const actingUserId = uploadReadPolicy.authorize(this.userId, 'not-authorized');
       const isTeacherOrAdmin = await hasUserRole(deps.getMethodAuthorizationDeps(), actingUserId, ['admin', 'teacher']);
 
       if (isTeacherOrAdmin) {
@@ -534,14 +417,13 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         date: today,
       });
 
-      const DAILY_LIMIT = 3;
       const used = quota?.uploadCount || 0;
 
       return {
         unlimited: false,
-        dailyLimit: DAILY_LIMIT,
+        dailyLimit: DAILY_LESSON_PACKAGE_LIMIT,
         used,
-        remaining: DAILY_LIMIT - used,
+        remaining: Math.max(0, DAILY_LESSON_PACKAGE_LIMIT - used),
         maxFileSize: '10MB',
         resetsAt: new Date(today + 'T00:00:00Z').getTime() + 86400000,
       };
@@ -550,19 +432,20 @@ export function createContentMethods(deps: ContentMethodsDeps) {
     setTdfUserSelect: async function(this: MethodContext, tdfId: string, isPublic: boolean) {
       requireAuthenticatedUser(this.userId, 'Must be logged in', 'not-authorized');
 
+      if (!normalizeTdfIdentity(tdfId) || typeof isPublic !== 'boolean') {
+        throw new Meteor.Error(400, 'Expected a lesson ID and a boolean visibility setting');
+      }
       const tdf = await deps.Tdfs.findOneAsync({ _id: tdfId });
       if (!tdf) {
         throw new Meteor.Error('not-found', 'TDF not found');
       }
 
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
-        subjectUserId: tdf.ownerId,
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 'not-authorized',
-        forbiddenMessage: 'Only owner can change public/private setting',
-        forbiddenCode: 'not-authorized',
-      });
+      await lessonVisibilityPolicy.authorize(deps.getMethodAuthorizationDeps(), this.userId, tdf.ownerId);
+
+      const parent = buildParentRootSelector([tdfId]);
+      if (parent && await deps.Tdfs.findOneAsync(parent, { fields: { _id: 1 } })) {
+        throw new Meteor.Error('tdf-condition-visibility', 'Change study visibility on the root lesson.');
+      }
 
       const newUserSelect = isPublic ? 'true' : 'false';
       const visibilityLockReason = String(tdf.content?.tdfs?.tutor?.setspec?.aiVisibilityLockReason || '').trim();
@@ -575,19 +458,20 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
       }
 
-      await deps.Tdfs.updateAsync(
-        { _id: tdfId },
-        { $set: { 'content.tdfs.tutor.setspec.userselect': newUserSelect }, $inc: { tdfRevision: 1 } }
-      );
-
-      const conditionIds = familyValidation.conditionTdfIds;
-      if (conditionIds.length > 0) {
+      const field = 'content.tdfs.tutor.setspec.userselect';
+      if (familyValidation.conditionTdfIds.length > 0) {
+        // Repair conditions made separately visible by the previous switch.
         await deps.Tdfs.updateAsync(
-          { _id: { $in: conditionIds }, ownerId: tdf.ownerId },
-          { $set: { 'content.tdfs.tutor.setspec.userselect': newUserSelect }, $inc: { tdfRevision: 1 } },
+          { _id: { $in: familyValidation.conditionTdfIds }, ownerId: tdf.ownerId, [field]: { $ne: 'false' } },
+          { $set: { [field]: 'false' }, $inc: { tdfRevision: 1 } },
           { multi: true }
         );
       }
+      const changed = await deps.Tdfs.updateAsync(
+        { _id: tdfId, ownerId: tdf.ownerId, tdfRevision: tdf.tdfRevision ?? { $exists: false } },
+        { $set: { [field]: newUserSelect }, $inc: { tdfRevision: 1 } }
+      );
+      if (!changed) throw new Meteor.Error('tdf-changed', 'Lesson changed. Refresh and try again.');
 
       await deps.AuditLog.insertAsync({
         action: 'tdf_userselect_change',

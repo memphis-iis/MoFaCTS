@@ -1,6 +1,5 @@
 import { expect } from 'chai';
 import {
-  buildConditionVisibilityTerms,
   buildParentRootSelector,
   createLessonFamilyResolver,
 } from './tdfLessonFamilyResolver';
@@ -18,23 +17,6 @@ describe('tdfLessonFamilyResolver', function() {
     expect(buildParentRootSelector(['child-id', 'child.json'], ['child-id'])).to.deep.equal({
       'content.tdfs.tutor.setspec.conditionTdfIds': { $in: ['child-id'] },
     });
-  });
-
-  it('builds dashboard visibility terms from root condition refs', function() {
-    const terms = buildConditionVisibilityTerms([{
-      content: {
-        tdfs: {
-          tutor: {
-            setspec: {
-              condition: ['condition-a.json', 'condition-b.json'],
-              conditionTdfIds: ['condition-a', 'condition-b'],
-            },
-          },
-        },
-      },
-    }]);
-
-    expect(terms).to.deep.equal([{ _id: { $in: ['condition-a', 'condition-b'] } }]);
   });
 
   it('uses explicit condition ids instead of same-named filename refs', async function() {

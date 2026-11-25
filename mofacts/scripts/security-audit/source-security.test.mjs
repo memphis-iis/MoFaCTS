@@ -1,5 +1,9 @@
+import './tests/applicationMeteorRegistration.test.mjs';
 import './tests/uploadBoundary.test.mjs';
 import './tests/catalogRegistry.test.mjs';
+import './tests/verificationBundle.test.mjs';
+import './tests/meteorCaseEvidence.test.mjs';
+import './tests/composeVerificationBundle.test.mjs';
 import './tests/assemblyV2.test.mjs';
 import './tests/reportV2.test.mjs';
 import './tests/ingestionV2.test.mjs';
@@ -29,7 +33,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-import {
+import { historicalScannerSource, historicalScannerModule } from './tests/helpers/historicalScanner.mjs';
+const {
   canonicalJson,
   control,
   finalizeReport,
@@ -37,17 +42,19 @@ import {
   sanitizedMetrics,
   sanitizedText,
   section,
-} from './audit-lib.mjs';
-import { resolveCompositeUdpExposure } from './composite-exposure.mjs';
+} = await historicalScannerModule('audit-lib.mjs');
+const { resolveCompositeUdpExposure } = await historicalScannerModule('composite-exposure.mjs');
+// Historical V1 behavior only; current passwordless policy lives in the source catalog.
+const { passwordlessContainmentOutcomes } = await historicalScannerModule('authentication-probes.mjs');
 import {
   boundedBuildExposureObservations,
   classifyDevelopmentDependencyPosture,
 } from './dependency-posture.mjs';
-import {
+const {
   INTERNAL_CONTROL_DEFINITIONS,
   INTERNAL_EXECUTION_CATEGORIES,
   internalExecutionError,
-} from './internal-audit-contract.mjs';
+} = await historicalScannerModule('internal-audit-contract.mjs');
 import {
   boundedGitleaksObservations,
   boundedNpmAuditObservations,
@@ -73,7 +80,6 @@ import {
   assertUniqueSemanticProbeIds,
   classifyAuthenticationTiming,
   classifyEnumeration,
-  passwordlessContainmentOutcomes,
   routeProbePassed,
   selectExpiredResetLink,
   semanticAuthorizationProbeId,
@@ -696,10 +702,12 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   const index = fs.readFileSync(new URL('../../client/index.html', import.meta.url), 'utf8');
   const serverMain = fs.readFileSync(new URL('../../server/main.ts', import.meta.url), 'utf8');
   const cspRuntime = fs.readFileSync(new URL('../../server/runtime/contentSecurityPolicy.ts', import.meta.url), 'utf8');
+  const httpRegistration = fs.readFileSync(new URL('../../server/securitySurfaces/registerHttpRoutes.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(index, /<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index, /<style\b/i);
   assert.match(serverMain, /runtime\/contentSecurityPolicy/);
-  assert.match(cspRuntime, /setInlineScriptsAllowed\(false\)/);
+  assert.match(cspRuntime, /await bindFrameworkRuntimeConfig\(webAppInternals, HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION\)/);
+  assert.match(httpRegistration, /await webAppInternals\.setInlineScriptsAllowed\(false\)/);
   assert.doesNotMatch(apache, /ws:\/\/localhost:3000/);
   const auditAdmin = fs.readFileSync(new URL('../../client/views/adminSecurityAuditsV2.ts', import.meta.url), 'utf8');
   assert.match(auditAdmin, /text\(key, options\?\.hash\)/);
@@ -736,7 +744,7 @@ test('encrypted report retention round-trips and detects tampering', () => {
 });
 
 test('production authentication probes honor session-scoped credentials and fail closed', () => {
-  const source = fs.readFileSync(new URL('./production-auth-audit.mjs', import.meta.url), 'utf8');
+  const source = historicalScannerSource('production-auth-audit.mjs');
   assert.match(source, /sessionStorage\.getItem\('Meteor\.loginToken'\)/);
   assert.match(source, /sessionStorage\.setItem\('Meteor\.loginToken', stored\.token\)/);
   assert.doesNotMatch(source, /localStorage\.(?:getItem|setItem)\('Meteor\.(?:loginToken|userId|loginTokenExpires)'/);
@@ -754,8 +762,8 @@ test('production authentication probes honor session-scoped credentials and fail
 });
 
 test('external UDP probes retain raw uncertainty and assembly resolves it with bounded host facts', () => {
-  const source = fs.readFileSync(new URL('./external-audit.mjs', import.meta.url), 'utf8');
-  const assembly = fs.readFileSync(new URL('./assemble-report.mjs', import.meta.url), 'utf8');
+  const source = historicalScannerSource('external-audit.mjs');
+  const assembly = historicalScannerSource('assemble-report.mjs');
   const host = fs.readFileSync(new URL('../../../deploy/security-audit/host-exposure-audit.sh', import.meta.url), 'utf8');
   assert.match(source, /'-sU', '--reason', '-p', udpPorts/);
   assert.doesNotMatch(source, /'-sV'|'--max-retries'/);

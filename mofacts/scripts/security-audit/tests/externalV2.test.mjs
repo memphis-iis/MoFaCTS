@@ -13,7 +13,7 @@ import { promisify } from 'node:util';
 import { ACTIVE_AUDIT_CATALOG, readAuditCatalog } from '../../../common/securityAudit/catalogRegistry.ts';
 import { parseAuditProducerArtifact } from '../../../common/securityAudit/producerArtifact.ts';
 import { evaluateExternalObservationsV2, parseExternalNmapV2 } from '../external/observationsV2.mjs';
-import { acquireExternalObservationsV2, EXTERNAL_PROBE_IO_V2, ExternalProbeErrorV2 } from '../external/acquireV2.mjs';
+import { acquireExternalObservationsV2, acquireExternalHttpObservationsV2, EXTERNAL_PROBE_IO_V2, ExternalProbeErrorV2 } from '../external/acquireV2.mjs';
 import { evaluateUdpExposure } from '../composite/udpExposure.mjs';
 import { writeExternalProducerFilesV2 } from '../external/producerFilesV2.mjs';
 import { canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
@@ -146,6 +146,17 @@ function ioFixture() {
     calls.push({ name, args }); return method(...args);
   }])) };
 }
+
+test('targeted HTTP recovery reuses full-producer observations without repeating unrelated probes', async () => {
+  const full = await acquireExternalObservationsV2({ env, now, io: ioFixture().io });
+  const focused = ioFixture(), result = await acquireExternalHttpObservationsV2({ env, io: focused.io });
+  assert.equal(Object.keys(result).length, 4);
+  for (const [id, observation] of Object.entries(result)) assert.deepEqual(observation, full.observations[id]);
+  assert.equal(focused.calls.length, 4);
+  assert.ok(focused.calls.every(call => call.name === 'request'));
+  const missing = await acquireExternalHttpObservationsV2({ env, io: { request: async () => { throw new ExternalProbeErrorV2('timeout'); } } });
+  assert.ok(Object.values(missing).every(row => row.state === 'unavailable' && row.reason === 'timeout'));
+});
 
 test('V2 acquisition covers the resolved IPv4/IPv6 inventory and derives actual external/composite counts', async () => {
   const value = ioFixture(), result = await acquireExternalObservationsV2({ env, now, io: value.io });

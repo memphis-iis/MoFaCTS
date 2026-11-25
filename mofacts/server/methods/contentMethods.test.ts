@@ -1,3 +1,9 @@
+import { strict as assert } from 'node:assert';
+import { Meteor } from 'meteor/meteor';
+import { MANUAL_DRAFT_VERIFICATIONS, PACKAGE_DELETION_VERIFICATION } from '../../common/securityAudit/verificationCatalog';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
+import { Mongo } from 'meteor/mongo';
+import { Random } from 'meteor/random';
 import { expect } from 'chai';
 import { createContentMethods } from './contentMethods';
 import { DYNAMIC_ASSET_PUBLICATION_FIELDS } from '../publications';
@@ -71,14 +77,6 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
       updateAsync: async () => undefined,
       removeAsync: async () => undefined
     },
-    Stims: {
-      find: () => ({
-        fetchAsync: async () => [
-          { _id: 'stim-a', meta: { fileName: 'stim-a.json' } },
-          { _id: 'stim-extra', meta: { fileName: 'stim-extra.json' } }
-        ]
-      })
-    },
     DynamicAssets: {
       find: () => ({ fetchAsync: async () => [], countAsync: async () => 0 }),
       findOneAsync: async () => null,
@@ -103,17 +101,13 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
     isPlainRecord: (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value),
     cloneJsonLike: <T>(value: T) => JSON.parse(JSON.stringify(value)),
     normalizeCanonicalId: (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null,
-    canAccessContentUploadTdf: async () => true,
+    stimulusFilePolicy: { authorize: async () => true },
     getOrBuildCurrentPackageAsset: async () => ({ link: '/package.zip' }),
     parseLocalMediaReference: () => ({}),
     extractSrcFromHtml: () => [],
     getStimuliSetIdCandidates: () => [],
     findDynamicAssetsScopedBatch: async () => [],
-    decryptData: (value: string) => value,
     deleteTdfRuntimeData: async () => undefined,
-    updateStimDisplayTypeMap: async () => undefined,
-    rebuildStimDisplayTypeMapSnapshot: async () => undefined,
-    getStimDisplayTypeMapDeps: () => ({}),
     getMethodAuthorizationDeps: () => ({})
   };
 
@@ -121,6 +115,107 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('contentMethods content upload summaries', function() {
+  it('checks the archive owner before touching any family data', async function() {
+    const inspected: string[] = [];
+    const methods = createContentMethods(createContentDeps({
+      DynamicAssets: { findOneAsync: async () => ({ _id: 'archive', userId: 'other' }) },
+      Tdfs: { find: () => { inspected.push('family'); throw Error('Unexpected family access'); } },
+      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => false }),
+    }));
+    await assert.rejects(
+      () => methods.deletePackageFile.call({ userId: 'owner' }, 'archive', { wholeFamily: true }),
+      (error: any) => error.error === 403,
+    );
+    assert.deepEqual(inspected, []);
+  });
+  it('toggles study visibility while keeping locked and previously listed conditions out of the public list', async function() {
+    const tdfs = new Mongo.Collection<any>('visibility' + Random.id());
+    const methods = createContentMethods(createContentDeps({
+      Tdfs: tdfs,
+      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async (userId: string) => userId === 'admin' }),
+    }));
+    const toggle = (id: string, value: boolean) => methods.setTdfUserSelect.call({ userId: 'owner' }, id, value);
+    const listed = () => tdfs.find({ 'content.tdfs.tutor.setspec.userselect': 'true' }).mapAsync(doc => doc._id);
+    try {
+      await tdfs.insertAsync({ _id: 'root', ownerId: 'owner', content: { tdfs: { tutor: { setspec: {
+        condition: ['condition.json'], conditionTdfIds: ['child'], userselect: 'false',
+      } } } } });
+      await tdfs.insertAsync({ _id: 'child', ownerId: 'owner', content: { tdfs: { tutor: { unit: [{}],
+        setspec: { userselect: 'true', aiVisibilityLockReason: 'missing attribution' },
+      } } } });
+      for (const userId of ['outsider', 'admin']) {
+        await assert.rejects(methods.setTdfUserSelect.call({ userId }, 'root', true),
+          (error: any) => error.error === 'not-authorized');
+      }
+      await toggle('root', true);
+      assert.deepEqual(await listed(), ['root']);
+      await assert.rejects(toggle('child', true), (error: any) => error.error === 'tdf-condition-visibility');
+      const child = await tdfs.findOneAsync('child');
+      assert.equal(child.content.tdfs.tutor.setspec.aiVisibilityLockReason, 'missing attribution');
+      await toggle('root', false);
+      assert.deepEqual(await listed(), []);
+      assert.equal((await tdfs.findOneAsync('child')).tdfRevision, child.tdfRevision);
+      await tdfs.updateAsync('root', { $set: { 'content.tdfs.tutor.setspec.aiVisibilityLockReason': 'private' } });
+      await assert.rejects(toggle('root', true), (error: any) => error.error === 'tdf-public-locked');
+    } finally {
+      await tdfs.rawCollection().drop();
+    }
+  });
+
+  it('updates and removes only an existing manual draft owned by the caller', async function() {
+    const drafts = (globalThis as any).ManualContentDrafts as Mongo.Collection<any>;
+    const methods = (Meteor as any).server.method_handlers;
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed draft methods');
+    for (const verification of MANUAL_DRAFT_VERIFICATIONS) {
+      const rows: typeof observed.surfaces = observed.surfaces.filter(row => row.name === verification.method);
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0]?.verification, verification);
+      assert.deepEqual(rows[0]?.policy, { kind: 'manual-draft', operation: 'owner' });
+    }
+    const owner = { userId: Random.id() };
+    const other = { userId: Random.id() };
+    let draftId: string | undefined;
+    const state = { lessonName: 'Revised' };
+    const missing = (err: any) => err.error === 404;
+    try {
+      await Meteor.users.insertAsync({ _id: owner.userId, profile: { displayName: 'Synthetic author' } } as any);
+      const created = await methods.saveManualContentDraft.call(owner, { state, ownerId: other.userId });
+      assert.equal(typeof created.draftId, 'string');
+      draftId = created.draftId as string;
+      const payload = { draftId, state };
+      for (const [name, arg] of [['getManualContentDraft', draftId], ['saveManualContentDraft', payload], ['deleteManualContentDraft', draftId]] as const) {
+        await assert.rejects(methods[name].call({}, arg), (err: any) => err.error === 401);
+      }
+      assert.equal((await drafts.findOneAsync(draftId)).ownerId, owner.userId);
+      await assert.rejects(methods.getManualContentDraft.call(other, draftId), missing);
+      await assert.rejects(methods.saveManualContentDraft.call(other, payload), missing);
+      await assert.rejects(methods.deleteManualContentDraft.call(other, draftId), missing);
+      await methods.saveManualContentDraft.call(owner, payload);
+      assert.equal((await methods.getManualContentDraft.call(owner, draftId)).lessonName, 'Revised');
+      await drafts.updateAsync(draftId, { $set: { draftType: 'other-kind' } });
+      await assert.rejects(methods.saveManualContentDraft.call(owner, payload), missing);
+      await assert.rejects(methods.deleteManualContentDraft.call(owner, draftId), missing);
+      await drafts.updateAsync(draftId, { $set: { draftType: 'manual-content-creator' } });
+      assert.deepEqual(await methods.deleteManualContentDraft.call(owner, draftId), { deleted: true });
+      await assert.rejects(methods.deleteManualContentDraft.call(owner, draftId), missing);
+      await assert.rejects(methods.saveManualContentDraft.call(owner, payload), missing);
+    } finally {
+      if (draftId) await drafts.removeAsync({ _id: draftId });
+      await Meteor.users.removeAsync({ _id: owner.userId });
+    }
+  });
+
+  it('waits for the stimulus file access decision', async function() {
+    const methods = createContentMethods(createContentDeps({
+      Tdfs: { findOneAsync: async () => ({ rawStimuliFile: {}, content: { tdfs: { tutor: { setspec: { stimulusfile: 'test.json' } } } } }) },
+      stimulusFilePolicy: { authorize: async () => false },
+    }));
+    let denied;
+    try { await methods.getStimuliFileForTdf.call({ userId: 'learner' }, 'lesson'); } catch (err) { denied = err; }
+    expect(denied).to.include({ error: 403 });
+  });
+
   it('keeps asset publications limited to fields needed by client link and metadata views', function() {
     expect(DYNAMIC_ASSET_PUBLICATION_FIELDS).to.deep.equal({
       _id: 1,
@@ -164,123 +259,60 @@ describe('contentMethods content upload summaries', function() {
     }
   });
 
-  it('dry-runs orphan DynamicAssets cleanup against active TDF references', async function() {
-    const tdfs = [
-      { _id: 'tdf-active', stimuliSetId: 1, packageAssetId: 'package-live', packageFile: 'package-live.zip' },
-    ];
-    const assets = [
-      { _id: 'media-active', name: 'active.jpg', ext: 'jpg', size: 10, meta: { stimuliSetId: 1 } },
-      { _id: 'media-orphan', name: 'orphan.jpg', ext: 'jpg', size: 20, meta: { stimuliSetId: 2 } },
-      { _id: 'package-orphan', name: 'old.zip', ext: 'zip', size: 30, meta: {} },
-      { _id: 'package-live', name: 'package-live.zip', ext: 'zip', size: 40, meta: {} },
-      { _id: 'unscoped-media', name: 'scratch.png', ext: 'png', size: 50, meta: {} },
-    ];
-    const removed: string[] = [];
-    const deps = createContentDeps({
-      Tdfs: {
-        find: () => ({ fetchAsync: async () => tdfs, countAsync: async () => tdfs.length }),
-        findOneAsync: async () => null,
-        updateAsync: async () => undefined,
-        removeAsync: async () => undefined
-      },
-      DynamicAssets: {
-        find: () => ({ fetchAsync: async () => assets, countAsync: async () => assets.length }),
-        findOneAsync: async () => null,
-        removeAsync: async (selector: any) => { removed.push(selector._id); },
-        collection: {
-          rawCollection: () => ({ aggregate: () => ({ toArray: async () => [] }) }),
-          updateAsync: async () => undefined
-        }
-      },
-      getStimuliSetIdCandidates: (value: unknown) => {
-        const text = String(value);
-        const numberValue = Number(text);
-        return Number.isFinite(numberValue) ? [text, numberValue] : [text];
-      },
-      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => true })
+  it('deletes only package-bound media with no surviving lesson reference', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw Error(observed.reason);
+    const binding = observed.surfaces.find(({ name }) => name === 'deletePackageFile');
+    assert.equal(binding?.verification, PACKAGE_DELETION_VERIFICATION);
+    const tdfs = new Mongo.Collection<any>('packageDeletionLessons' + Random.id());
+    const assets = new Mongo.Collection<any>('packageDeletionAssets' + Random.id());
+    const makeMedia = (id: string, name: string, target = 'lesson', setId: string | number = 88) => ({
+      _id: id, name, userId: 'collaborator',
+      meta: { uploadPurpose: 'content-media', tdfId: target, stimuliSetId: setId },
     });
-    const methods = createContentMethods(deps);
+    const methods = createContentMethods(createContentDeps({
+      Tdfs: tdfs, DynamicAssets: assets,
+      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => false }),
+    }));
 
-    const result = await methods.cleanupOrphanDynamicAssets.call({ userId: 'admin-user' }, { dryRun: true });
+    try {
+      await tdfs.insertAsync({ _id: 'lesson', ownerId: 'owner', stimuliSetId: 88, packageAssetId: 'archive' });
+      await tdfs.insertAsync({ _id: 'condition', ownerId: 'owner', stimuliSetId: 89, packageAssetId: 'archive' });
+      await tdfs.insertAsync({ _id: 'neighbor-scope', ownerId: 'other', stimuliSetId: '89' });
+      await tdfs.insertAsync({
+        _id: 'other', ownerId: 'other', stimuliSetId: 98,
+        content: { tdfs: { tutor: { setspec: { lessonHelp: '<img src="/dynamic-assets/shared-id/photo.png">' } } } },
+        rawStimuliFile: { setspec: { clusters: [{ stims: [{ audioStimulus: 'same name.wav' }] }] } },
+      });
+      for (const asset of [
+        { _id: 'archive', userId: 'owner', ext: 'zip', meta: { uploadPurpose: 'package' } },
+        makeMedia('delete-me', 'other.png'),
+        makeMedia('shared-id', 'photo.png'),
+        makeMedia('same-name', 'same name.wav'),
+        makeMedia('sibling-scope', 'condition.png', 'condition', 89),
+        makeMedia('unrelated-id', 'other.png', 'other', 98),
+        makeMedia('mismatched-scope', 'scope.png', 'lesson', '88'),
+        { _id: 'legacy-scope-only', name: 'other.png', meta: { stimuliSetId: 88 } },
+      ]) await assets.insertAsync(asset);
 
-    expect(result.dryRun).to.equal(true);
-    expect(result.orphanCount).to.equal(2);
-    expect(result.sizeBytes).to.equal(50);
-    expect(result.assets.map((asset: any) => asset.assetId)).to.deep.equal(['media-orphan', 'package-orphan']);
-    expect(removed).to.deep.equal([]);
-  });
-
-  it('removes scoped DynamicAssets when deleting the last TDF for a package stimuli set', async function() {
-    const tdfs = [
-      { _id: 'tdf-delete', ownerId: 'owner', stimuliSetId: 88, packageAssetId: 'package-delete', stimuli: [] },
-    ];
-    const assets = [
-      { _id: 'package-delete', name: 'package-delete.zip', ext: 'zip', userId: 'owner', meta: {} },
-      { _id: 'media-delete', name: 'lesson.jpg', ext: 'jpg', meta: { stimuliSetId: 88 } },
-      { _id: 'media-keep', name: 'other.jpg', ext: 'jpg', meta: { stimuliSetId: 99 } },
-    ];
-    const removed: string[] = [];
-    const deps = createContentDeps({
-      Tdfs: {
-        find: (selector: any) => ({
-          fetchAsync: async () => {
-            if (selector?._id?.$nin) {
-              return [];
-            }
-            if (selector?.$or) {
-              return tdfs.filter((tdf) => tdf.packageAssetId === 'package-delete');
-            }
-            if (selector?.stimuliSetId?.$in) {
-              return tdfs.filter((tdf) => selector.stimuliSetId.$in.includes(tdf.stimuliSetId));
-            }
-            return tdfs;
-          },
-          countAsync: async () => tdfs.length
-        }),
-        findOneAsync: async () => null,
-        updateAsync: async () => undefined,
-        removeAsync: async (selector: any) => {
-          const index = tdfs.findIndex((tdf) => tdf._id === selector._id);
-          if (index >= 0) {
-            tdfs.splice(index, 1);
-          }
-        }
-      },
-      DynamicAssets: {
-        find: (selector: any) => ({
-          fetchAsync: async () => {
-            if (selector?.['meta.stimuliSetId']?.$in) {
-              return assets.filter((asset) => selector['meta.stimuliSetId'].$in.includes(asset.meta?.stimuliSetId));
-            }
-            return assets;
-          },
-          countAsync: async () => assets.length
-        }),
-        findOneAsync: async (selector: any) => assets.find((asset) => asset._id === selector._id) || null,
-        removeAsync: async (selector: any) => {
-          removed.push(selector._id);
-          const index = assets.findIndex((asset) => asset._id === selector._id);
-          if (index >= 0) {
-            assets.splice(index, 1);
-          }
-        },
-        collection: {
-          rawCollection: () => ({ aggregate: () => ({ toArray: async () => [] }) }),
-          updateAsync: async () => undefined
-        }
-      },
-      getStimuliSetIdCandidates: (value: unknown) => {
-        const text = String(value);
-        const numberValue = Number(text);
-        return Number.isFinite(numberValue) ? [text, numberValue] : [text];
-      },
-      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => true })
-    });
-    const methods = createContentMethods(deps);
-
-    await methods.deletePackageFile.call({ userId: 'admin-user' }, 'package-delete', { wholeFamily: true });
-
-    expect(removed).to.deep.equal(['package-delete', 'media-delete']);
-    expect(assets.map((asset) => asset._id)).to.deep.equal(['media-keep']);
+      await assert.rejects(
+        methods.deletePackageFile.call({ userId: 'owner' }, 'archive'),
+        (error: any) => error.error === 'whole-family-confirmation-required',
+      );
+      await assert.rejects(
+        methods.deletePackageFile.call({ userId: 'collaborator' }, 'archive', { wholeFamily: true }),
+        (error: any) => error.error === 403,
+      );
+      assert.equal(await tdfs.find({ packageAssetId: 'archive' }).countAsync(), 2);
+      assert.deepEqual(await methods.deletePackageFile.call({ userId: 'owner' }, 'archive', { wholeFamily: true }),
+        { deletedCount: 2 });
+      assert.equal(await tdfs.find({ packageAssetId: 'archive' }).countAsync(), 0);
+      assert.deepEqual((await assets.find({}).mapAsync(asset => asset._id)).sort(), [
+        'legacy-scope-only', 'mismatched-scope', 'same-name', 'shared-id', 'sibling-scope', 'unrelated-id',
+      ]);
+    } finally {
+      await tdfs.removeAsync({});
+      await assets.removeAsync({});
+    }
   });
 });

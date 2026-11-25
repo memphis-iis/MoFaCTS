@@ -172,7 +172,7 @@ test('V2 image bridge rejects missing canaries, unsafe environments and invalid 
   const f = fixture();
   assert.equal((await observeImageCanariesV2({ ...f.input, canaries: [] }, { run: f.run, archive: f.archive })).reason, 'configuration');
   await assert.rejects(observeImageCanariesV2({ ...f.input, environment: { ...environment, AUDIT_AUTH_FIXTURES_JSON: 'PRIVATE' } },
-    { run: f.run, archive: f.archive }), /Invalid repository command configuration/);
+    { run: f.run, archive: f.archive }), /Invalid audit child environment/);
   await assert.rejects(observeImageCanariesV2(f.input, { run: null, archive: f.archive }), /inspection incomplete/);
   assert.equal(f.calls.length, 0);
 });

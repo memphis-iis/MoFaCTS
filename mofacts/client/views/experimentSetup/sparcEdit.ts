@@ -70,7 +70,6 @@ Template.sparcEdit.onRendered(function(this: any) {
     instance.svelteMount = createBlazeMount(target, SparcAuthoringEditor, {
       tdfId: instance.tdfId,
       initialTdf: clone(tdf),
-      queryParams: FlowRouter.current()?.queryParams || {},
       onCancel: () => FlowRouter.go('/contentUpload'),
       onSave: async (updatedRawStimuliFile: any) => {
         const saved = await saveEditedContent({ callAsync: meteorCallAsync, method: 'saveTdfStimuli',

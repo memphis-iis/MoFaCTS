@@ -9,6 +9,7 @@ import type {
 import { sparcTrialDisplayAdapter } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
 import { validateSimulationConfig } from '../../../packages/phet-monitor/lesson';
+import { assertSimulationActivityHistory } from '../../runtime/simulationActivityHistory';
 import type { ModelPracticeRuntime } from '../../runtime/modelPracticeRuntime';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import {
@@ -668,18 +669,20 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
     const config = validateSimulationConfig(node.simulation);
     const evidence = submitted.evidence;
     const facts = submitted.facts;
+    assertSimulationActivityHistory(submitted.activity);
+    if (submitted.activity.buildId !== config.buildId || submitted.activity.attemptId !== evidence.attemptId) throw new Error('Simulation activity identity mismatch');
     if (evidence.buildId !== config.buildId || typeof evidence.attemptId !== 'string'
       || !Number.isSafeInteger(evidence.checkpointSequence) || !Number.isSafeInteger(evidence.firstSequence)
       || !Number.isSafeInteger(evidence.lastSequence)
       || Number(evidence.firstSequence) > Number(evidence.checkpointSequence)
       || Number(evidence.checkpointSequence) > Number(evidence.lastSequence)) throw new Error('Invalid simulation evidence reference');
-    if (Object.keys(facts).length !== config.bindings.length || config.bindings.some(binding => {
-      const value = facts[binding.name];
+    const permitted = new Set([...config.bindings.flatMap(binding => [binding.name, `previous_${binding.name}`]), 'simulationEvent', 'interactionBinding', 'changeCount']);
+    if (Object.keys(facts).some(key => !permitted.has(key)) || config.bindings.some(binding => !(binding.name in facts)) || Object.values(facts).some(value => {
       return value !== null && typeof value !== 'boolean' && typeof value !== 'string' && !(typeof value === 'number' && Number.isFinite(value));
     })) throw new Error('Invalid simulation observation facts');
-    return [{ eventId: `${evidence.attemptId}:${evidence.checkpointSequence}:${nodeId}`,
+    return [{ eventId: `${submitted.activity.sourceEventId}:${nodeId}`,
       type: 'simulation-observation', source: { pageKey: params.pageKey, nodeId }, time: params.result.timestamp,
-      payload: { ...submitted.facts, evidence, evidenceComplete: true } }];
+      payload: { ...submitted.facts, simulationActivity: submitted.activity, evidence, evidenceComplete: true } }];
   }
   if (params.result.eventType === 'focus-changed' && submittedEntries.length === 0) {
     const nodeId = typeof params.result.triggeredBy === 'string' ? params.result.triggeredBy.trim() : '';
@@ -724,7 +727,7 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
     }
     const defaultIncorrectFeedbackNodeId = nearestMessageBoxIdForNode(params.display.nodes, nodeId);
     events.push({
-      eventId: `${params.pageKey}:${nodeId}:${index}:trial-display`,
+      eventId: params.result.simulationActivity ? `${params.result.simulationActivity.sourceEventId}:${nodeId}:${index}` : `${params.pageKey}:${nodeId}:${index}:trial-display`,
       type: 'response-submitted',
       source: {
         pageKey: params.pageKey,
@@ -738,6 +741,7 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
         triggeredBy: params.result.triggeredBy ?? null,
         ...focusPayload,
         sparcAnswerable: nodeIsAnswerable(node) || isCompletionButtonAction(params.display, selection, action),
+        ...(params.result.simulationActivity ? { simulationActivity: params.result.simulationActivity } : {}),
         sparcDefaultIncorrectMessage: 'No, this is not correct.',
         ...(defaultIncorrectFeedbackNodeId ? { sparcDefaultIncorrectFeedbackNodeId: defaultIncorrectFeedbackNodeId } : {}),
       },

@@ -96,12 +96,6 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       : '';
   }
 
-  function getUserAccessedTdfIds(user: any) {
-    return Array.isArray(user?.accessedTDFs)
-      ? user.accessedTDFs.map((id: unknown) => String(id || '').trim()).filter(Boolean)
-      : [];
-  }
-
   async function getTdfsByIds(keys: unknown[]) {
     const normalizedKeys = normalizeTdfKeys(keys);
     if (normalizedKeys.length === 0) {
@@ -307,16 +301,14 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
     const tdfExperimentTarget = getTdfExperimentTarget(tdfAccess);
     let user: any = null;
     let userExperimentTarget = '';
-    let accessedTdfIds: string[] = [];
     if (tdfExperimentTarget) {
       user = await deps.usersCollection.findOneAsync(
         { _id: this.userId },
-        { fields: { profile: 1, accessedTDFs: 1 } }
+        { fields: { 'profile.experimentTarget': 1 } }
       );
       userExperimentTarget = getUserExperimentTarget(user);
-      accessedTdfIds = getUserAccessedTdfIds(user);
 
-      if (userExperimentTarget === tdfExperimentTarget || accessedTdfIds.includes(String(tdfAccess._id || ''))) {
+      if (userExperimentTarget === tdfExperimentTarget) {
         return await loadFullTdf();
       }
     }
@@ -347,17 +339,13 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       if (!user) {
         user = await deps.usersCollection.findOneAsync(
           { _id: this.userId },
-          { fields: { profile: 1, accessedTDFs: 1 } }
+          { fields: { 'profile.experimentTarget': 1 } }
         );
         userExperimentTarget = getUserExperimentTarget(user);
-        accessedTdfIds = getUserAccessedTdfIds(user);
       }
       const canAccessExperimentRoot =
         !!rootExperimentTarget &&
-        (
-          userExperimentTarget === rootExperimentTarget ||
-          accessedTdfIds.includes(rootId)
-        );
+        userExperimentTarget === rootExperimentTarget;
       if (!canViewRoot && !assignedRootIds.has(rootId) && !canAccessExperimentRoot) {
         continue;
       }

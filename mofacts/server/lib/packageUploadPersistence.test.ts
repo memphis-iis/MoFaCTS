@@ -44,7 +44,6 @@ function packageDeps(overrides: Partial<ProcessPackageUploadDeps> = {}): Process
     async upsertPackage() {
       return { stimuliSetId: 1 };
     },
-    async updateStimDisplayTypeMap() {},
     async getStimuliSetIdByFilename() {
       return undefined;
     },

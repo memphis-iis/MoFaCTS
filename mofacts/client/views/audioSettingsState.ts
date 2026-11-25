@@ -1,32 +1,5 @@
-export const AUDIO_INPUT_SENSITIVITY_MIN = 20;
-export const AUDIO_INPUT_SENSITIVITY_MAX = 80;
-export const AUDIO_INPUT_SENSITIVITY_DEFAULT = 60;
-
-export type AudioPromptMode = 'silent' | 'question' | 'feedback' | 'all';
-
-export type AudioSettingsForm = Readonly<{
-  audioPromptMode: AudioPromptMode;
-  audioPromptQuestionVolume: number;
-  audioPromptQuestionSpeakingRate: number;
-  audioPromptVoice: string;
-  audioPromptFeedbackVolume: number;
-  audioPromptFeedbackSpeakingRate: number;
-  audioPromptFeedbackVoice: string;
-  audioInputMode: boolean;
-  audioInputSensitivity: number;
-}>;
-
-export const DEFAULT_AUDIO_SETTINGS: AudioSettingsForm = Object.freeze({
-  audioPromptMode: 'silent',
-  audioPromptQuestionVolume: 0,
-  audioPromptQuestionSpeakingRate: 1,
-  audioPromptVoice: 'en-US-Standard-A',
-  audioPromptFeedbackVolume: 0,
-  audioPromptFeedbackSpeakingRate: 1,
-  audioPromptFeedbackVoice: 'en-US-Standard-A',
-  audioInputMode: false,
-  audioInputSensitivity: AUDIO_INPUT_SENSITIVITY_DEFAULT,
-});
+import { AUDIO_INPUT_SENSITIVITY_MIN, AUDIO_INPUT_SENSITIVITY_MAX, AUDIO_INPUT_SENSITIVITY_DEFAULT, DEFAULT_AUDIO_SETTINGS, type AudioSettingsForm, type AudioPromptMode } from '../../common/personalAudioSettings';
+export { AUDIO_INPUT_SENSITIVITY_MIN, AUDIO_INPUT_SENSITIVITY_MAX, AUDIO_INPUT_SENSITIVITY_DEFAULT, DEFAULT_AUDIO_SETTINGS, type AudioSettingsForm, type AudioPromptMode };
 
 function finiteNumber(value: unknown, defaultValue: number): number {
   const parsed = Number(value);

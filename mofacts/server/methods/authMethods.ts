@@ -1,3 +1,4 @@
+import { accountDiagnosticsPolicy, privateParticipantActivity, participantConnectionRoot } from '../lib/participantSession';
 import { Meteor } from 'meteor/meteor';
 import { ensurePublishedDeploymentBrandProfile } from '../lib/deploymentBrandProfileRegistry';
 import { Accounts } from 'meteor/accounts-base';
@@ -44,13 +45,7 @@ type AuthMethodsDeps = {
     findOneAsync: (selector: UnknownRecord) => Promise<any>;
     insertAsync: (document: UnknownRecord) => Promise<unknown>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
-    removeAsync: (selector: UnknownRecord) => Promise<number>;
   };
-  requireAdminUser: (
-    userId: string | null | undefined,
-    errMsg?: string,
-    errorCode?: string | number
-  ) => Promise<void>;
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
   getUserRoleFlags: <RoleName extends string>(
     deps: MethodAuthorizationDeps,
@@ -97,24 +92,18 @@ type AuthMethodsDeps = {
   isNormalAccountUser: (user: any) => boolean;
   isUserEmailVerified: (user: any) => boolean;
   buildSessionAuthState: (loginMode: string, primaryFactor: string) => unknown;
-  normalizeCanonicalId: (value: unknown) => string | null;
   syncUsernameCaches: (userId: string, nextUsername: string, previousUsername?: string) => void;
   encryptData: (value: string) => string;
-  getUserPersonalApiKey: (
-    deps: ApiKeyResolutionDeps,
-    userId: string | null | undefined,
-    kind: 'speech' | 'tts'
-  ) => Promise<unknown>;
-  getAccessibleTdfApiKey: (
-    deps: ApiKeyResolutionDeps,
-    params: { userId: string | null | undefined; tdfId: string; kind: 'speech' | 'tts' }
-  ) => Promise<unknown>;
   getApiKeyResolutionDeps: () => ApiKeyResolutionDeps;
-  getPasswordHashRuntimeInfo: () => unknown;
 };
 
+export const accountSelfPolicy = Object.freeze({
+  kind: 'account-self', operation: 'current-caller',
+  authorize(userId: string | null | undefined) { return typeof userId === 'string' ? userId.trim() : ''; },
+} as const);
+
 function requireCurrentUserId(userId: string | null | undefined, message = 'Must be logged in') {
-  const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
+  const normalizedUserId = accountSelfPolicy.authorize(userId);
   if (!normalizedUserId) {
     throw new Meteor.Error(401, message);
   }
@@ -136,12 +125,28 @@ async function setPasswordForUser(userId: string, newPassword: string) {
   throw new Meteor.Error('accounts-set-password-unavailable', 'Server password update API is unavailable');
 }
 
+export const ssoProfilePolicy = Object.freeze({
+  kind: 'sso-profile',
+  operation: 'self-or-admin',
+  authorize(deps: MethodAuthorizationDeps, actingUserId: string | null | undefined, subjectUserId: string) {
+    return requireUserMatchesOrHasRole(deps, {
+      actingUserId,
+      subjectUserId,
+      roles: ['admin'],
+      notLoggedInMessage: 'Must be logged in',
+      notLoggedInCode: 401,
+      forbiddenMessage: 'Can only populate your own SSO profile',
+      forbiddenCode: 403,
+    });
+  },
+} as const);
+
 export function createAuthMethods(deps: AuthMethodsDeps) {
   return {
     getCurrentUserRoleFlags: async function(this: MethodContext) {
       const { admin, teacher } = await deps.getUserRoleFlags(
         deps.getMethodAuthorizationDeps(),
-        this.userId,
+        accountSelfPolicy.authorize(this.userId),
         ['admin', 'teacher'] as const
       );
       return { admin: !!admin, teacher: !!teacher };
@@ -163,10 +168,9 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       entryPoint: string,
       loginMode: string,
       curTeacher: unknown = undefined,
-      curClass: unknown = undefined,
-      assignedTdfs: unknown = undefined
+      curClass: unknown = undefined
     ) {
-      deps.serverConsole('setUserLoginData called with:', entryPoint, loginMode, curTeacher, curClass, assignedTdfs);
+      const studyRoot = participantConnectionRoot(this);
 
       const userId = requireCurrentUserId(this.userId, 'Must be logged in to set login data');
       const user = await deps.usersCollection.findOneAsync({ _id: userId });
@@ -181,23 +185,12 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       loginParams.curTeacher = curTeacher;
       loginParams.curClass = curClass;
       loginParams.loginMode = loginMode;
-      loginParams.assignedTdfs = assignedTdfs;
-      loginParams.authSessionState = deps.buildSessionAuthState(
+      delete loginParams.assignedTdfs;
+      if (!studyRoot) loginParams.authSessionState = deps.buildSessionAuthState(
         loginMode,
         loginMode === 'google' || loginMode === 'microsoft' || loginMode === 'memphisSaml' ? 'federated' : 'password'
       );
-      const normalizedAssignedTdfIds = Array.isArray(assignedTdfs)
-        ? assignedTdfs
-          .map((id: unknown) => deps.normalizeCanonicalId(id))
-          .filter((id: string | null): id is string => typeof id === 'string')
-        : [];
-
-      deps.serverConsole('setUserLoginData updating with loginParams:', loginParams);
-      const userUpdate: UnknownRecord = { $set: { loginParams } };
-      if (normalizedAssignedTdfIds.length > 0) {
-        userUpdate.$addToSet = { accessedTDFs: { $each: normalizedAssignedTdfIds } };
-      }
-      const result = await deps.usersCollection.updateAsync({ _id: userId }, userUpdate);
+      const result = await deps.usersCollection.updateAsync({ _id: userId }, { $set: { loginParams } });
       deps.serverConsole('setUserLoginData update result:', result);
 
       return result;
@@ -307,17 +300,6 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       return { success: true };
     },
 
-    cleanupExpiredPasswordResetTokens: async function(this: MethodContext) {
-      await deps.requireAdminUser(this.userId, 'Admin access required');
-
-      const deleted = await deps.PasswordResetTokens.removeAsync({
-        expiresAt: { $lt: new Date() },
-      });
-
-      deps.serverConsole('Cleaned up', deleted, 'expired password reset tokens');
-      return { deleted };
-    },
-
     signUpUser: async function(this: MethodContext, newUserName: string, newUserPassword: string) {
       check(newUserName, String);
       check(newUserPassword, String);
@@ -373,16 +355,9 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     },
 
     populateSSOProfile: async function(this: MethodContext, userId: string) {
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
-        subjectUserId: userId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Can only populate your own SSO profile',
-        forbiddenCode: 403,
-      });
+      await ssoProfilePolicy.authorize(deps.getMethodAuthorizationDeps(), this.userId, userId);
 
+      if (await privateParticipantActivity(this)) return;
       const user = await deps.usersCollection.findOneAsync({ _id: userId });
       if (user && user.services) {
         const service = Object.keys(user.services)[0];
@@ -399,7 +374,6 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
         const profile = {
           email: serviceEmail,
           service,
-          refreshToken: serviceProfile.refreshToken,
         };
         const normalizedEmail = deps.normalizeCanonicalEmail(serviceEmail);
         await deps.usersCollection.updateAsync({ _id: userId }, { $set: {
@@ -428,40 +402,17 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       return 'failure';
     },
 
-    clearLoginData: async function(this: MethodContext) {
-      const userId = requireCurrentUserId(this.userId, 'User must be logged in to clear login data');
-      const user = await deps.usersCollection.findOneAsync({ _id: userId });
-      if (!user) {
-        throw new Meteor.Error(404, 'User not found');
-      }
-      const loginParams = user.loginParams || {};
-      loginParams.entryPoint = null;
-      loginParams.curTeacher = null;
-      loginParams.curClass = null;
-      loginParams.loginMode = null;
-      loginParams.authSessionState = null;
-      await deps.usersCollection.updateAsync({ _id: userId }, { $set: { loginParams } });
-      await deps.writeAuditLog('auth.sessionRevoked', userId, userId, {
-        reason: 'clearLoginData',
-      });
-    },
-
-    getUserSpeechAPIKey: async function(this: MethodContext) {
-      requireCurrentUserId(this.userId, 'Must be logged in to read speech API key status');
-      return '';
-    },
-
     isUserSpeechAPIKeySetup: async function(this: MethodContext) {
-      const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
+      const userId = accountSelfPolicy.authorize(this.userId);
       if (!userId) {
         return false;
       }
-      const speechAPIKey = (await deps.usersCollection.findOneAsync({ _id: userId }))?.speechAPIKey;
+      const speechAPIKey = (await deps.usersCollection.findOneAsync({ _id: userId }, { fields: { speechAPIKey: 1 } }))?.speechAPIKey;
       return !!speechAPIKey;
     },
 
     hasUserPersonalKeys: async function(this: MethodContext, tdfId?: string | null) {
-      const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
+      const userId = accountSelfPolicy.authorize(this.userId);
       if (!userId) {
         return { hasSR: false, hasTTS: false };
       }
@@ -493,27 +444,10 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       await deps.usersCollection.upsertAsync({ _id: userId }, { $set: { speechAPIKey: deps.encryptData(key) } });
     },
 
-    getTdfTTSAPIKey: async function(this: MethodContext, tdfId: string) {
-      const key = await deps.getAccessibleTdfApiKey(deps.getApiKeyResolutionDeps(), {
-        userId: this.userId,
-        tdfId,
-        kind: 'tts',
-      });
-      return { configured: Boolean(key) };
-    },
-
-    getTdfSpeechAPIKey: async function(this: MethodContext, tdfId: string) {
-      const key = await deps.getAccessibleTdfApiKey(deps.getApiKeyResolutionDeps(), {
-        userId: this.userId,
-        tdfId,
-        kind: 'speech',
-      });
-      return { configured: Boolean(key) };
-    },
-
     setUserSessionId: async function(this: MethodContext, sessionId: string, sessionIdTimestamp: number) {
+      if (!await accountDiagnosticsPolicy.authorize(this)) return;
       deps.serverConsole('setUserSessionId request received');
-      const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
+      const userId = accountSelfPolicy.authorize(this.userId);
       if (!userId) {
         return;
       }
@@ -526,19 +460,14 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     recordSessionRevocation: async function(this: MethodContext, reason: string) {
       check(reason, String);
       const userId = requireCurrentUserId(this.userId);
-      await deps.writeAuditLog('auth.sessionRevoked', userId, userId, {
+      if (!await privateParticipantActivity(this)) await deps.writeAuditLog('auth.sessionRevoked', userId, userId, {
         reason: reason.trim() || 'unspecified',
       });
       return { success: true };
     },
 
-    getPasswordHashRuntimeInfo: async function(this: MethodContext) {
-      await deps.requireAdminUser(this.userId, 'Admin access required');
-      return deps.getPasswordHashRuntimeInfo();
-    },
-
     deleteUserSpeechAPIKey: async function(this: MethodContext) {
-      const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
+      const userId = accountSelfPolicy.authorize(this.userId);
       if (!userId) {
         return;
       }

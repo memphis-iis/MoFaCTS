@@ -10,9 +10,10 @@ Module._load = function(name, ...args) {
   if (name === 'meteor/meteor') return { Meteor: { Error: class extends Error { constructor(code, message) { super(message); this.error = code; } } } };
   return originalLoad.call(this, name, ...args);
 };
+const { configuredStudyWait } = require('../server/lib/studyWaitingPeriod.ts');
 const { createProlificParticipationService } = require('../server/lib/prolificParticipation.ts');
 const { createProlificManagementService } = require('../server/lib/prolificManagement.ts');
-const { createProlificMethods } = require('../server/methods/prolificMethods.ts');
+const { createProlificMethodRegistration } = require('../server/methods/prolificMethods.ts');
 const { prolificRequest, ProlificApiError } = require('../server/lib/prolificApi.ts');
 const { prolificCompletionUrl, prolificAmount } = require('../common/prolific.ts');
 const { savedLessonCompleted } = require('../common/experimentCompletion.ts');
@@ -175,11 +176,12 @@ describe('participation persistence and session boundaries', () => {
     await progress(f, p, { currentUnitNumber: 1, lastUnitCompleted: 0 });
     assert.equal((await f.participation.checkpoint(p.userId)).completionUrl, undefined);
     f.users.rows[0].lockouts = { root: { currentLockoutUnit: 1, lockoutMinutes: 5, lockoutTimeStamp: Date.now() } };
-    assert.equal(await f.participation.validateLockout(p.userId, 'root', 1), 5);
+    assert.equal(configuredStudyWait(await f.participation.enrolledStudyProgress(p.userId), 'root', 1), 5);
     f.Tdfs.rows[0].content.tdfs.tutor.unit[1].deliverySettings = [{ lockoutminutes: 5 }, { lockoutminutes: 15 }];
     f.states.rows[0].experimentState.experimentXCond = 1;
-    assert.equal(await f.participation.validateLockout(p.userId, 'root', 1), 15);
-    await assert.rejects(f.participation.validateLockout(p.userId, 'root', 2));
+    assert.equal(configuredStudyWait(await f.participation.enrolledStudyProgress(p.userId), 'root', 1), 15);
+    const current = await f.participation.enrolledStudyProgress(p.userId);
+    assert.throws(() => configuredStudyWait(current, 'root', 2));
     assert.equal((await f.participation.checkpoint(p.userId)).completionUrl, completionUrl);
     assert.equal((await f.participation.checkpoint(p.userId)).completionUrl, null);
     assert.equal((await f.participation.checkpoint(p.userId, true)).completionUrl, completionUrl);
@@ -201,9 +203,9 @@ describe('participation persistence and session boundaries', () => {
     tutor.deliverySettings = [{ lockoutminutes: 5 }, { lockoutminutes: 15 }];
     tutor.unit[1].deliverySettings = { optimalThreshold: 0.8 };
     f.states.rows[0].experimentState.experimentXCond = 1;
-    assert.equal(await f.participation.validateLockout(p.userId, 'root', 1), 15);
+    assert.equal(configuredStudyWait(await f.participation.enrolledStudyProgress(p.userId), 'root', 1), 15);
     tutor.unit[1].deliverySettings.lockoutminutes = 0;
-    assert.equal(await f.participation.validateLockout(p.userId, 'root', 1), 0);
+    assert.equal(configuredStudyWait(await f.participation.enrolledStudyProgress(p.userId), 'root', 1), 0);
   });
   it('does not count initial pre-work lockouts or mid-unit progress', async () => {
     const f = fixture(), p = await started(f);
@@ -317,7 +319,7 @@ describe('researcher operations and reminders', () => {
   });
   it('enforces roles, self authentication, rate limiting and sanitized errors at method boundaries', async () => {
     const f = fixture(), rateCalls = [];
-    const methods = createProlificMethods({ participation: f.participation, management: f.management, authorization: () => ({ userIsInRoleAsync: async id => id === 'owner' }), rateLimit: async (...args) => rateCalls.push(args) });
+    const { methods } = createProlificMethodRegistration({ participation: f.participation, management: f.management, authorization: () => ({ userIsInRoleAsync: async id => id === 'owner' }), rateLimit: async (...args) => rateCalls.push(args) });
     await assert.rejects(methods.prolificDashboard.call({ userId: 'student' }, { studyId }));
     for (const name of ['prolificCreateTestParticipant', 'prolificPrepareTestStudy', 'prolificExecuteTestStudy', 'prolificTestSetupStatus']) {
       await assert.rejects(methods[name].call({ userId: 'student' }, {}));
@@ -325,33 +327,38 @@ describe('researcher operations and reminders', () => {
     }
     await assert.rejects(methods.completeProlificParticipation.call({}));
     await methods.startProlificParticipation.call({ connection: { clientAddress: 'synthetic' } }, launch);
-    assert.equal(rateCalls[0][0], 'prolific-start');
+    assert.deepEqual(rateCalls, []);
+    await methods.prolificDashboard.call({ userId: 'owner' }, { studyId });
+    assert.equal(rateCalls[0][0], 'prolific-dashboard');
     await assert.rejects(methods.startProlificParticipation.call({}, {}), e => e.error === 'prolific.invalidIdentity');
   });
 });
 
-it('appends export identities with bounded batched joins and empty ordinary participant values', async () => {
+it('exports one opaque participant key and preserves ordinary rows in bounded batches', async () => {
   const chunks = [], batches = [];
   const histories = Array.from({ length: 205 }, (_, i) => ({ userId: `u${i}`, anonStudentId: `synthetic${i}` }));
-  await writeHistoryExport(histories, c => chunks.push(c), e => { throw e; }, async ids => { batches.push(ids); return ids.includes('u0') ? [{ userId: 'u0', participantId, studyId, submissionId }] : []; });
-  assert.deepEqual(batches.map(b => b.length), [100, 100, 5]);
-  assert.match(chunks[0], /Prolific Participant ID\tProlific Study ID\tProlific Submission ID\n$/);
-  assert.equal(chunks[1].endsWith(`${participantId}\t${studyId}\t${submissionId}\n`), true);
-  assert.equal(chunks[2].endsWith('\t\t\t\n'), true);
+  await writeHistoryExport(histories, c => chunks.push(c), e => { throw e; }, async rows => {
+    batches.push(rows.length);
+    return row => row.userId === 'u0' ? 'opaque-participation' : undefined;
+  });
+  assert.deepEqual(batches, [100, 100, 5]);
+  assert.doesNotMatch(chunks[0], /Prolific (Participant|Study|Submission) ID/);
+  assert.equal(chunks[0].split('\t')[0], 'Anon Student Id');
+  assert.equal(chunks[1].split('\t')[0], 'opaque-participation');
+  assert.equal(chunks[2].split('\t')[0], 'synthetic1');
 });
-
 
 describe('learner completion navigation', () => {
   const state = new Map(), storage = new Map();
   let user = { _id: 'learner', profile: { createdBy: 'startProlificParticipation' } };
-  let fail = false, completions = 0;
+  let fail = false, completions = 0, redirect = true;
   const navigations = [];
   const loader = Module._load;
   Module._load = function(name, ...args) {
     if (name === 'meteor/meteor') return { Meteor: { user: () => user, userId: () => user?._id } };
     if (name === 'meteor/session') return { Session: { get: k => state.get(k), set: (k, v) => state.set(k, v) } };
     if (name === './launchLoading') return { finishLaunchLoading: () => state.set('appLoading', false) };
-    if (name === './meteorAsync') return { meteorCallAsync: async () => { completions++; if (fail) throw new Error('save failure'); return { completionUrl }; } };
+    if (name === './meteorAsync') return { meteorCallAsync: async () => { completions++; if (fail) throw new Error('save failure'); return { completionUrl: redirect ? completionUrl : null }; } };
     if (name.endsWith('/navigationCleanup')) return { leavePage: async (url, external) => navigations.push({ url, external }) };
     return loader.call(this, name, ...args);
   };
@@ -359,7 +366,7 @@ describe('learner completion navigation', () => {
   // Transpiled dynamic imports use require when finalization runs, so intercept only that module during these tests.
   Module._load = loader;
   beforeEach(() => {
-    state.clear(); storage.clear(); navigations.length = 0; completions = 0; fail = false;
+    state.clear(); storage.clear(); navigations.length = 0; completions = 0; fail = false; redirect = true;
     user = { _id: 'learner', profile: { createdBy: 'startProlificParticipation' } };
     global.sessionStorage = { getItem: k => storage.get(k), removeItem: k => storage.delete(k) };
     storage.set('prolificInitialReturn', 'learner');
@@ -377,7 +384,7 @@ describe('learner completion navigation', () => {
   });
   it('retains context on failure and retries without navigation until persistence succeeds', async () => {
     fail = true;
-    await runtime.checkpointProlificLockout();
+    await runtime.checkpointProlificLockout(runtime.finalizeProlificSession);
     assert.equal(navigations.length, 0); assert.equal(runtime.participationSaveFailed(), true);
     assert.equal(storage.get('prolificInitialReturn'), 'learner');
     await runtime.retryParticipationSave();
@@ -386,8 +393,23 @@ describe('learner completion navigation', () => {
     await runtime.retryParticipationSave();
     assert.equal(navigations.length, 1); assert.equal(runtime.participationSaveFailed(), false);
   });
+  it('re-enters instructions after a later checkpoint failure on a saved lockout', async () => {
+    redirect = false; fail = true;
+    let countdowns = 0;
+    async function instructions() {
+      if (await runtime.checkpointProlificLockout(instructions)) return;
+      countdowns++;
+    }
+    await instructions();
+    assert.equal(countdowns, 0);
+    fail = false;
+    await runtime.retryParticipationSave();
+    assert.equal(countdowns, 1);
+    assert.equal(completions, 2);
+    assert.deepEqual(navigations, []);
+  });
   it('never replays a failed participant save under a different authenticated account', async () => {
-    fail = true; await runtime.checkpointProlificLockout();
+    fail = true; await runtime.checkpointProlificLockout(runtime.finalizeProlificSession);
     user = { _id: 'different', profile: {} };
     await runtime.retryParticipationSave();
     assert.equal(completions, 1); assert.equal(runtime.participationSaveFailed(), false);

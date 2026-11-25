@@ -10,6 +10,80 @@ release, or close Phase 0. See the [audit status](../../docs-developer/security-
 
 ## Authority and stored data
 
+### Standard post-acceptance command-sheet hook
+
+`qualification/recordDeploymentRelease.mjs` composes the existing record/history
+owner, immutable registry observer and a bounded running-image observer. It
+requires the repository-pinned Node runtime and explicit completed participant
+acceptance. Its candidate is the existing ordinary six-field record, including
+the existing clean/dirty flag. It adds the actual configuration digest and
+operator acceptance, then writes the existing authority/history and credential-free
+V2 receipt; it never invents ReleaseQualification proof.
+
+```sh
+node mofacts/scripts/security-audit/qualification/recordDeploymentRelease.mjs \
+  "$release_record" "$six_field_candidate" "$ssh_host" "$ssh_key" \
+  "$known_hosts" "$existing_private_evidence_directory" --participant-checks-passed
+```
+
+The observer uses strict existing SSH host trust and the deployment owner's
+existing identity. It reads only the fixed `mofacts` container/image metadata,
+streams the Docker image archive through the one bounded graph reader to resolve
+the configuration digest, and rechecks the exact running container afterward.
+Image layers are discarded, not extracted or retained. The observation is not a
+code/source test or an application request and cannot install, build or restart.
+Its private evidence directory receives only public identity observations and
+the receipt. Missing source, graph/registry disagreement, container replacement,
+missing acceptance or output collisions stop recording.
+
+Windows OpenSSH requires the standard `ProgramData` OS path in the helper's
+restricted child environment. The native regression verifies actual local SSH
+configuration expansion without a network connection. The initial two-minute
+production observation remained incomplete. Its approved ten-minute follow-up
+completed the full graph/final-container check in about five minutes and matched
+the already selected November 5 baseline. The standard remote recorder now
+explicitly selects that ten-minute budget; shared/local defaults and archive
+bounds remain unchanged. No production authority or receipt was written.
+See the [read-only observation acceptance](production-image-observation.md).
+
+The operator approved making this the standard production recording path on
+2026-11-12. The canonical `mofacts_config/deploy production.txt` now checks the
+pinned runtime and existing SSH trust file before its first deployment/config
+update. After the unchanged readiness/participant checks, it writes the six-field
+candidate to a new private evidence directory and calls
+`deploy/record-deployment-release.ps1`. Direct overwrite of the authority and the
+native-engine-reference-as-config assignment are removed from that recording
+block. There is no optional or silent replacement recording branch.
+
+The PowerShell entry point requires an explicit absolute `-NodeExecutable`.
+`deploy/resolve-node-runtime.ps1` verifies it against `mofacts/package.json`;
+missing, linked or wrong-version executables stop the procedure before deployment.
+For this Windows operator the project-local runtime is under
+`$env:LOCALAPPDATA\MoFaCTS\tools\node-v24.22.1-win-x64\node.exe`. It was installed
+from the official Node archive with published SHA-256 and a valid Windows
+Authenticode signature. Global PATH and other project runtimes are unchanged.
+Other operators supply their explicitly installed pinned executable; the helper
+does not search coding-app caches or substitute the global Node version.
+
+```powershell
+& .\deploy\record-deployment-release.ps1 -NodeExecutable $PinnedNodeExecutable `
+    -RecordPath $ReleaseRecordPath -CandidatePath $AcceptedCandidatePath `
+    -SshHost $OperatorSshHost -SshKey $OperatorSshKey -KnownHosts $KnownHostsPath `
+    -EvidenceDirectory $PrivateEvidenceDirectory -ParticipantChecksPassed
+```
+
+Focused tests cover classic/containerd graphs, source/replacement mismatch,
+missing acceptance, unchanged dirty-build semantics, record history and receipt
+readback. Windows tests additionally prove correct runtime selection, wrong-version
+rejection and the participant-acceptance guard. The actual canonical local
+preflight and existing local production-record format pass. Only the intentional
+integration hunks are staged/published; unrelated operator edits are preserved.
+Live execution of the new SSH/recording composition against production remains
+unexecuted and requires production authorization. Standard recording is an
+operational identity/acceptance record, not source/CI/release qualification.
+Source-only generic builds and application startup retain their existing behavior.
+See P1-04 in the current checklist.
+
 ### Inert V2 receiver projection (P1-D7)
 
 The single standalone parser now lives at
@@ -37,6 +111,46 @@ The tuple input is a bounded JSON file containing only the existing published-im
 object, not an entire registry response, CI smoke tuple or new release authority.
 The resulting `MoFaCTSReleaseReceiptV2` contains only bounded public identity
 fields and the existing record's SHA-256; it contains no credentials or settings.
+
+#### Deployment-owner identity hook
+
+The root deployment owner can acquire an independent running-image observation
+with `release-receipt.sh observe-image`. This action resolves the actual Docker
+image graph to its configuration digest and reads the revision label. It checks
+that the same running container/image is still selected afterward. It neither
+requires nor selects a receipt and grants no additional restricted-SSH command.
+Do not give this deployment-owner action to the audit account.
+
+The read-only `qualification/observePublishedImage.mjs` helper accepts an
+immutable registry reference and the independently observed image configuration
+and platform. It verifies exact registry blob hashes and, for an index, its
+single matching platform manifest. It cannot build, pull, publish or qualify an
+image. Keep registry-root, platform-manifest, configuration and engine-reference
+identities distinct.
+
+After the existing readiness and participant smoke acceptance has actually
+passed, an extended release candidate can be recorded and projected together:
+
+```sh
+node mofacts/scripts/security-audit/qualification/releaseRecordStore.mjs \
+  write-v2 "$release_record" "$accepted_candidate" \
+  "$published_image_observation" "$running_image_observation" > "$private_transfer"
+```
+
+`write-v2` requires the existing explicit image ID and acceptance fields. It
+checks source/configuration/platform against the independent running observation
+and registry mapping before allocating record files. The existing record owner
+archives prior and accepted bytes, replaces the authority atomically, then
+re-reads its accepted bytes before returning the receipt. A missing observation,
+failed write or changed readback cannot return a successful receipt. A retained
+lock after interruption requires explicit owner recovery as documented below.
+
+This optional evidence hook does not replace ordinary unqualified deployment
+recording or add an application startup/deployment gate. Health alone cannot
+manufacture participant acceptance. No production command-sheet execution or
+installation is implied by these source tools. The image-source reader shared
+with CI can independently verify the embedded source in an immutable local
+image; that observation alone creates no CI proof or release qualification.
 
 At authorized cutover, the root deployment owner saves the current V1 receipt
 and tooling for explicit rollback, removes the old *active* receipt, provisions

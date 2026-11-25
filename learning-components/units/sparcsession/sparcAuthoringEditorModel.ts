@@ -66,6 +66,8 @@ export function defaultProductionTest(): SparcProductionRuleTest {
 
 export function defaultProductionEffect(type = 'classify'): SparcProductionRuleEffect {
   switch (type) {
+    case 'history-event':
+      return { type: 'history-event', selection: literalExpression('Activity'), action: literalExpression('Observe'), input: '', outcome: literalExpression('unknown') };
     case 'assert-fact':
       return {
         type: 'assert-fact',

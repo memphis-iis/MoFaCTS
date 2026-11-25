@@ -1,7 +1,6 @@
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
-import { Tracker } from 'meteor/tracker';
 import './instructorReporting.html';
 import './instructorReporting.css';
 import '../shared/adminUi/adminUi';
@@ -23,11 +22,9 @@ import {
 } from '../../lib/adminUi/scopedAsyncCommandRegistry';
 import {
   findAssignmentForTdf,
-  findTdfSummary,
   getCourseAssignments,
   getReportingTotals,
   normalizePerformanceBuckets,
-  resolveSelectedDueDate,
   rowsHaveData,
   toDateInputValue,
   toDateMillis,
@@ -36,12 +33,7 @@ import {
   type ReportingCourse,
   type ReportingPerformanceBuckets,
   type ReportingPerformanceRow,
-  type ReportingTdfSummary,
 } from './instructorReportingState';
-
-declare const Tdfs: {
-  find(): { fetch(): ReportingTdfSummary[] };
-};
 
 type ReportingCommandResult = Readonly<{ message: string }>;
 type ReportingCommandStates = Record<string, AsyncCommandState<ReportingCommandResult>>;
@@ -49,7 +41,6 @@ type ReportingCommandStates = Record<string, AsyncCommandState<ReportingCommandR
 type InstructorReportingInitialData = Readonly<{
   courses: ReportingCourse[];
   assignmentsByCourseId: ReportingAssignmentsByCourseId;
-  allTdfs: ReportingTdfSummary[];
 }>;
 
 type InstructorReportingInstance = Blaze.TemplateInstance & {
@@ -70,8 +61,6 @@ type InstructorReportingInstance = Blaze.TemplateInstance & {
   dueDateFilter: ReactiveVar<boolean>;
   exceptionDateError: ReactiveVar<string>;
   exceptionDateValidationUserId: ReactiveVar<string>;
-  tdfListingSub?: { stop(): void };
-  tdfReadyComputation?: { stop(): void };
 };
 
 function reportingText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
@@ -115,7 +104,6 @@ function getInitialData(instance: InstructorReportingInstance): InstructorReport
   return readyLoadValue(instance.initialPresentation.get()) || {
     courses: [],
     assignmentsByCourseId: {},
-    allTdfs: [],
   };
 }
 
@@ -148,43 +136,22 @@ function commandPresentation(
   return { id, text: state.message, variant: 'error', urgent: true };
 }
 
-function waitForTdfListing(instance: InstructorReportingInstance, sub: { ready(): boolean }): Promise<void> {
-  instance.tdfReadyComputation?.stop();
-  return new Promise<void>((resolve) => {
-    instance.tdfReadyComputation = Tracker.autorun((computation) => {
-      if (sub.ready()) {
-        computation.stop();
-        if (instance.tdfReadyComputation === computation) {
-          delete instance.tdfReadyComputation;
-        }
-        resolve();
-      }
-    });
-  });
-}
-
 async function loadInitialReportingData(instance: InstructorReportingInstance): Promise<void> {
   const requestId = ++instance.nextInitialRequestId;
   const generation = instance.initialLifetime.begin();
   instance.initialPresentation.set(startLoad(instance.initialPresentation.get(), requestId));
   instance.performancePresentation.set({ status: 'idle' });
 
-  instance.tdfListingSub?.stop();
-  const tdfListingSub = Meteor.subscribe('allTdfsListing');
-  instance.tdfListingSub = tdfListingSub;
-
   try {
     const [assignmentsByCourseId, courses] = await Promise.all([
       meteorCallAsync('getTdfAssignmentsByCourseIdMap', Meteor.userId()),
       meteorCallAsync('getAllCoursesForInstructor', Meteor.userId()),
-      waitForTdfListing(instance, tdfListingSub),
     ]);
     if (!instance.initialLifetime.isCurrent(generation)) return;
 
     const value = {
       courses: Array.isArray(courses) ? courses as ReportingCourse[] : [],
       assignmentsByCourseId: (assignmentsByCourseId || {}) as ReportingAssignmentsByCourseId,
-      allTdfs: Tdfs.find().fetch(),
     };
     instance.initialPresentation.set(resolveLoad(
       instance.initialPresentation.get(),
@@ -224,8 +191,7 @@ function selectTdf(instance: InstructorReportingInstance, tdfId: string): void {
   const data = getInitialData(instance);
   const courseId = instance.selectedCourseId.get();
   const assignment = findAssignmentForTdf(data.assignmentsByCourseId, courseId, tdfId);
-  const tdf = findTdfSummary(data.allTdfs, tdfId);
-  const dueDate = toDateInputValue(resolveSelectedDueDate(assignment, tdf));
+  const dueDate = toDateInputValue(assignment?.dueAt);
   instance.selectedTdfId.set(tdfId);
   instance.selectedAssignmentId.set(assignment?.assignmentId || null);
   instance.selectedDueDate.set(dueDate);
@@ -325,8 +291,6 @@ Template.instructorReporting.onDestroyed(function(this: InstructorReportingInsta
   this.initialLifetime.destroy();
   this.performanceLifetime.destroy();
   this.commandRegistry.destroy();
-  this.tdfReadyComputation?.stop();
-  this.tdfListingSub?.stop();
 });
 
 Template.instructorReporting.helpers({

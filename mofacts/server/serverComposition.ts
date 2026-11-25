@@ -1,16 +1,17 @@
 import { publishContentUploadMetadata } from './lib/contentUploadMetadataPublication';
-import { createSimulationTelemetryMethods } from './methods/simulationTelemetryMethods';
+import { createSimulationTelemetryRegistration } from './methods/simulationTelemetryMethods';
 import { ensureSimulationTelemetryIndexes, removeSimulationResearchUserRecords } from './lib/simulationTelemetry';
 import { createSparcVideoCatalogMethods } from './methods/sparcVideoCatalogMethods';
 import { createSparcLibraryCurationMethods } from './methods/sparcLibraryCurationMethods';
 import { SPARC_PROMPT_IMAGE_PURPOSE } from '../common/lib/sparcPromptImage';
 import { createSparcLibraryCuration, isSparcAdministrativeRemoval, readSparcAdministrativeRemovals } from './lib/sparcLibraryCurationStorage';
 import { ensureSparcVideoCatalogIndexes, sparcVideoReuseStatus } from './lib/sparcVideoCatalog';
+import { SparcCandidateUnusableError } from './lib/sparcMoveLibraryService';
 import { createSparcMoveLibraryMethods } from './methods/sparcMoveLibraryMethods';
 import { createSparcInstructionalBrowseMethods } from './methods/sparcInstructionalBrowseMethods';
 import { createInstructionalBrowseStore } from './lib/sparcInstructionalBrowseStorage';
 import { createSparcMoveStore, ensureSparcMoveLibraryIndexes, removeSparcMoveUserRecords } from './lib/sparcMoveLibraryStorage';
-import { createProlificMethods } from './methods/prolificMethods';
+import { createProlificMethodRegistration } from './methods/prolificMethods';
 import { createProlificTestExperiment } from './lib/prolificTestExperiment';
 import { createProlificParticipationService } from './lib/prolificParticipation';
 import { createProlificManagementService } from './lib/prolificManagement';
@@ -53,53 +54,64 @@ import { registerServerRuntime } from './runtime/serverRuntime';
 import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
 import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
-import { createStimulusLookupHelpers } from './lib/stimulusLookup';
-import { createAccessMethods } from './methods/accessMethods';
+import { createStimulusLookupHelpers, prepareStimuliSetForRuntime } from './lib/stimulusLookup';
+import { DEFAULT_AUDIO_SETTINGS } from '../common/personalAudioSettings';
+import { accountDiagnosticsPolicy } from './lib/participantSession';
+import { PUBLIC_READ_RATE_LIMIT, PUBLIC_ACCOUNT_RATE_LIMITS } from './runtime/ddpRateLimits';
+import { requireAccountProgressSession, requireParticipantProgressLesson } from './lib/participantProgressScope';
+import { assetDeletionPolicy, packageDeletionPolicy } from './methods/contentAssetMaintenanceMethods';
+import { AUDIO_PROVIDER_VERIFICATIONS, GENERATED_PACKAGE_VERIFICATION, LESSON_EDIT_VERIFICATIONS, PACKAGE_DOWNLOAD_VERIFICATION, LESSON_COPY_VERIFICATION, PACKAGE_UPLOAD_VERIFICATIONS, PACKAGE_DELETION_VERIFICATION, CONTENT_MAINTENANCE_VERIFICATIONS, PUBLIC_READ_VERIFICATIONS, LEARNER_PROGRESS_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, PROFILE_OPERATION_VERIFICATIONS, ADMIN_OPERATION_VERIFICATIONS, ADMIN_ROLE_CHANGE_VERIFICATION, UPLOAD_READ_VERIFICATIONS, MANUAL_DRAFT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION, SSO_PROFILE_VERIFICATION, AUDIO_SAVE_VERIFICATION, PREFERENCE_VERIFICATIONS, STUDY_WAIT_VERIFICATION, ACCESSOR_READ_VERIFICATIONS, LESSON_ACCESS_VERIFICATIONS, LESSON_SHARING_VERIFICATION, RECIPIENT_LOOKUP_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { createAccessMethods, accessorReadPolicy, lessonSharingPolicy, ownLessonListPolicy } from './methods/accessMethods';
+import { configuredStudyWait, readStudyProgress } from './lib/studyWaitingPeriod';
+import { participantConnectionRoot, privateParticipantActivity } from './lib/participantSession';
+import { transferOwnerPolicy } from './lib/tdfOwnershipTransfer';
 import { transferTdfOwnership } from './lib/tdfOwnershipTransferMongo';
 import { createAdminMethods } from './methods/adminMethods';
-import { createAnalyticsMethods } from './methods/analyticsMethods';
+import { createAnalyticsMethodRegistration } from './methods/analyticsMethods';
 import { insertSparcHistoryBatch } from './lib/sparcHistoryBatchStorage';
 import { Random } from 'meteor/random';
 import { HistoryCommitState, historyCommitStorage } from './lib/historyCommitMongo';
 import { refreshDashboardHistory } from './lib/dashboardHistoryMongo';
 import { archiveDashboardHistory } from './lib/dashboardHistoryArchive';
 import { writeConditionState } from './lib/conditionAllocationMongo';
-import { createAuthMethods } from './methods/authMethods';
-import { createContentMethods } from './methods/contentMethods';
-import { createCourseMethods } from './methods/courseMethods';
+import { createAuthMethods, accountSelfPolicy, ssoProfilePolicy } from './methods/authMethods';
+import { createContentMethods, manualDraftPolicy, uploadReadPolicy, packageDownloadPolicy, lessonVisibilityPolicy } from './methods/contentMethods';
+import { createCourseService } from './methods/courseMethods';
 import type { CourseAssignmentHistoryContext } from '../common/courseAssignments.contracts';
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
 import { createLearnerAnalyticsMethods } from './methods/learnerAnalyticsMethods';
-import { createDeploymentReadinessMethods } from './methods/deploymentReadinessMethods';
-import { createBackupMethods, createBackupRegistry } from './methods/backupMethods';
+import { createDeploymentReadinessRegistration } from './methods/deploymentReadinessMethods';
+import { createBackupMethodRegistration, createBackupRegistry } from './methods/backupMethods';
 import { createSecurityAuditRuntimeV2 } from './securityAudit/securityAuditRuntimeV2';
 import { SecurityAuditReportsV2 } from './securityAudit/securityAuditCollectionsV2';
+import { AUDIT_CATALOG_V2 } from '../common/securityAudit/catalogRegistry';
 import { registerSecurityAuditHttp } from './http/securityAudits';
 import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
-import { createExperimentMethods, issueExperimentLoginToken } from './methods/experimentMethods';
+import { createExperimentMethodRegistration, issueExperimentLoginToken } from './methods/experimentMethods';
 import { createExperimentTargetFamilyResolver } from './lib/experimentTargetFamilyResolver';
-import { createPackageMethods } from './methods/packageMethods';
+import { generatedPackagePolicy } from './methods/packageGeneratedContentMethods';
+import { createPackageService, packageUploadPolicy, packageUploadPlanPolicy, lessonCopyPolicy } from './methods/packageMethods';
 import {
-  createOpenRouterCatalogMethods,
+  createOpenRouterCatalogMethods, modelCatalogPolicy,
   createOpenRouterModelCatalogService,
 } from './methods/openRouterCatalogMethods';
-import { createOpenRouterMethods } from './methods/openRouterMethods';
+import { createOpenRouterRegistration } from './methods/openRouterMethods';
 import { createSparcPromptImageMethods } from './methods/sparcPromptImageMethods';
 import { createSparcFigureLibraryStore, ensureSparcFigureLibraryIndexes,
   removeSparcFigureUserDecisions, withSparcFigureLibraryLock } from './lib/sparcFigureLibraryStorage';
 import { createSparcFigureBrowseStore, ensureSparcFigureBrowseIndexes } from './lib/sparcFigureBrowseStorage';
 import { consolidateSparcInstructionalLibrary, SparcInstructionalLibrary } from './lib/sparcInstructionalLibraryStorage';
 import { createSparcFigureClusterLabeler } from './lib/sparcFigureClusterLabels';
-import { createProfileMethods } from './methods/profileMethods';
-import { createSpeechMethods } from './methods/speechMethods';
-import { createSystemMethods } from './methods/systemMethods';
-import { createRecoverableWarningMethods } from './methods/recoverableWarningMethods';
-import { createTdfIdentityMigrationMethods } from './methods/tdfIdentityMigrationMethods';
+import { createProfileMethods, profileEditPolicy, personalProviderPolicy } from './methods/profileMethods';
+import { createSpeechMethods, audioProviderPolicy } from './methods/speechMethods';
+import { createSystemMethods, preferencePolicy, audioSavePolicy } from './methods/systemMethods';
+import { createRecoverableWarningRegistration } from './methods/recoverableWarningMethods';
+import { createTdfIdentityMigrationRegistration } from './methods/tdfIdentityMigrationMethods';
 import {
   createThemeMethods,
   createUpdateActiveThemeDocument,
 } from './methods/themeMethods';
-import { createDeploymentBrandProfileMethods } from './methods/deploymentBrandProfileMethods';
+import { createDeploymentBrandProfileRegistration } from './methods/deploymentBrandProfileMethods';
 import { getOrBuildCurrentPackageAsset } from './lib/packageExport';
 import { getClassPerformanceByTdfWorkflow } from './lib/classPerformance';
 import { createAuthSupport } from './lib/authSupport';
@@ -107,10 +119,16 @@ import { createMediaReferenceHelpers } from './lib/mediaReferences';
 import { getMemphisSamlClientConfig } from './lib/memphisSaml';
 import { createTdfLookupHelpers } from './lib/tdfLookup';
 import { registerSparcRetrievalPublication } from './lib/sparcRetrievalPublication';
+import { registerNamedPublication } from './securitySurfaces/registerNamedPublication.ts';
+import { DEFAULT_PUBLICATION_VERIFICATIONS, NAMED_PUBLICATION_VERIFICATIONS } from '../common/securityAudit/verificationCatalog.ts';
+import { registerDefaultPublication } from './securitySurfaces/registerDefaultPublication.ts';
+import { bindAssetUploadSurfaceOwner } from './securitySurfaces/bindAssetUploadSurfaces.ts';
+import { createSecurityAuditInventoryRegistration } from './securitySurfaces/securityAuditSurfaceInventoryMethod';
+import { completeStartupSurfaceRegistration } from './securitySurfaces/startupSurfaceInventory';
+import { registerMeteorMethods } from './securitySurfaces/registerMeteorMethods.ts';
 import { createSparcDemoAccess } from './lib/sparcDemoAccess';
 import { createSparcLessonAuthorizer, requireSparcLessonAccess } from './lib/sparcLessonAccess';
 import {
-  hasMeaningfulProgressSignal,
 } from './lib/mappingPolicyClassifier';
 import {
   canAccessContentUploadTdf,
@@ -120,20 +138,10 @@ import {
 } from './lib/contentAccessPolicy';
 import {
   ADMIN_API_KEY_SETTINGS_KEY,
-  getAccessibleTdfApiKey,
-  getUserPersonalApiKey,
   type ApiKeyResolutionDeps,
 } from './lib/apiKeyResolution';
 import {
-  clearStimDisplayTypeMap,
-  getStimDisplayTypeMap as getStimDisplayTypeMapSnapshot,
-  getStimDisplayTypeMapVersion as getStimDisplayTypeMapSnapshotVersion,
-  rebuildStimDisplayTypeMapSnapshot,
-  updateStimDisplayTypeMap as refreshStimDisplayTypeMap,
-} from './lib/stimDisplayTypeMap';
-import {
   requireAuthenticatedUser,
-  requireUserWithRoles,
   getUserRoleFlags,
   type MethodAuthorizationDeps,
 } from './lib/methodAuthorization';
@@ -150,9 +158,6 @@ import { ensurePublicDemoCleanupIndex, purgeExpiredPublicDemoUsers } from './lib
 const MeteorAny = Meteor as any;
 
 const AssetsAny = Assets as unknown as { getTextAsync: (path: string) => Promise<string> };
-const PapaAny = (globalThis as unknown as {
-  Papa?: { parse: (csv: string) => { data: unknown[] } };
-}).Papa;
 
 
 
@@ -268,6 +273,7 @@ const authSupport = createAuthSupport({
   getMethodAuthorizationDeps,
 });
 const securityAuditRuntime = createSecurityAuditRuntimeV2({
+  catalog: AUDIT_CATALOG_V2,
   createReports: () => SecurityAuditReportsV2,
   requireAdminUser: authSupport.requireAdminUser,
   targetOrigin: () => new URL(String(process.env.ROOT_URL || '')).origin,
@@ -275,6 +281,7 @@ const securityAuditRuntime = createSecurityAuditRuntimeV2({
   now: () => new Date(),
 });
 registerSecurityAuditHttp(securityAuditRuntime);
+const securityAuditInventory = createSecurityAuditInventoryRegistration(authSupport.requireAdminUser);
 const {
   minPasswordLength,
   experimentUsernameRegex,
@@ -355,7 +362,7 @@ const serverUtilities = createServerUtilityHelpers({
   ErrorReports,
   findUsersByIds: (userIds) => MeteorAny.users.find(
     { _id: { $in: userIds } },
-    { fields: { _id: 1, username: 1, emails: 1 } }
+    { fields: { _id: 1, username: 1, emails: 1, 'profile.experiment': 1, 'profile.createdBy': 1 } }
   ).fetchAsync(),
   adminUsers,
   ownerEmail,
@@ -370,20 +377,11 @@ const {
   buildDiskUsageStatus,
   sendEmail,
   sendErrorReportSummaries,
+  sendEmailAsync,
 } = serverUtilities;
 
-const stimulusLookupHelpers = createStimulusLookupHelpers({
-  Tdfs,
-  serverConsole,
-  refreshStimDisplayTypeMap,
-  getStimDisplayTypeMapSnapshot,
-  getStimDisplayTypeMapSnapshotVersion,
-});
+const stimulusLookupHelpers = createStimulusLookupHelpers({ Tdfs });
 const {
-  getStimDisplayTypeMapDeps,
-  updateStimDisplayTypeMap,
-  getStimDisplayTypeMap,
-  getStimDisplayTypeMapVersion,
   getStimuliSetById,
   getStimuliSetIdByFilename,
 } = stimulusLookupHelpers;
@@ -394,7 +392,8 @@ const updateActiveThemeDocument = createUpdateActiveThemeDocument({
   usersCollection: MeteorAny.users,
 });
 
-const courseMethods = createCourseMethods({
+const { methods: publicCourseMethods, methodBindings: courseReadBindings, resolveAssignedRootTdfIdsForUser,
+  invalidateCourseSnapshotsForCourse, invalidateCourseSnapshotsForAssignment } = createCourseService({
   Roles,
   DynamicAssets,
   serverConsole,
@@ -408,7 +407,7 @@ const courseMethods = createCourseMethods({
   Histories,
   itemSourceSentences,
   usersCollection: MeteorAny.users,
-  sendEmail,
+  sendEmail: sendEmailAsync,
   emailFrom,
   thisServerUrl,
   getMethodAuthorizationDeps,
@@ -416,20 +415,6 @@ const courseMethods = createCourseMethods({
   normalizeCanonicalId,
   removeRuntimeTdfSecrets,
 });
-
-const {
-  resolveAssignedRootTdfIdsForUser: resolveAssignedRootTdfIdsForUserMethod,
-  invalidateCourseSnapshotForUser: _invalidateCourseSnapshotForUser,
-  invalidateCourseSnapshotsForCourse: _invalidateCourseSnapshotsForCourse,
-  invalidateCourseSnapshotsForAssignment: _invalidateCourseSnapshotsForAssignment,
-  getTdfIdsByOwnerId: _getTdfIdsByOwnerId,
-  getSourceSentences: _getSourceSentences,
-  checkForTDFData: _checkForTDFData,
-  ...publicCourseMethods
-} = courseMethods as Record<string, unknown>;
-const resolveAssignedRootTdfIdsForUser = resolveAssignedRootTdfIdsForUserMethod as (userId: string) => Promise<string[]>;
-const invalidateCourseSnapshotsForCourse = _invalidateCourseSnapshotsForCourse as (courseId: string, reason: string) => Promise<unknown>;
-const invalidateCourseSnapshotsForAssignment = _invalidateCourseSnapshotsForAssignment as (assignmentId: string, reason: string) => Promise<unknown>;
 
 const {
   deleteTdfRuntimeData,
@@ -486,7 +471,8 @@ const {
   canonicalizeFlatStimuliMediaRefs,
 } = mediaReferenceHelpers;
 
-const packageMethods = createPackageMethods({
+const packageService = createPackageService({
+  storageRoot: getLocalStoragePaths(Meteor.settings, process.env).dynamicAssetsPath,
   Tdfs,
   TdfMutationJobs,
   usersCollection: MeteorAny.users,
@@ -513,9 +499,6 @@ const packageMethods = createPackageMethods({
   legacyTrim,
   encryptData,
   getApiKeyResolutionDeps,
-  updateStimDisplayTypeMap,
-  rebuildStimDisplayTypeMapSnapshot,
-  getStimDisplayTypeMapDeps,
   getMimeTypeForAssetName,
   parseLocalMediaReference,
   findDynamicAssetScoped,
@@ -525,8 +508,8 @@ const packageMethods = createPackageMethods({
   canonicalizeStimDisplayMediaRefs,
   canonicalizeFlatStimuliMediaRefs,
 });
+const { getResponseKCMapForTdf, upsertStimFile, importPrivateRepoTdfBatch, normalizeOptionalString } = packageService;
 const {
-  getResponseKCMapForTdf,
   processPackageUpload,
   confirmPackageUpload,
   cancelPackageUpload,
@@ -534,10 +517,7 @@ const {
   saveTdfStimuli,
   saveTdfContent,
   copyTdf,
-  upsertStimFile,
-  importPrivateRepoTdfBatch,
-  normalizeOptionalString,
-} = packageMethods;
+} = packageService.methods;
 
 const dashboardCacheMethods = createDashboardCacheMethods({
   getAccessibleTdf: (userId, tdfId, options) => getTdfById.call({ userId }, tdfId, options),
@@ -579,7 +559,7 @@ const learnerAnalyticsMethods = createLearnerAnalyticsMethods({
   now: () => Date.now(),
 });
 
-const analyticsMethods = createAnalyticsMethods({
+const analyticsRegistration = createAnalyticsMethodRegistration({
   writeConditionState,
   serverConsole,
   Histories,
@@ -609,18 +589,10 @@ const analyticsMethods = createAnalyticsMethods({
   },
   syncUsernameCaches,
   getClassPerformanceByTdfWorkflow,
-  getStimuliSetById,
-  hasMeaningfulProgressSignal,
 
 });
 
-const {
-  getHistoryByTDFID: getHistoryByTDFIDMethod,
-  getStimSetFromLearningSessionByClusterList: _getStimSetFromLearningSessionByClusterList,
-  getUserLastFeedbackTypeFromHistory: _getUserLastFeedbackTypeFromHistory,
-  ...publicAnalyticsMethods
-} = analyticsMethods as Record<string, unknown>;
-const getHistoryByTDFID = getHistoryByTDFIDMethod as (TDFId: string) => Promise<any[]>;
+const { getHistoryByTDFID } = analyticsRegistration;
 
 const speechMethods = createSpeechMethods({
   serverConsole,
@@ -647,7 +619,11 @@ const prolificManagement = createProlificManagementService({ resolveExperimentTa
   testExperiment: { ...prolificTestExperiment, baseUrl: () => Meteor.absoluteUrl() },
 });
 
-const experimentMethods = createExperimentMethods({
+const experimentRegistration = createExperimentMethodRegistration({
+  validateProlificBinding: async (userId, studyId, rootTdfId) => {
+    const participant = await ProlificParticipations.findOneAsync({ userId, studyId, rootTdfId }, { fields: { ownerId: 1 } });
+    return Boolean(participant && await ProlificStudies.findOneAsync({ studyId, rootTdfId, ownerId: participant.ownerId }, { fields: { _id: 1 } }));
+  },
   isProlificAccount: async userId => Boolean(await ProlificParticipations.findOneAsync({ userId }, { fields: { _id: 1 } })),
   serverConsole,
   Tdfs,
@@ -664,10 +640,10 @@ const experimentMethods = createExperimentMethods({
 const {
   getTdfByExperimentTarget: getTdfByExperimentTargetRaw,
   ...publicExperimentMethods
-} = experimentMethods;
+} = experimentRegistration.methods;
 
 // Published to all clients (even without subscription calls)
-Meteor.publish(null, function() {
+registerDefaultPublication(Meteor, 'publication:default:account-self', DEFAULT_PUBLICATION_VERIFICATIONS.account, function publishCurrentAccount() {
   // Only valid way to get the user ID for publications
   const userId = this.userId;
 
@@ -679,6 +655,7 @@ Meteor.publish(null, function() {
         username: 1,
         profile: 1,
         loginParams: 1,
+        lockouts: 1,
         authState: 1,
         emails: 1,
         email_canonical: 1,
@@ -718,20 +695,51 @@ function normalizeCanonicalId(value: unknown): string | null {
   return null;
 }
 
+const brandProfileRegistration = createDeploymentBrandProfileRegistration({ requireAdminUser });
+const warningRegistration = createRecoverableWarningRegistration({ auditLog: AuditLog, requireAdminUser });
+const prolificRegistration = createProlificMethodRegistration({
+  participation: prolificParticipation, management: prolificManagement,
+  authorization: getMethodAuthorizationDeps, rateLimit: applyMethodRateLimit,
+});
+const waitingPeriodPolicy = Object.freeze({
+  kind: 'study-wait', operation: 'start-or-resume',
+  async authorize(context: Parameters<typeof participantConnectionRoot>[0], userId: string, tdfId: string, unit: number) {
+    const rootId = participantConnectionRoot(context);
+    const current = await prolificParticipation.enrolledStudyProgress(userId, rootId);
+    if (current) return configuredStudyWait(current, tdfId, unit);
+    if (!rootId) {
+      if (await privateParticipantActivity(context)) throw new Meteor.Error(403, 'A study session is required');
+      return null;
+    }
+    const root = await Tdfs.findOneAsync({ _id: rootId });
+    if (!root) throw new Meteor.Error(403, 'Current study is unavailable');
+    return configuredStudyWait(await readStudyProgress({ Tdfs, states: GlobalExperimentStates }, userId, root), tdfId, unit);
+  },
+} as const);
+
+const stimulusFilePolicy = Object.freeze({ kind: 'lesson-file', operation: 'owner-or-accessor', authorize: canAccessContentUploadTdf } as const);
+
 export const methods: any = {
-  ...createProlificMethods({ participation: prolificParticipation, management: prolificManagement, authorization: getMethodAuthorizationDeps, rateLimit: applyMethodRateLimit }),
-  ...createRecoverableWarningMethods({ auditLog: AuditLog, requireAdminUser }),
+  ...prolificRegistration.methods,
+  ...warningRegistration.methods,
   ...createSystemMethods({
-    validateProlificLockout: prolificParticipation.validateLockout,
+    studyWaitMinutes: waitingPeriodPolicy.authorize,
+    async savePersonalAudio(userId, patch) {
+      const result = await MeteorAny.users.rawCollection().updateOne({ _id: userId }, [{
+        $set: { audioSettings: { $mergeObjects: [
+          { $ifNull: ['$audioSettings', { ...DEFAULT_AUDIO_SETTINGS, audioPromptMode: { $ifNull: ['$audioPromptMode', DEFAULT_AUDIO_SETTINGS.audioPromptMode] },
+            audioInputMode: { $ifNull: ['$audioInputMode', DEFAULT_AUDIO_SETTINGS.audioInputMode] } }] },
+          { $literal: patch },
+        ] } },
+      }]);
+      if (result.matchedCount !== 1) throw new Meteor.Error('account-unavailable', 'Audio settings account unavailable');
+    },
     serverConsole,
     usersCollection: MeteorAny.users,
     ErrorReports,
     DynamicSettings,
-    getMethodAuthorizationDeps,
     requireAdminUser,
     buildDiskUsageStatus,
-    sendErrorReportSummaries,
-    sendEmail,
     getCurrentUser: () => MeteorAny.userAsync(),
     setVerbosityLevel: setServerVerbosityLevel,
   }),
@@ -744,7 +752,6 @@ export const methods: any = {
     Tdfs,
     usersCollection: MeteorAny.users,
     getMethodAuthorizationDeps,
-    isTdfOwner,
     getUserDisplayIdentifier,
     exactCaseInsensitiveRegex,
     isValidEmailAddress,
@@ -752,20 +759,10 @@ export const methods: any = {
   }),
 
   ...createAdminMethods({
-    removeUploadedAsset: async assetId => {
-      const asset = await DynamicAssets.collection.findOneAsync({ _id: assetId }, { fields: { meta: 1 } });
-      if (!asset) return;
-      if (asset.meta?.uploadPurpose === SPARC_PROMPT_IMAGE_PURPOSE) {
-        if (asset.meta.public !== false) throw new Error('Administrative removal requires a private SPARC teaching asset');
-        await withSparcFigureLibraryLock(() => sparcLibraryCuration.removeImageAsset(assetId));
-      } else {
-        await DynamicAssets.removeAsync({ _id: assetId });
-      }
-    },
+    isValidEmailAddress,
     removeSparcFigureUserDecisions: async userId => { await removeSparcFigureUserDecisions(userId); await removeSparcMoveUserRecords(userId); },
     removeSimulationResearchUserRecords,
     serverConsole,
-    csvParser: PapaAny,
     usersCollection: MeteorAny.users,
     Tdfs,
     DynamicAssets,
@@ -793,8 +790,6 @@ export const methods: any = {
     sendVerificationEmailForUser,
     getUserDisplayIdentifier,
     syncUsernameCaches,
-    deleteTdfRuntimeData,
-    clearStimDisplayTypeMap,
     encryptData,
     decryptData,
     openRouterModelCatalogService,
@@ -805,7 +800,6 @@ export const methods: any = {
     emailFrom,
     usersCollection: MeteorAny.users,
     PasswordResetTokens,
-    requireAdminUser,
     getMethodAuthorizationDeps,
     getUserRoleFlags,
     requireAllowPublicSignupSetting,
@@ -829,19 +823,14 @@ export const methods: any = {
     isNormalAccountUser,
     isUserEmailVerified,
     buildSessionAuthState,
-    normalizeCanonicalId,
     syncUsernameCaches,
     encryptData,
-    getUserPersonalApiKey,
-    getAccessibleTdfApiKey,
     getApiKeyResolutionDeps: getAudioApiKeyResolutionDeps,
-    getPasswordHashRuntimeInfo,
   }),
 
   ...createContentMethods({
     ManualContentDrafts,
     Tdfs,
-    Stims,
     DynamicAssets,
     usersCollection: MeteorAny.users,
     UserUploadQuota,
@@ -850,18 +839,15 @@ export const methods: any = {
     isPlainRecord,
     cloneJsonLike,
     normalizeCanonicalId,
-    canAccessContentUploadTdf,
+    stimulusFilePolicy,
     getOrBuildCurrentPackageAsset,
+    storageRoot: getLocalStoragePaths(Meteor.settings, process.env).dynamicAssetsPath,
     storageBoundary,
     parseLocalMediaReference,
     extractSrcFromHtml,
     getStimuliSetIdCandidates,
     findDynamicAssetsScopedBatch,
-    decryptData,
     deleteTdfRuntimeData,
-    updateStimDisplayTypeMap,
-    rebuildStimDisplayTypeMapSnapshot,
-    getStimDisplayTypeMapDeps,
     getMethodAuthorizationDeps,
   }),
 
@@ -874,9 +860,7 @@ export const methods: any = {
     updateActiveThemeDocument,
   }),
 
-  ...createDeploymentBrandProfileMethods({
-    requireAdminUser,
-  }),
+  ...brandProfileRegistration.methods,
 
   ...createProfileMethods({
     usersCollection: MeteorAny.users,
@@ -983,7 +967,7 @@ async function getTdfByExperimentTargetPublic(this: MethodContext, experimentTar
     : null;
   if (userId && tdf?._id) {
     try {
-      return await getTdfById.call({ userId }, String(tdf._id));
+      return await getTdfByIdPublic.call({ userId }, String(tdf._id));
     } catch (error: unknown) {
       if (!(error instanceof Meteor.Error) || (error.error !== 401 && error.error !== 403)) {
         throw error;
@@ -1015,8 +999,8 @@ async function getStimuliSetByIdPublic(this: MethodContext, stimuliSetId: string
       continue;
     }
     try {
-      await getTdfById.call({ userId }, tdfId);
-      return await getStimuliSetById(tdf.stimuliSetId ?? stimuliSetId);
+      const authorized = await getTdfById.call({ userId }, tdfId);
+      if (authorized) return prepareStimuliSetForRuntime(authorized);
     } catch (error: unknown) {
       if (error instanceof Meteor.Error && (error.error === 403 || error.error === 401)) {
         continue;
@@ -1038,29 +1022,6 @@ async function getResponseKCMapForTdfPublic(
   return await getResponseKCMapForTdf(tdfId);
 }
 
-async function updateStimDisplayTypeMapPublic(this: MethodContext, stimuliSetIds: unknown[] | null = null) {
-  await requireUserWithRoles(getMethodAuthorizationDeps(), {
-    userId: this.userId,
-    roles: ['admin'],
-    notLoggedInMessage: 'Must be logged in',
-    notLoggedInCode: 401,
-    forbiddenMessage: 'Admin access required to update stimulus display map',
-    forbiddenCode: 403,
-  });
-  if (!Array.isArray(stimuliSetIds) || stimuliSetIds.length === 0) {
-    return await rebuildStimDisplayTypeMapSnapshot(getStimDisplayTypeMapDeps());
-  }
-  return await updateStimDisplayTypeMap(stimuliSetIds);
-}
-
-async function getStimDisplayTypeMapPublic() {
-  return await getStimDisplayTypeMap();
-}
-
-async function getStimDisplayTypeMapVersionPublic() {
-  return await getStimDisplayTypeMapVersion();
-}
-
 const sparcDemoAccess = createSparcDemoAccess({
   readUser: userId => MeteorAny.users.findOneAsync({ _id: userId }, { fields: { createdAt: 1, 'profile.createdBy': 1, 'profile.experimentTarget': 1, 'profile.demoExpiresAt': 1 } }),
   async readDemoTutor(target) {
@@ -1072,23 +1033,47 @@ const sparcDemoAccess = createSparcDemoAccess({
 async function assertSparcDemoExpiry(userId: string): Promise<void> { await sparcDemoAccess.assertExpiry(userId); }
 async function assertPublicDemoAiQuota(userId: string, address: string): Promise<void> { await sparcDemoAccess.assertAiQuota(userId, address); }
 
+const deploymentReadiness = createDeploymentReadinessRegistration({
+  Roles,
+  Tdfs,
+  usersCollection: MeteorAny.users,
+  redisBoundary,
+});
+const backupRegistration = createBackupMethodRegistration({
+  settings: Meteor.settings || {},
+  backupJobs: createBackupRegistry(BackupJobs),
+  rawDatabase: () => Tdfs.rawDatabase(),
+  usersCollection: MeteorAny.users,
+  auditLog: AuditLog,
+  requireAdminUser: authSupport.requireAdminUser,
+});
+const tdfIdentityMigration = createTdfIdentityMigrationRegistration({
+  Tdfs,
+  UserTimesLog,
+  AuditLog,
+  userIsInRoleAsync: (userId, roles) => Roles.userIsInRoleAsync(userId, roles),
+  serverConsole,
+});
+const simulationTelemetry = createSimulationTelemetryRegistration({
+  getMethodAuthorizationDeps,
+  writeHistory: (userId, record) => analyticsRegistration.methods.insertHistory.call({ userId }, record),
+  loadLesson: id => Tdfs.findOneAsync({ _id: id }, { fields: { 'rawStimuliFile.setspec.sparcPages': 1 } }),
+});
+const openRouterRegistration = createOpenRouterRegistration({
+  serverConsole,
+  getApiKeyResolutionDeps: getSparcApiKeyResolutionDeps,
+  getMethodAuthorizationDeps,
+  openRouterModelCatalogService,
+  assertPublicDemoAiQuota,
+});
 export const asyncMethods: Record<string, unknown> = {
-  ...createTdfIdentityMigrationMethods({
-    Tdfs,
-    UserTimesLog,
-    AuditLog,
-    userIsInRoleAsync: (userId, roles) => Roles.userIsInRoleAsync(userId, roles),
-    serverConsole,
-  }),
+  ...tdfIdentityMigration.methods,
   getTdfByExperimentTarget: getTdfByExperimentTargetPublic,
 
-  ...publicAnalyticsMethods,
+  ...analyticsRegistration.methods,
   ...publicCourseMethods,
 
-  getStimDisplayTypeMap: getStimDisplayTypeMapPublic,
-  getStimDisplayTypeMapVersion: getStimDisplayTypeMapVersionPublic,
   getStimuliSetById: getStimuliSetByIdPublic,
-  updateStimDisplayTypeMap: updateStimDisplayTypeMapPublic,
 
   saveAiGeneratedPackageContent,
 
@@ -1103,7 +1088,7 @@ export const asyncMethods: Record<string, unknown> = {
   getTdfById: getTdfByIdPublic,
 
   ...speechMethods,
-  ...createSimulationTelemetryMethods({ getMethodAuthorizationDeps }),
+  ...simulationTelemetry.methods,
 
   ...createSparcLibraryCurationMethods({ getMethodAuthorizationDeps,
     remove: id => withSparcFigureLibraryLock(() => sparcLibraryCuration.remove(id)), removed: readSparcAdministrativeRemovals }),
@@ -1113,7 +1098,7 @@ export const asyncMethods: Record<string, unknown> = {
   ...createSparcMoveLibraryMethods({ store: createSparcMoveStore(), getMethodAuthorizationDeps,
     videoReuseStatus: sparcVideoReuseStatus,
     async verifyFigure(assetId) {
-      if (!await DynamicAssets.collection.findOneAsync({ _id: assetId, 'meta.ready': true, 'meta.figureLibraryVersion': { $exists: true } })) throw new Error('Reusable figure asset is unavailable');
+      if (!await DynamicAssets.collection.findOneAsync({ _id: assetId, 'meta.ready': true, 'meta.figureLibraryVersion': { $exists: true } })) throw new SparcCandidateUnusableError('Reusable figure asset is unavailable');
     } }),
   ...createSparcInstructionalBrowseMethods({ getMethodAuthorizationDeps,
     ...createInstructionalBrowseStore(async ids => new Map((await DynamicAssets.collection.find({ _id: { $in: ids }, 'meta.ready': true,
@@ -1127,40 +1112,211 @@ export const asyncMethods: Record<string, unknown> = {
     isRemoved: isSparcAdministrativeRemoval,
     figureLibrary: createSparcFigureLibraryStore() }),
 
-  ...createOpenRouterMethods({
-    serverConsole,
-    getApiKeyResolutionDeps: getSparcApiKeyResolutionDeps,
-    getMethodAuthorizationDeps,
-    openRouterModelCatalogService,
-    assertPublicDemoAiQuota,
-  }),
+  ...openRouterRegistration.methods,
 
   ...createOpenRouterCatalogMethods(openRouterModelCatalogService),
 
   ...publicDashboardCacheMethods,
   ...learnerAnalyticsMethods,
 
-  ...createDeploymentReadinessMethods({
-    Roles,
-    Tdfs,
-    usersCollection: MeteorAny.users,
-    redisBoundary
-  }),
+  ...deploymentReadiness.methods,
 
-  ...createBackupMethods({
-    settings: Meteor.settings || {},
-    backupJobs: createBackupRegistry(BackupJobs),
-    rawDatabase: () => Tdfs.rawDatabase(),
-    usersCollection: MeteorAny.users,
-    auditLog: AuditLog,
-    requireAdminUser: authSupport.requireAdminUser,
-  }),
+  ...backupRegistration.methods,
 
   ...securityAuditRuntime.methods,
+  ...securityAuditInventory.methods,
 }
 
 // Server-side startup logic
-Meteor.methods({...methods, ...asyncMethods});
+const installedMethods = { ...methods, ...asyncMethods };
+const accountProgressPolicy = { kind: 'learner-progress', operation: 'account-session', authorize: requireAccountProgressSession } as const;
+const studyProgressPolicy = { kind: 'learner-progress', operation: 'study-lesson', authorize: requireParticipantProgressLesson } as const;
+registerMeteorMethods(Meteor, installedMethods, [
+  ...securityAuditRuntime.methodBindings,
+  securityAuditInventory.binding,
+  ...courseReadBindings,
+  ...PACKAGE_UPLOAD_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: verification.method === 'processPackageUpload' ? packageUploadPolicy : packageUploadPlanPolicy,
+    dataEgress: verification.method === 'cancelPackageUpload' ? 'package-cancel-status' as const : 'package-upload-result' as const,
+  })),
+  ...LESSON_EDIT_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: { kind: 'content-maintenance' as const, operation: 'lesson-editor' as const, authorize: userCanManageTdf },
+    dataEgress: 'lesson-edit-result' as const,
+  })),
+  { verification: GENERATED_PACKAGE_VERIFICATION, handler: installedMethods.saveAiGeneratedPackageContent,
+    policy: generatedPackagePolicy, dataEgress: 'package-upload-result' },
+  ...AUDIO_PROVIDER_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method], policy: audioProviderPolicy,
+    dataEgress: verification.method === 'makeGoogleSpeechAPICall' ? 'speech-transcription' as const : 'audio-synthesis' as const,
+  })),
+  ...openRouterRegistration.methodBindings,
+  { verification: PACKAGE_DOWNLOAD_VERIFICATION, handler: installedMethods.getPackageDownloadLink,
+    policy: packageDownloadPolicy, dataEgress: 'package-download-link' },
+  { verification: LESSON_COPY_VERIFICATION, handler: installedMethods.copyTdf,
+    policy: lessonCopyPolicy, dataEgress: 'lesson-copy-result' },
+  { verification: PACKAGE_DELETION_VERIFICATION, handler: installedMethods.deletePackageFile,
+    policy: packageDeletionPolicy, dataEgress: 'delete-result' },
+  ...CONTENT_MAINTENANCE_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: verification.method === 'setTdfUserSelect' ? lessonVisibilityPolicy : assetDeletionPolicy,
+    dataEgress: ({ removeAssetById: 'none', removeMultipleAssets: 'delete-result', setTdfUserSelect: 'save-status' } as const)[verification.method],
+  })),
+  ...PUBLIC_READ_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: { kind: 'public-read' as const, operation: verification.method, rateLimit: PUBLIC_READ_RATE_LIMIT },
+    dataEgress: verification.method === 'getAuthClientConfig' ? 'public-sign-in-config' as const : 'published-help-markdown' as const,
+  })),
+  ...PUBLIC_ACCOUNT_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: { kind: 'public-account' as const, operation: verification.method,
+      rateLimit: PUBLIC_ACCOUNT_RATE_LIMITS[verification.method],
+      authorize: applyMethodRateLimit },
+    dataEgress: verification.method === 'signUpUser' ? 'account-creation-result' as const : 'save-status' as const,
+  })),
+  ...RUNTIME_LESSON_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: { kind: 'runtime-lesson' as const, operation: verification.method === 'getTdfByExperimentTarget' ? 'public-entry-or-accessible-lesson' as const : 'accessible-lesson' as const, authorize: getTdfById },
+    dataEgress: ({
+      getTdfById: 'runtime-lesson',
+      getTdfByExperimentTarget: 'experiment-entry-lesson',
+      getStimuliSetById: 'runtime-stimuli',
+      getResponseKCMapForTdf: 'response-kc-map',
+    } as const)[verification.method],
+  })),
+  ...SPARC_LESSON_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    policy: { kind: 'sparc-lesson' as const, operation: 'accessible-lesson-or-admin' as const, authorize: requireSparcLessonAccess },
+    dataEgress: ({
+      getSparcAdministrativeRemovals: 'removed-component-ids',
+      getSparcPromptImage: 'instructional-image',
+      lookupSparcPrimitive: 'instructional-component',
+      publishSparcPrimitive: 'instructional-component',
+      generateSparcPromptImage: 'instructional-figure-response',
+      resolveSparcVisualSupport: 'instructional-figure-response',
+    } as const)[verification.method],
+  })),
+  ...LEARNER_PROGRESS_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    ...({
+      getPracticeDashboardSnapshot: { policy: accountProgressPolicy, dataEgress: 'learner-dashboard' },
+      ensureDashboardCacheCurrent: { policy: accountProgressPolicy, dataEgress: 'dashboard-cache-status' },
+      resetOwnLessonProgress: { policy: accountProgressPolicy, dataEgress: 'progress-reset-result' },
+      getLearnerAnalyticsOverview: { policy: accountProgressPolicy, dataEgress: 'learner-analytics-overview' },
+      getLearnerLessonAnalyticsSource: { policy: accountProgressPolicy, dataEgress: 'learner-analytics-source' },
+      getLearnerLessonAnalyticsHistoryPage: { policy: accountProgressPolicy, dataEgress: 'learner-history-page' },
+      getLearnerTdfConfig: { policy: studyProgressPolicy, dataEgress: 'learner-lesson-config' },
+      saveLearnerTdfConfig: { policy: studyProgressPolicy, dataEgress: 'learner-lesson-config' },
+      getAdaptiveOutcomeRows: { policy: studyProgressPolicy, dataEgress: 'adaptive-outcomes' },
+      getStimulusCrowdStatsForDeck: { policy: studyProgressPolicy, dataEgress: 'stimulus-crowd-stats' },
+      createExperimentState: { policy: studyProgressPolicy, dataEgress: 'experiment-state' },
+      updateExperimentState: { policy: studyProgressPolicy, dataEgress: 'experiment-state' },
+      insertHistory: { policy: studyProgressPolicy, dataEgress: 'history-save-result' },
+    } as const)[verification.method],
+  })),
+  ...ACCOUNT_SELF_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method], policy: accountSelfPolicy,
+    dataEgress: ({
+      setUserLoginData: 'save-status',
+      recordSessionRevocation: 'save-status',
+      getCurrentUserRoleFlags: 'role-flags',
+      isUserSpeechAPIKeySetup: 'key-configured',
+      hasUserPersonalKeys: 'provider-settings-metadata',
+      saveUserSpeechAPIKey: 'none',
+      deleteUserSpeechAPIKey: 'none',
+    } as const)[verification.method],
+  })),
+  ...ACCOUNT_DIAGNOSTIC_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method], policy: accountDiagnosticsPolicy,
+    dataEgress: ({ sendUserErrorReport: 'error-report-id', logUserAgentAndLoginTime: 'save-status', setUserSessionId: 'none' } as const)[verification.method],
+  })),
+  ...PROFILE_OPERATION_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method],
+    ...({
+      updateOwnProfile: { policy: profileEditPolicy, dataEgress: 'save-status' },
+      updateOwnUiLocale: { policy: profileEditPolicy, dataEgress: 'save-status' },
+      updateOwnSparcPersona: { policy: profileEditPolicy, dataEgress: 'save-status' },
+      getOwnOpenRouterSettings: { policy: personalProviderPolicy, dataEgress: 'provider-settings-metadata' },
+      updateOwnOpenRouterSettings: { policy: personalProviderPolicy, dataEgress: 'provider-settings-metadata' },
+      deleteOwnOpenRouterKey: { policy: personalProviderPolicy, dataEgress: 'save-status' },
+      testOwnOpenRouterSettings: { policy: personalProviderPolicy, dataEgress: 'provider-test-result' },
+      getOpenRouterModelCatalog: { policy: modelCatalogPolicy, dataEgress: 'model-catalog' },
+    } as const)[verification.method],
+  })),
+  ...ADMIN_OPERATION_VERIFICATIONS.map(verification => ({
+    verification, handler: installedMethods[verification.method], policy: { kind: 'role' as const, role: 'admin' as const, authorize: requireAdminUser },
+    dataEgress: ({
+      initializeCustomTheme: 'theme-document',
+      createThemeFromBase: 'theme-document',
+      duplicateTheme: 'theme-document',
+      importThemeFile: 'theme-document',
+      exportThemeFile: 'theme-export',
+      deleteTheme: 'theme-document',
+      renameTheme: 'theme-document',
+      setActiveTheme: 'theme-document',
+      setCustomHelpPage: 'save-status',
+      removeCustomHelpPage: 'save-status',
+      getServerStatus: 'deployment-diagnostics',
+      setVerbosity: 'verbosity-level',
+      setClientVerbosity: 'verbosity-level',
+      getAdminTestSparcCompoundInterestSource: 'evaluation-page',
+      getAdminTestSparcCompoundInterestSources: 'evaluation-page-list',
+      getAdminApiKeyAlternativeMetadata: 'provider-settings-metadata',
+      saveAdminApiKeyAlternative: 'provider-settings-metadata',
+      deleteAdminApiKeyAlternative: 'provider-settings-metadata',
+      userAdminDeleteUser: 'account-deletion-result',
+      insertNewUsers: 'roster-import-result',
+      userAdminNewsEmailRecipients: 'news-recipient-list',
+      getAdminTestOpenRouterCapability: 'provider-settings-metadata',
+      callAdminTestResolvedOpenRouterJson: 'provider-test-result',
+      callAdminTestOpenRouterRequest: 'provider-test-result',
+      setCustomThemeProperty: 'theme-document',
+      refreshUserAdminUsageCaches: 'usage-cache-results',
+      getSparcVideoCatalogTargets: 'video-catalog-targets',
+      prepareSparcVideoCatalogTarget: 'video-catalog-preparation',
+      saveSparcVideoCatalogPassages: 'video-catalog-passages',
+      deleteSparcInstructionalComponent: 'none',
+      getSparcLibraryClusters: 'instructional-clusters',
+      listSparcInstructionalComponents: 'instructional-component-page',
+      replaceSparcLibraryImage: 'image-metadata',
+      reviseSparcPrimitive: 'instructional-component',
+    } as const)[verification.method],
+  })),
+  { verification: ADMIN_ROLE_CHANGE_VERIFICATION, handler: methods.userAdminRoleChange,
+    policy: { kind: 'role', role: 'admin', authorize: requireAdminUser }, dataEgress: 'role-change-result' },
+  ...UPLOAD_READ_VERIFICATIONS.map(verification => ({
+    verification, handler: methods[verification.method], policy: uploadReadPolicy,
+    dataEgress: verification.method === 'getUserAssetByName' ? 'owned-asset-filename' as const : 'own-upload-quota' as const,
+  })),
+  ...MANUAL_DRAFT_VERIFICATIONS.map(verification => ({
+    verification, handler: methods[verification.method], policy: manualDraftPolicy,
+    dataEgress: ({ getManualContentDraft: 'manual-draft', saveManualContentDraft: 'draft-save-receipt', deleteManualContentDraft: 'delete-result' } as const)[verification.method],
+  })),
+  { verification: STIMULUS_FILE_VERIFICATION, handler: methods.getStimuliFileForTdf, policy: stimulusFilePolicy, dataEgress: 'stimulus-file' },
+  deploymentReadiness.methodBinding,
+  ...backupRegistration.methodBindings,
+  ...brandProfileRegistration.methodBindings,
+  tdfIdentityMigration.methodBinding,
+  ...analyticsRegistration.methodBindings,
+  ...warningRegistration.methodBindings,
+  ...simulationTelemetry.methodBindings,
+  ...experimentRegistration.methodBindings,
+  { verification: SSO_PROFILE_VERIFICATION, handler: methods.populateSSOProfile, policy: ssoProfilePolicy, dataEgress: 'account-email-or-status' },
+  { verification: AUDIO_SAVE_VERIFICATION, handler: methods.saveAudioSettings, policy: audioSavePolicy, dataEgress: 'save-status' },
+  ...PREFERENCE_VERIFICATIONS.map(verification => ({
+    verification, handler: methods[verification.method], policy: preferencePolicy,
+    dataEgress: verification.method === 'getUserPreference' ? 'statistics-expanded' as const : 'save-status' as const,
+  })),
+  { verification: STUDY_WAIT_VERIFICATION, handler: methods.setLockoutTimeStamp, policy: waitingPeriodPolicy, dataEgress: 'saved-wait' },
+  { verification: LESSON_ACCESS_VERIFICATIONS.list, handler: methods.getAccessableTDFSForUser, policy: ownLessonListPolicy, dataEgress: 'owned-lesson-list' },
+  { verification: LESSON_ACCESS_VERIFICATIONS.transfer, handler: methods.transferDataOwnership, policy: transferOwnerPolicy, dataEgress: 'transfer-status' },
+  { verification: RECIPIENT_LOOKUP_VERIFICATION, handler: methods.resolveUsersForTdf, policy: accessorReadPolicy, dataEgress: 'recipient-lookup-result' },
+  ...ACCESSOR_READ_VERIFICATIONS.map(verification => ({ verification, handler: methods[verification.method], policy: accessorReadPolicy, dataEgress: 'accessor-identities' as const })),
+  { verification: LESSON_SHARING_VERIFICATION, handler: methods.assignAccessors, policy: lessonSharingPolicy, dataEgress: 'none' },
+  ...prolificRegistration.methodBindings,
+], () => MeteorAny.server?.method_handlers);
+bindAssetUploadSurfaceOwner(DynamicAssets, () => MeteorAny.server?.method_handlers);
 
 registerServerRuntime({
   DynamicAssets,
@@ -1179,6 +1335,8 @@ Meteor.startup(async function() {
   await ensureSparcVideoCatalogIndexes();
   await Histories.rawCollection().createIndex({ userId: 1, TDFId: 1, eventType: 1, _id: 1 });
   await ensureSparcFigureBrowseIndexes();
+  // Keep the expired, unused record briefly for the one-hour expiry audit.
+  await PasswordResetTokens.rawCollection().createIndex({ expiresAt: 1 }, { expireAfterSeconds: 120 });
   await ensureSimulationTelemetryIndexes();
   await ensureProlificIndexes();
   // Test provisioning checks exact lesson families without course/user scope.
@@ -1242,7 +1400,6 @@ Meteor.startup(async function() {
     updateActiveThemeDocument,
     upsertStimFile,
     importPrivateRepoTdfBatch,
-    updateStimDisplayTypeMap,
     sendErrorReportSummaries,
     sendEmail,
     getDiskUsageInfo,
@@ -1283,6 +1440,7 @@ Meteor.startup(async function() {
   if (!serverVerbosityObserverHandle || typeof serverVerbosityObserverHandle.stop !== 'function') {
     throw new Error('Server verbosity Change Streams observer did not provide a stop handle');
   }
+  completeStartupSurfaceRegistration('application-startup');
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
@@ -1298,6 +1456,10 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 }
 
 // DDP-only metadata; clients own summary construction and persistent snapshots.
-Meteor.publish('contentUploadMetadata', async function() {
-  await publishContentUploadMetadata(this, { Tdfs, Stims, DynamicAssets, serverConsole });
+registerNamedPublication(Meteor, 'contentUploadMetadata', {
+  policy: { kind: 'authenticated', delivery: 'async', denial: 'not-authorized' },
+  dataEgress: 'owned-or-shared-upload-metadata',
+  verification: NAMED_PUBLICATION_VERIFICATIONS.contentUploadMetadata,
+}, async function() {
+  await publishContentUploadMetadata(this, this.userId!, { Tdfs, DynamicAssets, serverConsole });
 });

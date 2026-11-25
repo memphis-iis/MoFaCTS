@@ -1,5 +1,5 @@
-// Explicit inert-V2 source gate: retain existing coverage and include the new
-// producer/acquisition contracts. Active V1 does not select this entry point.
+// V2 source gate. Production's historical scanner selection remains isolated;
+// staging2 exercises these shared producer and acquisition contracts.
 import './source-security.test.mjs';
 import './tests/externalV2.test.mjs';
 import './tests/repositoryV2.test.mjs';
@@ -12,4 +12,38 @@ import './tests/repositoryProducerFilesV2.test.mjs';
 import './tests/authorizationOutcomes.test.mjs';
 import './tests/legacyProbeInventory.test.mjs';
 import './tests/reportFilesV2.test.mjs';
+import './tests/archiveIntegrityV2.test.mjs';
+import './tests/reportReadbackBrowserV2.test.mjs';
 import './tests/reportAdminPresentationV2.test.mjs';
+import './tests/verificationCatalog.test.mjs';
+import './tests/authorizationBrowserV2.test.mjs';
+import './tests/selectedCasesV2.test.mjs';
+import './tests/stagingFixturesV2.test.mjs';
+import './tests/fixtureBrowserV2.test.mjs';
+import './tests/fixtureStorageV2.test.mjs';
+import './tests/authenticationProducerV2.test.mjs';
+import './tests/metadataV2.test.mjs';
+import './tests/staging2ReportWorkflowV2.test.mjs';
+import './tests/observeDeploymentImage.test.mjs';
+import './tests/recordDeploymentRelease.test.mjs';
+import './tests/standardRecordingRuntime.test.mjs';
+import './tests/operatorSecurityChecks.test.mjs';
+import './tests/operatorExposureV2.test.mjs';
+import './tests/imageStreamDiagnostics.test.mjs';
+import './tests/authenticationComparisonV2.test.mjs';
+import './tests/resetMailboxV2.test.mjs';
+import './tests/resetProtocolV2.test.mjs';
+import './tests/sessionLifetimeV2.test.mjs';
+import './tests/sessionRevocationV2.test.mjs';
+import './tests/currentResetV2.test.mjs';
+import './tests/currentResetBrowserV2.test.mjs';
+import './tests/expiredResetV2.test.mjs';
+import '../../../deploy/security-audit/tests/connected-reset-worker.test.mjs';
+import './tests/connectedGmailV2.test.mjs';
+import './tests/authenticationLeaseV2.test.mjs';
+import './tests/passwordlessProtocolV2.test.mjs';
+import './tests/materialThrottleV2.test.mjs';
+import './tests/protocolBindingsV2.test.mjs';
+import './tests/passwordlessFixturesV2.test.mjs';
+import './tests/passwordlessBrowserV2.test.mjs';
+import './tests/fixtureChildEnvironmentV2.test.mjs';

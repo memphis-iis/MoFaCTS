@@ -12,8 +12,8 @@ test('V2 catalog: pinned runtime JSON/TypeScript imports match the independently
   const parsed = await readAuditCatalog(ACTIVE_AUDIT_CATALOG, 'ingestion');
   assert.equal(await auditDigest(raw), golden);
   assert.equal(createHash('sha256').update(canonicalAuditJson(raw)).digest('hex'), golden);
-  assert.equal(await auditDigest(parsed), '00825a1d183e3b1b3d1014273e49c3f1de17c3bd0a8207299e5778d4c44e5ac4');
-  assert.equal(ACTIVE_AUDIT_CATALOG.catalogVersion, 2);
+  assert.equal(await auditDigest(parsed), golden);
+  assert.equal(ACTIVE_AUDIT_CATALOG.catalogDigestSha256, golden);
   assert.equal(profileControls(parsed, 'full').length, 70);
   assert.equal(profileControls(parsed, 'exposure').length, 23);
   assert.deepEqual(parsed.profiles.exposure.authentication, []);
@@ -58,7 +58,7 @@ test('V2 catalog: reject unresolved/duplicate/wrong-section metadata and profile
 });
 
 test('V2 catalog: retained coordinates are exact and semantic edits cannot retain the approved digest', async () => {
-  for (const change of [{ catalogId: 'another-catalog' }, { catalogVersion: 3 },
+  for (const change of [{ catalogId: 'another-catalog' }, { catalogVersion: 2 },
     { catalogDigestSha256: '1'.repeat(64) }, { unexpected: true }]) {
     await assert.rejects(readAuditCatalog({ ...ACTIVE_AUDIT_CATALOG, ...change }, 'retained'));
   }

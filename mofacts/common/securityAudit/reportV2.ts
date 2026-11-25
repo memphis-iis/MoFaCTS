@@ -72,7 +72,8 @@ export async function finalizeAuditReport(value: Omit<SecurityAuditReportV2, 'co
   return { ...payload, digestSha256: await auditDigest(payload) };
 }
 
-export async function parseSecurityAuditReportV2(value: unknown, context: AuditReportReadContext): Promise<SecurityAuditReportV2> {
+export async function parseSecurityAuditReportV2(value: unknown, context: AuditReportReadContext,
+  acceptedCatalog?: AuditCatalogCoordinates): Promise<SecurityAuditReportV2> {
   const record = proofRecord(value, ['schema', 'catalogId', 'catalogVersion', 'catalogDigestSha256', 'reportId', 'reportType',
     'startedAt', 'completedAt', 'target', 'scannerSourceRevision', 'deployedApplicationRevision', 'deployedImageDigest',
     'toolVersions', 'sections', 'executionErrors', 'counts', 'digestSha256']);
@@ -80,7 +81,7 @@ export async function parseSecurityAuditReportV2(value: unknown, context: AuditR
     || (context.purpose !== 'ingestion' && context.purpose !== 'retained')) invalid();
   const reportType = record.reportType as AuditReportType;
   const catalog = await readAuditCatalog({ catalogId: record.catalogId, catalogVersion: record.catalogVersion,
-    catalogDigestSha256: record.catalogDigestSha256 }, context.purpose);
+    catalogDigestSha256: record.catalogDigestSha256 }, context.purpose, acceptedCatalog);
   const startedAt = auditTimestamp(record.startedAt), completedAt = auditTimestamp(record.completedAt);
   const duration = Date.parse(completedAt) - Date.parse(startedAt);
   if (duration < 0 || duration > AUDIT_MAX_DURATION_MS) invalid();

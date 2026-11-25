@@ -103,6 +103,7 @@ function requireSparcControllerDialogueDisplay(display: unknown): SparcControlle
 }
 
 type SparcAutoTutorCommitParams = {
+  readonly signal?: AbortSignal;
   readonly submissionPresentation?: SparcAnswerSubmissionPresentation;
   readonly engine: UnitEngineLike | null | undefined;
   readonly currentDisplay: unknown;
@@ -130,6 +131,7 @@ async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Pr
   readonly committed: boolean;
   readonly sparcNodeValues: Record<string, unknown>;
 }> {
+  params.signal?.throwIfAborted();
   const sparcDisplay = requireSparcControllerDialogueDisplay(params.currentDisplay);
   if (!sparcDisplay) {
     return { committed: false, sparcNodeValues: {} };
@@ -146,6 +148,7 @@ async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Pr
     throw new Error('[SPARC][Dialogue] History requires an authenticated user');
   }
   const isAdmin = params.deps?.getIsAdmin ? params.deps.getIsAdmin() : (await import('../../../../lib/roleUtils')).currentUserHasRole('admin');
+  params.signal?.throwIfAborted();
   if (sparcDisplay.instructionalController?.policyId !== sparcPolicyForAccount(isAdmin, sparcDisplay.instructionalController?.policyId)) {
     throw new Error('AutoTutor account policy changed; reopen this lesson before submitting');
   }
@@ -183,11 +186,27 @@ async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Pr
       document: sparcRuntime.document,
       replayState: sparcRuntime.replayState,
       priorHistoryRecords,
-      scoreLearnerResponse: params.scoreLearnerResponse,
-      generateTutorUtterance: params.generateTutorUtterance,
-      ...(params.generateOrientation ? { generateOrientation: params.generateOrientation } : {}),
+      scoreLearnerResponse: async (...args) => {
+        params.signal?.throwIfAborted();
+        const result = await params.scoreLearnerResponse(...args);
+        params.signal?.throwIfAborted();
+        return result;
+      },
+      generateTutorUtterance: async (...args) => {
+        params.signal?.throwIfAborted();
+        const result = await params.generateTutorUtterance(...args);
+        params.signal?.throwIfAborted();
+        return result;
+      },
+      ...(params.generateOrientation ? { generateOrientation: async (...args: Parameters<SparcOrientationGenerator>) => {
+        params.signal?.throwIfAborted();
+        const result = await params.generateOrientation!(...args);
+        params.signal?.throwIfAborted();
+        return result;
+      } } : {}),
       history: {
         async writeCanonicalHistoryBatch(records) {
+          params.signal?.throwIfAborted();
           if (params.deps?.writeHistoryBatch) await params.deps.writeHistoryBatch(records);
           else {
             if (params.deps?.writeHistory) throw new Error('Injected SPARC history requires an atomic batch writer');
@@ -196,9 +215,11 @@ async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Pr
           // Publish replay state only after every row has been durably accepted.
           for (const record of records) rememberSparcRuntimeHistoryRecord(record);
           writtenHistoryCount += records.length;
+          params.signal?.throwIfAborted();
           await params.onNodeValues?.(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit, pageKey: sparcDisplay.pageKey, display: sparcDisplay }).nodeValues);
         },
         async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
+          params.signal?.throwIfAborted();
           if (params.deps?.writeHistory) {
             await params.deps.writeHistory(historyRecord);
           } else {
@@ -206,6 +227,9 @@ async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Pr
           }
           rememberSparcRuntimeHistoryRecord(historyRecord);
           writtenHistoryCount += 1;
+          // An already-issued write may finish after navigation. Retain its
+          // durable checkpoint, but never continue the abandoned controller.
+          params.signal?.throwIfAborted();
           const transitionId = (historyRecord.sparc as { stateTransition?: { transitionId?: string } })?.stateTransition?.transitionId ?? '';
           if (isSparcCategorizedPolicy(sparcDisplay.instructionalController?.policyId)
             && (transitionId.endsWith(':submission') || transitionId.endsWith(':feedback') || transitionId.endsWith(':orientation')
@@ -226,6 +250,7 @@ async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Pr
     throw error;
   }
 
+  params.signal?.throwIfAborted();
   clientConsole(2, '[SPARC][Dialogue] committed controller turn', {
     pageKey: sparcDisplay.pageKey,
     tdfId,

@@ -1,16 +1,8 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import { auditToolEnvironmentV2 } from '../core/childEnvironmentV2.mjs';
 
-const allowedEnvironment = new Set(['PATH', 'HOME', 'TMPDIR', 'XDG_CACHE_HOME', 'HTTP_PROXY', 'HTTPS_PROXY',
-  'NO_PROXY', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'NODE_OPTIONS', 'CI']);
 const invalid = () => { throw new Error('Invalid repository command configuration'); };
-
-export function repositoryToolEnvironmentV2(environment) {
-  if (!environment || typeof environment !== 'object' || Array.isArray(environment)
-    || !Object.hasOwn(environment, 'PATH') || environment.NODE_OPTIONS !== ''
-    || Object.entries(environment).some(([key, value]) => !allowedEnvironment.has(key) || typeof value !== 'string' || value.includes('\0'))) invalid();
-  return Object.freeze({ ...environment });
-}
 
 // The V1 text-returning command helper and CI's success-only collector cannot
 // preserve binary tool protocols, expected finding exits and owned process-tree
@@ -18,7 +10,7 @@ export function repositoryToolEnvironmentV2(environment) {
 // Callers provide a narrow tool environment; complete auth fixtures never enter it.
 export function runRepositoryCommandV2({ command, args, cwd, environment, input,
   timeoutMs = 15 * 60 * 1000, maximum = 8 * 1024 * 1024 }) {
-  const env = repositoryToolEnvironmentV2(environment);
+  const env = auditToolEnvironmentV2(environment);
   if (process.platform !== 'linux' || typeof command !== 'string' || !command.length || command.includes('\0')
     || !Array.isArray(args) || args.some(value => typeof value !== 'string' || value.includes('\0'))
     || typeof cwd !== 'string' || !path.isAbsolute(cwd)

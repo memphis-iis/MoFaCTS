@@ -47,7 +47,7 @@ describe('Content-removal lookup diagnostics', () => {
 
 
 describe('Instruction publication embedding ownership', () => {
-  it('forwards orientation ownership without descriptive metadata in the browser retrieval category', async () => {
+  it('shares one browser retrieval category across orientation modes', async () => {
     const originalCall = Meteor.callAsync, originalUser = Meteor.userId;
     Meteor.userId = () => 'orientation-category-user';
     const categories: unknown[] = [];
@@ -60,14 +60,44 @@ describe('Instruction publication embedding ownership', () => {
       const { orientationOwned: _ownership, ...unowned } = query.context;
       assert.deepEqual(categories, [], 'Creating a client does not preselect a mode or prepare unrelated categories');
       await client.lookup({ ...query, context: unowned });
-      assert.deepEqual(categories, [{ kind: 'instruction', responseFormat: 'text' }], 'Off uses only the preceding text contract');
+      assert.deepEqual(categories, [{ kind: 'instruction', responseFormat: 'text' }]);
       await client.lookup(query);
       await client.lookup({ ...query, context: unowned });
       assert.deepEqual(categories, [
         { kind: 'instruction', responseFormat: 'text' },
-        { kind: 'instruction', responseFormat: 'text', orientationOwned: true },
         { kind: 'instruction', responseFormat: 'text' },
-      ], 'Each actual request owns its category, including a restored off request after an owned request');
+        { kind: 'instruction', responseFormat: 'text' },
+      ]);
+    } finally { Meteor.callAsync = originalCall; Meteor.userId = originalUser; }
+  });
+
+  it('tries qualifying instructions in order, generates only after exhaustion, and propagates service failures', async () => {
+    const originalCall = Meteor.callAsync, originalUser = Meteor.userId;
+    const index = new SparcEmbeddingIndex();
+    index.set('written', [1, 0]); index.set('illustrated', [1, .1]); index.set('below-threshold', [0, 1]);
+    const attempts: Array<string | null> = [];
+    const client = createSparcMoveLibraryClient(async () => index);
+    const query = { tdfId: 'ranked-lesson', queryText: 'First knowledge component', context: {
+      kind: 'instruction', responseFormat: 'text', supportKind: 'visual', orientationOwned: true } } as SparcPrimitiveQuery;
+    let mode: 'hit' | 'exhausted' | 'offline' = 'hit';
+    Meteor.userId = () => 'ranked-test-user';
+    Meteor.callAsync = (async (method: string, _query: unknown, candidate: { entryId: string } | null) => {
+      if (method === 'callResolvedOpenRouterEmbeddings') return { embeddings: [[1, 0]] };
+      attempts.push(candidate?.entryId ?? null);
+      if (mode === 'offline') throw new Error('Connection lost');
+      if (!candidate) return { status: 'generate' };
+      if (candidate.entryId === 'written' || mode === 'exhausted') throw Object.assign(new Error(), { error: 'sparc-candidate-unusable' });
+      return { status: 'hit' };
+    }) as typeof Meteor.callAsync;
+    try {
+      assert.equal((await client.lookup(query)).status, 'hit');
+      assert.deepEqual(attempts.splice(0), ['written', 'illustrated']);
+      mode = 'exhausted';
+      assert.equal((await client.lookup(query)).status, 'generate');
+      assert.deepEqual(attempts.splice(0), ['written', 'illustrated', null]);
+      mode = 'offline';
+      await assert.rejects(client.lookup(query), /Connection lost/);
+      assert.deepEqual(attempts, ['written']);
     } finally { Meteor.callAsync = originalCall; Meteor.userId = originalUser; }
   });
 

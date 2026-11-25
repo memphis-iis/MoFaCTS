@@ -107,10 +107,14 @@ export function parseImageObservation(value: unknown): ImageObservation {
   return { configDigest: imageDigest(record.configDigest), platform: platform(record.platform) };
 }
 
+export function parseRunningImageObservation(value: unknown): ImageObservation & { baseCommit: string } {
+  const record = proofRecord(value, ['configDigest', 'platform', 'baseCommit']);
+  return { configDigest: imageDigest(record.configDigest), platform: platform(record.platform), baseCommit: sourceCommit(record.baseCommit) };
+}
+
 function parseReleaseIdentityTuple(value: unknown): ReleaseIdentityTuple {
   const record = proofRecord(value, ['sourceVerification', 'builtImage', 'publishedImage', 'runningImage', 'commands']);
   const publishedImage = parsePublishedImage(record.publishedImage);
-  const running = proofRecord(record.runningImage, ['configDigest', 'platform', 'baseCommit']);
   const commandRecord = proofRecord(record.commands, RELEASE_PROOF_COMMANDS);
   const commands = Object.fromEntries(
     RELEASE_PROOF_COMMANDS.map((name) => [name, parseCommand(commandRecord[name])]),
@@ -119,7 +123,7 @@ function parseReleaseIdentityTuple(value: unknown): ReleaseIdentityTuple {
     sourceVerification: parseSourceVerification(record.sourceVerification),
     builtImage: parseImageObservation(record.builtImage),
     publishedImage,
-    runningImage: { configDigest: imageDigest(running.configDigest), platform: platform(running.platform), baseCommit: sourceCommit(running.baseCommit) },
+    runningImage: parseRunningImageObservation(record.runningImage),
     commands,
   };
 }

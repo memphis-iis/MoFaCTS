@@ -1,9 +1,11 @@
+import { participantConnectionRoot } from '../lib/participantSession';
+import { participantProgressLessonIds, requireAccountProgressSession, requireParticipantProgressLesson } from '../lib/participantProgressScope';
 import { requireSparcLessonAccess } from '../lib/sparcLessonAccess';
 import { isSparcAdminPolicy, SPARC_INSTRUCTIONAL_POLICY_IDS } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import { worksheetHistoryWriteId } from '../lib/worksheetHistoryWrite';
 import { sparcHistoryWriteId } from '../lib/sparcHistoryWrite';
 import { HistoryCommitConflictError } from '../lib/historyCommitStorage';
-import { SparcContentAlreadyUsedError } from '../lib/sparcContentUse';
+import { SparcPresentationConflictError } from '../lib/sparcContentUse';
 import { Meteor } from 'meteor/meteor';
 import { progressiveRevisionPrefix } from '../lib/progressiveAssignmentRevision';
 import {
@@ -17,8 +19,9 @@ import {
   recordStimulusCrowdOutcome,
   type StimulusCrowdStatsCollection,
 } from '../lib/stimulusCrowdStats';
-import { createAnalyticsConditionCountMethods } from './analyticsConditionCountMethods';
-import { createAnalyticsDownloadMethods } from './analyticsDownloadMethods';
+import { createAnalyticsConditionCountRegistration } from './analyticsConditionCountMethods';
+import { CLASS_PERFORMANCE_VERIFICATION, PROGRESS_READ_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { createAnalyticsDownloadRegistration } from './analyticsDownloadMethods';
 import type { LearningHistoryReadOptions } from '../../../learning-components/units/UnitEngineServerMethods';
 import { curSemester } from '../../common/Definitions';
 import { collectLessonFamilyRefs, createLessonFamilyResolver } from '../lib/tdfLessonFamilyResolver';
@@ -86,8 +89,6 @@ type AnalyticsMethodsDeps = {
     deps: any,
     assignmentContext?: { assignmentId?: string | null; dueAt?: Date | number | string | null }
   ) => Promise<unknown>;
-  getStimuliSetById: (stimuliSetId: string | number) => Promise<Array<{ clusterKC?: string | number; stimulusKC?: string | number }>>;
-  hasMeaningfulProgressSignal: (experimentState: unknown) => boolean;
   insertSparcHistoryBatch?: (records: readonly (UnknownRecord & { _id: string; userId: string })[]) => Promise<readonly UnknownRecord[]>;
 };
 
@@ -134,7 +135,7 @@ function buildLearningHistoryScopeMatch(
   };
 }
 
-export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
+export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
   const lessonFamilies = createLessonFamilyResolver({ tdfs: deps.Tdfs });
 
   async function validateCourseEnrollmentForUser(userId: string, courseId: string) {
@@ -556,15 +557,16 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
 
   async function createExperimentState(
     curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string },
-    actorUserId: string | null,
+    context: MethodContext,
     options: { replaceExistingState?: boolean; allocateCondition?: boolean } = {},
   ) {
-    const resolvedUserId = requireAuthenticatedUser(actorUserId, 'Must be logged in', 401);
+    const resolvedUserId = requireAuthenticatedUser(context.userId, 'Must be logged in', 401);
     const rootTdfId = deps.normalizeCanonicalId((curExperimentState as any)?.currentRootTdfId)
       || deps.normalizeCanonicalId(curExperimentState.currentTdfId);
     if (!rootTdfId) {
       throw new Meteor.Error(400, 'createExperimentState requires currentRootTdfId/currentTdfId');
     }
+    await requireParticipantProgressLesson(context, deps.Tdfs, rootTdfId);
     await validateExperimentStateMutation(resolvedUserId, rootTdfId, curExperimentState, 'createExperimentState');
     const conditionState = await deps.writeConditionState({
       userId: resolvedUserId as string, rootTdfId, state: curExperimentState, ...options,
@@ -625,18 +627,6 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }
   }
 
-  async function getUserLastFeedbackTypeFromHistory(tdfID: string) {
-    const userHistory = await deps.Histories.findOneAsync(
-      { TDFId: tdfID, userId: (Meteor as any).userId, ...operationalHistorySelector() },
-      { sort: { time: -1 } }
-    );
-    let feedbackType = 'undefined';
-    if (userHistory && userHistory.feedbackType) {
-      feedbackType = userHistory.feedbackType;
-    }
-    return feedbackType;
-  }
-
   function assessmentScope(record: UnknownRecord): string {
     const sparc = record.sparc as { pageKey?: unknown; stateTransition?: { event?: { eventId?: unknown; payload?: { policyId?: unknown } } } } | undefined;
     return JSON.stringify([record.userId, record.TDFId, record.sessionID, record.levelUnit,
@@ -670,6 +660,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!tdfId) {
       throw new Meteor.Error(400, 'History record requires a TDFId');
     }
+    if (!authorizedScope) await requireParticipantProgressLesson(context, deps.Tdfs, tdfId);
     try {
       assertCanonicalHistoryEnvelope(decompressedRecord);
     } catch (error: unknown) {
@@ -702,6 +693,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       dynamicTagFields: [],
       recordedServerTime: (new Date()).getTime(),
     });
+    delete (sanitizedHistoryRecord as UnknownRecord).currentRootTdfId;
+    const studyRoot = participantConnectionRoot(context);
+    if (studyRoot) Object.assign(sanitizedHistoryRecord, { currentRootTdfId: studyRoot });
     const recordBuildMs = elapsedMsSince(recordBuildStartTime);
     return { sanitizedHistoryRecord, actingUserId, decompressMs, sanitizeMs, authorizationMs, recordBuildMs };
   }
@@ -755,8 +749,8 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     try {
       if (!(await deps.commitHistory(actingUserId, sanitizedHistoryRecord))) return;
     } catch (error) {
-      if (error instanceof SparcContentAlreadyUsedError) {
-        throw new Meteor.Error('sparc-content-already-used', 'The selected instructional content has already been used. This turn was not accepted.');
+      if (error instanceof SparcPresentationConflictError) {
+        throw new Meteor.Error('sparc-presentation-conflict', 'This turn conflicts with its saved instructional content.');
       }
       if (error instanceof HistoryCommitConflictError && durableId) {
         throw new Meteor.Error(worksheetId ? 'worksheet-history-conflict' : 'sparc-history-conflict', 'History changed in another session. Reload before continuing.');
@@ -784,17 +778,6 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }
   }
 
-  async function getLastTDFAccessed(userId: string) {
-    const lastExperimentStateUpdated = await deps.GlobalExperimentStates.findOneAsync(
-      { userId },
-      { sort: { 'experimentState.lastActionTimeStamp': -1 }, limit: 1 }
-    );
-    if (!lastExperimentStateUpdated?.TDFId) {
-      return null;
-    }
-    return lastExperimentStateUpdated.TDFId;
-  }
-
   async function getHistoryByTDFID(TDFId: string) {
     return await deps.Histories.find({ TDFId, ...operationalHistorySelector() }).fetchAsync();
   }
@@ -810,6 +793,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!normalizedTdfId) {
       throw new Meteor.Error(400, 'Invalid TDFId');
     }
+    await requireParticipantProgressLesson(this, deps.Tdfs, normalizedTdfId);
     if (!Array.isArray(stimulusIdentities)) {
       throw new Meteor.Error(400, 'stimulusIdentities must be an array');
     }
@@ -1050,25 +1034,17 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     );
   }
 
-  async function getUserRecentTDFs(userId: string) {
-    const history = await deps.Histories.find({ userId, ...operationalHistorySelector() }, { sort: { time: -1 }, limit: 5 }).fetchAsync();
-    const recentTdfIds = history
-      .map((historyRecord: any) => deps.normalizeCanonicalId(historyRecord?.TDFId))
-      .filter((tdfId: string | null): tdfId is string => typeof tdfId === 'string');
-    if (recentTdfIds.length === 0) {
-      return [];
-    }
-
-    const recentTdfDocs = await deps.Tdfs.find({ _id: { $in: [...new Set(recentTdfIds)] } }).fetchAsync();
-    const recentTdfById = new Map(
-      recentTdfDocs.map((tdf: any) => [String(tdf?._id || ''), tdf])
-    );
-    return recentTdfIds.map((tdfId: string) => recentTdfById.get(tdfId));
-  }
+  const classPerformancePolicy = Object.freeze({
+    kind: 'course-read', operation: 'instructor-or-admin', authorize: requireUserMatchesOrHasRole,
+  } as const);
 
   async function getClassPerformanceByTDF(this: MethodContext, classId: string, tdfId: string, date: number | false = false) {
+    requireAccountProgressSession(this);
     if (!this.userId) {
       throw new Meteor.Error(401, 'Must be logged in');
+    }
+    if (typeof classId !== 'string' || !classId || typeof tdfId !== 'string' || !tdfId) {
+      throw new Meteor.Error(400, 'Select a course and an assigned lesson');
     }
     const course = (await deps.Courses.find(
       { _id: classId },
@@ -1077,7 +1053,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!course) {
       throw new Meteor.Error(404, 'Course not found');
     }
-    await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
+    await classPerformancePolicy.authorize(deps.getMethodAuthorizationDeps(), {
       actingUserId: this.userId,
       subjectUserId: course.teacherUserId,
       roles: ['admin'],
@@ -1090,6 +1066,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       { courseId: classId, $or: [{ TDFId: tdfId }, { assignmentType: 'progressive', memberTdfIds: tdfId }] },
       { fields: { _id: 1, dueAt: 1 } }
     );
+    if (!assignment) throw new Meteor.Error(403, 'This lesson is not assigned to the selected course');
     return deps.getClassPerformanceByTdfWorkflow(classId, tdfId, date, {
       serverConsole: deps.serverConsole,
       Sections: deps.Sections,
@@ -1099,26 +1076,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         { _id: { $in: userIds } },
         { fields: { _id: 1, username: 1, dueDateExceptions: 1 } }
       ).fetchAsync(),
-    }, assignment ? { assignmentId: String(assignment._id || ''), dueAt: assignment.dueAt ?? null } : undefined);
-  }
-
-  async function getStimSetFromLearningSessionByClusterList(stimuliSetId: string | number, clusterList: Array<string | number>) {
-    deps.serverConsole('getStimSetFromLearningSessionByClusterList', stimuliSetId, clusterList);
-    const itemRet = await deps.getStimuliSetById(stimuliSetId);
-    const learningSessionItem: Array<string | number> = [];
-    for (const item of itemRet) {
-      const clusterKC = item.clusterKC;
-      const stimulusKC = item.stimulusKC;
-      if (
-        typeof clusterKC !== 'undefined' &&
-        typeof stimulusKC !== 'undefined' &&
-        clusterList.includes(clusterKC) &&
-        learningSessionItem.includes(stimulusKC) === false
-      ) {
-        learningSessionItem.push(stimulusKC);
-      }
-    }
-    return learningSessionItem;
+    }, { assignmentId: String(assignment._id), dueAt: assignment.dueAt ?? null });
   }
 
   async function getStudentPerformanceByIdAndTDFIdFromHistory(userId: string, TDFId: string, returnRows: number | null = null) {
@@ -1319,7 +1277,8 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     TDFId: string,
     levelUnit: number,
     unitScopedOnly = false,
-    options: LearningHistoryReadOptions = {}
+    options: LearningHistoryReadOptions = {},
+    studyLessonIds: string[] | null = null,
   ) {
     await rejectMissingCourseAssignmentContextForAssignedTdf(
       userId,
@@ -1330,6 +1289,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const selector = options.courseAssignment
       ? await buildCourseLearningHistoryScopeMatch(userId, TDFId, options)
       : buildLearningHistoryScopeMatch(userId, TDFId, levelUnit, unitScopedOnly);
+    if (studyLessonIds && options.courseAssignment) selector.TDFId = { $in: studyLessonIds };
     return await deps.Histories.find(selector, {
       fields: {
         TDFId: 1,
@@ -1473,181 +1433,6 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     return hiddenStimulusKCs;
   }
 
-  async function getNumDroppedItemsByUserIDAndTDFId(userId: string, TDFId: string) {
-    deps.serverConsole('getNumDroppedItemsByUserIDAndTDFId', userId, TDFId);
-    return await deps.Histories.find({ userId, TDFId, CFItemRemoved: true, ...modelPracticeHistorySelector() }).countAsync();
-  }
-
-  async function getStudentPerformanceForClassAndTdfId(instructorId: string, date: number | null = null) {
-    const courses = await deps.Courses.find({ teacherUserId: instructorId }).fetchAsync();
-    if (courses.length === 0) {
-      return [{}, {}];
-    }
-    const courseIds = courses.map((course: { _id: string }) => course._id);
-
-    const sections = await deps.Sections.find({ courseId: { $in: courseIds } }).fetchAsync();
-    if (sections.length === 0) {
-      return [{}, {}];
-    }
-    const sectionIds = sections.map((section: { _id: string }) => section._id);
-    const sectionToCourse: Record<string, string> = {};
-    for (const section of sections) {
-      sectionToCourse[section._id] = section.courseId;
-    }
-
-    const enrollments = await deps.SectionUserMap.find({ sectionId: { $in: sectionIds } }).fetchAsync();
-    if (enrollments.length === 0) {
-      return [{}, {}];
-    }
-    const enrolledUserIds = [...new Set(enrollments.map((enrollment: { userId: string }) => enrollment.userId))];
-    const userSectionMap: Record<string, Array<{ sectionId: string; courseId: string }>> = {};
-    for (const enrollment of enrollments) {
-      const courseId = sectionToCourse[enrollment.sectionId];
-      if (!courseId) {
-        continue;
-      }
-      if (!userSectionMap[enrollment.userId]) {
-        userSectionMap[enrollment.userId] = [];
-      }
-      userSectionMap[enrollment.userId]!.push({ sectionId: enrollment.sectionId, courseId });
-    }
-
-    const histMatch: Record<string, unknown> = {
-      ...modelPracticeHistorySelector(),
-      userId: { $in: enrolledUserIds },
-    };
-    if (date) {
-      histMatch.recordedServerTime = { $lt: date };
-    }
-
-    const pipeline = [
-      { $match: histMatch },
-      {
-        $group: {
-          _id: { userId: '$userId', TDFId: '$TDFId' },
-          correct: { $sum: { $cond: [{ $eq: ['$outcome', 'correct'] }, 1, 0] } },
-          incorrect: { $sum: { $cond: [{ $ne: ['$outcome', 'correct'] }, 1, 0] } },
-          totalPracticeDuration: { $sum: { $add: [{ $ifNull: ['$CFEndLatency', 0] }, { $ifNull: ['$CFFeedbackLatency', 0] }] } },
-        },
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id.userId',
-          foreignField: '_id',
-          as: '_user',
-        },
-      },
-      {
-        $addFields: {
-          username: { $ifNull: [{ $arrayElemAt: ['$_user.username', 0] }, ''] },
-        },
-      },
-      { $project: { _user: 0 } },
-    ];
-
-    const aggResults: Array<{
-      _id: { userId: string; TDFId: string };
-      correct: number;
-      incorrect: number;
-      totalPracticeDuration: number;
-      username: string;
-    }> = await deps.Histories.rawCollection().aggregate(pipeline).toArray();
-
-    type ClassTotal = { count: number; totalTime: number; numCorrect: number; percentCorrect?: string; totalTimeDisplay?: string };
-    type StudentTotal = ClassTotal & { username: string; userId: string };
-    const studentPerformanceForClass: Record<string, Record<string, ClassTotal>> = {};
-    const studentPerformanceForClassAndTdfIdMap: Record<string, Record<string, Record<string, StudentTotal>>> = {};
-
-    for (const row of aggResults) {
-      const userId = row._id.userId;
-      const TDFId = row._id.TDFId;
-      const correct = Number(row.correct);
-      const incorrect = Number(row.incorrect);
-      const totalPracticeDuration = Number(row.totalPracticeDuration);
-      const count = correct + incorrect;
-      const studentUsername = row.username || '';
-
-      if (studentUsername) {
-        deps.syncUsernameCaches(String(userId), studentUsername);
-      }
-
-      const userSections = userSectionMap[userId];
-      if (!userSections) {
-        continue;
-      }
-
-      for (const { courseId } of userSections) {
-        if (!studentPerformanceForClass[courseId]) {
-          studentPerformanceForClass[courseId] = {};
-        }
-        if (!studentPerformanceForClass[courseId][TDFId]) {
-          studentPerformanceForClass[courseId][TDFId] = { count: 0, totalTime: 0, numCorrect: 0 };
-        }
-        const classTdf = studentPerformanceForClass[courseId][TDFId];
-        if (classTdf) {
-          classTdf.numCorrect += correct;
-          classTdf.count += count;
-          classTdf.totalTime += totalPracticeDuration;
-        }
-
-        if (!studentPerformanceForClassAndTdfIdMap[courseId]) {
-          studentPerformanceForClassAndTdfIdMap[courseId] = {};
-        }
-        if (!studentPerformanceForClassAndTdfIdMap[courseId][TDFId]) {
-          studentPerformanceForClassAndTdfIdMap[courseId][TDFId] = {};
-        }
-        if (!studentPerformanceForClassAndTdfIdMap[courseId][TDFId][userId]) {
-          studentPerformanceForClassAndTdfIdMap[courseId][TDFId][userId] = {
-            count: 0,
-            totalTime: 0,
-            numCorrect: 0,
-            username: studentUsername,
-            userId,
-          };
-        }
-        const studentEntry = studentPerformanceForClassAndTdfIdMap[courseId][TDFId][userId];
-        if (studentEntry) {
-          studentEntry.numCorrect += correct;
-          studentEntry.count += count;
-          studentEntry.totalTime += totalPracticeDuration;
-        }
-      }
-    }
-
-    for (const courseId of Object.keys(studentPerformanceForClass)) {
-      const courseTotals = studentPerformanceForClass[courseId];
-      if (!courseTotals) {
-        continue;
-      }
-      for (const tdfId of Object.keys(courseTotals)) {
-        const tdfTotal = courseTotals[tdfId];
-        if (!tdfTotal) {
-          continue;
-        }
-        tdfTotal.percentCorrect = ((tdfTotal.numCorrect / tdfTotal.count) * 100).toFixed(2) + '%';
-        tdfTotal.totalTimeDisplay = (tdfTotal.totalTime / (60 * 1000)).toFixed(1);
-      }
-    }
-    for (const courseId of Object.keys(studentPerformanceForClassAndTdfIdMap)) {
-      const courseTotals = studentPerformanceForClassAndTdfIdMap[courseId];
-      if (!courseTotals) {
-        continue;
-      }
-      for (const tdfId of Object.keys(courseTotals)) {
-        const tdfTotals = courseTotals[tdfId];
-        if (!tdfTotals) {
-          continue;
-        }
-        for (const studentTotal of Object.values(tdfTotals)) {
-          studentTotal.percentCorrect = ((studentTotal.numCorrect / studentTotal.count) * 100).toFixed(2) + '%';
-          studentTotal.totalTimeDisplay = (studentTotal.totalTime / (60 * 1000)).toFixed(1);
-        }
-      }
-    }
-    return [studentPerformanceForClass, studentPerformanceForClassAndTdfIdMap];
-  }
-
   function requireSelfScopedUserId(
     thisArg: MethodContext | undefined,
     requestedUserId: unknown,
@@ -1669,10 +1454,19 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     return normalizedTdfId;
   }
 
-  const downloadMethods = createAnalyticsDownloadMethods(deps);
-  const conditionCountMethods = createAnalyticsConditionCountMethods(deps, { validateExperimentStateMutation });
+  async function requireProgressTdfId(context: MethodContext, TDFId: unknown) {
+    const lessonId = requireNormalizedTdfId(TDFId);
+    await progressReadPolicy.requireLesson(context, deps.Tdfs, lessonId);
+    return lessonId;
+  }
 
-  return {
+  const progressReadPolicy = Object.freeze({ kind: 'progress-read', operation: 'own-study-lessons',
+    authorize: requireSelfScopedUserId, requireLesson: requireParticipantProgressLesson } as const);
+
+  const downloads = createAnalyticsDownloadRegistration(deps);
+  const conditionCounts = createAnalyticsConditionCountRegistration(deps, { validateExperimentStateMutation });
+
+  const methods = {
     createExperimentState: async function(
       this: MethodContext,
       curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string },
@@ -1688,7 +1482,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       ) {
         throw new Meteor.Error(400, 'Invalid experiment state write options');
       }
-      return await createExperimentState(curExperimentState, this.userId || null, options);
+      return await createExperimentState(curExperimentState, this, options);
     },
     getClassPerformanceByTDF,
     getStudentPerformanceByIdAndTDFIdFromHistory: async function(
@@ -1697,8 +1491,8 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       TDFId: string,
       returnRows: number | null = null
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getStudentPerformanceByIdAndTDFIdFromHistory(scopedUserId, requireNormalizedTdfId(TDFId), returnRows);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
+      return await getStudentPerformanceByIdAndTDFIdFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), returnRows);
     },
     getStudentPerformanceForUnitFromHistory: async function(
       this: MethodContext,
@@ -1707,8 +1501,8 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       levelUnit: number,
       unitScopedOnly = false
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getStudentPerformanceForUnitFromHistory(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, unitScopedOnly);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
+      return await getStudentPerformanceForUnitFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit, unitScopedOnly);
     },
     getAssessmentCompletedTrialCountFromHistory: async function(
       this: MethodContext,
@@ -1716,8 +1510,8 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       TDFId: string,
       levelUnit: number
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getAssessmentCompletedTrialCountFromHistory(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
+      return await getAssessmentCompletedTrialCountFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit);
     },
     getVideoCompletedCheckpointQuestionCountFromHistory: async function(
       this: MethodContext,
@@ -1725,8 +1519,8 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       TDFId: string,
       levelUnit: number
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getVideoCompletedCheckpointQuestionCountFromHistory(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
+      return await getVideoCompletedCheckpointQuestionCountFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit);
     },
     getLearningHistoryForUnit: async function(
       this: MethodContext,
@@ -1736,8 +1530,10 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       unitScopedOnly = false,
       options: LearningHistoryReadOptions = {}
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getLearningHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, unitScopedOnly, options);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
+      const lessonId = requireNormalizedTdfId(TDFId);
+      const studyLessonIds = await progressReadPolicy.requireLesson(this, deps.Tdfs, lessonId);
+      return await getLearningHistoryForUnit(scopedUserId, lessonId, levelUnit, unitScopedOnly, options, studyLessonIds);
     },
     getSparcHistoryForUnit: async function(
       this: MethodContext,
@@ -1746,12 +1542,12 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       levelUnit: number,
       options: Pick<LearningHistoryReadOptions, 'courseAssignment'> & { worksheetPageKey?: string; worksheetCheckpointIndex?: number } = {}
     ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getSparcHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, options);
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
+      return await getSparcHistoryForUnit(scopedUserId, await requireProgressTdfId(this, TDFId), levelUnit, options);
     },
     getHiddenStimulusKCsFromHistory: async function(this: MethodContext, userId: string, TDFId: string) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getHiddenStimulusKCsFromHistory(scopedUserId, requireNormalizedTdfId(TDFId));
+      const scopedUserId = progressReadPolicy.authorize(this, userId);
+      return await getHiddenStimulusKCsFromHistory(scopedUserId, await requireProgressTdfId(this, TDFId));
     },
     getAdaptiveOutcomeRows: async function(this: MethodContext, userId: string, TDFId: string) {
       const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
@@ -1759,6 +1555,10 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       const normalizedTdfId = deps.normalizeCanonicalId(TDFId);
       if (!normalizedTdfId) {
         throw new Meteor.Error(400, 'Invalid TDF');
+      }
+      await requireParticipantProgressLesson(this, deps.Tdfs, normalizedTdfId);
+      if (participantConnectionRoot(this) && requestedUserId !== actingUserId) {
+        throw new Meteor.Error(403, 'Can only read adaptive outcomes for the current user');
       }
       await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
         actingUserId,
@@ -1785,104 +1585,13 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         }
       ).fetchAsync();
     },
-    getNumDroppedItemsByUserIDAndTDFId: async function(this: MethodContext, userId: string, TDFId: string) {
-      const scopedUserId = requireSelfScopedUserId(this, userId);
-      return await getNumDroppedItemsByUserIDAndTDFId(scopedUserId, requireNormalizedTdfId(TDFId));
-    },
-    getStudentPerformanceForClassAndTdfId: async function(this: MethodContext, instructorId: string, date: number | null = null) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-      const requestedInstructorId = deps.normalizeCanonicalId(instructorId) || this.userId;
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
-        subjectUserId: requestedInstructorId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Can only access your own instructor performance data',
-        forbiddenCode: 403,
-      });
-      return await getStudentPerformanceForClassAndTdfId(requestedInstructorId, date);
-    },
-    getStimSetFromLearningSessionByClusterList,
     getExperimentState: async function(this: MethodContext, userId: string, TDFId: string) {
-      const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only read experiment state for the current user');
-      return await getExperimentState(scopedUserId, requireNormalizedTdfId(TDFId));
-    },
-    setExperimentState: async function(
-      this: MethodContext,
-      userId: string,
-      TDFId: string,
-      experimentStateId: string,
-      newExperimentState: UnknownRecord,
-      where: string
-    ) {
-      const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only mutate experiment state for the current user');
-      return await setExperimentState(
-        scopedUserId,
-        requireNormalizedTdfId(TDFId),
-        experimentStateId,
-        newExperimentState,
-        where || 'methods.setExperimentState'
-      );
-    },
-    getLastTDFAccessed: async function(this: MethodContext, userId: string | null = null) {
-      const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only read recent TDFs for the current user');
-      return await getLastTDFAccessed(scopedUserId);
+      const scopedUserId = progressReadPolicy.authorize(this, userId, 'Can only read experiment state for the current user');
+      const lessonId = await requireProgressTdfId(this, TDFId);
+      return await getExperimentState(scopedUserId, lessonId);
     },
     insertHistory,
-    getHistoryByTDFID,
     getStimulusCrowdStatsForDeck,
-    getUserRecentTDFs: async function(this: MethodContext, userId: string | null = null) {
-      const scopedUserId = requireSelfScopedUserId(this, userId, 'Can only read recent TDFs for the current user');
-      return await getUserRecentTDFs(scopedUserId);
-    },
-    getUserLastFeedbackTypeFromHistory,
-
-    getLearnerProgressSignals: async function(this: MethodContext, targetUserId?: string) {
-      const currentUserId = this.userId;
-      if (!currentUserId) {
-        throw new Meteor.Error('not-authorized', 'Must be logged in');
-      }
-
-      const requestedUserId = typeof targetUserId === 'string' && targetUserId.trim().length
-        ? targetUserId.trim()
-        : currentUserId;
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: currentUserId,
-        subjectUserId: requestedUserId,
-        roles: ['admin', 'teacher'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 'not-authorized',
-        forbiddenMessage: 'Insufficient privileges to inspect another learner',
-        forbiddenCode: 'not-authorized',
-      });
-
-      const docs = await deps.GlobalExperimentStates.find(
-        { userId: requestedUserId },
-        { fields: { TDFId: 1, experimentState: 1 } }
-      ).fetchAsync();
-
-      const attempted = new Set<string>();
-      const meaningful = new Set<string>();
-      for (const doc of docs) {
-        const tdfId = typeof doc?.TDFId === 'string' ? doc.TDFId : null;
-        if (!tdfId) {
-          continue;
-        }
-        attempted.add(tdfId);
-        if (deps.hasMeaningfulProgressSignal(doc?.experimentState)) {
-          meaningful.add(tdfId);
-        }
-      }
-
-      return {
-        attemptedTdfIds: Array.from(attempted),
-        meaningfulProgressTdfIds: Array.from(meaningful),
-      };
-    },
-
     updateExperimentState: async function(
       this: MethodContext,
       curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string },
@@ -1890,8 +1599,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     ) {
       let existingExperimentDoc: { userId?: string; TDFId?: string } | null = null;
       if (experimentId) {
+        const lessonIds = await participantProgressLessonIds(this, deps.Tdfs);
         existingExperimentDoc = await deps.GlobalExperimentStates.findOneAsync(
-          { _id: experimentId },
+          { _id: experimentId, ...(lessonIds ? { userId: this.userId, TDFId: { $in: lessonIds } } : {}) },
           { fields: { userId: 1, TDFId: 1 } }
         );
         if (!existingExperimentDoc) {
@@ -1911,6 +1621,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         throw new Meteor.Error(400, 'updateExperimentState requires a canonical root TDF context');
       }
       const conditionTdfId = deps.normalizeCanonicalId((curExperimentState as any)?.conditionTdfId);
+      await requireParticipantProgressLesson(this, deps.Tdfs, rootTdfId);
       await validateExperimentStateMutation(this.userId, rootTdfId, curExperimentState, 'methods.updateExperimentState');
       deps.serverConsole('updateExperimentState', {
         userId: this.userId || null,
@@ -1929,10 +1640,25 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
           'methods.updateExperimentState'
         );
       }
-      return await createExperimentState(curExperimentState, this.userId || null);
+      return await createExperimentState(curExperimentState, this);
     },
 
-    ...downloadMethods,
-    ...conditionCountMethods,
+    ...downloads.methods,
+    ...conditionCounts.methods,
   };
+  const progressReadBindings = PROGRESS_READ_VERIFICATIONS.map(verification => ({
+    verification, handler: methods[verification.method], policy: progressReadPolicy,
+    dataEgress: ({
+      getStudentPerformanceByIdAndTDFIdFromHistory: 'performance-history',
+      getStudentPerformanceForUnitFromHistory: 'performance-history',
+      getAssessmentCompletedTrialCountFromHistory: 'completed-trial-count',
+      getVideoCompletedCheckpointQuestionCountFromHistory: 'completed-trial-count',
+      getLearningHistoryForUnit: 'learning-history',
+      getSparcHistoryForUnit: 'sparc-history',
+      getHiddenStimulusKCsFromHistory: 'hidden-stimulus-kcs',
+      getExperimentState: 'experiment-state',
+    } as const)[verification.method],
+  }));
+  return { methods, getHistoryByTDFID, methodBindings: Object.freeze([...conditionCounts.methodBindings, ...downloads.methodBindings, ...progressReadBindings,
+    { verification: CLASS_PERFORMANCE_VERIFICATION, handler: getClassPerformanceByTDF, policy: classPerformancePolicy, dataEgress: 'class-performance' as const }]) };
 }

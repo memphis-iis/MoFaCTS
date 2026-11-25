@@ -19,6 +19,12 @@ COPY --from=source_inputs / /captured-source/
 RUN node /captured-source/mofacts/scripts/security-audit/qualification/imageSourceObservation.mjs \
     /captured-source /source-observation.json "$MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256" "$MOFACTS_SOURCE_REVISION" "$MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES"
 
+# Build-only proof transfer, separate from the source snapshot it describes.
+ARG MOFACTS_VERIFICATION_BUNDLE_SHA256=
+RUN --mount=type=secret,id=mofacts_verification_bundle node /captured-source/mofacts/scripts/security-audit/qualification/imageVerificationBundle.mjs \
+    /source-observation.json /captured-source/mofacts/.meteor/release /run/secrets/mofacts_verification_bundle \
+    /verification-artifacts "$MOFACTS_VERIFICATION_BUNDLE_SHA256"
+
 # This digest-pinned image bootstraps the Meteor CLI. From the application
 # directory, the CLI springboards to the exact release in .meteor/release;
 # assert that toolchain below rather than using the bootstrap release to build.
@@ -153,6 +159,7 @@ FROM node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d
 ARG MOFACTS_SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision=$MOFACTS_SOURCE_REVISION
 COPY --from=source_observation /source-observation.json /opt/mofacts-source-observation.json
+COPY --from=source_observation /verification-artifacts/ /opt/
 
 ENV APP_BUNDLE_FOLDER /opt/bundle
 ENV SCRIPTS_FOLDER /docker

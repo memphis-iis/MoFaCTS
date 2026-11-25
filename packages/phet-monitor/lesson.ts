@@ -1,23 +1,31 @@
 import { isRecord, ObservedState } from './protocol.ts';
+import { validateSimulationAsset, type SimulationAsset } from './assets.ts';
 
 export type SimulationBinding = {
   name: string;
   address: { path?: string; tandem?: string };
   projection: 'value' | 'count' | 'any-nonzero';
   memberProperty?: string;
+  label?: string;
+  unit?: string;
 };
-export type SimulationNodeConfig = { buildId: string; bindings: SimulationBinding[] };
-const reserved = new Set(['pageKey', 'sourceNode', 'eventId', 'eventType', 'time', 'evidence', 'evidenceComplete', '__proto__', 'prototype', 'constructor']);
+export type SimulationNodeConfig = { buildId: string; asset: SimulationAsset; bindings: SimulationBinding[] };
+const reserved = new Set(['pageKey', 'sourceNode', 'eventId', 'eventType', 'time', 'evidence', 'evidenceComplete', 'simulationActivity', 'simulationEvent', 'interactionBinding', 'changeCount', '__proto__', 'prototype', 'constructor']);
 
 export function validateSimulationConfig(input: unknown): SimulationNodeConfig {
   if (!isRecord(input) || typeof input.buildId !== 'string' || !/^[a-z0-9.-]{1,160}$/.test(input.buildId)
     || !Array.isArray(input.bindings) || input.bindings.length < 1 || input.bindings.length > 32) throw new Error('Invalid simulation build or bindings');
+  const asset = input.asset as SimulationAsset | undefined;
+  validateSimulationAsset(asset, typeof asset?.url === 'string' && asset.url.startsWith('/'));
   const names = new Set<string>();
   for (const binding of input.bindings) {
     if (!isRecord(binding) || typeof binding.name !== 'string' || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(binding.name)
-      || reserved.has(binding.name) || names.has(binding.name) || !isRecord(binding.address)
+      || reserved.has(binding.name) || binding.name.startsWith('previous_') || names.has(binding.name) || !isRecord(binding.address)
       || !['value', 'count', 'any-nonzero'].includes(String(binding.projection))) throw new Error('Invalid simulation binding');
     names.add(binding.name);
+    for (const key of ['label', 'unit']) {
+      if (binding[key] !== undefined && (typeof binding[key] !== 'string' || binding[key].length > 120)) throw new Error('Invalid simulation binding description');
+    }
     const { path, tandem } = binding.address;
     if ((typeof path === 'string') === (typeof tandem === 'string')
       || (typeof path === 'string' && (!path || path.length > 1000))

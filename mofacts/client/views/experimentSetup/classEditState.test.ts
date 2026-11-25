@@ -28,7 +28,7 @@ describe('classEditState', function() {
     ], 'teacher-1', 'America/Chicago');
 
     expect(data.courses.map((course) => course.courseName)).to.deep.equal(['Algebra']);
-    expect(data.courses[0]?.sections).to.deep.equal(['Morning']);
+    expect(data.courses[0]?.existingSections).to.deep.equal([{ sectionId: 'section-1', originalName: 'Morning', sectionName: 'Morning', remove: false }]);
     expect(data.courses[0]?.visibility).to.equal('public');
     expect(data.sectionLinks.map((section) => section.sectionId)).to.deep.equal(['section-1']);
   });

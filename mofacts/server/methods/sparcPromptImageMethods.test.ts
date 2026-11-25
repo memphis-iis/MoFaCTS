@@ -1,4 +1,3 @@
-import { SPARC_INSTRUCTIONAL_NEED_VERSION } from '../../../learning-components/runtime/sparcInstructionalNeed';
 import { strict as assert } from 'node:assert';
 import { createSparcPromptImageMethods } from './sparcPromptImageMethods';
 import { generateSparcPromptImage } from '../lib/sparcPromptImageGeneration';
@@ -116,40 +115,6 @@ describe('SPARC private supported Prompt image contracts', () => {
     const f = fixture(); f.deps.isRemoved = async id => id === 'deleted';
     assert.deepEqual(await f.methods.getSparcPromptImage.call({ userId: 'admin' }, 'deleted'), { administrativeRemoval: true });
     await assert.rejects(f.methods.getSparcPromptImage.call({ userId: 'admin' }, 'missing'), /not found/);
-  });
-
-  it('inspects all completed shared figures across systems and versions, in bounded pages without private state', async () => {
-    const library = sparcLibraryFixture(); const f = fixture(library.store);
-    for (let i = 0; i < 25; i++) {
-      const id = String(i).padStart(20, '0');
-      const version = i === 0 ? 'earlier-library-version' : 'sparc-teaching-figure-library-v1';
-      library.entries.set(id, { _id: id, version, imageModel: 'synthetic-model', embeddingModel: 'synthetic-embedding', embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
-        dimensions: 2, situation: 'Private situation', embedding: [1, 0], ready: true, createdAt: new Date('2026-10-12T00:00:00Z') });
-      f.assets.set(id, { _id: id, userId: 'another-admin', type: 'image/png', path: 'synthetic-image',
-        meta: { public: false, uploadPurpose: SPARC_PROMPT_IMAGE_PURPOSE, figureLibraryVersion: version, ready: true,
-          tdfId: i % 2 ? 'system-a' : 'system-b', sessionId: 'private-session', description: `Teaching figure ${i}` } });
-    }
-    f.assets.set('private-prompt', { _id: 'private-prompt', meta: { public: false, ready: true, uploadPurpose: SPARC_PROMPT_IMAGE_PURPOSE } });
-    library.entries.set('unfinished', { ...library.entries.get('00000000000000000001')!, _id: 'unfinished', ready: false });
-    const first = await f.methods.listSparcLibraryImages.call({ userId: 'admin' });
-    assert.equal(first.images.length, 24);
-    assert.equal(first.nextCursor, '00000000000000000023');
-    assert.deepEqual(Object.keys(first.images[0]!).sort(), ['assetId', 'createdAt', 'description', 'model']);
-    const last = await f.methods.listSparcLibraryImages.call({ userId: 'otherAdmin' }, { afterId: first.nextCursor! });
-    assert.equal(last.images.length, 1); assert.equal(last.nextCursor, null);
-    const raster = await f.methods.getSparcPromptImage.call({ userId: 'admin' }, first.images[0]!.assetId);
-    assert.ok(raster.dataUrl!.startsWith('data:image/png;base64,'));
-    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'student' }), /Permission denied|Reopen this lesson|do not have access/);
-    await assert.rejects(f.methods.listSparcLibraryImages.call({}), /logged in/);
-    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'admin' }, { afterId: '$invalid' }), /Invalid image cursor/);
-    assert.equal(f.providerCalls(), 0);
-  });
-
-  it('reports a broken canonical asset rather than silently hiding library records', async () => {
-    const library = sparcLibraryFixture(); const f = fixture(library.store);
-    library.entries.set('missing', { _id: 'missing', version: 'v1', imageModel: 'synthetic-model', embeddingModel: 'synthetic-embedding', embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
-      dimensions: 2, situation: 'Private situation', embedding: [1, 0], ready: true, createdAt: new Date() });
-    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'admin' }), /missing its completed canonical asset/);
   });
 
   it('shares only canonical teaching-library figures across authorized users and retains each decision', async () => {

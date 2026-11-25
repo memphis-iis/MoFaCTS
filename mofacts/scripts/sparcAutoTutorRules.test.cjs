@@ -41,7 +41,6 @@ require('../server/lib/backup/dashboardHistoryRestore.test.ts');
 require('../server/lib/userDeletion.test.ts');
 require('../server/lib/sparcMoveLibraryService.test.ts');
 require('../server/lib/sparcRetrievalSelector.test.ts');
-require('../server/lib/sparcRetrievalPublicationState.test.ts');
 require('../server/lib/sparcRetrievalPublication.test.ts');
 require('../server/lib/boundedExternalSort.test.ts');
 require('../server/lib/sortedHistoryExport.test.ts');
@@ -58,7 +57,8 @@ if (process.argv.includes('--include-general-rules')) {
   require('../../learning-components/trial-displays/sparc/sparcSemanticNodes.test.ts');
   require('../../learning-components/trial-displays/sparc/sparcProgressiveNodes.test.ts');
 }
-if (process.argv.includes('--include-client-contracts') || process.argv.includes('--include-history-contracts')) {
+const retrievalContracts = process.argv.includes('--include-retrieval-contracts');
+if (retrievalContracts || process.argv.includes('--include-client-contracts') || process.argv.includes('--include-history-contracts')) {
   // Isolated client contracts use the same injected providers/writers as Meteor tests.
   // This is not a live Meteor or Mongo integration run.
   const Module = require('node:module');
@@ -67,7 +67,7 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
   // Match module identity: injected method transports must be shared by all importers.
   const meteorModule = { Meteor: { Error: class MeteorError extends Error {
     constructor(code, reason, details) { super(reason); this.error = code; this.reason = reason; this.details = details; }
-  }, callAsync: () => { throw new Error('Unexpected live Meteor call in isolated contracts'); } } };
+  }, user: () => null, callAsync: () => { throw new Error('Unexpected live Meteor call in isolated contracts'); } } };
   const dom = new JSDOM('');
   global.document = dom.window.document;
   global.window = dom.window;
@@ -75,6 +75,7 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
   global.MutationObserver = dom.window.MutationObserver;
   Module._load = function(request, parent, isMain) {
     if (request === 'meteor/meteor') return meteorModule;
+    if (request === 'meteor/accounts-base') return { Accounts: { _storedLoginToken: () => null } };
     if (request === 'meteor/tracker') return { Tracker: {} };
     if (request === 'meteor/mongo') return { Mongo: {} };
     if (request === 'meteor/session') return { Session: { get: () => undefined } };
@@ -87,7 +88,15 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
     if (request === 'meteor/random') return { Random: { secret: () => require('node:crypto').randomBytes(32).toString('hex') } };
     return originalLoad.call(this, request, parent, isMain);
   };
-  try {
+  tests.after(() => { dom.window.close(); delete global.document; delete global.window; delete global.HTMLElement; delete global.MutationObserver; });
+  function registerContracts() {
+    if (retrievalContracts) {
+      require('../client/views/experiment/svelte/services/sparcMoveLibraryClient.test.ts');
+      require('../client/views/experiment/svelte/services/sparcLocalRetrieval.test.ts');
+      require('../server/lib/sparcFigureLibraryService.test.ts');
+      require('../server/methods/sparcMoveLibraryMethods.test.ts');
+      return;
+    }
     if (process.argv.includes('--include-client-contracts')) {
       require('../client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.test.ts');
       require('../client/views/experiment/svelte/services/sparcLocalRetrieval.test.ts');
@@ -120,6 +129,6 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
     require('../server/lib/dashboardHistoryRefresh.test.ts');
     require('../server/lib/dashboardHistoryArchive.test.ts');
     if (process.argv.includes('--include-history-contracts')) require('../server/methods/analyticsMethods.test.ts');
-  } finally { Module._load = originalLoad; }
-  tests.after(() => { dom.window.close(); delete global.document; delete global.window; delete global.HTMLElement; delete global.MutationObserver; });
+  }
+  try { registerContracts(); } finally { Module._load = originalLoad; }
 }

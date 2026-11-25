@@ -1,0 +1,38 @@
+name: mofacts-audit-connection
+services:
+  connection:
+    image: ${AUDIT_CONNECTION_IMAGE:?Select the exact qualified connection image}
+    user: "2000:2000"
+    command: ["serve", "/state", "/run/connection/scanner.sock", "/lease", "/run/http/http.sock"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.25
+    pids_limit: 64
+    init: true
+    network_mode: none
+    volumes:
+      - type: bind
+        source: /var/lib/mofacts-audit-connection/state
+        target: /state
+        bind: {create_host_path: false}
+      - type: bind
+        source: /run/mofacts-audit-connection/channel
+        target: /run/connection
+        bind: {create_host_path: false}
+      - type: bind
+        source: /var/lib/mofacts-audit-scanner/staging2
+        target: /lease
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /run/mofacts-audit-connection/http
+        target: /run/http
+        bind: {create_host_path: false}
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=8m"]
+    healthcheck:
+      test: ["CMD", "node", "--input-type=module", "-e", "import http from 'node:http';const r=http.get({socketPath:'/run/http/http.sock',path:'/.well-known/oauth-protected-resource/audit-connection/mcp',headers:{Host:'staging2.optimallearning.org'}},r=>{r.resume();if(r.statusCode!==200)process.exit(1)});r.setTimeout(4000,()=>r.destroy());r.on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

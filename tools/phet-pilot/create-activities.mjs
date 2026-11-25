@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { packageSources } from './package-sources.mjs';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
@@ -20,13 +21,22 @@ const test = (op, left, right) => ({ op, left: variable(left), right: literal(ri
 const observed = slots => ({ factType: 'interface-event', slots: { eventType: literal('simulation-observation'), ...slots } });
 const state = (key, value) => ({ factType: 'interface-state', slots: { node: literal('simulation'), key: literal(key), value } });
 const absent = key => ({ type: 'not', pattern: state(key, literal(true)) });
+const variableDescriptions = {
+  mass: { label: 'Block mass', unit: 'kg' }, volume: { label: 'Block volume', unit: 'm³' },
+  length: { label: 'Pendulum length', unit: 'm' }, angle: { label: 'Pendulum angle', unit: 'rad' },
+  componentCount: { label: 'Component count', unit: 'count' }, conducting: { label: 'Conducting circuit', unit: 'boolean' },
+};
+const describeVariable = name => {
+  if (!variableDescriptions[name]) throw new Error('Missing authored variable description: ' + name);
+  return variableDescriptions[name];
+};
 const specifications = [
   { simulation: 'density', title: 'Density: mass and volume', instructions: 'Open Intro. Keep the wood material and increase the block volume above 5 liters. Observe how mass changes while density remains 400 kg per cubic meter.',
     bindings: [['mass', 'blockA.massProperty'], ['volume', 'blockA.volumeProperty']],
     stages: [{ id: 'relationship', when: [observed({ mass: bind('mass'), volume: bind('volume') }), absent('completed')],
       tests: [test('gt', 'volume', 0.0055), ...['gt', 'lt'].map((op, index) => ({ op, left: { type: 'function', name: 'subtract', args: [variable('mass'), { type: 'function', name: 'multiply', args: [literal(400), variable('volume')] }] }, right: literal(index ? 0.001 : -0.001) }))],
       complete: true, message: 'Task complete: mass increased with volume, and mass / volume is still 400 kg/m³.' }] },
-  { simulation: 'pendulum-lab', title: 'Pendulum: length and oscillation', instructions: 'Open Intro. Increase the first pendulum length to at least 0.75 m, then drag and release its bob. We will detect the length change and a subsequent left–right–left oscillation. This is a sampled oscillation check, not an exact period estimate.',
+  { simulation: 'pendulum-lab', title: 'Pendulum: length and oscillation', instructions: 'Open Intro. Increase the first pendulum length to at least 0.75 m, then drag and release its bob. We will detect the length change and a subsequent left–right–left oscillation. This observes angular crossings; it does not estimate an exact period.',
     bindings: [['length', 'pendula.0.lengthProperty'], ['angle', 'pendula.0.angleProperty']],
     stages: [
       { id: 'lengthChanged', when: [observed({ length: bind('length') }), absent('lengthChanged')], tests: [test('gte', 'length', 0.75)], message: 'Length change observed. Release the bob and let it swing across the center.' },
@@ -44,22 +54,57 @@ const specifications = [
 ];
 await mkdir(output, { recursive: true });
 const zip = new JSZip();
+const releaseManifest = JSON.parse(await readFile(new URL('./releases.json', import.meta.url), 'utf8'));
 for (const spec of specifications) {
   const build = JSON.parse(await readFile(path.join(root, 'tmp/phet-pilot', spec.simulation, 'monitored/monitored-build-result.json'), 'utf8'));
   if (build.status !== 'built' || build.collectorHash !== collectorHash || build.bridgeHash !== bridgeHash) throw new Error(`Build ${spec.simulation} with current shared sources first`);
   const pageKey = `phet-${spec.simulation}`;
+  const workspace = path.join(root, 'tmp/phet-pilot', spec.simulation, 'monitored');
+  const release = releaseManifest.pilots.find(pilot => pilot.simulation === spec.simulation);
+  const html = await readFile(path.join(workspace, spec.simulation, release.buildArtifact));
+  const catalog = await readFile(path.join(workspace, 'monitor-catalog.json'));
+  const catalogMetadata = JSON.parse(catalog);
+  if (hash(html) !== build.artifactHash || catalogMetadata.buildId !== build.identity || catalogMetadata.artifactSha256 !== build.artifactHash) throw new Error(`Distribution identity mismatch: ${spec.simulation}`);
+  const asset = { url: `${pageKey}.html${spec.simulation === 'pendulum-lab' ? '?accessibility' : ''}`, sha256: hash(html),
+    catalog: { url: `${pageKey}.catalog.json`, sha256: hash(catalog) } };
+  const lessonZip = new JSZip();
+  const assets = [[`${pageKey}.html`, html], [`${pageKey}.catalog.json`, catalog],
+    [`${pageKey}-source.zip`, await packageSources(spec.simulation, build)],
+    [`${pageKey}-NOTICES.txt`, `Adapted from PhET Interactive Simulations, University of Colorado Boulder.\nPublic release: ${release.version}; adapted build: ${build.identity}.\nThe HTML retains upstream notices. Corresponding pinned and modified source, dependency manifests, build instructions and upstream license files accompany this lesson in ${pageKey}-source.zip.\nShared monitoring is event-based; silent mutable fields remain unsupported.\n`]];
+  asset.attachments = assets.slice(2).map(([url, bytes]) => ({ url, sha256: hash(bytes) }));
+  for (const [name, bytes] of assets) { await writeFile(path.join(output, name), bytes); zip.file(name, bytes); lessonZip.file(name, bytes); }
   const target = nodeId => ({ pageKey, nodeId });
   const write = (key, value) => ({ type: 'write-state', write: { target: target('simulation'), key, value: literal(value) } });
   const message = (text, messageType = 'hint') => ({ type: 'message', messageType, template: text, target: target('feedback') });
-  const rules = spec.stages.map(stage => ({ id: `${pageKey}.${stage.id}`, when: stage.when, tests: stage.tests || [], then: [write(stage.complete ? 'completed' : stage.id, true), message(stage.message, stage.complete ? 'success' : 'hint')] }));
+  const history = (selection, action, input, outcome = 'unknown', endsAttempt = false) => ({ type: 'history-event', selection: literal(selection), action: literal(action), input, outcome: literal(outcome), ...(endsAttempt ? { endsAttempt: true } : {}) });
+  const rules = spec.stages.map(stage => ({ id: `${pageKey}.${stage.id}`, when: stage.when, tests: stage.tests || [], then: [write(stage.complete ? 'completed' : stage.id, true), message(stage.message, stage.complete ? 'success' : 'hint'), history(spec.title, stage.complete ? 'Check' : 'Observe task condition', stage.message, stage.complete ? 'correct' : 'unknown')] }));
   const button = selection => ({ factType: 'interface-event', slots: { selection: literal(selection), action: literal('ButtonPressed') } });
-  rules.push({ id: `${pageKey}.hint`, when: [button('hint')], then: [message(spec.instructions)] });
-  rules.push({ id: `${pageKey}.done`, when: [button('done'), state('completed', literal(true))], then: [{ type: 'classify', outcome: 'correct' }] });
-  rules.push({ id: `${pageKey}.not-done`, when: [button('done'), absent('completed')], then: [message('Complete the simulation task before selecting Done.')] });
+  rules.push({ id: `${pageKey}.hint`, when: [button('hint')], then: [message(spec.instructions), history('Hint button', 'Request hint', 'hint')] });
+  rules.push({ id: `${pageKey}.done`, when: [button('done'), state('completed', literal(true))], then: [{ type: 'classify', outcome: 'correct' }, history(spec.title, 'Complete', 'Authored task complete', 'unknown', true)] });
+  rules.push({ id: `${pageKey}.not-done`, when: [button('done'), absent('completed')], then: [message('Complete the simulation task before selecting Done.'), history(spec.title, 'Check', 'Task conditions not satisfied', 'incorrect')] });
+  for (const [name, , projection = 'value'] of spec.bindings) if (projection === 'value') {
+    const description = describeVariable(name);
+    rules.push({ id: pageKey + '.interaction.' + name,
+      when: [observed({ simulationEvent: literal('interaction-completed'), interactionBinding: literal(name),
+        [name]: bind(name), ['previous_' + name]: bind('previous_' + name) })],
+      tests: [{ op: 'neq', left: variable(name), right: variable('previous_' + name) }],
+      then: [history(description.label, 'Adjust ' + name, description.label + ' {previous_' + name + '} → {' + name + '} ' + description.unit)] });
+  }
+  for (const [signal, action] of [['interaction-cancelled', 'Cancel adjustment'], ['reset', 'Reset'], ['collection-added', 'Component added'], ['collection-removed', 'Component removed']]) {
+    rules.push({ id: pageKey + '.activity.' + signal, when: [observed({ simulationEvent: literal(signal), changeCount: bind('count') })],
+      then: [history(spec.title, action, signal.startsWith('collection-') ? '{count} component(s)' : action),
+        ...(signal === 'reset' && spec.simulation === 'pendulum-lab' ? spec.stages.filter(stage => !stage.complete).map(stage => write(stage.id, false)) : [])] });
+  }
+  if (spec.simulation === 'circuit-construction-kit-dc') {
+    rules.push({ id: pageKey + '.conducting.start', when: [observed({ simulationEvent: literal('observation'), conducting: literal(true) }), absent('conductingRecorded')],
+      then: [write('conductingRecorded', true), history(spec.title, 'Conducting circuit established', 'Nonzero simulated current')] });
+    rules.push({ id: pageKey + '.conducting.stop', when: [observed({ simulationEvent: literal('observation'), conducting: literal(false) }), state('conductingRecorded', literal(true))],
+      then: [write('conductingRecorded', false), history(spec.title, 'Circuit stopped conducting', 'No conducting path')] });
+  }
   const display = { type: 'sparc', schema: 'tutorscript-sparc/2.0', nodes: [
     { id: 'instructions', nodeType: 'atomic', atomType: 'text-block', value: spec.instructions },
-    { id: 'simulation', nodeType: 'atomic', atomType: 'simulation', label: spec.title, simulation: { buildId: build.identity,
-      bindings: spec.bindings.map(([name, address, projection = 'value', memberProperty]) => ({ name, address: { path: `screens.1.model.${address}` }, projection, ...(memberProperty ? { memberProperty } : {}) })) } },
+    { id: 'simulation', nodeType: 'atomic', atomType: 'simulation', label: spec.title, simulation: { buildId: build.identity, asset,
+      bindings: spec.bindings.map(([name, address, projection = 'value', memberProperty]) => ({ name, ...describeVariable(name), address: { path: `screens.1.model.${address}` }, projection, ...(memberProperty ? { memberProperty } : {}) })) } },
     { id: 'feedback', nodeType: 'atomic', atomType: 'message-box', value: 'Start a fresh simulation attempt when ready.' },
     { id: 'hint', nodeType: 'atomic', atomType: 'button', value: 'Hint', label: 'Hint' },
     { id: 'done', nodeType: 'atomic', atomType: 'button', value: 'Done', label: 'Done' },
@@ -71,8 +116,10 @@ for (const spec of specifications) {
       { unitname: 'Complete', unitinstructions: '<p>Simulation activity complete. Your recorded task progress is preserved.</p>' }] } };
   const stimuli = { setspec: { lessonname: spec.title, clusters: [{ clusterid: 0, clustername: pageKey, clusterKC: pageKey, stims: [{ stimulusid: 0, stimulusKC: pageKey, clusterKC: pageKey, textStimulus: spec.title, response: { correctResponse: '__SPARC_COMPLETED__' } }] }], sparcPages: [{ pageId: pageKey, display }] } };
   for (const [name, data] of [[`${pageKey}_TDF.json`, tdf], [stimulusName, stimuli]]) {
-    const text = JSON.stringify(data, null, 2) + '\n'; await writeFile(path.join(output, name), text); zip.file(name, text);
+    const text = JSON.stringify(data, null, 2) + '\n'; await writeFile(path.join(output, name), text); zip.file(name, text); lessonZip.file(name, text);
   }
+  await writeFile(path.join(path.dirname(output), `SPARC PhET ${spec.simulation}.zip`), await lessonZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
+  console.log(`${spec.simulation}: packaged HTML, catalog, source, notices and lesson`);
 }
-await writeFile(path.join(path.dirname(output), 'SPARC PhET Pilot.zip'), await zip.generateAsync({ type: 'nodebuffer' }));
+await writeFile(path.join(path.dirname(output), 'SPARC PhET Pilot.zip'), await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
 console.log(`Wrote three pinned activities to ${output}`);

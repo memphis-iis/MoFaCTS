@@ -1,11 +1,15 @@
 import { expect } from 'chai';
-import { createRecoverableWarningMethods } from './recoverableWarningMethods';
+import { randomUUID } from 'node:crypto';
+import { Meteor } from 'meteor/meteor';
+import { createRecoverableWarningRegistration } from './recoverableWarningMethods';
+import { WARNING_METHOD_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog';
+import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods';
 import { RECOVERABLE_WARNING_ACTION, type RecoverableWarning, type RecoverableWarningRow, type SparcOutputLimitWarning } from '../../common/recoverableWarnings';
 
 function fixture(rows: RecoverableWarningRow[] = []) {
   const writes: Record<string, unknown>[] = [];
   const reads: Array<{ selector: Record<string, unknown>; options: Record<string, unknown> }> = [];
-  const methods = createRecoverableWarningMethods({
+  const { methods } = createRecoverableWarningRegistration({
     auditLog: {
       async insertAsync(document) { writes.push(document); return 'event-1'; },
       find(selector, options) { reads.push({ selector, options }); return { fetchAsync: async () => rows }; },
@@ -22,6 +26,33 @@ async function rejected(operation: () => Promise<unknown>) {
 }
 
 describe('recoverable warning log methods', function() {
+  it('skips stored diagnostics for private participants before validating the report', async function() {
+    const userId = await Meteor.users.insertAsync({
+      username: `synthetic-private-warning-${randomUUID()}`,
+      profile: { experiment: true },
+    });
+    try {
+      const { methods, writes } = fixture();
+      expect(await methods.reportRecoverableWarning.call({ userId }, {} as RecoverableWarning)).to.equal(false);
+      expect(writes).to.deep.equal([]);
+    } finally {
+      await Meteor.users.removeAsync(userId);
+    }
+  });
+  it('binds both installed warning methods to their existing authorization', function() {
+    const observation = registeredMeteorMethodSurfaces();
+    if (observation.state !== 'observed') throw new Error(observation.reason);
+    const expected = {
+      reportRecoverableWarning: { kind: 'diagnostic-telemetry', operation: 'non-private-report' },
+      getRecoverableWarnings: { kind: 'role', role: 'admin' },
+    } as const;
+    for (const verification of Object.values(WARNING_METHOD_VERIFICATIONS)) {
+      const entries = observation.surfaces.filter(entry => entry.name === verification.method);
+      expect(entries).to.have.length(1);
+      expect(entries[0]?.verification).to.equal(verification);
+      expect(entries[0]?.policy).to.deep.equal(expected[verification.method]);
+    }
+  });
   it('stores bounded removal-check errors with server redaction and rejects extra fields', async function() {
     const { methods, writes } = fixture();
     const connection = new URL('mongodb://host/db');

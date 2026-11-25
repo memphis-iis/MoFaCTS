@@ -268,12 +268,14 @@ export function createOpenRouterModelCatalogService(
   return { getCatalog: readCatalog };
 }
 
+export const modelCatalogPolicy = Object.freeze({ kind: 'model-catalog', operation: 'authenticated-read', authorize: requireAuthenticatedUser } as const);
+
 export function createOpenRouterCatalogMethods(
   catalogService: OpenRouterModelCatalogService,
 ) {
   return {
     getOpenRouterModelCatalog: async function(this: MethodContext) {
-      requireAuthenticatedUser(
+      modelCatalogPolicy.authorize(
         this.userId,
         'Must be logged in to read the OpenRouter model catalog',
         401,

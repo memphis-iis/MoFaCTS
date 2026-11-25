@@ -20,6 +20,9 @@ declare global {
       emit(source: object, args: unknown[]): void;
       dispose(object: object): void;
       frame(): void;
+      registerInteraction(control: object, descriptor: { version: 1; kind: 'value'; property: object } | { version: 1; kind: 'reset' }): void;
+      linkInteractionProperties(owner: object, element: object): void;
+      interaction(control: object, phase: 'start' | 'complete' | 'cancel', input?: { trusted: boolean; modality: 'pointer' | 'keyboard' | 'programmatic' }): void;
     };
   }
 }

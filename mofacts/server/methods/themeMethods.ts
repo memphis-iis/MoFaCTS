@@ -274,36 +274,6 @@ export function createThemeMethods(deps: ThemeMethodDeps) {
       }
     },
 
-    generateFaviconsFromLogo: async function(this: MethodContext, logoDataUrl: string) {
-      await deps.requireAdminUser(this.userId, 'Only admins can generate favicons', 'unauthorized');
-      return await generateFaviconsFromLogoInternal(deps.serverConsole, logoDataUrl);
-    },
-
-    toggleCustomTheme: async function(this: MethodContext) {
-      deps.serverConsole('toggleCustomTheme');
-      await deps.requireAdminUser(this.userId, 'Only admins can toggle themes', 'unauthorized');
-
-      const current = await themeRegistry.ensureActiveTheme();
-      const wasEnabled = current?.enabled !== false;
-      const nextState = {
-        ...current,
-        enabled: !wasEnabled,
-      };
-
-      await deps.DynamicSettings.upsertAsync({ key: 'customTheme' }, { $set: { value: nextState } });
-
-      const entry = nextState?.activeThemeId ? themeRegistry.getThemeEntry(nextState.activeThemeId) : null;
-      if (entry && !entry.readOnly) {
-        await themeRegistry.updateTheme(entry.id, (theme: ThemeMutable) => {
-          theme.enabled = nextState.enabled;
-          return theme;
-        });
-      }
-
-      deps.serverConsole('custom theme enabled:', nextState.enabled);
-      return nextState;
-    },
-
     createThemeFromBase: async function(
       this: MethodContext,
       options: { name: string; baseThemeId?: string; properties?: Record<string, unknown>; activate?: boolean }
@@ -504,27 +474,6 @@ export function createThemeMethods(deps: ThemeMethodDeps) {
       });
 
       return { success: true };
-    },
-
-    getCustomHelpPageStatus: async function() {
-      deps.serverConsole('getCustomHelpPageStatus');
-
-      const activeTheme = await themeRegistry.ensureActiveTheme();
-      const help = activeTheme?.help;
-
-      if (!help || help.enabled === false || (!help.markdown && !help.url)) {
-        return {
-          enabled: false,
-          uploadedAt: null,
-          uploadedBy: null,
-        };
-      }
-
-      return {
-        enabled: true,
-        uploadedAt: help.uploadedAt || null,
-        uploadedBy: help.uploadedBy || null,
-      };
     },
   };
 }

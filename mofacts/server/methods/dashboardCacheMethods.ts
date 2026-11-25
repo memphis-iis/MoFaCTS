@@ -6,12 +6,9 @@ import type {
 import { createStimulusKey, isBlankIdentityValue, isOperationalHistoryRecord, isModelPracticeHistoryRecord } from '../../common/historyEnvelope';
 import { curSemester } from '../../common/Definitions';
 import type { DashboardHistoryRefreshResult } from '../lib/dashboardHistoryRefresh';
-import {
-  computeSummaryStats,
-  computeUsageSummary,
-} from './dashboardCacheShared';
 import { createDashboardLearnerConfigMethods } from './dashboardLearnerConfigMethods';
 import { createDashboardPracticeSnapshotMethods } from './dashboardPracticeSnapshotMethods';
+import { requireAccountProgressSession, requireParticipantProgressLesson } from '../lib/participantProgressScope';
 import {
   createLessonFamilyResolver,
   getLessonFamilySetspec,
@@ -432,6 +429,7 @@ export function createDashboardCacheMethods({
   }
 
   const practiceSnapshotMethods = createDashboardPracticeSnapshotMethods({
+    Courses,
     Meteor,
     Tdfs,
     Assignments,
@@ -444,10 +442,23 @@ export function createDashboardCacheMethods({
     ...(decryptData ? { decryptData } : {})
   });
   const learnerConfigMethods = createDashboardLearnerConfigMethods({
+    requireSessionLesson: (context, tdfId) => requireParticipantProgressLesson(context, Tdfs, tdfId),
     getAccessibleTdf,
     Meteor,
     UserDashboardCache,
   });
+
+  async function rebuildDashboardCache(this: any, targetUserId: string) {
+    requireAccountProgressSession(this);
+    if (targetUserId !== this.userId && !(await Roles.userIsInRoleAsync(this.userId, ['admin']))) {
+      throw new Meteor.Error('not-authorized', 'Cannot initialize cache for other users');
+    }
+    if (!(await usersCollection.findOneAsync({ _id: targetUserId }, { fields: { _id: 1 } }))) {
+      throw new Meteor.Error('not-found', 'Cannot initialize cache for missing user');
+    }
+    return await redisBoundary.withLock(`dashboard-cache:ensure:${targetUserId}`, 120000,
+      async () => await refreshDashboardHistory(targetUserId, { forceRebuild: true }));
+  }
 
   const methods = {
     async getPracticeDashboardSnapshot(this: any) {
@@ -456,38 +467,18 @@ export function createDashboardCacheMethods({
     },
     ...learnerConfigMethods,
 
-    initializeDashboardCache: async function(this: any, userId: string | null = null) {
-      const targetUserId = userId || this.userId;
-      if (!targetUserId) throw new Meteor.Error('not-authorized', 'Must be logged in');
-      if (targetUserId !== this.userId && !(await Roles.userIsInRoleAsync(this.userId, ['admin']))) {
-        throw new Meteor.Error('not-authorized', 'Cannot initialize cache for other users');
-      }
-      if (!(await usersCollection.findOneAsync({ _id: targetUserId }, { fields: { _id: 1 } }))) {
-        throw new Meteor.Error('not-found', 'Cannot initialize cache for missing user');
-      }
-      return await redisBoundary.withLock(`dashboard-cache:ensure:${targetUserId}`, 120000,
-        async () => await refreshDashboardHistory(targetUserId, { forceRebuild: true }));
-    },
-
     ensureDashboardCacheCurrent: async function(this: any) {
       if (!this.userId) throw new Meteor.Error('not-authorized', 'Must be logged in');
+      requireAccountProgressSession(this);
       return await redisBoundary.withLock(`dashboard-cache:ensure:${this.userId}`, 120000,
         async () => await refreshDashboardHistory(this.userId));
-    },
-
-    refreshDashboardCache: async function(this: any) {
-      if (!this.userId) {
-        throw new Meteor.Error('not-authorized');
-      }
-
-      await UserDashboardCache.removeAsync({ userId: this.userId });
-      return await methods.initializeDashboardCache.call(this);
     },
 
     resetOwnLessonProgress: async function(this: any, tdfId: string) {
       if (!this.userId) {
         throw new Meteor.Error('not-authorized', 'Must be logged in');
       }
+      requireAccountProgressSession(this);
       if (!GlobalExperimentStates) {
         throw new Meteor.Error('server-misconfigured', 'Experiment state collection is unavailable');
       }
@@ -557,7 +548,7 @@ export function createDashboardCacheMethods({
       serverConsole(`[Cache] Refreshing ${normalizedUserIds.length} user dashboard caches with concurrency ${DASHBOARD_ADMIN_REFRESH_CONCURRENCY}`);
       await mapWithBoundedConcurrency(normalizedUserIds, DASHBOARD_ADMIN_REFRESH_CONCURRENCY, async (targetUserId) => {
         try {
-          const result = await methods.initializeDashboardCache.call(this, targetUserId);
+          const result = await rebuildDashboardCache.call(this, targetUserId);
           refreshed.push({ userId: targetUserId, tdfCount: result.tdfCount });
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error);
@@ -574,50 +565,6 @@ export function createDashboardCacheMethods({
       };
     },
 
-    removeTdfFromCache: async function(this: any, tdfId: string) {
-      if (!this.userId) {
-        throw new Meteor.Error('not-authorized');
-      }
-
-      const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-      if (!isAdmin) {
-        throw new Meteor.Error('not-authorized', 'Admin only');
-      }
-
-      const caches = await UserDashboardCache.find(
-        { [`tdfStats.${tdfId}`]: { $exists: true } },
-        { fields: { tdfStats: 1 } }
-      ).fetchAsync();
-
-      let modified = 0;
-
-      for (const cache of caches) {
-        delete cache.tdfStats[tdfId];
-        const summary = computeSummaryStats(cache.tdfStats || {});
-        const usageSummary = computeUsageSummary(cache.tdfStats || {});
-        await UserDashboardCache.updateAsync(
-          { _id: cache._id },
-          {
-            $set: {
-              tdfStats: cache.tdfStats,
-              summary,
-              usageSummary,
-              lastUpdated: new Date()
-            },
-            // Administrative pruning explicitly requests source reconstruction
-            // on the next dashboard entry; it cannot certify a processed prefix.
-            $unset: {
-              lastHistorySequence: '',
-              historyRepairRevision: '',
-              historyTdfTargets: '',
-            }
-          }
-        );
-        modified++;
-      }
-
-      return { success: true, modified };
-    }
   };
 
   return methods;

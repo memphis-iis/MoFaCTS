@@ -19,6 +19,9 @@ must already have execution permission for the selected HTTPS target. Sessions
 are separate for anonymous, learnerA/B, teacherA/B and admin. Authenticated
 identities and authoritative hydrated role flags must match the source actors.
 Failed login/role binding cannot accidentally run a case as anonymous.
+The browser checks the approved origin after initial navigation, on cached
+sessions and after route navigation. A foreign redirect fails before credential
+entry and cannot supply a successful route-denial observation.
 
 The acquisition owner closes its browser before returning evidence; cleanup
 failure is an execution failure. Only source verification IDs and five finite
@@ -57,7 +60,20 @@ document, the synthetic own-history export SHA-256 and the synthetic audit repor
 ID/digest. The source catalog names the exact aliases and the parser owns shapes.
 
 This is an in-memory subset for the V2 fixture loader, not another credential
-store or a replacement for the full production V1 configuration. Full V2 fixture
-composition, protected binding preparation and live staging2 execution remain
-separate work. Do not publish bindings, alter production secrets, infer missing
+store or a replacement for the full production V1 configuration. Broader V2 protocol
+fixture composition remains Phase 2 work; the selected live qualification is
+recorded below. Do not publish bindings, alter production secrets, infer missing
 values or read the recovery backup merely to populate this interface.
+
+The executed access scope is described in
+[disposable staging2 qualification](staging2-authorization-fixtures.md): four
+fresh actors with exactly two teacher grants and cleanup, reusing the existing
+administrator. The operator explicitly approved that scope on 2026-11-11;
+continue its preparation, verification, execution and cleanup without another
+permission request. No teacher credential is inferred or existing account reset.
+The live corrected qualification passed all 29 cases with positive baselines on
+candidate 1c72734b. Independent reads confirm both fixture attempts' accounts,
+role assignments and seven data rows per attempt are absent. The first attempt's
+28 PASS/one timing ERROR remains recorded; requiring DDP reconnection corrected
+the scanner without changing application permissions. Broader reset/session/
+passwordless/throttle scenarios remain Phase 2 work.

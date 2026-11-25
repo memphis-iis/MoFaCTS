@@ -25,8 +25,8 @@ for (const [simulation, facts] of Object.entries(examples)) {
   let sequence = 1;
   let transitions = 0;
   const observe = values => {
-    const evidence = { buildId: display.nodes.find(n => n.id === 'simulation').simulation.buildId, attemptId: 'synthetic-contract-attempt', firstSequence: sequence, lastSequence: sequence, checkpointSequence: sequence++ };
-    const result = evaluateSparcTrialDisplayProductionRuleEvents({ pageKey, display, document, replayState, priorHistoryRecords: [], result: { eventType: 'simulation-observation', submittedNodes: { simulation: { facts: values, evidence } }, timestamp: sequence } });
+    const evidence = { buildId: display.nodes.find(n => n.id === 'simulation').simulation.buildId, attemptId: 'synthetic-contract-attempt', firstSequence: sequence, lastSequence: sequence, checkpointSequence: sequence, sourceSequence: sequence++ };
+    const result = evaluateSparcTrialDisplayProductionRuleEvents({ pageKey, display, document, replayState, priorHistoryRecords: [], result: { eventType: 'simulation-observation', submittedNodes: { simulation: { facts: values, evidence, activity: { version:1,recordRole:'internal',buildId:evidence.buildId,attemptId:evidence.attemptId,sourceEventId:'contract:'+sequence,origin:'observation',eventName:'observation',values:{},evidence } } }, timestamp: sequence } });
     for (const evaluation of result.evaluations) if (evaluation.transition) { replayState = applySparcStateTransition(replayState, evaluation.transition); transitions++; }
     assert.deepEqual(result.classifications, []); assert.deepEqual(result.credits, []);
     for (const evaluation of result.evaluations) {

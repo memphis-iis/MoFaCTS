@@ -1,5 +1,8 @@
+import { COURSE_SNAPSHOT_VERSION } from './lib/courseLearnerSnapshotCache';
+import { DDPRateLimiter } from 'meteor/ddp-rate-limiter';
+import { AUDIO_PROVIDER_VERIFICATIONS, LESSON_EDIT_VERIFICATIONS, PUBLIC_READ_VERIFICATIONS, PUBLIC_ACCOUNT_VERIFICATIONS, RUNTIME_LESSON_VERIFICATIONS, SPARC_LESSON_VERIFICATIONS, ACCOUNT_SELF_VERIFICATIONS, CLASS_PERFORMANCE_VERIFICATION, ACCOUNT_DIAGNOSTIC_VERIFICATIONS, COURSE_DELETE_VERIFICATION, COURSE_READ_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './lib/prolificCollections';
-import "../common/Collections";
+import { CourseLearnerSnapshotCache } from '../common/Collections';
 import { Meteor } from 'meteor/meteor';
 import { Roles } from 'meteor/alanning:roles';
 import { asyncMethods, methods } from './serverComposition';
@@ -9,6 +12,14 @@ import { expect } from 'chai';
 import { compressHistoryRecord } from '../common/historyCompression';
 import { SERVER_VERBOSITY_SETTING } from '../common/loggingSettings';
 import { encryptData } from './lib/encryption';
+import { Accounts } from 'meteor/accounts-base';
+import { createHash, randomBytes } from 'node:crypto';
+import { unusedExpiredResetPrecondition, resetAttemptOutcome } from '../common/securityAudit/resetProtocol';
+import { sessionLifetimeStatus } from '../common/securityAudit/sessionLifetime';
+import { CONDITION_COUNT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION } from '../common/securityAudit/verificationCatalog';
+import { FRAMEWORK_AUTH_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
+import { registeredFrameworkAuthSurfaces } from './securitySurfaces/registerFrameworkAuth';
+import { registeredMeteorMethodSurfaces } from './securitySurfaces/registerMeteorMethods';
 
 const MeteorAny = Meteor as any;
 const MeteorUsersAny = Meteor.users as any;
@@ -131,6 +142,91 @@ describe('server auth and session methods', function() {
     await Roles.createRoleAsync('teacher', { unlessExists: true });
   });
 
+  it('observes installed account hooks, native methods and provider service owners', function() {
+    const observed = registeredFrameworkAuthSurfaces();
+    if (observed.state !== 'observed') throw Error(observed.reason);
+    expect(observed.surfaces.map(row => row.verification.verificationId)).to.have.members(
+      Object.values(FRAMEWORK_AUTH_VERIFICATIONS).map(row => row.verificationId),
+    );
+    expect(observed.surfaces.map(row => row.surfaceId)).to.have.members(
+      Object.values(FRAMEWORK_AUTH_VERIFICATIONS).map(row => row.surfaceId),
+    );
+  });
+
+  it('serves only public sign-in configuration and active help with per-connection limits', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed public reads');
+    const limiter = DDPRateLimiter as typeof DDPRateLimiter & {
+      findAllMatchingRulesAsync(input: { type: string; name: string; connectionId: string; userId: null }): Promise<unknown[]>;
+    };
+    for (const verification of PUBLIC_READ_VERIFICATIONS) {
+      const row = observed.surfaces.find(item => item.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      expect(row?.policy).to.deep.equal({ kind: 'public-read', operation: verification.method,
+        rateLimit: { requests: 60, windowMs: 60000, scope: 'connection' } });
+      const rules = await limiter.findAllMatchingRulesAsync({
+        type: 'method', name: verification.method, connectionId: Random.id(), userId: null,
+      });
+      expect(rules).to.have.length(1);
+    }
+    const handlers = MeteorAny.server.method_handlers;
+    const config = await handlers.getAuthClientConfig.call({ userId: null });
+    expect(config).to.have.all.keys('allowPublicSignup', 'requireEmailVerification', 'minPasswordLength',
+      'memphisSamlEnabled', 'memphisSamlDisplayName');
+    const help = await handlers.getCustomHelpPage.call({ userId: null });
+    expect(help === null || typeof help === 'string').to.equal(true);
+  });
+
+  it('acknowledges unknown verification recipients and binds public account limits', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed public account methods');
+    const limiter = DDPRateLimiter as typeof DDPRateLimiter & {
+      findAllMatchingRulesAsync(input: { type: string; name: string; connectionId: string; userId: null }): Promise<unknown[]>;
+    };
+    for (const verification of PUBLIC_ACCOUNT_VERIFICATIONS) {
+      const row = observed.surfaces.find(item => item.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      const requests = ['requestPasswordReset', 'resendVerificationEmail'].includes(verification.method) ? 3 : 5;
+      expect(row?.policy).to.deep.equal({ kind: 'public-account', operation: verification.method,
+        rateLimit: { requests, windowMs: 3600000, scope: 'connection' } });
+      const rules = await limiter.findAllMatchingRulesAsync({
+        type: 'method', name: verification.method, connectionId: Random.id(), userId: null,
+      });
+      expect(rules).to.have.length(1);
+    }
+    const result = await MeteorAny.server.method_handlers.resendVerificationEmail.call({ userId: null }, Random.id() + '@example.invalid');
+    expect(result).to.deep.equal({ success: true });
+  });
+
+  it('keeps installed account settings and sign-in updates scoped to the caller', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed account handlers');
+    for (const verification of ACCOUNT_SELF_VERIFICATIONS) {
+      const row = observed.surfaces.find(item => item.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      expect(row?.policy).to.deep.equal({ kind: 'account-self', operation: 'current-caller' });
+    }
+    const handlers = MeteorAny.server.method_handlers;
+    const actor = { userId: await MeteorUsersAny.insertAsync({ username: Random.id() }) };
+    const other = { userId: await MeteorUsersAny.insertAsync({ username: Random.id() }) };
+    const anon = { userId: null };
+    expect(await handlers.getCurrentUserRoleFlags.call(anon)).to.deep.equal({ admin: false, teacher: false });
+    expect(await handlers.hasUserPersonalKeys.call(anon)).to.deep.equal({ hasSR: false, hasTTS: false });
+    expect(await handlers.isUserSpeechAPIKeySetup.call(anon)).to.equal(false);
+    await handlers.saveUserSpeechAPIKey.call(actor, Random.secret());
+    expect(await handlers.isUserSpeechAPIKeySetup.call(actor)).to.equal(true);
+    expect(await handlers.isUserSpeechAPIKeySetup.call(other)).to.equal(false);
+    await handlers.deleteUserSpeechAPIKey.call(other);
+    expect(await handlers.isUserSpeechAPIKeySetup.call(actor)).to.equal(true);
+    await handlers.deleteUserSpeechAPIKey.call(actor);
+    expect(await handlers.isUserSpeechAPIKeySetup.call(actor)).to.equal(false);
+    await handlers.setUserLoginData.call(actor, 'section-invite', 'password');
+    expect((await MeteorUsersAny.findOneAsync(actor.userId)).loginParams.entryPoint).to.equal('section-invite');
+    expect((await MeteorUsersAny.findOneAsync(other.userId)).loginParams).to.equal(undefined);
+    await handlers.recordSessionRevocation.call(actor, 'auth-route-logout');
+    expect(await AuditLogAny.findOneAsync({ actorUserId: actor.userId, targetUserId: actor.userId, action: 'auth.sessionRevoked' })).to.exist;
+  });
+
   it('writes auth.signupCompleted for native signup', async function() {
     const email = `signup-${Random.id()}@example.com`;
     const password = `LongPassword-${Random.id()}123`;
@@ -160,9 +256,94 @@ describe('server auth and session methods', function() {
     expect(result).to.not.have.property('token');
   });
 
-  it('logs canonical email changes when populateSSOProfile updates the account email', async function() {
+  it('rejects an unused aged reset token and verifies current reset, replay denial and stored-session revocation', async function() {
+    const email = `reset-protocol-${Random.id()}@example.com`.toLowerCase();
+    const originalPassword = `Original-${Random.secret()}-Aa7!`;
+    const nextPassword = `Changed-${Random.secret()}-Aa7!`;
+    const replayPassword = `Replay-${Random.secret()}-Aa7!`;
+    const { userId } = await methods.signUpUser.call({}, email, originalPassword);
+    expect((await MeteorUsersAny.findOneAsync(userId)).email_canonical).to.equal(email);
+    const accounts = Accounts as any;
+    const passwordMatches = async (password: string) => {
+      const user = await MeteorUsersAny.findOneAsync(userId);
+      const checked = await accounts._checkPasswordAsync(user, password);
+      return checked.userId === userId && !checked.error;
+    };
+    expect(await passwordMatches(originalPassword)).to.equal(true);
+    const nativeStamp = accounts._generateStampedLoginToken();
+    const nativeExpiry = accounts._tokenExpiration(nativeStamp.when);
+    // Check native duration generation, not an unexecuted DDP login baseline.
+    expect(sessionLifetimeStatus((nativeExpiry.getTime() - nativeStamp.when.getTime()) / 86400000)).to.equal('PASS');
+    expect(accounts._getTokenLifetimeMs()).to.equal(30 * 86400000);
+    const now = Date.now(), lifetimeMs = 3600000;
+    const expired = randomBytes(32).toString('hex'), current = randomBytes(32).toString('hex');
+    const expiredId = await PasswordResetTokensAny.insertAsync({ userId, email,
+      tokenHash: createHash('sha256').update(expired).digest('hex'), used: false,
+      createdAt: new Date(now - 3601000), expiresAt: new Date(now - 1000) });
+    const eligibleExpired = await PasswordResetTokensAny.findOneAsync({ userId, email,
+      tokenHash: createHash('sha256').update(expired).digest('hex'), used: false });
+    expect(eligibleExpired?._id).to.equal(expiredId);
+    expect(eligibleExpired.expiresAt.getTime()).to.be.lessThan(now);
+    // Synthetic record age in isolated Mongo, not a live mailbox/wall-clock claim.
+    expect(unusedExpiredResetPrecondition({ owned: true, unused: true,
+      ageMs: 3601000, lifetimeMs, remainingMs: -1000 })).to.equal(true);
+    let expiredCode: unknown;
+    try { await methods.resetPasswordWithToken.call({}, email, expired, nextPassword); }
+    catch (error: any) { expiredCode = error.error; }
+    expect(expiredCode).to.equal('invalid-token');
+    expect((await PasswordResetTokensAny.findOneAsync(expiredId)).used).to.equal(false);
+    expect(await passwordMatches(originalPassword)).to.equal(true);
+    expect(await passwordMatches(nextPassword)).to.equal(false);
+
+    const currentId = await PasswordResetTokensAny.insertAsync({ userId, email,
+      tokenHash: createHash('sha256').update(current).digest('hex'), used: false,
+      createdAt: new Date(now), expiresAt: new Date(now + lifetimeMs) });
+    await MeteorUsersAny.updateAsync(userId, { $set: { 'services.resume.loginTokens': [
+      { hashedToken: createHash('sha256').update(Random.secret()).digest('base64'), when: new Date(now) },
+    ] } });
+    expect((await MeteorUsersAny.findOneAsync(userId)).services.resume.loginTokens.length).to.equal(1);
+    expect(await methods.resetPasswordWithToken.call({}, email, current, nextPassword)).to.deep.equal({ success: true });
+    expect(await passwordMatches(nextPassword)).to.equal(true);
+    expect(await passwordMatches(originalPassword)).to.equal(false);
+    const used = await PasswordResetTokensAny.findOneAsync(currentId);
+    expect(used.used).to.equal(true);
+    expect((await MeteorUsersAny.findOneAsync(userId)).services.resume.loginTokens ?? []).to.have.length(0);
+    let replayCode: unknown;
+    try { await methods.resetPasswordWithToken.call({}, email, current, replayPassword); }
+    catch (error: any) { replayCode = error.error; }
+    expect(replayCode).to.equal('invalid-token');
+    expect(resetAttemptOutcome({ state: 'rejected', code: String(replayCode) })).to.equal('DENIED_BY_POLICY');
+    expect(await PasswordResetTokensAny.findOneAsync(currentId)).to.deep.equal(used);
+    expect(await passwordMatches(nextPassword)).to.equal(true);
+    expect(await passwordMatches(replayPassword)).to.equal(false);
+  });
+
+  it('binds SSO profile completion to the account holder or an administrator', async function() {
+    const registry = registeredMeteorMethodSurfaces();
+    if (registry.state !== 'observed') throw new Error('Expected observed Meteor methods');
+    const rows = registry.surfaces.filter(row => row.name === 'populateSSOProfile');
+    expect(rows).to.have.length(1);
+    expect(rows[0]?.policy).to.deep.equal({ kind: 'sso-profile', operation: 'self-or-admin' });
+    const handler = MeteorAny.server.method_handlers.populateSSOProfile;
+    const subject = Random.id();
+    for (const [userId, code] of [[null, 401], [Random.id(), 403]] as const) {
+      let denial: unknown;
+      try { await handler.call({ userId }, subject); } catch (error) { denial = error; }
+      expect(denial).to.be.instanceOf(Meteor.Error);
+      expect(denial).to.include({ error: code });
+    }
+    const admin = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await Roles.createRoleAsync('admin', { unlessExists: true });
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    const email = subject + '@example.com';
+    await MeteorUsersAny.insertAsync({ _id: subject, services: { google: { email } } });
+    expect(await handler.call({ userId: admin }, subject)).to.equal('success: ' + email);
+  });
+
+  it('keeps the SSO credential in provider storage and logs canonical email changes', async function() {
     const originalEmail = `original-${Random.id()}@example.com`;
     const nextEmail = `updated-${Random.id()}@example.com`;
+    const providerCredential = Random.id();
     const password = `LongPassword-${Random.id()}123`;
 
     const result = await methods.signUpUser.call({}, originalEmail, password);
@@ -172,7 +353,7 @@ describe('server auth and session methods', function() {
       services: {
         google: {
           email: nextEmail,
-          refreshToken: Random.id()
+          refreshToken: providerCredential
         }
       }
     }});
@@ -185,6 +366,8 @@ describe('server auth and session methods', function() {
     }) as any;
 
     expect(populateResult).to.equal(`success: ${nextEmail}`);
+    expect(updatedUser.profile).to.deep.equal({ email: nextEmail, service: 'google', username: nextEmail.toLowerCase() });
+    expect(updatedUser.services.google.refreshToken).to.equal(providerCredential);
     expect(updatedUser.email_canonical).to.equal(nextEmail.toLowerCase());
     expect(auditEntry).to.exist;
     expect(auditEntry.details.previousEmailCanonical).to.equal(originalEmail.toLowerCase());
@@ -192,49 +375,48 @@ describe('server auth and session methods', function() {
     expect(auditEntry.details.source).to.equal('populateSSOProfile');
   });
 
-  it('clears loginParams and records auth.sessionRevoked', async function() {
-    const email = `session-${Random.id()}@example.com`;
-    const password = `LongPassword-${Random.id()}123`;
-    const loginParams = {
-      entryPoint: Random.id(),
-      curTeacher: Random.id(),
-      curClass: Random.id(),
-      loginMode: 'test',
-      authSessionState: 'active'
-    };
-
-    const result = await methods.signUpUser.call({}, email, password);
-    const userId = result.userId;
-
-    await MeteorUsersAny.updateAsync({_id: userId}, {$set: { loginParams }});
-
-    const userAsyncStub = sinon.stub(MeteorAny, 'userAsync').resolves({
-      _id: userId,
-      loginParams
-    });
-    const userIdStub = sinon.stub(MeteorAny, 'userId').returns(userId);
-
-    try {
-      await methods.clearLoginData.call({ userId });
-    } finally {
-      userAsyncStub.restore();
-      userIdStub.restore();
+  it('keeps retired maintenance commands and package helpers out of Meteor', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of ['auditPublicAssetsWithoutSharedTdf', 'repairAiGeneratedPackageMedia', 'generateFaviconsFromLogo',
+      'getMaxResponseKC', 'upsertStimFile', 'importPrivateRepoTdfBatch', 'normalizeOptionalString']) {
+      expect(handlers).not.to.have.own.property(name);
     }
+    for (const name of ['saveAiGeneratedPackageContent', 'confirmPackageUpload', 'getResponseKCMapForTdf']) {
+      expect(handlers[name]).to.be.a('function');
+    }
+  });
 
-    const updatedUser = await MeteorUsersAny.findOneAsync({_id: userId}) as any;
-    const auditEntry = await AuditLogAny.findOneAsync({
-      action: 'auth.sessionRevoked',
-      actorUserId: userId,
-      targetUserId: userId
-    }) as any;
+  it('exposes individual package deletion without installation-wide deletion', function() {
+    for (const name of ['deleteAllFiles', 'cleanupOrphanDynamicAssets']) {
+      expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);
+    }
+    expect(MeteorAny.server.method_handlers.deletePackageFile).to.be.a('function');
+  });
 
-    expect(updatedUser.loginParams.entryPoint).to.equal(null);
-    expect(updatedUser.loginParams.curTeacher).to.equal(null);
-    expect(updatedUser.loginParams.curClass).to.equal(null);
-    expect(updatedUser.loginParams.loginMode).to.equal(null);
-    expect(updatedUser.loginParams.authSessionState).to.equal(null);
-    expect(auditEntry).to.exist;
-    expect(auditEntry.details.reason).to.equal('clearLoginData');
+  it('retires manual reset cleanup and login-data clearing', function() {
+    for (const name of ['cleanupExpiredPasswordResetTokens', 'clearLoginData']) {
+      expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);
+    }
+  });
+
+  it('automatically removes expired reset requests while preserving current requests', async function() {
+    this.timeout(110000);
+    const raw = PasswordResetTokensAny.rawCollection();
+    const indexes = await raw.indexes();
+    expect(indexes.some((index: any) => index.key.expiresAt === 1 && Object.keys(index.key).length === 1 &&
+      index.expireAfterSeconds === 120)).to.equal(true);
+    const now = Date.now();
+    const insert = (expiresAt: Date) => PasswordResetTokensAny.insertAsync({
+      userId: Random.id(), tokenHash: Random.id(), expiresAt, used: false,
+    });
+    const expired = await insert(new Date(now - 180000));
+    const current = await insert(new Date(now + 3600000));
+    const deadline = Date.now() + 95000;
+    while (await raw.countDocuments({ _id: expired }) && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    expect(await raw.countDocuments({ _id: expired })).to.equal(0);
+    expect(await raw.countDocuments({ _id: current })).to.equal(1);
   });
 
   it('blocks admin user deletion when the target owns authored content', async function() {
@@ -302,6 +484,44 @@ describe('server auth and session methods', function() {
 });
 
 describe('public TDF and stimulus method authorization', function() {
+  it('checks the installed lesson reads and rejects anonymous response mappings', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed lesson reads');
+    for (const verification of RUNTIME_LESSON_VERIFICATIONS) {
+      expect(observed.surfaces.find(row => row.name === verification.method)?.verification).to.equal(verification);
+    }
+    let code;
+    try {
+      await MeteorAny.server.method_handlers.getResponseKCMapForTdf.call({ userId: null }, Random.id());
+    } catch (error: any) { code = error.error; }
+    expect(code).to.equal(401);
+  });
+
+  it('requires access to the selected SPARC lesson before library or image operations', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed lesson methods');
+    const tdfId = Random.id();
+    const args = {
+      getSparcAdministrativeRemovals: [[], tdfId],
+      getSparcPromptImage: ['synthetic', tdfId],
+      lookupSparcPrimitive: [{ tdfId }, {}, []],
+      publishSparcPrimitive: [{ query: { tdfId } }, {}],
+      generateSparcPromptImage: [{ tdfId }],
+      resolveSparcVisualSupport: [{ tdfId }],
+    };
+    for (const verification of SPARC_LESSON_VERIFICATIONS) {
+      const row = observed.surfaces.find(item => item.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      expect(row?.policy).to.deep.equal({ kind: 'sparc-lesson', operation: 'accessible-lesson-or-admin' });
+      const handler = MeteorAny.server.method_handlers[verification.method];
+      for (const userId of [null, Random.id()]) {
+        let code;
+        try { await handler.apply({ userId }, args[verification.method]); } catch (error: any) { code = error.error; }
+        expect(userId ? [403, 404] : [401]).to.include(code, verification.method);
+      }
+    }
+  });
+
   beforeEach(async function() {
     await clearServerCompositionCollections();
   });
@@ -409,7 +629,7 @@ describe('public TDF and stimulus method authorization', function() {
       stimuliSetId: 109,
       content: {
         fileName: 'AssignedContext.json',
-        tdfs: { tutor: { setspec: { lessonname: 'Assigned Context', userselect: 'false' } } },
+        tdfs: { tutor: { setspec: { lessonname: 'Assigned Context', userselect: 'false', experimentTarget: 'course-access-test' } } },
       },
     });
 
@@ -428,6 +648,46 @@ describe('public TDF and stimulus method authorization', function() {
     );
 
     expect(tdf._id).to.equal('assigned-context-tdf');
+    const actor = { userId: 'assigned-student' };
+    const id = tdf._id;
+    await MeteorUsersAny.insertAsync({ _id: actor.userId, accessedTDFs: [id] });
+    await GlobalExperimentStatesAny.insertAsync({ userId: actor.userId, TDFId: id, experimentState: { currentUnitNumber: 2 } });
+    await methods.setUserLoginData.call(actor, 'section-invite', 'password', null, null, ['unused-id']);
+    const user = await MeteorUsersAny.findOneAsync(actor.userId);
+    expect(user.loginParams).not.to.have.property('assignedTdfs');
+    expect(user.accessedTDFs).to.deep.equal([id]);
+
+    const context = { courseAssignment: { assignmentId: 'assignment-launch-context', courseId: 'course-launch-context',
+      TDFId: id, launchSource: 'courses', launchMode: 'individual' } };
+    const lookup = (options = {}) => (asyncMethods.getTdfById as any).call(actor, id, options);
+    await AssignmentsAny.removeAsync(context.courseAssignment.assignmentId);
+    async function expectDenied(options: Record<string, unknown>, code: number) {
+      let denied: unknown;
+      try { await lookup(options); } catch (error) { denied = error; }
+      expect(denied).to.be.instanceOf(Meteor.Error);
+      expect(denied).to.include({ error: code });
+    }
+    async function dashboardIds() {
+      const snapshot = await MeteorAny.server.method_handlers.getPracticeDashboardSnapshot.call(actor);
+      return snapshot.lessons.map((lesson: { TDFId: string }) => lesson.TDFId);
+    }
+    expect(await dashboardIds()).not.to.include(id);
+    await expectDenied(context, 400);
+    await expectDenied({}, 403);
+    await AssignmentsAny.insertAsync({ _id: context.courseAssignment.assignmentId, courseId: context.courseAssignment.courseId, assignmentType: 'lesson', TDFId: id });
+    expect((await lookup(context))._id).to.equal(id);
+    await AssignmentsAny.removeAsync(context.courseAssignment.assignmentId);
+    await TdfsAny.updateAsync(id, { $set: { accessors: [{ userId: actor.userId }] } });
+    expect((await lookup())._id).to.equal(id);
+    expect(await dashboardIds()).to.include(id);
+    await TdfsAny.updateAsync(id, { $unset: { accessors: 1 } });
+    await CoursesAny.insertAsync({ _id: 'other-course', semester: 'SU_2022', teacherUserId: 'teacher-user' });
+    await SectionsAny.insertAsync({ _id: 'other-section', courseId: 'other-course' });
+    await SectionUserMapAny.insertAsync({ userId: actor.userId, sectionId: 'other-section' });
+    Object.assign(context.courseAssignment, { courseId: 'other-course', assignmentId: 'other-assignment' });
+    await AssignmentsAny.insertAsync({ _id: 'other-assignment', courseId: 'other-course', assignmentType: 'lesson', TDFId: id });
+    expect((await lookup(context))._id).to.equal(id);
+    expect((await GlobalExperimentStatesAny.findOneAsync({ userId: actor.userId, TDFId: id })).experimentState.currentUnitNumber).to.equal(2);
   });
 
   it('blocks direct condition-child lookup for a student with an active root course assignment', async function() {
@@ -796,6 +1056,11 @@ describe('public TDF and stimulus method authorization', function() {
 
   it('allows owner public stimulus lookup by stimuliSetId', async function() {
     await TdfsAny.insertAsync({
+      _id: 'different-private-lesson', ownerId: 'different-owner', stimuliSetId: 105,
+      stimuli: [{ stimulusKC: 9, clusterKC: 1, correctResponse: 'separate lesson' }],
+      content: { fileName: 'different.json', tdfs: { tutor: { setspec: { userselect: 'false' } } } },
+    });
+    await TdfsAny.insertAsync({
       _id: 'stim-owned-tdf',
       ownerId: 'owner-user',
       stimuliSetId: 105,
@@ -883,6 +1148,93 @@ describe('public TDF and stimulus method authorization', function() {
     expect(stimuli[0].stimulusKC).to.equal(4);
   });
 
+  it('resumes a progress-backed participant without a password or explicit experiment markers', async function() {
+    const userId = Random.id(), progressId = Random.id();
+    await TdfsAny.insertAsync({ _id: 'progress-return-root', ownerId: 'researcher', tdfAvailability: 'available',
+      content: { tdfs: { tutor: { setspec: { lessonname: 'Progress return', experimentTarget: 'progress-return', userselect: 'false' }, unit: [{}] } } } });
+    await MeteorUsersAny.insertAsync({ _id: userId, username: 'AUDIT-PROGRESS-RETURN', createdAt: new Date(), profile: {} });
+    await GlobalExperimentStatesAny.insertAsync({ _id: progressId, userId, TDFId: 'progress-return-root',
+      experimentState: { currentUnitNumber: 0, lastUnitCompleted: -1, lastActionTimeStamp: Date.now() } });
+    const before = await GlobalExperimentStatesAny.findOneAsync({ _id: progressId });
+    const first = await methods.provisionExperimentUser.call({}, 'progress-return', 'AUDIT-PROGRESS-RETURN');
+    const second = await methods.provisionExperimentUser.call({}, 'progress-return', 'AUDIT-PROGRESS-RETURN');
+    expect(first.userExists).to.equal(true); expect(first.userId).to.equal(userId); expect(second.userId).to.equal(userId);
+    expect(first.loginToken).to.be.a('string').and.not.equal(''); expect(second.loginToken).not.to.equal(first.loginToken);
+    const after = await MeteorUsersAny.findOneAsync({ _id: userId });
+    expect(after.services?.password).to.equal(undefined); expect(after.emails).to.equal(undefined);
+    expect(after.profile.experimentTarget).to.equal('progress-return');
+    expect(after.services.resume.loginTokens.some((row: any) => row.hashedToken === (Accounts as any)._hashLoginToken(first.loginToken))).to.equal(true);
+    expect(after.services.resume.loginTokens.some((row: any) => row.hashedToken === (Accounts as any)._hashLoginToken(second.loginToken))).to.equal(true);
+    expect(await GlobalExperimentStatesAny.findOneAsync({ _id: progressId })).to.deep.equal(before);
+    const publishProgress = (Meteor as any).server.publish_handlers.userExperimentState;
+    const cursor = publishProgress.call({ userId: first.userId, ready() {} }, 'progress-return-root');
+    expect((await cursor.fetchAsync()).map((row: { _id: string }) => row._id)).to.deep.equal([progressId]);
+  });
+
+  it('retains the recorded experiment binding when a progress-backed participant tries another target', async function() {
+    const userId = Random.id();
+    for (const target of ['progress-original', 'progress-other']) await TdfsAny.insertAsync({ _id: target, ownerId: 'researcher',
+      tdfAvailability: 'available', content: { tdfs: { tutor: { setspec: { experimentTarget: target, userselect: 'false' }, unit: [{}] } } } });
+    await MeteorUsersAny.insertAsync({ _id: userId, username: 'AUDIT-BOUND-RETURN', profile: { experimentTarget: 'progress-original' } });
+    await GlobalExperimentStatesAny.insertAsync({ userId, TDFId: 'progress-original', experimentState: { lastUnitCompleted: -1 } });
+    const baseline = await methods.provisionExperimentUser.call({}, 'progress-original', 'AUDIT-BOUND-RETURN');
+    expect(baseline.userId).to.equal(userId); expect(baseline.loginToken).to.be.a('string').and.not.equal('');
+    try { await methods.provisionExperimentUser.call({}, 'progress-other', 'AUDIT-BOUND-RETURN'); expect.fail('Expected target mismatch'); }
+    catch (error: any) { expect(error.error).to.equal('experiment-target-mismatch'); }
+    expect((await MeteorUsersAny.findOneAsync({ _id: userId })).profile.experimentTarget).to.equal('progress-original');
+  });
+
+  it('requires lesson access for teacher audio while retaining administrator testing', async function() {
+    const teacher = Random.id(), admin = Random.id(), lessonId = Random.id();
+    await Roles.createRoleAsync('teacher', { unlessExists: true });
+    await Roles.createRoleAsync('admin', { unlessExists: true });
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    await TdfsAny.insertAsync({
+      _id: lessonId, ownerId: 'different-owner', tdfAvailability: 'available',
+      content: { tdfs: { tutor: { setspec: {
+        userselect: 'false', speechAPIKey: encryptData('synthetic-lesson-speech'),
+        textToSpeechAPIKey: encryptData('synthetic-lesson-tts'),
+      } } } },
+    });
+    await HistoriesAny.insertAsync({ userId: teacher, TDFId: lessonId });
+    const provider = sinon.stub(globalThis, 'fetch').callsFake(async () => new Response(JSON.stringify({
+      audioContent: 'synthetic-audio', results: [{ alternatives: [{ transcript: 'cat' }] }],
+    }), { status: 200 }));
+    try {
+      const observed = registeredMeteorMethodSurfaces();
+      if (observed.state !== 'observed') throw Error(observed.reason);
+      const inputs = {
+        makeGoogleSpeechAPICall: [lessonId, null, { config: { languageCode: 'en-US' }, audio: { content: 'synthetic' } }, ['cat']],
+        makeGoogleTTSApiCall: [lessonId, 'cat', 1, 0, 'en-US-Standard-A', 'en-US'],
+      };
+      for (const verification of AUDIO_PROVIDER_VERIFICATIONS) {
+        const row: typeof observed.surfaces[number] | undefined = observed.surfaces.find(entry => entry.name === verification.method);
+        expect(row?.verification).to.equal(verification);
+        const handler = MeteorAny.server.method_handlers[verification.method];
+        try {
+          await handler.call({ userId: teacher }, ...inputs[verification.method]);
+          expect.fail('Teacher role and prior history must not authorize this private lesson');
+        } catch (error: any) {
+          expect(error.error).to.equal(403);
+        }
+      }
+      expect(provider.callCount).to.equal(0);
+      await TdfsAny.updateAsync({ _id: lessonId }, { $set: { accessors: [{ userId: teacher }] } });
+      for (const userId of [teacher, admin]) {
+        for (const verification of AUDIO_PROVIDER_VERIFICATIONS) {
+          const result = await MeteorAny.server.method_handlers[verification.method].call({ userId }, ...inputs[verification.method]);
+          expect(result).to.exist;
+        }
+      }
+      expect(provider.callCount).to.equal(4);
+    } finally {
+      provider.restore();
+      await Roles.removeUsersFromRolesAsync(teacher, 'teacher');
+      await Roles.removeUsersFromRolesAsync(admin, 'admin');
+    }
+  });
+
   it('resolves shared audio keys for a new experiment participant before any history or profile audio setup', async function() {
     await TdfsAny.insertAsync({
       _id: 'audio-root', ownerId: 'researcher', tdfAvailability: 'available',
@@ -953,9 +1305,10 @@ describe('public TDF and stimulus method authorization', function() {
     }
   });
 
-  it('keeps stimulus display map reads callable for the client sync path', async function() {
-    expect(asyncMethods.getStimDisplayTypeMap).to.be.a('function');
-    expect(asyncMethods.getStimDisplayTypeMapVersion).to.be.a('function');
+  it('removes the retired stimulus display cache methods from Meteor', function() {
+    for (const name of ['getStimDisplayTypeMap', 'getStimDisplayTypeMapVersion', 'updateStimDisplayTypeMap']) {
+      expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);
+    }
   });
 
   it('does not expose helper-only content and analytics methods publicly', function() {
@@ -1041,6 +1394,7 @@ describe('public TDF and stimulus method authorization', function() {
             setspec: {
               lessonname: 'Owned Experiment Root',
               experimentTarget: 'study-b',
+              speechAPIKey: 'synthetic', textToSpeechAPIKey: 'synthetic', openRouterApiKey: 'synthetic',
               userselect: 'false',
             },
             unit: [{ unitname: 'owner-visible unit' }],
@@ -1052,6 +1406,9 @@ describe('public TDF and stimulus method authorization', function() {
     const tdf = await (asyncMethods.getTdfByExperimentTarget as any).call({ userId: 'owner-user' }, 'study-b');
 
     expect(tdf._id).to.equal('owned-experiment-root');
+    for (const field of ['speechAPIKey', 'textToSpeechAPIKey', 'openRouterApiKey']) {
+      expect(tdf.content.tdfs.tutor.setspec).not.to.have.property(field);
+    }
     expect(tdf.content.fileName).to.equal('owned-experiment-root.json');
     expect(tdf.content.tdfs.tutor.unit).to.have.length(1);
   });
@@ -1060,6 +1417,26 @@ describe('public TDF and stimulus method authorization', function() {
 describe('editor save shape preservation methods', function() {
   beforeEach(async function() {
     await clearServerCompositionCollections();
+  });
+
+  it('limits installed editor saves to users who manage the lesson', async function() {
+    const lessonId = Random.id();
+    const content = { tdfs: { tutor: { setspec: { lessonname: 'Synthetic lesson' }, unit: [{}] } } };
+    await TdfsAny.insertAsync({ _id: lessonId, ownerId: 'synthetic-owner', content });
+    const inputs = { saveTdfContent: [content], saveTdfStimuli: [{ setspec: { clusters: [] } }, null] };
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw Error(observed.reason);
+    for (const verification of LESSON_EDIT_VERIFICATIONS) {
+      const row: typeof observed.surfaces[number] | undefined = observed.surfaces.find(entry => entry.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      try {
+        await MeteorAny.server.method_handlers[verification.method].call({ userId: 'unrelated-editor' }, lessonId, ...inputs[verification.method]);
+        expect.fail('An unrelated account cannot write to a lesson');
+      } catch (error: any) {
+        expect(error.error).to.equal('not-authorized');
+      }
+    }
+    expect((await TdfsAny.findOneAsync(lessonId)).content).to.deep.equal(content);
   });
 
   it('preserves condition-root fields and absence of tutor.unit when saving TDF editor changes', async function() {
@@ -1716,7 +2093,7 @@ describe('learner analytics method authorization', function() {
     expect(rows[1]).to.have.nested.property('sparc.pageKey', 'doc-1');
   });
 
-  it('denies cross-user experiment-state and recent-TDF reads', async function() {
+  it('denies cross-user experiment-state reads', async function() {
     try {
       await (asyncMethods.getExperimentState as any).call({ userId: 'current-user' }, 'other-user', 'tdf-1');
       expect.fail('Expected cross-user experiment state read to be denied');
@@ -1724,12 +2101,51 @@ describe('learner analytics method authorization', function() {
       expect(error.error).to.equal(403);
     }
 
-    try {
-      await (asyncMethods.getLastTDFAccessed as any).call({ userId: 'current-user' }, 'other-user');
-      expect.fail('Expected cross-user recent TDF read to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
+  });
+
+  it('keeps the supported study, learner settings, SPARC and audited performance operations', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of [
+      'listSparcMoveLibrary', 'listSparcLibraryImages', 'getLearnerProgressSignals', 'resetLearnerTdfConfig', 'setExperimentState',
+    ]) expect(handlers).not.to.have.own.property(name);
+    for (const name of [
+      'createExperimentState', 'updateExperimentState', 'getExperimentState', 'getLearnerTdfConfig', 'saveLearnerTdfConfig',
+      'listSparcInstructionalComponents', 'getSparcPromptImage', 'getStudentPerformanceByIdAndTDFIdFromHistory',
+    ]) expect(handlers[name]).to.be.a('function');
+  });
+
+  it('exposes the active dashboard, draft, theme and user operations without the retired commands', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of [
+      'initializeDashboardCache', 'refreshDashboardCache', 'removeTdfFromCache',
+      'listManualContentDrafts', 'toggleCustomTheme', 'adminCreateOrUpdateUser',
+    ]) {
+      expect(handlers).not.to.have.own.property(name);
     }
+    for (const name of [
+      'ensureDashboardCacheCurrent', 'refreshUserAdminUsageCaches', 'getManualContentDraft',
+      'saveManualContentDraft', 'setActiveTheme', 'insertNewUsers',
+    ]) {
+      expect(handlers[name]).to.be.a('function');
+    }
+  });
+
+  it('excludes retired analytics reads and internal helpers from the Meteor registry', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of [
+      'getLastTDFAccessed',
+      'getUserRecentTDFs',
+      'getNumDroppedItemsByUserIDAndTDFId',
+      'getStudentPerformanceForClassAndTdfId',
+      'getHistoryByTDFID',
+      'getStimSetFromLearningSessionByClusterList',
+      'getUserLastFeedbackTypeFromHistory',
+    ]) {
+      expect(handlers).not.to.have.own.property(name);
+    }
+    expect(handlers.getStimuliSetById).to.be.a('function');
+    expect(handlers.getClassPerformanceByTDF).to.be.a('function');
+    expect(handlers.getExperimentState).to.be.a('function');
   });
 
   it('derives experiment-state creation actor from method context', async function() {
@@ -1774,6 +2190,46 @@ describe('system method authorization', function() {
     }
   });
 
+  it('records ordinary account diagnostics and suppresses private study writes', async function() {
+    const current = Random.id(), study = Random.id();
+    const reports = (globalThis as any).ErrorReports;
+    const handlers = MeteorAny.server.method_handlers;
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed diagnostic methods');
+    for (const verification of ACCOUNT_DIAGNOSTIC_VERIFICATIONS) {
+      const row = observed.surfaces.find(item => item.name === verification.method);
+      expect(row?.verification).to.equal(verification);
+      expect(row?.policy).to.deep.equal({ kind: 'diagnostic-telemetry', operation: 'non-private-account' });
+    }
+    const record = async (id: string) => {
+      const context = { userId: id };
+      await handlers.sendUserErrorReport.call(context, id, 'Invalid timestamps', '/content', { unit: 1 },
+        'test-agent', ['trial start'], { currentUnitNumber: 1 });
+      await handlers.logUserAgentAndLoginTime.call(context, id, 'test-agent');
+      await handlers.setUserSessionId.call(context, 'practice-session', 12);
+    };
+    try {
+      await MeteorUsersAny.insertAsync({ _id: current, username: current });
+      await MeteorUsersAny.insertAsync({ _id: study, username: study, profile: { experiment: true } });
+      await record(current);
+      await record(study);
+      const ordinary = await MeteorUsersAny.findOneAsync(current);
+      expect(ordinary.status.userAgent).to.equal('test-agent');
+      expect(ordinary.lastSessionId).to.equal('practice-session');
+      const report = await reports.findOneAsync({ user: current });
+      expect(report.logs).to.deep.equal(['trial start']);
+      expect(report.currentExperimentState).to.deep.equal({ currentUnitNumber: 1 });
+      expect(report.sessionVars).to.deep.equal({ unit: 1 });
+      const participant = await MeteorUsersAny.findOneAsync(study);
+      expect(participant.status).to.equal(undefined);
+      expect(participant.lastSessionId).to.equal(undefined);
+      expect(await reports.find({ user: study }).countAsync()).to.equal(0);
+    } finally {
+      await reports.removeAsync({ user: { $in: [current, study] } });
+      await MeteorUsersAny.removeAsync({ _id: { $in: [current, study] } });
+    }
+  });
+
   it('requires login user-agent updates to target the current user', async function() {
     try {
       await methods.logUserAgentAndLoginTime.call({ userId: 'current-user' }, 'other-user', 'test-agent');
@@ -1783,14 +2239,7 @@ describe('system method authorization', function() {
     }
   });
 
-  it('requires auth for debug logging and self-only error reports', async function() {
-    try {
-      await methods.debugLog.call({}, 'anonymous log');
-      expect.fail('Expected anonymous debug logging to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(401);
-    }
-
+  it('requires self-only error reports', async function() {
     try {
       await methods.sendUserErrorReport.call(
         { userId: 'current-user' },
@@ -1903,6 +2352,39 @@ describe('not-max condition allocation transactions', function() {
 describe('condition count method authorization', function() {
   beforeEach(async function() {
     await clearServerCompositionCollections();
+  });
+
+  it('binds all count methods to their installed study policies', function() {
+    const observation = registeredMeteorMethodSurfaces();
+    if (observation.state !== 'observed') throw new Error(observation.reason);
+    const operations = {
+      updateTdfConditionCounts: 'replace', incrementTdfConditionCount: 'increment', resetTdfConditionCounts: 'reset',
+    } as const;
+    for (const verification of Object.values(CONDITION_COUNT_VERIFICATIONS)) {
+      const entries = observation.surfaces.filter(entry => entry.name === verification.method);
+      expect(entries).to.have.length(1);
+      expect(entries[0]?.verification).to.equal(verification);
+      expect(entries[0]?.policy).to.deep.equal({ kind: 'study-condition-count', operation: operations[verification.method] });
+      expect(entries[0]?.dataEgress).to.equal('none');
+    }
+  });
+
+  it('requires the exact assigned condition for a later block milestone', async function() {
+    const userId = 'audit-condition-participant';
+    const root = 'audit-condition-root';
+    await TdfsAny.insertAsync({ _id: root, ownerId: 'audit-condition-owner', conditionCounts: [0, 0],
+      content: { tdfs: { tutor: { setspec: { lessonname: 'Synthetic study', userselect: 'true', loadbalancing: 'not-max',
+        countcompletion: 'end', condition: ['left.json', 'right.json'], conditionTdfIds: ['left', 'right'] } } } } });
+    await GlobalExperimentStatesAny.insertAsync({ userId, TDFId: root, experimentState: { conditionTdfId: 'left' } });
+    const increment = MeteorAny.server.method_handlers.incrementTdfConditionCount;
+    let failure: any;
+    try { await increment.call({ userId }, root, 1); }
+    catch (error) { failure = error; }
+    expect(failure?.error).to.equal(403);
+    expect(failure?.reason).to.equal('Can only count the participant’s assigned condition');
+    expect((await TdfsAny.findOneAsync(root)).conditionCounts).to.deep.equal([0, 0]);
+    await increment.call({ userId }, root, 0);
+    expect((await TdfsAny.findOneAsync(root)).conditionCounts).to.deep.equal([1, 0]);
   });
 
   it('denies unauthenticated condition count updates', async function() {
@@ -2364,6 +2846,308 @@ describe('course method authorization', function() {
     await Roles.createRoleAsync('teacher', { unlessExists: true });
   });
 
+  function boundCourseRead(name: keyof typeof COURSE_READ_VERIFICATIONS, operation: string) {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed Meteor method bindings');
+    const entries = observed.surfaces.filter(row => row.name === name);
+    expect(entries).to.have.length(1);
+    expect(entries[0]?.verification).to.equal(COURSE_READ_VERIFICATIONS[name]);
+    expect(entries[0]?.policy).to.deep.equal({ kind: 'course-read', operation });
+    return MeteorAny.server.method_handlers[name];
+  }
+
+  async function expectCourseDenial(call: () => Promise<unknown>, code: number, reason?: string) {
+    let denied: unknown;
+    try { await call(); } catch (error) { denied = error; }
+    expect(denied).to.be.instanceOf(Meteor.Error);
+    expect(denied).to.include({ error: code });
+    if (reason !== undefined) expect(denied).to.include({ reason });
+  }
+
+  it('counts all practice for enrolled learners only on assigned lessons', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed class performance handler');
+    const binding = observed.surfaces.find(row => row.name === 'getClassPerformanceByTDF');
+    expect(binding?.verification).to.equal(CLASS_PERFORMANCE_VERIFICATION);
+    const [owner, learner, outsider] = await Promise.all(Array.from({ length: 3 }, () =>
+      MeteorUsersAny.insertAsync({ username: Random.id() })));
+    const course = await CoursesAny.insertAsync({ teacherUserId: owner });
+    const section = await SectionsAny.insertAsync({ courseId: course });
+    await SectionUserMapAny.insertAsync({ userId: learner, sectionId: section });
+    const lesson = Random.id(), otherCourse = Random.id(), otherLesson = Random.id();
+    const assignment = await AssignmentsAny.insertAsync({ courseId: course, assignmentType: 'lesson', TDFId: lesson });
+    const run = (who: string, selected: string) => MeteorAny.server.method_handlers.getClassPerformanceByTDF.call({ userId: who }, course, selected);
+    for (const origin of [undefined, course, otherCourse]) {
+      await HistoriesAny.insertAsync({ userId: learner, TDFId: lesson, outcome: 'correct', recordedServerTime: 1,
+        ...(origin ? { courseAssignment: { courseId: origin } } : {}) });
+    }
+    await HistoriesAny.insertAsync({ userId: outsider, TDFId: lesson, outcome: 'correct', recordedServerTime: 1 });
+    await HistoriesAny.insertAsync({ userId: learner, TDFId: otherLesson, outcome: 'correct', recordedServerTime: 1 });
+    await expectCourseDenial(() => run(outsider, lesson), 403);
+    await expectCourseDenial(() => run(owner, otherLesson), 403);
+    const [met, late] = await run(owner, lesson);
+    expect(met.map((row: any) => [row.userId, row.count])).to.deep.equal([[learner, 3]]);
+    expect(late).to.deep.equal([]);
+    await AssignmentsAny.updateAsync(assignment, { $set: { assignmentType: 'progressive', memberTdfIds: [lesson] }, $unset: { TDFId: 1 } });
+    expect((await run(owner, lesson))[0][0].count).to.equal(3);
+  });
+
+  it('binds course deletion to its owner or an administrator', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed Meteor method bindings');
+    const rows = observed.surfaces.filter(row => row.name === 'deleteCourse');
+    expect(rows).to.have.length(1);
+    expect(rows[0]?.verification).to.equal(COURSE_DELETE_VERIFICATION);
+    expect(rows[0]?.policy).to.deep.equal({ kind: 'course-management', operation: 'manage-course' });
+    const [owner, other, admin, learner] = await Promise.all(Array.from({ length: 4 }, () =>
+      MeteorUsersAny.insertAsync({ username: Random.id() })));
+    await Roles.addUsersToRolesAsync([owner, other], 'teacher');
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    const create = () => CoursesAny.insertAsync({ teacherUserId: owner, courseName: Random.id() });
+    const [first, second, untouched] = await Promise.all([create(), create(), create()]);
+    const remove = MeteorAny.server.method_handlers.deleteCourse;
+    await expectCourseDenial(() => remove.call({}, first), 401);
+    for (const userId of [learner, other]) await expectCourseDenial(() => remove.call({ userId }, first), 403);
+    expect(await remove.call({ userId: owner }, first)).to.equal(true);
+    expect(await remove.call({ userId: admin }, second)).to.equal(true);
+    expect(await CoursesAny.find({ _id: { $in: [first, second, untouched] } }).countAsync()).to.equal(1);
+    expect(await CoursesAny.findOneAsync(untouched)).to.exist;
+  });
+
+  it('requires an available progressive assignment before returning lesson content', async function() {
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed Meteor method bindings');
+    const rows = observed.surfaces.filter(row => row.name === 'getProgressiveAssignmentLaunch');
+    expect(rows).to.have.length(1);
+    expect(rows[0]?.verification).to.equal(COURSE_READ_VERIFICATIONS.getProgressiveAssignmentLaunch);
+    expect(rows[0]?.policy).to.deep.equal({ kind: 'course-launch', operation: 'progressive-prefix' });
+    const launch = MeteorAny.server.method_handlers.getProgressiveAssignmentLaunch;
+    const userId = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await expectCourseDenial(() => launch.call({}, Random.id(), Random.id()), 401);
+    await expectCourseDenial(() => launch.call({ userId }, Random.id(), Random.id()), 403,
+      'Progressive assignment is not available for this user');
+  });
+
+  it('returns a successful section join when the confirmation has no recipient', async function() {
+    const learner = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const course = await CoursesAny.insertAsync({ teacherUserId: teacher, courseName: 'Enrollment test' });
+    const section = await SectionsAny.insertAsync({ courseId: course, sectionName: 'A' });
+    const join = MeteorAny.server.method_handlers.addUserToTeachersClass;
+    await expectCourseDenial(() => join.call({}, teacher, section), 401);
+    await expectCourseDenial(() => join.call({ userId: learner }, Random.id(), section), 403);
+    expect(await SectionUserMapAny.find({ userId: learner }).countAsync()).to.equal(0);
+    expect(await join.call({ userId: learner }, teacher, section)).to.equal(true);
+    expect(await join.call({ userId: learner }, teacher, section)).to.equal(true);
+    expect(await SectionUserMapAny.find({ userId: learner, sectionId: section }).countAsync()).to.equal(1);
+  });
+
+  it('limits new course owners to existing teachers and administrators', async function() {
+    const users = await Promise.all(['admin', 'teacher', 'otherAdmin', 'learner'].map(() =>
+      MeteorUsersAny.insertAsync({ username: Random.id() })));
+    const [admin, teacher, otherAdmin, learner] = users;
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    await Roles.addUsersToRolesAsync(otherAdmin, 'admin');
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    const handlers = MeteorAny.server.method_handlers;
+    const create = (userId: string, teacherUserId: string) => handlers.addCourse.call({ userId }, {
+      courseName: Random.id(), timezone: 'America/Chicago', teacherUserId, sections: ['A'],
+    });
+    const ineligible = 'Course owner must be an existing teacher or administrator';
+    for (const id of [learner, Random.id()]) await expectCourseDenial(() => create(admin, id), 400, ineligible);
+    await expectCourseDenial(() => create(admin, ''), 400, 'A valid course owner ID is required');
+    expect(await CoursesAny.find({}).countAsync()).to.equal(0);
+    const own = await create(teacher, otherAdmin);
+    expect((await CoursesAny.findOneAsync(own)).teacherUserId).to.equal(teacher);
+    const courseId = await create(admin, teacher);
+    const section = await SectionsAny.findOneAsync({ courseId });
+    const transfer = (teacherUserId: string) => handlers.editCourse.call({ userId: admin }, {
+      courseId, courseName: 'Synthetic course', teacherUserId, sections: [],
+      existingSections: [{ sectionId: section._id, originalName: 'A', sectionName: 'A', remove: false }],
+    });
+    await Roles.removeUsersFromRolesAsync(teacher, 'teacher');
+    await transfer(teacher);
+    for (const id of [learner, Random.id()]) await expectCourseDenial(() => transfer(id), 400, ineligible);
+    expect((await CoursesAny.findOneAsync(courseId)).teacherUserId).to.equal(teacher);
+    await transfer(otherAdmin);
+    expect((await CoursesAny.findOneAsync(courseId)).teacherUserId).to.equal(otherAdmin);
+  });
+
+  it('renames sections in place and deletes only explicitly selected sections', async function() {
+    const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const student = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    const courseId = await CoursesAny.insertAsync({ teacherUserId: teacher, semester: 'SU_2022', courseName: 'Original', timezone: 'America/Chicago' });
+    const sectionId = await SectionsAny.insertAsync({ courseId, sectionName: 'A' });
+    const sibling = await SectionsAny.insertAsync({ courseId, sectionName: 'B' });
+    const membership = await SectionUserMapAny.insertAsync({ userId: student, sectionId });
+    const formerStudent = Random.id();
+    const exiting = await SectionUserMapAny.insertAsync({ userId: formerStudent, sectionId: sibling });
+    const assignment = await AssignmentsAny.insertAsync({ courseId, TDFId: Random.id() });
+    await CourseLearnerSnapshotCache.insertAsync({ userId: student, assignedCourseIds: [courseId], publicCourseIds: [], version: COURSE_SNAPSHOT_VERSION } as any);
+    await CourseLearnerSnapshotCache.insertAsync({ userId: formerStudent, assignedCourseIds: [courseId], publicCourseIds: [], version: COURSE_SNAPSHOT_VERSION } as any);
+    const a = { sectionId, sectionName: 'Monday', originalName: 'A', remove: false };
+    const b = { sectionId: sibling, sectionName: 'B', originalName: 'B', remove: false };
+    const edit = (existingSections: unknown[], sections: string[] = [], userId = teacher) =>
+      MeteorAny.server.method_handlers.editCourse.call({ userId }, { courseId, courseName: 'Updated', existingSections, sections });
+    await expectCourseDenial(() => edit([a, b], [], student), 403);
+    await expectCourseDenial(() => edit([a]), 409);
+    await expectCourseDenial(() => edit([a, b], ['Monday']), 400);
+    expect((await CoursesAny.findOneAsync(courseId)).courseName).to.equal('Original');
+    expect((await SectionsAny.findOneAsync(sectionId)).sectionName).to.equal('A');
+    await edit([a, b]);
+    expect((await SectionsAny.findOneAsync(sectionId)).sectionName).to.equal('Monday');
+    expect(await SectionUserMapAny.findOneAsync(membership)).to.include({ userId: student, sectionId });
+    expect(await MeteorAny.server.method_handlers.addUserToTeachersClass.call({ userId: student }, teacher, sectionId)).to.equal(true);
+    await expectCourseDenial(() => edit([a, { ...b, remove: true }]), 409);
+    expect(await SectionUserMapAny.findOneAsync(exiting)).to.exist;
+    await CourseLearnerSnapshotCache.updateAsync({ userId: formerStudent }, { $set: { invalidatedAt: null } } as any);
+    await edit([{ ...a, originalName: 'Monday' }, { ...b, remove: true }], ['Tuesday']);
+    expect(await SectionsAny.findOneAsync(sibling)).not.to.exist;
+    expect(await SectionUserMapAny.findOneAsync(exiting)).not.to.exist;
+    expect(await SectionsAny.findOneAsync({ courseId, sectionName: 'Tuesday' })).to.exist;
+    expect(await SectionUserMapAny.findOneAsync(membership)).to.exist;
+    expect(await AssignmentsAny.findOneAsync(assignment)).to.exist;
+    expect((await CourseLearnerSnapshotCache.findOneAsync({ userId: formerStudent }))?.invalidatedAt).to.be.instanceOf(Date);
+    expect((await CourseLearnerSnapshotCache.findOneAsync({ userId: student }))?.invalidatedAt).to.be.instanceOf(Date);
+  });
+
+  it('requires current course enrollment for each due-date exception edit', async function() {
+    const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const student = await MeteorUsersAny.insertAsync({ username: Random.id(), profile: { retained: true } });
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    const course = await CoursesAny.insertAsync({ teacherUserId: teacher });
+    const section = await SectionsAny.insertAsync({ courseId: course });
+    const lesson = Random.id();
+    const assignment = await AssignmentsAny.insertAsync({ courseId: course, assignmentType: 'lesson', TDFId: lesson });
+    const handlers = MeteorAny.server.method_handlers;
+    const actor = { userId: teacher };
+    const add = (date: number) => handlers.addUserDueDateException.call(actor, student, lesson, course, date, assignment);
+    const remove = () => handlers.removeUserDueDateException.call(actor, student, lesson, course, assignment);
+    await expectCourseDenial(() => add(1000), 403);
+    await expectCourseDenial(remove, 403);
+    const membership = await SectionUserMapAny.insertAsync({ sectionId: section, userId: student });
+    await add(1000);
+    await add(2000);
+    const read = () => MeteorUsersAny.findOneAsync(student);
+    const saved = (await read()).dueDateExceptions;
+    expect(saved).to.have.length(1);
+    expect(saved[0]).to.include({ courseId: course, assignmentId: assignment, date: 2000 });
+    await SectionUserMapAny.removeAsync(membership);
+    await expectCourseDenial(() => add(3000), 403);
+    await expectCourseDenial(remove, 403);
+    expect((await read()).dueDateExceptions).to.deep.equal(saved);
+    await SectionUserMapAny.insertAsync({ sectionId: section, userId: student });
+    await remove();
+    expect((await read()).dueDateExceptions).to.deep.equal([]);
+    expect((await read()).profile).to.deep.equal({ retained: true });
+  });
+
+  it('preserves assigned lessons after sharing ends and checks every new use', async function() {
+    const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const admin = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    const courseId = await CoursesAny.insertAsync({ teacherUserId: teacher, semester: 'SU_2022', timezone: 'America/Chicago' });
+    const first = await TdfsAny.insertAsync({ ownerId: admin, accessors: [{ userId: teacher }] });
+    const second = await TdfsAny.insertAsync({ ownerId: teacher });
+    const save = MeteorAny.server.method_handlers.saveCourseAssignments;
+    const editor = MeteorAny.server.method_handlers.getCourseAssignmentEditorSnapshot;
+    const registry = registeredMeteorMethodSurfaces();
+    if (registry.state !== 'observed') throw new Error('Expected installed Meteor methods');
+    for (const name of ['saveCourseAssignments', 'getCourseAssignmentEditorSnapshot']) {
+      expect(registry.surfaces.find(row => row.name === name)?.policy).to.deep.equal({ kind: 'course-management', operation: 'manage-course' });
+    }
+    const row = { assignmentType: 'lesson', TDFId: first, order: 0, required: false };
+    const write = (assignments: unknown[], userId = teacher) => save.call({ userId }, { courseId, assignments });
+    await expectCourseDenial(() => write([row], Random.id()), 403);
+    await write([row]);
+    const original = await AssignmentsAny.findOneAsync({ courseId, TDFId: first });
+    await TdfsAny.updateAsync(first, { $set: { accessors: [] } });
+    const snapshot = await editor.call({ userId: teacher }, courseId);
+    expect(snapshot.assignableTdfs.map((tdf: any) => tdf.TDFId)).not.to.include(first);
+    expect(snapshot.assignments.map((a: any) => a.assignmentId)).to.include(original._id);
+    const kept = { ...row, assignmentId: original._id, required: true };
+    await write([kept, { ...row, TDFId: second }]);
+    expect((await AssignmentsAny.findOneAsync(original._id)).required).to.equal(true);
+    const other = await AssignmentsAny.findOneAsync({ courseId, TDFId: second });
+    await expectCourseDenial(() => write([{ ...kept, assignmentId: other._id }]), 404);
+    await expectCourseDenial(() => write([{ ...kept, assignmentType: 'progressive', TDFId: undefined,
+      title: 'Sequence', memberTdfIds: [first, second] }]), 404);
+    await expectCourseDenial(() => write([row]), 404);
+    expect(await AssignmentsAny.find({ courseId }).countAsync()).to.equal(2);
+    await write([]);
+    await expectCourseDenial(() => write([row]), 404);
+    await write([row], admin);
+    expect(await AssignmentsAny.find({ courseId, TDFId: first }).countAsync()).to.equal(1);
+  });
+
+  it('limits learner teacher discovery to public or enrolled sections', async function() {
+    const directory = boundCourseRead('getAllTeachers', 'section-directory');
+    const sections = boundCourseRead('getAllCourseSections', 'section-directory');
+    await expectCourseDenial(() => directory.call({}), 401);
+    await expectCourseDenial(() => sections.call({}), 401);
+    const learner = { userId: await MeteorUsersAny.insertAsync({ username: Random.id() }) };
+    const fixtures: Array<{ teacher: string; label: string; section: string | null }> = [];
+    for (const kind of ['public', 'private', 'other', 'empty', 'past', 'former']) {
+      const label = Random.id() + '@example.test';
+      const teacher = await MeteorUsersAny.insertAsync({ username: Random.id(), email_canonical: label });
+      if (kind !== 'former') await Roles.addUsersToRolesAsync(teacher, 'teacher');
+      const course = await CoursesAny.insertAsync({ teacherUserId: teacher, courseName: kind,
+        semester: kind === 'past' ? 'past' : 'SU_2022', visibility: ['private', 'other'].includes(kind) ? 'private' : 'public' });
+      const section = kind === 'empty' ? null : await SectionsAny.insertAsync({ courseId: course, sectionName: kind });
+      fixtures.push({ teacher, label, section });
+    }
+    const [visible, invited, other] = fixtures;
+    await SectionUserMapAny.insertAsync({ userId: Random.id(), sectionId: other!.section });
+    const option = (row: typeof fixtures[number]) => ({ _id: row.teacher, displayIdentifier: row.label });
+    expect(await directory.call(learner)).to.deep.equal([option(visible!)]);
+    expect((await sections.call(learner)).some((s: any) => s.sectionId === invited!.section)).to.equal(false);
+    await SectionUserMapAny.insertAsync({ userId: learner.userId, sectionId: invited!.section });
+    expect(await directory.call(learner)).to.have.deep.members([option(visible!), option(invited!)]);
+    expect((await sections.call(learner)).some((s: any) => s.sectionId === invited!.section)).to.equal(true);
+    const staff = await directory.call({ userId: visible!.teacher });
+    expect(staff).to.deep.include(option(other!));
+    for (const row of staff) expect(Object.keys(row).sort()).to.deep.equal(['_id', 'displayIdentifier']);
+  });
+
+  it('binds the learner course snapshot to the current account session', async function() {
+    const read = boundCourseRead('getLearnerCoursesSnapshot', 'own-account-session');
+    const userId = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await expectCourseDenial(() => read.call({}), 401);
+    try {
+      const snapshot = await read.call({ userId });
+      expect(snapshot.assignedCourses).to.be.an('array');
+      expect(snapshot.publicCourses).to.be.an('array');
+    } finally {
+      await CourseLearnerSnapshotCache.removeAsync({ userId });
+    }
+  });
+
+  it('binds instructor course reads to the instructor or an administrator', async function() {
+    const teacher = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    const admin = await MeteorUsersAny.insertAsync({ username: Random.id() });
+    await Roles.addUsersToRolesAsync(teacher, 'teacher');
+    await Roles.addUsersToRolesAsync(admin, 'admin');
+    const courseId = Random.id(), otherCourseId = Random.id(), lessonId = Random.id();
+    const fileName = 'synthetic-course-lesson.json';
+    for (const [id, instructor] of [[courseId, teacher], [otherCourseId, admin]]) {
+      await CoursesAny.insertAsync({ _id: id, semester: 'SU_2022', teacherUserId: instructor, courseName: id });
+      await AssignmentsAny.insertAsync({ courseId: id, assignmentType: 'lesson', TDFId: lessonId });
+    }
+    await TdfsAny.insertAsync({ _id: lessonId, content: { fileName } });
+    for (const name of ['getAllCoursesForInstructor', 'getTdfAssignmentsByCourseIdMap'] as const) {
+      const read = boundCourseRead(name, 'instructor-or-admin');
+      await expectCourseDenial(() => read.call({}, teacher), 401);
+      await expectCourseDenial(() => read.call({ userId: Random.id() }, teacher), 403);
+      await expectCourseDenial(() => read.call({ userId: teacher }, admin), 403);
+      const own = await read.call({ userId: teacher }, teacher);
+      if (name === 'getAllCoursesForInstructor') expect(own.map((row: any) => row._id)).to.deep.equal([courseId]);
+      if (name === 'getTdfAssignmentsByCourseIdMap') expect(Object.keys(own)).to.deep.equal([courseId]);
+      expect(await read.call({ userId: admin }, teacher)).to.deep.equal(own);
+    }
+  });
+
   it('denies course creation by non-teachers', async function() {
     try {
       await (asyncMethods.addCourse as any).call({ userId: 'student-user' }, {
@@ -2388,43 +3172,6 @@ describe('course method authorization', function() {
     }
   });
 
-  it('denies assignment edits by teachers who do not own the course', async function() {
-    await Roles.addUsersToRolesAsync('teacher-a', 'teacher');
-    await Roles.addUsersToRolesAsync('teacher-b', 'teacher');
-    await CoursesAny.insertAsync({
-      _id: 'course-owned-by-a',
-      teacherUserId: 'teacher-a',
-      courseName: 'Owned Course',
-    });
-
-    try {
-      await (asyncMethods.editCourseAssignments as any).call({ userId: 'teacher-b' }, {
-        courseId: 'course-owned-by-a',
-        tdfIds: [],
-      });
-      expect.fail('Expected cross-course assignment edit to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-    }
-  });
-
-  it('requires admin access for broad course listing', async function() {
-    try {
-      await (asyncMethods.getAllCourses as any).call({ userId: 'student-user' });
-      expect.fail('Expected broad course listing to require admin access');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-    }
-  });
-
-  it('denies cross-user due date exception reads', async function() {
-    try {
-      await (asyncMethods.checkForUserException as any).call({ userId: 'student-user' }, 'other-user', 'tdf-id');
-      expect.fail('Expected cross-user due date exception read to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-    }
-  });
 });
 
 describe('content helper authorization', function() {
@@ -2432,25 +3179,73 @@ describe('content helper authorization', function() {
     await clearServerCompositionCollections();
   });
 
-  it('requires login for owner display lookup', async function() {
-    try {
-      await (methods.getTdfOwnersMap as any).call({}, ['owner-user']);
-      expect.fail('Expected anonymous owner lookup to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(401);
+  it('omits retired owner lookups and returns only the selected lesson response mapping', async function() {
+    for (const name of ['getTdfOwnersMap', 'getTdfsByOwnerId']) {
+      expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);
+    }
+    const owner = Random.id();
+    const lesson = async (answer: string, responseKC: number) => TdfsAny.insertAsync({
+      ownerId: owner, stimuli: [{ correctResponse: answer, responseKC }],
+    });
+    const selected = await lesson('Alpha', 3);
+    await lesson('Beta', 99);
+    const map = await MeteorAny.server.method_handlers.getResponseKCMapForTdf.call({ userId: owner }, selected);
+    expect(map).to.deep.equal({ alpha: 3 });
+  });
+
+  it('returns stimulus files only to the lesson owner and explicit accessors', async function() {
+    const name = 'getStimuliFileForTdf';
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Expected installed method bindings');
+    const rows = observed.surfaces.filter(row => row.name === name);
+    expect(rows).to.have.length(1);
+    expect(rows[0]?.verification).to.equal(STIMULUS_FILE_VERIFICATION);
+    expect(rows[0]?.policy).to.deep.equal({ kind: 'lesson-file', operation: 'owner-or-accessor' });
+    const owner = Random.id(), shared = Random.id();
+    const file = { setspec: { name: 'synthetic' } };
+    const id = await TdfsAny.insertAsync({ ownerId: owner, accessors: [{ userId: shared }],
+      rawStimuliFile: file, content: { tdfs: { tutor: { setspec: { stimulusfile: 'test.json', userselect: 'true' } } } } });
+    const read = MeteorAny.server.method_handlers[name];
+    for (const [context, expected] of [[{}, 401], [{ userId: Random.id() }, 403]] as const) {
+      let denied;
+      try { await read.call(context, id); } catch (err) { denied = err; }
+      expect(denied).to.include({ error: expected });
+    }
+    for (const userId of [owner, shared]) {
+      expect(await read.call({ userId }, id)).to.deep.equal({ fileName: 'test.json', stimFile: file });
     }
   });
 
-  it('denies cross-owner TDF listing', async function() {
-    try {
-      await (methods.getTdfsByOwnerId as any).call({ userId: 'student-user' }, 'owner-user');
-      expect.fail('Expected cross-owner TDF listing to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
+  it('keeps the retired course lookup and internal course helpers out of Meteor', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of [
+      'getAllCourses', 'getAllCourseAssignmentsForInstructor', 'getTdfNamesAssignedByInstructor',
+      'editCourseAssignments', 'checkForUserException', 'getTdfsAssignedToStudent', 'resolveAssignedRootTdfIdsForUser', 'invalidateCourseSnapshotForUser',
+      'invalidateCourseSnapshotsForCourse', 'invalidateCourseSnapshotsForAssignment',
+      'getTdfIdsByOwnerId', 'getSourceSentences', 'checkForTDFData',
+    ]) {
+      expect(handlers).not.to.have.own.property(name);
+    }
+    expect(handlers.getLearnerCoursesSnapshot).to.be.a('function');
+  });
+
+  it('retires the five unused status methods and preserves the active help and speech methods', function() {
+    const handlers = MeteorAny.server.method_handlers;
+    for (const name of [
+      'getCustomHelpPageStatus', 'getPasswordHashRuntimeInfo', 'getUserSpeechAPIKey',
+      'getTdfSpeechAPIKey', 'getTdfTTSAPIKey',
+    ]) {
+      expect(handlers).not.to.have.own.property(name);
+    }
+    for (const name of ['getCustomHelpPage', 'hasUserPersonalKeys', 'isUserSpeechAPIKeySetup']) {
+      expect(handlers[name]).to.be.a('function');
     }
   });
 
-  it('does not expose retired raw content save or fingerprint confirmation methods', function() {
+  it('does not expose retired mail, logging or content methods', function() {
+    for (const name of ['sendEmail', 'sendErrorReportSummaries', 'serverLog', 'debugLog']) {
+      expect(MeteorAny.server.method_handlers).not.to.have.own.property(name);
+    }
     expect(asyncMethods).not.to.have.property('saveContentFile');
     expect(asyncMethods).not.to.have.property('tdfUpdateConfirmed');
   });
@@ -2486,6 +3281,12 @@ describe('Prolific composed account and completion methods', function() {
     } catch (error: any) { expect(error.error).to.equal(403); }
     await ProlificParticipations.updateAsync({ _id: p._id }, { $set: { userId: p.userId } });
     await GlobalExperimentStatesAny.insertAsync({ userId: p.userId, TDFId: 'prolific-root', experimentState: { currentUnitNumber: 0, lastUnitCompleted: -1 } });
+    const observation = registeredMeteorMethodSurfaces();
+    expect(observation.state).to.equal('observed');
+    if (observation.state !== 'observed') throw new Error('Waiting period binding is unavailable');
+    const binding = observation.surfaces.find(row => row.name === 'setLockoutTimeStamp');
+    expect(binding?.policy).to.deep.equal({ kind: 'study-wait', operation: 'start-or-resume' });
+    expect(binding?.dataEgress).to.equal('saved-wait');
     const lockouts = await Promise.all(Array.from({ length: 4 }, () => methods.setLockoutTimeStamp.call({ userId: p.userId }, 0, 999, 0, 'prolific-root')));
     expect(new Set(lockouts.map((lockout: any) => lockout.lockoutTimeStamp)).size).to.equal(1);
     expect(lockouts[0].lockoutMinutes).to.equal(5);
@@ -2507,5 +3308,72 @@ describe('Prolific composed account and completion methods', function() {
       await methods.provisionExperimentUser.call({}, 'ordinary', 'ANOTHER-PARTICIPANT');
       expect.fail('Password-required experiments must retain credentialed login');
     } catch (error: any) { expect(error.error).to.equal('experiment-password-required'); }
+  });
+});
+
+describe('dashboard preference', () => {
+  it('persists only the signed-in user practice statistics boolean', async () => {
+    const id = Random.id(), other = Random.id();
+    const key = 'practiceTableStatisticsExpanded';
+    const handlers = MeteorAny.server.method_handlers;
+    const read = (userId: string, name = key) => handlers.getUserPreference.call({ userId }, name);
+    const write = (userId: string, name: string, value: unknown) => handlers.setUserPreference.call({ userId }, name, value);
+    const { rejects } = await import('node:assert/strict');
+    const observed = registeredMeteorMethodSurfaces();
+    if (observed.state !== 'observed') throw new Error('Preference registry unavailable');
+    for (const method of ['getUserPreference', 'setUserPreference']) {
+      expect(observed.surfaces.find(row => row.name === method)?.policy).to.deep.equal({ kind: 'dashboard-preference', operation: 'self' });
+    }
+    try {
+      await MeteorUsersAny.insertAsync({ _id: id, preferences: { existing: 17 } });
+      await MeteorUsersAny.insertAsync({ _id: other, preferences: { [key]: true } });
+      expect(await read(id)).to.equal(undefined);
+      await rejects(read(''), { error: 'not-authorized' });
+      await rejects(write('', key, true), { error: 'not-authorized' });
+      await rejects(read(id, 'existing'), { error: 'invalid-preference' });
+      await rejects(write(id, 'existing', false), { error: 'invalid-preference' });
+      for (const value of [true, false]) {
+        expect(await write(id, key, value)).to.equal(true);
+        expect(await read(id)).to.equal(value);
+      }
+      await rejects(write(id, key, 'true'), { error: 'invalid-preference' });
+      expect(await read(other)).to.equal(true);
+      expect((await MeteorUsersAny.findOneAsync(id)).preferences).to.deep.equal({ existing: 17, [key]: false });
+      await MeteorUsersAny.updateAsync(id, { $set: { ['preferences.' + key]: { invalid: true } } });
+      await rejects(read(id), { error: 'invalid-preference' });
+    } finally {
+      await MeteorUsersAny.removeAsync({ _id: { $in: [id, other] } });
+    }
+  });
+});
+
+describe('personal audio settings', () => {
+  it('validates the whole patch and preserves omitted personal audio choices', async () => {
+    const id = Random.id();
+    const handler = MeteorAny.server.method_handlers.saveAudioSettings;
+    const save = (patch: unknown) => handler.call({ userId: id }, patch);
+    const read = async () => (await MeteorUsersAny.findOneAsync(id)).audioSettings;
+    const { rejects } = await import('node:assert/strict');
+    const observation = registeredMeteorMethodSurfaces();
+    if (observation.state !== 'observed') throw new Error('Audio method registry unavailable');
+    expect(observation.surfaces.find(row => row.name === 'saveAudioSettings')?.policy).to.deep.equal({ kind: 'personal-audio', operation: 'self' });
+    try {
+      await MeteorUsersAny.insertAsync({ _id: id, audioPromptMode: 'feedback', audioInputMode: true });
+      await rejects(handler.call({}, { audioInputSensitivity: 70 }), { error: 401 });
+      await rejects(save({ audioInputSensitivity: 70, unknown: true }), { error: 'invalid-audio-settings' });
+      expect(await read()).to.equal(undefined);
+      await Promise.all([save({ audioInputSensitivity: 70 }), save({ audioPromptVoice: 'en-US-Standard-J' })]);
+      const baseline = await read();
+      expect(baseline).to.include({ audioInputMode: true, audioPromptMode: 'feedback', audioInputSensitivity: 70, audioPromptVoice: 'en-US-Standard-J' });
+      for (const invalid of [{ audioPromptMode: 'custom' }, { audioInputMode: 1 }, { audioPromptVoice: 'unknown' },
+        { audioPromptFeedbackVoice: '' }, { audioPromptQuestionVolume: -7 }, { audioPromptFeedbackVolume: 0.1 },
+        { audioPromptQuestionSpeakingRate: 0 }, { audioPromptFeedbackSpeakingRate: 1.1 }, { audioInputSensitivity: '70' }]) {
+        await rejects(save({ audioInputSensitivity: 30, ...invalid }), { error: 'invalid-audio-settings' });
+      }
+      expect(await read()).to.deep.equal(baseline);
+      await save({ audioPromptQuestionVolume: -6, audioPromptFeedbackVolume: 6, audioPromptQuestionSpeakingRate: 0.25, audioPromptFeedbackSpeakingRate: 2,
+        audioPromptFeedbackVoice: 'en-US-Standard-B', audioPromptMode: 'all', audioInputMode: false });
+      expect(await read()).to.include({ audioPromptQuestionVolume: -6, audioPromptFeedbackVolume: 6, audioInputSensitivity: 70, audioPromptVoice: 'en-US-Standard-J' });
+    } finally { await MeteorUsersAny.removeAsync(id); }
   });
 });

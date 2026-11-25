@@ -1,3 +1,4 @@
+import { uploadNewLessonMedia } from './uploadNewLessonMedia';
 import { startContentUploadCache } from '../../lib/contentUploadCache';
 import { createContentUploadProjection } from './contentUploadProjection';
 import { buildSparcVideoCatalog } from './sparcVideoCatalogBuilder';
@@ -103,6 +104,8 @@ function contentText(key: Parameters<typeof translatePlatformString>[1], values?
 }
 
 function uploadErrorText(error: any): string {
+  if (error?.error === 'sharing-recipient-missing') return contentText('content.sharingRecipientMissing');
+  if (error?.error === 'ambiguous-recipient') return contentText('content.ambiguousRecipient');
   return String(error?.reason || error?.message || error || '');
 }
 
@@ -495,9 +498,6 @@ Template.contentUpload.helpers({
     const pending = (Template.instance() as ContentUploadInstance).commandRegistry.getState(scope).status === 'pending';
     return pending ? { disabled: true, 'aria-busy': 'true' } : {};
   },
-  adminUploadMessage() {
-    return (Template.instance() as any).uploadMessages?.get()?.admin || null;
-  },
   contentListUploadMessage() {
     return (Template.instance() as any).uploadMessages?.get()?.['content-list'] || null;
   },
@@ -512,9 +512,6 @@ Template.contentUpload.helpers({
   },
   uploadConfirmationOpen() {
     return inlineConfirmationPlacement(Template.instance()) === 'upload-package';
-  },
-  adminDangerConfirmationOpen() {
-    return inlineConfirmationPlacement(Template.instance()) === 'admin-danger';
   },
   quotaStatus() {
     const state = (Template.instance() as ContentUploadInstance).quotaPresentation.get();
@@ -868,12 +865,6 @@ Template.contentUpload.helpers({
     const currentList = listValue(template);
     return currentList ? currentList.hasMore : false;
   },
-  'showDeleteAllButton': function(this: any){
-    // Only show delete all button if user is admin AND setting is enabled
-    const isAdmin = currentUserHasRole('admin');
-    const settingEnabled = Meteor.settings.public.enableDeleteAllButton || false;
-    return isAdmin && settingEnabled;
-  },
   disabledAttr(isEnabled: any) {
     return isEnabled ? null : { disabled: true };
   },
@@ -1212,22 +1203,9 @@ Template.contentUpload.events({
       }
     }
 
-    // Check for stim file selector in the same table row
-    const stimSelector = row.find('.stim-file-selector');
-    let stimFileParam = '';
-
-    if (stimSelector.length > 0) {
-      const selectedStimId = stimSelector.val();
-      const selectedFilename = stimSelector.find('option:selected').data('filename');
-      if (selectedStimId && selectedFilename) {
-        // Pass stim file info as query params
-        stimFileParam = `?stimFile=${encodeURIComponent(selectedFilename)}&stimId=${selectedStimId}`;
-      }
-    }
-
     const routeToEditor = (selectedTdf: any) => {
       const editorRoute = tdfHasSparcPages(selectedTdf) ? '/sparcEdit/' : '/contentEdit/';
-      FlowRouter.go(editorRoute + tdfId + stimFileParam);
+      FlowRouter.go(editorRoute + tdfId);
     };
 
     const selectedTdf = TdfsCollection.findOne({ _id: tdfId });
@@ -1299,18 +1277,6 @@ Template.contentUpload.events({
 
     // Optional: Store selection in Session for persistence
     Session.set(`selectedConditionFor_${rootTdfId}`, selectedTdfId);
-  },
-
-  // Stim file selector change handler
-  'change .stim-file-selector': function(event: any, _template: any) {
-    const selectedStimId = $(event.currentTarget).val();
-    const selectedFilename = $(event.currentTarget).find('option:selected').data('filename');
-    const tdfId = $(event.currentTarget).data('tdf-id');
-
-    clientConsole(2, `[STIM SELECT] TDF: ${tdfId}, Selected: ${selectedFilename} (${selectedStimId})`);
-
-    // Optional: Store selection in Session for persistence
-    Session.set(`selectedStimFor_${tdfId}`, { stimId: selectedStimId, filename: selectedFilename });
   },
 
   // Copy TDF to create a private copy
@@ -1470,6 +1436,7 @@ Template.contentUpload.events({
       const fileName = event.currentTarget.getAttribute('data-filename') || 'this package';
       const row = $(event.currentTarget).closest('tr');
       const tdfId = row.find('#content-edit-btn').attr('value') || packageAssetId;
+      const unpackagedLesson = !packageAssetId && !packageFile;
 
       const confirmed = await requestContentConfirmation(template, {
         placement: assetActionPlacement(String(tdfId || '')),
@@ -1495,7 +1462,9 @@ Template.contentUpload.events({
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
       await template.commandRegistry.run(`asset:${tdfId}`, async () => {
         try {
-          await MeteorAny.callAsync('deletePackageFile', packageAssetId, { wholeFamily: true });
+          await MeteorAny.callAsync('deletePackageFile', unpackagedLesson ? tdfId : packageAssetId, {
+            wholeFamily: true, unpackagedLesson,
+          });
           
           // Invalidate cache and trigger reactive refresh
           assetsHelperCachedResult = [];
@@ -1550,30 +1519,6 @@ Template.contentUpload.events({
       getErrorMessage: (error: any) => contentText('content.stimulusDownloadError', { error: uploadErrorText(error) }),
       onFailure: (error: any) => clientConsole(1, '[DOWNLOAD] Stimulus download failed:', error),
     });
-  },
-  'click #deleteAllAssetsConfirm': async function(e: any, template: any) {
-    e.preventDefault();
-    const confirmed = await requestContentConfirmation(template, {
-      placement: 'admin-danger',
-      title: contentText('content.deleteAllUploadedFiles'),
-      message: contentText('content.deleteAllWarning'),
-      confirmLabel: contentText('content.deleteAllUploadedFiles'),
-      cancelLabel: contentText('content.cancel'),
-      level: 'error'
-    });
-    if (!confirmed) {
-      return;
-    }
-    
-    MeteorAny.callAsync('deleteAllFiles',
-      function(error: any, result: any) {
-        if (error) {
-          setUploadMessage(template, contentText('content.errorDeletingFiles', { error: uploadErrorText(error) }), 'error', 'admin');
-        } else {
-          setUploadMessage(template, contentText('content.deletedFiles', { count: result }), 'success', 'admin');
-        }
-      }
-    );
   },
   'click .imageLink'(e: any, template: any) {
     const url = $(e.currentTarget).data('link');
@@ -1849,12 +1794,18 @@ Template.contentUpload.events({
     }
 
     await template.commandRegistry.run(`media:${tdfId}`, async () => {
-      await MeteorAny.callAsync('removeMultipleAssets', assetIds);
-      
-      // Refresh the assets list
+      const result = await MeteorAny.callAsync('removeMultipleAssets', assetIds);
+      panel.find('.media-select-checkbox, .select-all-media').prop('checked', false);
+      panel.find('.select-all-media').prop('indeterminate', false);
+      updateDeleteButtonState(tdfId);
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-      return { text: '' };
+      const countText = contentText('content.mediaDeletionCount', { count: result.deleted });
+      if (result.storageFailed || result.selectionChanged) {
+        const reason = result.storageFailed ? 'content.mediaDeletionInterrupted' : 'content.mediaSelectionChanged';
+        return { text: countText + ' ' + contentText(reason), level: result.storageFailed ? 'error' : 'warning' };
+      }
+      return { text: countText };
     }, {
       getErrorMessage: (error: any) => contentText('content.errorDeletingFiles', { error: uploadErrorText(error) }),
       onFailure: (error: any) => clientConsole(1, '[MEDIA] Batch delete error:', error),
@@ -1898,40 +1849,18 @@ async function uploadMediaFiles(files: any, tdfId: any, template: any) {
     return;
   }
 
-  if (validFiles.length !== files.length) {
-    const skipped = files.length - validFiles.length;
-    setUploadMessage(template, contentText('content.mediaFilesSkipped', { count: skipped }), 'warning', `media:${tdfId}`);
-  }
-
+  const messages: string[] = [];
+  const skipped = files.length - validFiles.length;
+  if (skipped) messages.push(contentText('content.mediaFilesSkipped', { count: skipped }));
   progressContainer.show();
-  let completed = 0;
   const total = validFiles.length;
-
-  for (const file of validFiles as any[]) {
-    statusText.text(`Uploading ${file.name} (${completed + 1}/${total})...`);
-
-    try {
-      // Check if file already exists
-      const existingFile = DynamicAssetsCollection.findOne({ name: file.name, 'meta.stimuliSetId': stimSetId });
-      if (existingFile) {
-        const confirmed = await requestContentConfirmation(template, {
-          placement: mediaPlacement(String(tdfId || '')),
-          title: contentText('content.overwriteMediaFile'),
-          message: contentText('content.mediaFileExistsOverwrite', { filename: file.name }),
-          confirmLabel: contentText('content.overwriteFile'),
-          cancelLabel: contentText('content.skip'),
-          level: 'warning'
-        });
-        if (!confirmed) {
-          completed++;
-          continue;
-        }
-        // Remove existing file first
-        await MeteorAny.callAsync('removeAssetById', existingFile._id);
-      }
-
-      // Upload using DynamicAssetsCollection
-      await new Promise((resolve: any, reject: any) => {
+  const batch = await uploadNewLessonMedia(
+    validFiles as File[],
+    String(stimSetId),
+    name => Boolean(DynamicAssetsCollection.findOne({ name, 'meta.stimuliSetId': stimSetId })),
+    (file, index) => {
+      statusText.text(file.name);
+      return new Promise<void>((resolve, reject) => {
         const upload = DynamicAssetsCollection.insert({
           transport: 'ddp',
           file: file,
@@ -1945,37 +1874,27 @@ async function uploadMediaFiles(files: any, tdfId: any, template: any) {
         }, false);
 
         upload.on('progress', function(progress: any) {
-          const overallProgress = ((completed + progress / 100) / total) * 100;
+          const overallProgress = ((index + progress / 100) / total) * 100;
           progressBar.css('width', overallProgress + '%');
         });
 
-        upload.on('end', function(error: any, fileObj: any) {
-          if (error) {
-            reject(error);
-          } else {
-            
-            resolve(fileObj);
-          }
-        });
-
+        upload.on('end', (error: unknown) => error ? reject(error) : resolve());
         upload.start();
       });
-
-      completed++;
-      progressBar.css('width', (completed / total) * 100 + '%');
-    } catch (error: any) {
-      clientConsole(1, '[MEDIA] Upload error for', file.name, ':', error);
-      setUploadMessage(template, contentText('content.uploadMediaError', { filename: file.name, error: uploadErrorText(error) }), 'error', `media:${tdfId}`);
-    }
-  }
-
-  // Hide progress immediately, then refresh
+    },
+  );
   progressContainer.hide();
   progressBar.css('width', '0%');
-  statusText.text('Upload complete!');
-  if (completed === total) {
-    setUploadMessage(template, contentText('content.uploadedMediaFiles', { count: completed }), 'success', `media:${tdfId}`);
+  if (batch.uploaded) messages.push(contentText('content.uploadedMediaFiles', { count: batch.uploaded }));
+  if (batch.duplicates.length) {
+    messages.push(contentText('content.mediaNamesAlreadyUsed', { filenames: batch.duplicates.join(', ') }));
   }
+  for (const { name, error } of batch.errors) {
+    clientConsole(1, '[MEDIA] Upload error for', name, ':', error);
+    messages.push(contentText('content.uploadMediaError', { filename: name, error: uploadErrorText(error) }));
+  }
+  const level = batch.errors.length ? 'error' : skipped || batch.duplicates.length ? 'warning' : 'success';
+  setUploadMessage(template, messages.join(' '), level, `media:${tdfId}`);
 
   // Refresh the assets list after a short delay to ensure UI updates
   setTimeout(() => {
@@ -2173,6 +2092,7 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
                   return
                 }
               }
+              loadUploadQuotaStatus(template);
               // SUCCESS: Keep pending entry visible until the actual lesson row appears.
               const uploadData = template.pendingUploads.get(pendingUploadId);
               if (uploadData) {

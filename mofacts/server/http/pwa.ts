@@ -1,4 +1,6 @@
 import { WebApp } from 'meteor/webapp';
+import { HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { registerHttpMiddleware } from '../securitySurfaces/registerHttpRoutes.ts';
 import type { IncomingMessage, ServerResponse } from 'http';
 import fs from 'fs/promises';
 import path from 'path';
@@ -210,7 +212,12 @@ async function resolveThemeIconContent(theme: ThemeLike, propertyName: string) {
   return await readThemeAssetFromUrl(propertyValue);
 }
 
-WebAppAny.handlers.use(async function(req: IncomingMessage, res: ServerResponse, next: () => void) {
+registerHttpMiddleware(WebAppAny, 'handlers', {
+  surfaceId: 'middleware:pwa-assets',
+  policy: Object.freeze({ kind: 'public', applicationRateLimit: 'none' }),
+  dataEgress: Object.freeze({ kind: 'public-brand-assets' }),
+  verification: HTTP_MIDDLEWARE_VERIFICATIONS.pwa,
+}, async function(req: IncomingMessage, res: ServerResponse, next: () => void) {
   const method = req.method || 'GET';
   if (method !== 'GET' && method !== 'HEAD') {
     next();

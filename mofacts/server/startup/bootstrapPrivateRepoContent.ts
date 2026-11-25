@@ -33,7 +33,6 @@ type BootstrapPrivateRepoContentDeps = {
     records: Array<{ sourceKey: string; sourceFileName: string; fileName: string; tdfs: BootstrapTdfPayload['tdfs'] }>,
     adminUserId: string,
   ) => Promise<Array<{ tdfId: string; stimuliSetId?: number | string | null }>>;
-  updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
 };
 
 async function readRepoJsonFilenames(dirPath: string, serverConsole: Logger) {
@@ -58,17 +57,10 @@ export async function bootstrapPrivateRepoContentIfNeeded(deps: BootstrapPrivate
   deps.serverConsole('loading stims and tdfs from asset dir');
 
   const stimFilenames = await readRepoJsonFilenames('./assets/app/stims/', deps.serverConsole);
-  const stimSetIdsLoaded = new Set<string | number>();
   for (const filename of stimFilenames) {
     const data = await deps.AssetsAny.getTextAsync('stims/' + filename);
     const json = JSON.parse(data);
-    const stimuliSetId = await deps.upsertStimFile(filename, json, deps.adminUserId);
-    if (stimuliSetId !== undefined && stimuliSetId !== null) {
-      stimSetIdsLoaded.add(stimuliSetId);
-    }
-  }
-  if (stimSetIdsLoaded.size > 0) {
-    await deps.updateStimDisplayTypeMap(Array.from(stimSetIdsLoaded));
+    await deps.upsertStimFile(filename, json, deps.adminUserId);
   }
 
   const tdfFilenames = await readRepoJsonFilenames('./assets/app/tdf/', deps.serverConsole);
@@ -97,14 +89,5 @@ export async function bootstrapPrivateRepoContentIfNeeded(deps: BootstrapPrivate
       tdfs: json,
     });
   }
-  const tdfStimSetIds = new Set<string | number>();
-  const importedTdfs = await deps.importPrivateRepoTdfBatch(tdfRecords, deps.adminUserId);
-  for (const tdfResult of importedTdfs) {
-    if (tdfResult?.stimuliSetId !== undefined && tdfResult?.stimuliSetId !== null) {
-      tdfStimSetIds.add(tdfResult.stimuliSetId);
-    }
-  }
-  if (tdfStimSetIds.size > 0) {
-    await deps.updateStimDisplayTypeMap(Array.from(tdfStimSetIds));
-  }
+  await deps.importPrivateRepoTdfBatch(tdfRecords, deps.adminUserId);
 }

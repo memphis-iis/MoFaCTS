@@ -486,25 +486,6 @@
                                             </div>
                                             {{/if}}
 
-                                            {{#if stimFiles}}
-                                            <div class="condition-selector-wrapper">
-                                                <label for="stim-selector-{{_id}}" class="form-label small admin-form-row-xs">
-                                                    {{t 'content.selectStimFileToEdit'}}
-                                                </label>
-                                                <select id="stim-selector-{{_id}}"
-                                                        class="form-select form-select-sm stim-file-selector"
-                                                        data-tdf-id="{{_id}}">
-                                                    {{#each stimFiles}}
-                                                        <option value="{{this.stimId}}"
-                                                                data-filename="{{this.filename}}"
-                                                                {{disabledAttr this.exists}}>
-                                                            {{this.filename}}
-                                                            {{#unless this.exists}} ({{t 'content.notFoundMarker'}}){{/unless}}
-                                                        </option>
-                                                    {{/each}}
-                                                </select>
-                                            </div>
-                                            {{/if}}
                                         </div>
                                         {{/if}}
                                     </div>
@@ -637,32 +618,6 @@
             {{> imsccWizard}}
         </div>
 
-        {{#if showDeleteAllButton}}
-        <div class="admin-section">
-            <div class="card admin-card">
-                <div class="card-body">
-                    <div class="admin-section-heading">
-                        <i class="fa fa-exclamation-triangle admin-section-icon content-upload-danger-icon"></i>
-                        <h5>{{t 'content.adminFunctions'}}</h5>
-                    </div>
-                    <div class="alert alert-danger admin-form-row" role="alert">
-                        <strong>{{t 'content.warning'}}</strong> {{t 'content.deleteAllWarning'}}
-                    </div>
-                    <div class="text-center">
-                        <button class="btn btn-danger" id="deleteAllAssetsConfirm">
-                            <i class="fa fa-trash"></i> {{t 'content.deleteAllUploadedFiles'}}
-                        </button>
-                    </div>
-                    {{#if adminDangerConfirmationOpen}}
-                    <div class="admin-form-row-top">
-                        {{> adminInlineConfirmation confirmation=inlineConfirmationView}}
-                    </div>
-                    {{/if}}
-                    {{#with adminUploadMessage}}{{> adminStatus variant=level text=text}}{{/with}}
-                </div>
-            </div>
-        </div>
-        {{/if}}
     </div>
 </template>
 

@@ -1,8 +1,13 @@
+import { PARTICIPANT_TOKEN_PREFIX, studyOnlyAccount } from '../../common/participantPrivacy';
+import { configuredRoleNames, configuredLoginIdentity, startupRoleIdentifier } from '../lib/configuredRoles';
 import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import { Roles } from 'meteor/alanning:roles';
 import { ServiceConfiguration } from 'meteor/service-configuration';
 import { WebApp } from 'meteor/webapp';
+import { HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
+import { bindAccountServiceOwner, bindNativeAccountMethods, registerAccountLifecycleHook } from '../securitySurfaces/registerFrameworkAuth';
+import { registerHttpMiddleware } from '../securitySurfaces/registerHttpRoutes.ts';
 import { curSemester } from '../../common/Definitions';
 import { displayify } from '../../common/globalHelpers';
 import type { NextFunction } from 'connect';
@@ -126,7 +131,6 @@ type RunServerStartupDeps = {
   updateActiveThemeDocument: (userId: string | null | undefined, mutator: (theme: any) => any) => Promise<unknown>;
   upsertStimFile: (filename: string, json: unknown, ownerId: string) => Promise<string | number | null | undefined>;
   importPrivateRepoTdfBatch: (records: any[], ownerId: string) => Promise<Array<{ tdfId: string; stimuliSetId?: number | string | null }>>;
-  updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
   sendErrorReportSummaries: () => Promise<unknown>;
   sendEmail: (to: string, from: string, subject: string, text: string) => void;
   getDiskUsageInfo: (path?: string) => { free: number; total: number } | null;
@@ -163,11 +167,16 @@ const WebAppAny = WebApp as unknown as {
 };
 
 function registerSecurityHeaders() {
-  WebAppAny.handlers.use((req: IncomingMessage, res: ServerResponse<IncomingMessage>, next: NextFunction) => {
+  registerHttpMiddleware(WebAppAny, 'handlers', {
+    surfaceId: 'middleware:security-headers',
+    policy: Object.freeze({ kind: 'response-headers' }),
+    dataEgress: Object.freeze({ kind: 'none' }),
+    verification: HTTP_MIDDLEWARE_VERIFICATIONS.headers,
+  }, (req: IncomingMessage, res: ServerResponse<IncomingMessage>, next: NextFunction) => {
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Referrer-Policy', /^\/(?:experiment|prolific\/resume)(?:[/?]|$)/i.test(req.url || '') ? 'no-referrer' : 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(self)');
     if (req.url === '/stimSchema.json' || req.url === '/tdfSchema.json') {
       res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -258,22 +267,8 @@ async function findUserByName(deps: RunServerStartupDeps, username: string) {
   if (!username || username.length < 1) {
     return null;
   }
-  const normalizedUsername = username.trim();
-  const lookupSelector = deps.isValidEmailAddress(normalizedUsername)
-    ? {
-        $or: [
-          { username: normalizedUsername.toLowerCase() },
-          { email_canonical: normalizedUsername.toLowerCase() },
-          { 'emails.address': normalizedUsername.toLowerCase() },
-        ],
-      }
-    : {
-        $or: [
-          { username: normalizedUsername },
-          { email_canonical: normalizedUsername },
-          { 'emails.address': normalizedUsername },
-        ],
-      };
+  const identity = startupRoleIdentifier(username, deps.isValidEmailAddress);
+  const lookupSelector = { $or: [{ username: identity }, { email_canonical: identity }, { 'emails.address': identity }] };
   return await deps.usersCollection.findOneAsync(lookupSelector);
 }
 
@@ -479,13 +474,14 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     deps.serverConsole('WARNING: No Microsoft OAuth configuration found in settings');
   }
 
-  Accounts.onLogin(async (loginInfo: {
+  registerAccountLifecycleHook(Accounts, 'onLogin', async (loginInfo: {
     type?: string;
     user?: { _id?: string; emails?: Array<{ address?: string }>; email?: string; username?: string };
     methodName?: string;
     allowed?: boolean;
     connection?: { clientAddress?: string | null };
   }) => {
+    if (loginInfo.type === 'experimentParticipant' || (loginInfo.type === 'resume' && studyOnlyAccount(loginInfo.user))) return;
     deps.serverConsole('[ACCOUNTS.ONLOGIN] Login detected:', {
       type: loginInfo.type,
       methodName: loginInfo.methodName,
@@ -496,7 +492,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     }
 
     const userId = loginInfo.user._id;
-    const userEmail = loginInfo.user.emails?.[0]?.address || loginInfo.user.email || loginInfo.user.username;
+    const userEmail = configuredLoginIdentity(loginInfo.user);
     const normalizedUserEmail = typeof userEmail === 'string' ? userEmail.trim().toLowerCase() : '';
     const isOAuthLogin = loginInfo.type === 'google' || loginInfo.type === 'microsoft' || loginInfo.type === 'memphisSaml';
 
@@ -512,8 +508,8 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
 
     const initRoles = (Meteor.settings as any)?.initRoles;
     if (initRoles && normalizedUserEmail && userId) {
-      const admins = (initRoles?.admins || []).map((value: unknown) => String(value).trim().toLowerCase()).filter(Boolean);
-      const teachers = (initRoles?.teachers || []).map((value: unknown) => String(value).trim().toLowerCase()).filter(Boolean);
+      const admins = configuredRoleNames(initRoles, 'admin').map(name => name.toLowerCase());
+      const teachers = configuredRoleNames(initRoles, 'teacher').map(name => name.toLowerCase());
       if (admins.includes(normalizedUserEmail)) {
         deps.serverConsole('[ACCOUNTS.ONLOGIN] Matching initRoles.admins entry found; assigning admin role');
         try {
@@ -589,6 +585,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   };
 
   (Accounts as any).config({
+    forbidClientAccountCreation: true,
     loginExpirationInDays: 30,
     ambiguousErrorMessages: true,
     argon2Enabled: deps.isArgon2Enabled(),
@@ -617,10 +614,11 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       }
     },
   });
-  meteorMethodHandlers.login = wrapPasswordLoginMethodWithResponseEnvelope(
-    passwordLoginMethod,
-    failedPasswordResponseEnvelope,
-  );
+  const installedPasswordLogin = wrapPasswordLoginMethodWithResponseEnvelope(passwordLoginMethod, failedPasswordResponseEnvelope);
+  meteorMethodHandlers.login = installedPasswordLogin;
+  bindNativeAccountMethods(installedPasswordLogin, () => (Meteor as unknown as {
+    server?: { method_handlers?: Record<string, unknown> };
+  }).server?.method_handlers);
   deps.serverConsole('Failed-password response timing envelope registered');
   const meteorPasswordVerifier = (Accounts as unknown as {
     _checkPasswordAsync?: Parameters<typeof createPasswordTimingDefense>[0];
@@ -648,7 +646,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     runCaseInsensitivePasswordUserLookup,
   );
 
-  Accounts.validateLoginAttempt(async (attempt: {
+  registerAccountLifecycleHook(Accounts, 'validateLoginAttempt', async (attempt: {
     allowed?: boolean;
     type?: string;
     user?: {
@@ -659,6 +657,10 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     error?: { error?: string; reason?: string; message?: string };
     methodArguments?: unknown[];
   }) => {
+    if (attempt.type === 'experimentParticipant') return attempt.allowed === true;
+    const resume = (attempt.methodArguments?.[0] as { resume?: unknown })?.resume;
+    if (typeof resume === 'string' && resume.startsWith(PARTICIPANT_TOKEN_PREFIX)) return false;
+    if (attempt.allowed && attempt.type === 'resume' && studyOnlyAccount(attempt.user)) return true;
     const identifier = deps.extractLoginAttemptIdentifier(attempt);
     const clientIp = deps.getAuthClientIp(attempt);
     if (attempt.type === 'password') {
@@ -714,8 +716,8 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   }
 
   const roleSettings = ((Meteor.settings as any)?.initRoles || {}) as { admins?: unknown[]; teachers?: unknown[] };
-  const roleAdd = async (memberName: 'admins' | 'teachers', roleName: 'admin' | 'teacher') => {
-    const requested = Array.isArray(roleSettings[memberName]) ? roleSettings[memberName] as unknown[] : [];
+  const roleAdd = async (roleName: 'admin' | 'teacher') => {
+    const requested = configuredRoleNames(roleSettings, roleName);
     deps.serverConsole('Role', roleName, '- found', requested.length);
     for (const username of requested) {
       const user = await findUserByName(deps, String(username || ''));
@@ -728,8 +730,8 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       deps.serverConsole('Configured role assignment completed:', { role: roleName });
     }
   };
-  await roleAdd('admins', 'admin');
-  await roleAdd('teachers', 'teacher');
+  await roleAdd('admin');
+  await roleAdd('teacher');
 
   if (await deps.Tdfs.find().countAsync() === 0) {
     await bootstrapPrivateRepoContentIfNeeded({
@@ -740,11 +742,10 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       AssetsAny: deps.AssetsAny,
       upsertStimFile: deps.upsertStimFile,
       importPrivateRepoTdfBatch: deps.importPrivateRepoTdfBatch,
-      updateStimDisplayTypeMap: deps.updateStimDisplayTypeMap,
     });
   }
 
-  Accounts.onCreateUser(function(options: { profile?: {} | undefined }, user: Meteor.User) {
+  registerAccountLifecycleHook(Accounts, 'onCreateUser', function(options: { profile?: {} | undefined }, user: Meteor.User) {
     deps.serverConsole('[ACCOUNTS] onCreateUser called');
     deps.serverConsole('[ACCOUNTS] User services:', Object.keys(user.services || {}));
 
@@ -829,6 +830,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     return user;
   });
 
+  bindAccountServiceOwner(Accounts as unknown as Parameters<typeof bindAccountServiceOwner>[0]);
   deps.serverConsole('Password hash runtime info:', deps.getPasswordHashRuntimeInfo());
 
   await deps.AuditLog.rawCollection().createIndex(

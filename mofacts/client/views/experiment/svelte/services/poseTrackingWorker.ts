@@ -2,7 +2,7 @@ import type { PoseLandmarker, HandLandmarker } from '@mediapipe/tasks-vision';
 import type { PoseObservation, PoseConnection } from './poseTracking';
 
 export type PoseWorkerRequest = { type: 'initialize' } | {
-  type: 'frame'; bitmap: ImageBitmap; timestamp: number; width: number; height: number;
+  type: 'frame'; bitmap: ImageBitmap; timestamp: number; width: number; height: number; bodyTracking: boolean;
 };
 export type PoseWorkerMessage = { type: 'ready' } | { type: 'error'; message: string } | {
   type: 'frame'; observation: PoseObservation; connections: readonly PoseConnection[]; handConnections: readonly PoseConnection[];
@@ -13,6 +13,7 @@ const scope = self as unknown as {
   postMessage(message: PoseWorkerMessage): void;
 };
 let pose: PoseLandmarker | null = null;
+let createPose: (() => Promise<PoseLandmarker>) | null = null;
 let hands: HandLandmarker | null = null;
 let connections: readonly PoseConnection[] = [];
 let handConnections: readonly PoseConnection[] = [];
@@ -25,7 +26,9 @@ scope.onmessage = async ({ data }) => {
       const { FilesetResolver, PoseLandmarker, HandLandmarker } = await import('@mediapipe/tasks-vision');
       const base = scope.location.origin + '/mediapipe/';
       const files = await FilesetResolver.forVisionTasks(base + 'wasm');
-      pose = await PoseLandmarker.createFromOptions(files, {
+      // The hand demo must not load or wait for a body model. Only the explicit
+      // body-comparison panel requests this independent observation stream.
+      createPose = () => PoseLandmarker.createFromOptions(files, {
         baseOptions: { modelAssetPath: base + 'pose_landmarker_full.task', delegate: 'CPU' },
         canvas: new OffscreenCanvas(1, 1), runningMode: 'VIDEO', numPoses: 1, outputSegmentationMasks: false,
       });
@@ -38,16 +41,18 @@ scope.onmessage = async ({ data }) => {
       scope.postMessage({ type: 'ready' });
     } else {
       try {
-        if (!pose || !hands) throw new Error('Pose inference is not initialized');
-        const result = pose.detectForVideo(data.bitmap, data.timestamp);
+        if (!hands || !createPose) throw new Error('Hand inference is not initialized');
+        if (data.bodyTracking) pose ??= await createPose();
+        else { pose?.close(); pose = null; }
+        const result = data.bodyTracking ? pose!.detectForVideo(data.bitmap, data.timestamp) : null;
         const handResult = hands.detectForVideo(data.bitmap, data.timestamp);
         scope.postMessage({ type: 'frame', observation: {
-          landmarks: result.landmarks[0] ?? [], worldLandmarks: result.worldLandmarks[0] ?? [],
+          landmarks: result?.landmarks[0] ?? [], worldLandmarks: result?.worldLandmarks[0] ?? [],
           hands: handResult.landmarks, handWorldLandmarks: handResult.worldLandmarks,
           handedness: handResult.handedness.map(categories => categories[0]?.categoryName ?? ''),
           handednessConfidence: handResult.handedness.map(categories => categories[0]?.score ?? 0),
           timestamp: data.timestamp, width: data.width, height: data.height,
-        }, connections, handConnections });
+        }, connections: data.bodyTracking ? connections : [], handConnections });
       } finally { data.bitmap.close(); }
     }
   } catch (error) {

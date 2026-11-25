@@ -30,7 +30,6 @@ import { isLessonRoutePath } from "./lessonRoute";
 import { clearRuntimeStimulusCache } from "./runtimeStimuli";
 declare const Session: any;
 declare const Meteor: any;
-declare const GlobalExperimentStates: any;
 
 /* *****************************************************************
  * All of our currently known session variables
@@ -153,18 +152,8 @@ function sessionCleanUp() {
   applySessionCleanupEntries(Session, FULL_LAUNCH_SESSION_DEFAULTS);
   deliverySettingsStore.set({});
   ExperimentStateStore.clear();
-  ExperimentStateStore.clear();
 
   clearEngine();
-  const currentExperimentState = ExperimentStateStore.get();
-  if (currentExperimentState) {
-    let mergedExperimentState = currentExperimentState;
-    let globalExperimentState = GlobalExperimentStates.findOne({TDFId: Session.get('currentRootTdfId')})
-    if(globalExperimentState){
-      mergedExperimentState = Object.assign(globalExperimentState.experimentState, mergedExperimentState);
-      GlobalExperimentStates.update({_id: globalExperimentState._id}, {$set: {experimentState: mergedExperimentState}});
-    }
-  }
   Session.set('currentRootTdfId', undefined);
   Session.set('conditionTdfId', undefined);
 }

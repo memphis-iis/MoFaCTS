@@ -15,9 +15,7 @@ type Session = { withTransaction(work: () => Promise<void>, options: { readConce
 type Scope = { tdfId: string; sessionId: string; eventId: string };
 type Initialization = { version: 1; phase: 'requests' | 'figures' | 'history' | 'complete'; cursor: string | null; requestCount: number; figureCount: number; historyCount: number };
 const PAGE_SIZE = 100;
-export class SparcContentAlreadyUsedError extends Error {
-  constructor() { super('This instructional content has already been used for this user'); this.name = 'SparcContentAlreadyUsedError'; }
-}
+export class SparcPresentationConflictError extends Error {}
 const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 export const sparcContentUseKeys = (content: SparcPrimitiveContent, entryId?: string) => sparcPrimitiveContentUseKeys(content, hash, entryId);
 export const sparcCatalogUseKeys = (entry: { _id: string; kind: string; content?: SparcPrimitiveContent }) => sparcCatalogContentUseKeys(entry, hash);
@@ -36,8 +34,6 @@ function scope(value: Row): Scope {
   return { tdfId: result.tdfId, sessionId: result.sessionId, eventId: result.eventId };
 }
 function sameScope(a: Scope, b: Scope): boolean { return a.tdfId === b.tdfId && a.sessionId === b.sessionId && a.eventId === b.eventId; }
-function visualIdentity(userId: string, value: Scope): string { return hash(JSON.stringify([userId, value.tdfId, value.sessionId, value.eventId])); }
-function mediaKey(value: string): boolean { return value.startsWith('image:') || value.startsWith('video:'); }
 function initialization(value: unknown): Initialization {
   if (value === undefined) return { version: 1, phase: 'requests', cursor: null, requestCount: 0, figureCount: 0, historyCount: 0 };
   const record = value as Initialization;
@@ -48,27 +44,6 @@ function initialization(value: unknown): Initialization {
     || !Number.isSafeInteger(record.historyCount) || record.historyCount < 0) throw new Error('Invalid content-use initialization checkpoint');
   return record;
 }
-/** Bounded derived catalog metadata, preserving concurrent administrator revisions. */
-export async function ensureSparcContentUseCatalog(collection: SparcContentUseCollection): Promise<void> {
-  let cursor: string | null = null;
-  while (true) {
-    const rows = await collection.find({ contentUseKeys: { $exists: false }, ...(cursor === null ? {} : { _id: { $gt: cursor } }) },
-      { projection: { _id: 1, kind: 1, content: 1 }, sort: { _id: 1 }, limit: PAGE_SIZE }).toArray();
-    if (!rows.length) {
-      if (await collection.findOne({ contentUseKeys: { $exists: false } }, { projection: { _id: 1 } })) {
-        throw new Error('Catalog content changed during eligibility initialization; reopen the lesson');
-      }
-      return;
-    }
-    await collection.bulkWrite(rows.map(row => ({ updateOne: {
-      filter: { _id: row._id, kind: row.kind, contentUseKeys: { $exists: false }, ...(row.content ? { content: row.content } : {}) },
-      update: { $set: { contentUseKeys: sparcCatalogUseKeys(row as { _id: string; kind: string; content?: SparcPrimitiveContent }) } },
-    } })), { ordered: true });
-    cursor = rows.at(-1)!._id;
-    requireIdentity(cursor);
-  }
-}
-
 /** Accepted request/visual decisions remain the owner; historical proofs stay in that owner. */
 export function createSparcContentUseStorage(deps: {
   requests: SparcContentUseCollection; figures: SparcContentUseCollection;
@@ -118,7 +93,7 @@ export function createSparcContentUseStorage(deps: {
         if (saved && (saved.kind !== receipt.kind || saved.userId !== receipt.userId || saved.sourceHistoryId !== receipt.sourceHistoryId
           || saved.entryId !== receipt.entryId || !sameScope(scope(saved), scope(receipt))
           || JSON.stringify(keys(saved.contentUseKeys)) !== JSON.stringify(keys(receipt.contentUseKeys)))) {
-          throw new Error('Saved SPARC presentation identity conflicts with its durable content');
+          throw new SparcPresentationConflictError('Saved SPARC presentation identity conflicts with its durable content');
         }
       }
       await writeChunks(deps.requests, batch.map(receipt => ({ updateOne: {
@@ -209,37 +184,6 @@ export function createSparcContentUseStorage(deps: {
     }
   }
 
-  async function assertUnused(userId: string, candidate: string[], requestScope: Scope | undefined, requestId: string, session: Session, presentedEntryId?: string): Promise<void> {
-    let cursor: string | null = null;
-    while (true) {
-      const rows = await deps.requests.find({ userId, contentUseKeys: { $in: candidate }, ...(cursor === null ? {} : { _id: { $gt: cursor } }) },
-        { projection: { _id: 1, kind: 1, scope: 1, 'query.tdfId': 1, 'query.sessionId': 1, 'query.eventId': 1, entryId: 1, contentUseKeys: 1 }, sort: { _id: 1 }, limit: PAGE_SIZE, session }).toArray();
-      for (const row of rows) {
-        if (row._id === requestId) continue;
-        const previousScope = scope(row);
-        const sameEvent = requestScope ? sameScope(previousScope, requestScope) : visualIdentity(userId, previousScope) === requestId;
-        const previousKeys = keys(row.contentUseKeys);
-        const overlap = previousKeys.filter(key => candidate.includes(key));
-        // The saved primitive reserves its own forthcoming output. Its exact
-        // event, entry and content must agree; another component cannot borrow it.
-        if (presentedEntryId && row.kind !== 'presentation-use' && sameEvent && row.entryId === presentedEntryId
-          && candidate.every(key => previousKeys.includes(key))) continue;
-        // Canonical history owns restoration if its original request is missing.
-        // A same-event receipt never authorizes replacing it with a fresh selection.
-        if (overlap.some(key => !(sameEvent && (mediaKey(key) || (presentedEntryId && row.kind === 'presentation-use'
-          && row.entryId === presentedEntryId && key === `entry:${presentedEntryId}`))))) throw new SparcContentAlreadyUsedError();
-      }
-      if (!rows.length) break;
-      cursor = rows.at(-1)!._id; requireIdentity(cursor);
-    }
-    const media = candidate.filter(mediaKey).map(key => key.slice(key.indexOf(':') + 1));
-    if (!media.length) return;
-    const ownVisual = requestScope ? visualIdentity(userId, requestScope) : requestId;
-    if (await deps.figures.findOne({ kind: 'decision', userId, assetId: { $in: media }, _id: { $ne: ownVisual } }, { projection: { _id: 1 }, session })) {
-      throw new SparcContentAlreadyUsedError();
-    }
-  }
-
   async function saveRequest<T extends Row>(value: T): Promise<T> {
     await ensureUser(value.userId);
     return await transaction(value.userId, async session => {
@@ -252,7 +196,11 @@ export function createSparcContentUseStorage(deps: {
         if (!entry) throw new Error('Selected content is unavailable');
         const expected = sparcCatalogUseKeys(entry as { _id: string; kind: string; content?: SparcPrimitiveContent });
         if (JSON.stringify(keys(value.contentUseKeys)) !== JSON.stringify(expected)) throw new Error('Selected component changed before it was accepted');
-        await assertUnused(value.userId, expected, scope(value), value._id, session);
+        const event = scope(value);
+        if (await deps.requests.findOne({ kind: 'presentation-use', userId: value.userId, entryId: value.entryId,
+          'scope.tdfId': event.tdfId, 'scope.sessionId': event.sessionId, 'scope.eventId': event.eventId }, { session })) {
+          throw new SparcPresentationConflictError('This event already has a saved presentation for this entry');
+        }
       }
       if (!previous) await deps.requests.updateOne({ _id: value._id }, { $setOnInsert: value }, { upsert: true, session });
       else if (value.entryId) await deps.requests.updateOne({ _id: value._id, userId: value.userId, entryId: { $exists: false } },
@@ -272,7 +220,6 @@ export function createSparcContentUseStorage(deps: {
         return;
       }
       const contentUseKeys = [value.video ? `video:${value.video.segmentId}` : `image:${value.assetId}`];
-      await assertUnused(value.userId, contentUseKeys, undefined, value._id, session);
       await deps.figures.updateOne({ _id: value._id }, { $setOnInsert: { ...value, contentUseKeys } }, { upsert: true, session });
     });
   }
@@ -287,20 +234,17 @@ export function createSparcContentUseStorage(deps: {
   async function acceptPresentations(userId: string, rows: readonly Record<string, unknown>[], session: Session): Promise<void> {
     if (rows.some(row => row.userId !== userId)) throw new Error('SPARC presentation commits require one authenticated user');
     const receipts = rows.flatMap(presentationReceipts);
-    const pending: Row[] = [];
     for (const receipt of receipts) {
-      const candidate = keys(receipt.contentUseKeys);
-      await assertUnused(userId, candidate, scope(receipt), receipt._id, session, receipt.entryId);
-      for (const prior of pending) {
-        const sameEvent = sameScope(scope(prior), scope(receipt));
-        const repeated = keys(prior.contentUseKeys).filter(key => candidate.includes(key));
-        if (repeated.some(key => !(sameEvent && (mediaKey(key) || (receipt.entryId && prior.entryId === receipt.entryId && key === `entry:${receipt.entryId}`))))) {
-          throw new SparcContentAlreadyUsedError();
-        }
+      if (!receipt.entryId) continue;
+      const event = scope(receipt);
+      const accepted = await deps.requests.findOne({ userId, entryId: receipt.entryId, 'query.tdfId': event.tdfId,
+        'query.sessionId': event.sessionId, 'query.eventId': event.eventId }, { projection: { contentUseKeys: 1 }, session });
+      if (accepted) {
+        const acceptedKeys = keys(accepted.contentUseKeys);
+        if (!keys(receipt.contentUseKeys).every(key => acceptedKeys.includes(key))) throw new SparcPresentationConflictError('Presented content differs from the accepted component');
       }
-      pending.push(receipt);
     }
-    await writeReceipts(pending, session);
+    await writeReceipts(receipts, session);
   }
   return { ensureUser, saveRequest, saveDecision, preparePresentations, acceptPresentations };
 }

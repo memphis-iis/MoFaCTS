@@ -16,7 +16,8 @@ commit=${3:?exact source commit}
 [[ "$(git -c "safe.directory=$job/source" -C "$job/source" rev-parse HEAD)" == "$commit" ]]
 [[ -z "$(git -c "safe.directory=$job/source" -C "$job/source" status --porcelain)" ]]
 name="mofacts-ci-$(basename "$job" | tr '[:upper:].' '[:lower:]-')"
-image="mofacts-local/integration:${commit:0:12}"
+exec 9<"$job"
+flock -n 9 || { echo "Another worker owns this job" >&2; exit 1; }
 label="org.mofacts.integration=$name"
 export TMPDIR="$job/tmp"
 mkdir -p "$TMPDIR" "$job/results"
@@ -31,15 +32,80 @@ coordinator() {
 }
 capture="$job/source/mofacts/scripts/security-audit/qualification/captureBuildSource.mjs"
 
+owned() { [[ "$(docker inspect "$1" --format '{{index .Config.Labels "org.mofacts.integration"}}')" == "$name" ]]; }
+cleanup() {
+  result=$?
+  trap - EXIT HUP INT TERM
+  if [[ "$action" == prepare && "$result" == 0 ]]; then return; fi
+  printf '%s\n' "$result" > "$job/results/$action-exit-status"
+  printf 'incomplete\n' > "$job/results/cleanup-status"
+  docker info --format '{{.ServerVersion}}' > /dev/null || exit 1
+  for container in "$name-test" "$name-mongodb" "$name-setup"; do
+    if docker container inspect "$container" > /dev/null 2>&1; then
+      owned "$container" || { printf 'Container ownership mismatch\n' >&2; exit 1; }
+      docker inspect "$container" --format '{{json .State}}' > "$job/results/$container-state.json"
+      docker rm -f -v "$container" > /dev/null
+    fi
+  done
+  if docker network inspect "$name" > /dev/null 2>&1; then
+    [[ "$(docker network inspect "$name" --format '{{index .Labels "org.mofacts.integration"}}')" == "$name" ]]
+    docker network rm "$name" > /dev/null
+  fi
+  # Only the per-job Meteor cache is discarded; source/results stay for review.
+  if docker volume inspect "$name-tools" > /dev/null 2>&1; then
+    [[ "$(docker volume inspect "$name-tools" --format '{{index .Labels "org.mofacts.integration"}}')" == "$name" ]]
+    docker volume rm "$name-tools" > /dev/null
+  fi
+  for app in "$TMPDIR"/mofacts-qualified-build-*/test-context/mofacts; do
+    [[ -d "$app" ]] || continue
+    [[ "$(realpath "$app")" == "$app" && ! -L "$app/.meteor" ]] || exit 1
+    rm -rf --one-file-system -- "$app/node_modules" "$app/.meteor/local" "$app/_build"
+  done
+  printf 'complete\n' > "$job/results/cleanup-status"
+  if [[ "$action" == run ]]; then printf '%s\n' "$result" > "$job/results/lane-exit-status"; fi
+  exit "$result"
+}
+
 if [[ "$action" == prepare ]]; then
-  [[ ! -e "$job/prepared" && ! -e "$job/results/capture.json" ]]
+  [[ ! -e "$job/build" && ! -e "$job/prepared" && ! -e "$job/results/prepare-exit-status" && ! -e "$job/results/capture.json" ]]
+else
+  [[ "${4:-}" == --authorize-one-meteor-run && -f "$job/prepared" && ! -e "$job/invoked" && ! -e "$job/results/run-exit-status" ]]
+fi
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+guest_available=$(df -B1 --output=avail "$job" | tail -1)
+printf '%s\n' "$guest_available" > "$job/results/$action-linux-free-bytes"
+(( guest_available >= 10 * 1024 ** 3 )) || { echo 'Meteor worker requires 10 GiB free in the job filesystem' >&2; exit 1; }
+if grep -qi microsoft /proc/sys/kernel/osrelease; then
+  mountpoint -q /mnt/c || { echo 'Cannot measure C: at /mnt/c' >&2; exit 1; }
+  [[ "$(findmnt -n -o SOURCE --mountpoint /mnt/c | cut -c1-2 | tr A-Z a-z)" == c: ]] || { echo 'Expected C: mounted at /mnt/c' >&2; exit 1; }
+  available=$(df -B1 --output=avail /mnt/c | tail -1)
+  printf '%s\n' "$available" > "$job/results/$action-c-free-bytes"
+  (( available >= 20 * 1024 ** 3 )) || { echo 'Meteor worker requires 20 GiB free on C:' >&2; exit 1; }
+fi
+
+if [[ "$action" == prepare ]]; then
   mkdir "$job/build"
   cp "$job/control/Dockerfile" "$job/build/Dockerfile"
   cp "$job/source/mofacts/.meteor/release" "$job/build/release"
   cp "$job/source/mofacts/.meteor/packages" "$job/build/packages"
   cp "$job/source/mofacts/.meteor/versions" "$job/build/versions"
   cp "$job/source/mofacts/package.json" "$job/source/mofacts/package-lock.json" "$job/build/"
-  docker build --progress plain --label "$label" --tag "$image" "$job/build" > "$job/results/tool-image-build.log" 2>&1
+  input_hash=$(cd "$job/build" && sha256sum Dockerfile release packages versions package.json package-lock.json | sha256sum | cut -d' ' -f1)
+  tag="mofacts-local/integration:$input_hash"
+  image_label=org.mofacts.integration.inputs
+  (
+    flock -x 8
+    if docker image inspect "$tag" >/dev/null 2>&1; then
+      printf 'Reusing %s\n' "$tag"
+    else
+      docker build --progress plain --label "$image_label=$input_hash" --tag "$tag" "$job/build"
+    fi
+    docker image inspect "$tag" --format '{{.Id}}' > "$job/results/tool-image-id"
+  ) 8<"$job/.." > "$job/results/tool-image-build.log" 2>&1
+  image=$(cat "$job/results/tool-image-id")
   coordinator node "$job/source/mofacts/scripts/ciMongoReadiness.cjs" host
   coordinator node "$capture" prepare-tests --builder default --base-commit "$commit" --dirty false > "$job/results/capture.json"
   coordinator node -e 'const fs = require("node:fs"); const result = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if (result.state !== "test-inputs-captured-unqualified" || typeof result.workspace !== "string") throw Error("Incomplete source capture"); console.log(result.workspace);' \
@@ -63,7 +129,6 @@ if [[ "$action" == prepare ]]; then
     'test "$(node --version)" = v24.22.1; test "$(npm --version)" = 11.19.1; npm ci; meteor update --npm' > "$job/results/dependency-setup.log" 2>&1
   coordinator node "$capture" verify-tests --builder default --workspace "$workspace" > "$job/results/source-before.json"
   docker pull mongo:8.0.34 > "$job/results/mongo-pull.log" 2>&1
-  docker image inspect "$image" --format '{{.Id}}' > "$job/results/tool-image-id"
   docker image inspect mongo:8.0.34 --format '{{.Id}}' > "$job/results/mongo-image-id"
   sha256sum "$job/control/"* > "$job/results/tool-source-sha256"
   touch "$job/prepared"
@@ -71,39 +136,16 @@ if [[ "$action" == prepare ]]; then
   exit 0
 fi
 
-[[ "${4:-}" == --authorize-one-meteor-run && -f "$job/prepared" && ! -e "$job/invoked" ]]
 workspace=$(cat "$job/workspace")
 [[ "$workspace" == "$TMPDIR"/mofacts-qualified-build-* && -d "$workspace/test-context/mofacts" ]]
+image=$(cat "$job/results/tool-image-id")
+[[ "$image" =~ ^sha256:[0-9a-f]{64}$ ]]
 [[ "$(docker image inspect "$image" --format '{{.Id}}')" == "$(cat "$job/results/tool-image-id")" ]]
 # Leave a host-memory reserve; compilation failure is a failure, never a reason
 # to lift the cap, add swap, restart the live application or retry implicitly.
 available_kib=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
 (( available_kib >= 8192 * 1024 ))
 
-owned() { [[ "$(docker inspect "$1" --format '{{index .Config.Labels "org.mofacts.integration"}}')" == "$name" ]]; }
-cleanup() {
-  result=$?
-  trap - EXIT
-  for container in "$name-test" "$name-mongodb" "$name-setup"; do
-    if docker container inspect "$container" > /dev/null 2>&1; then
-      owned "$container" || { printf 'Container ownership mismatch\n' >&2; exit 1; }
-      docker inspect "$container" --format '{{json .State}}' > "$job/results/$container-state.json"
-      docker rm -f -v "$container" > /dev/null
-    fi
-  done
-  if docker network inspect "$name" > /dev/null 2>&1; then
-    [[ "$(docker network inspect "$name" --format '{{index .Labels "org.mofacts.integration"}}')" == "$name" ]]
-    docker network rm "$name" > /dev/null
-  fi
-  # Only the per-job Meteor cache is discarded; source/results stay for review.
-  if docker volume inspect "$name-tools" > /dev/null 2>&1; then
-    [[ "$(docker volume inspect "$name-tools" --format '{{index .Labels "org.mofacts.integration"}}')" == "$name" ]]
-    docker volume rm "$name-tools" > /dev/null
-  fi
-  printf '%s\n' "$result" > "$job/results/lane-exit-status"
-  exit "$result"
-}
-trap cleanup EXIT
 docker network create --label "$label" "$name" > /dev/null
 docker run -d --name "$name-mongodb" --label "$label" --network "$name" --network-alias mongodb \
   --memory 384m --memory-swap 384m --cpus 0.25 \
@@ -130,6 +172,7 @@ docker create --init --name "$name-test" --label "$label" --network "$name" \
   --workdir /capture/test-context/mofacts \
   --env CI=1 --env TEST_SETTINGS_FILE=settings.ci.json \
   --env MOFACTS_TEST_EVIDENCE_FILE=/evidence/meteor-run.json \
+  --env MOFACTS_TEST_STARTUP_REGISTRY_FILE=/evidence/startup-registry.json \
   --env TEST_RUN_TIMEOUT_MS=1200000 \
   --env 'MONGO_URL=mongodb://mongodb:27017/meteor?replicaSet=mofacts-ci-rs&directConnection=true' \
   --env MOFACTS_MONGO_REPLICA_SET_NAME=mofacts-ci-rs \
@@ -145,7 +188,7 @@ test_status=$?
 set -e
 docker inspect "$name-test" --format '{{json .State}}' > "$job/results/test-state.json"
 date -u +%FT%TZ > "$job/results/finished-at"
-[[ "$test_status" == 0 ]]
+(( test_status == 0 )) || exit "$test_status"
 coordinator node "$capture" verify-tests --builder default --workspace "$workspace" > "$job/results/source-after.json"
-coordinator node "$job/control/record-native.cjs" "$job/results" "$job/source/mofacts" "$commit"
+coordinator node "$job/control/record-native.cjs" "$job/results" "$job/source/mofacts" "$commit" --with-startup-registry
 printf 'Native integration verified; no GitHub or release qualification claimed.\n'

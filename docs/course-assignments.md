@@ -43,7 +43,9 @@ Implementation should stay inside the active MoFaCTS app tree under `mofacts/`.
 - Preserve existing teacher/admin access checks for course management.
 - Preserve existing practice launch behavior and runtime route guards.
 - Public course browsing must not create section membership or enrollment records.
+- Removing an ordinary private lesson assignment ends access granted by that course, including for students who started it. Reassignment restores access to the saved progress. Another active assignment or direct lesson share can independently grant access. Experiment participants retain progress-backed passwordless return.
 - Progressive launch authorizes against the current course and section enrollment before returning member lesson content; a cached course snapshot cannot retain access after enrollment is removed. Current course owners and administrators retain their existing access.
+- Edit existing sections by ID. Renaming preserves the section ID, its invitation URL, and its enrollments. Only sections explicitly marked for deletion are removed when the course is saved. A stale list is rejected; reload the course before editing again.
 - Removing a course section also removes its enrollment references and invalidates snapshots that already reference the course, including learners no longer discoverable through its surviving sections.
 - Existing assignment rows containing only `courseId` and `TDFId` must remain readable during migration.
 - Course assignment context must be recorded into learner history when a learner launches from a course assignment.
@@ -482,7 +484,7 @@ Query requirements:
 
 ### `saveCourseAssignments(input)`
 
-Replaces `editCourseAssignments({ courseId, tdfs })` for new UI code.
+An instructor may add a lesson they own or that is shared with them. After sharing ends, a saved assignment may keep that lesson, including as a member of the same progressive assignment. It may be removed, but moving it to another assignment, converting its assignment type, or adding it again requires current access. Administrators can assign any existing lesson.
 
 Authorization:
 
@@ -626,7 +628,7 @@ Performance rules:
 - Validate `beginDate`, `endDate`, and `timezone`.
 - Require `timezone` for new courses.
 - Reject invalid visibility values.
-- Preserve existing teacher/admin ownership behavior.
+- Teachers manage their own courses. An administrator creating a course for another account or transferring ownership must select an existing teacher or administrator. An existing owner may stay assigned after losing that role.
 - Insert only recognized course fields; avoid persisting arbitrary UI fields from the client payload.
 
 ### `editCourse`
@@ -636,20 +638,17 @@ Performance rules:
 - Validate `beginDate`, `endDate`, and `timezone`.
 - Preserve existing course timezone when the edit payload omits timezone for a legacy caller.
 - Reject invalid visibility values.
-- Preserve existing teacher/admin ownership behavior.
+- Apply the same owner eligibility rule as course creation when an administrator transfers a course.
 - Update only recognized course fields.
+
+### Enrollment teacher directory
+
+Signed-in learners see current teachers with at least one public section or a section they are enrolled in for the current semester. Staff retain their teacher directory. Each entry contains only the teacher ID and existing display label, which can be an email address. A direct invitation enrolls the learner in the specified section before loading the directory.
 
 ### `getAllCourseSections`
 
 - Include `visibility`, `beginDate`, `endDate`, and `timezone` in the projected course fields so Class Management can render existing values without an extra method call.
 - Keep the method field-limited.
-
-### Legacy `editCourseAssignments`
-
-- Keep temporarily only for confirmed old callers, but new UI must call `saveCourseAssignments`.
-- If retained, implement it as a thin compatibility wrapper around `saveCourseAssignments` that converts the old file-name array into assignment rows.
-- Assignment writers accept TDF IDs directly and fail clearly when an ID is missing or inaccessible; filenames are presentation metadata only.
-- Do not maintain two independent assignment-save paths.
 
 ## Course Management UI
 
@@ -790,6 +789,7 @@ Reporting due-date precedence:
 Compatibility:
 
 - Existing due-date exceptions matching `{ classId/courseId, TDFId }` must continue to work.
+- Adding, changing, or removing an exception requires current student enrollment in a section of the course. Leaving the course preserves the existing exception. It can be edited again after re-enrollment.
 - New due-date exceptions must store `assignmentId`.
 - Existing exceptions continue to read old `{ classId/courseId, TDFId }` shapes.
 - Assignment `dueAt` is authoritative over TDF `setspec.duedate` for course reporting.
@@ -845,7 +845,7 @@ Server tests:
 - Learner course snapshot returns public courses to signed-in ordinary learners.
 - Private courses appear only for enrolled learners, owning teachers, and admins.
 - Public course browsing does not insert `SectionUserMap` rows.
-- New section membership sends a course assignment email with the app link, `/courses` link, and course-finding instructions.
+- A saved section membership is a successful join. If the confirmation cannot be prepared or sent, the server records the failure stage and the learner can continue. New section membership attempts a course assignment email with the app link, `/courses` link, and course-finding instructions.
 - Existing section membership does not resend the course assignment email.
 - Unreleased assignments appear as locked rows for ordinary learners and cannot launch.
 - Snapshot uses `UserDashboardCache.tdfStats` and `buildDashboardStatsProjection`.
@@ -908,6 +908,7 @@ UI verification:
 - Public courses are discoverable by signed-in learners, teachers, and admins; learners join a section before launching course assignments.
 - Ordinary assignment title overrides remain deferred; progressive groups have their own label.
 - Progressive practice has no aggregate completion state. Per-member history and metrics remain authoritative even when teachers later insert, remove, or reorder members.
+- Progressive assignments open and resume through an ordinary account session. Passwordless study sessions resume through their experiment entry.
 - A new progressive launch uses the current saved order. The server records the ordering in `Assignments.progressiveRevisions`, keyed by its SHA-256 digest, when first launched. Identical orderings reuse the same entry; assignment edits preserve existing entries. The required `progressiveRevisionId` travels through the lesson URL, runtime context, and trial context. Reads, writes, crowd statistics, and reloads resolve the original prefix from that server-owned revision. Inserting or reordering lessons affects subsequent launches only. Removing a member revokes writes for that source and excludes it from subsequent course-context reads; removing the endpoint revokes the session. Reloading a session whose prefix includes a removed member requires a new launch. Existing history is retained. Deleting the assignment deletes its revisions and revokes its launches.
 - Existing trial records do not require migration: their original lesson and unit identities remain unchanged. An open progressive URL/context without a revision must be relaunched from Courses after this update; the server never infers an old ordering from the current assignment.
-- Due-date exceptions use only `assignmentId`, `courseId`, `TDFId`, `date`, `createdAt`, and `updatedAt`. Reads and removals match assignment identity; `checkForUserException(userId, assignmentId)` accepts an assignment ID. Older assignment-less and lowercase identity formats are unsupported. No exception migration is required for the production database checked on September 4, 2026 (zero exception records).
+- Due-date exceptions use only `assignmentId`, `courseId`, `TDFId`, `date`, `createdAt`, and `updatedAt`. Reads and removals match assignment identity. Older assignment-less and lowercase identity formats are unsupported. No exception migration is required for the production database checked on September 4, 2026 (zero exception records).

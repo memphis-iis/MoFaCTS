@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright');
 const { rspack, NormalModuleReplacementPlugin } = require('@rspack/core');
+const { rspackClientOutputContract } = require('./rspackClientOutputContract.cjs');
 const app = path.resolve(__dirname, '..');
 const shellStylesheets = [...fs.readFileSync(path.join(app, 'client/index.html'), 'utf8')
   .matchAll(/<link\b[^>]*>/g)].map(match => match[0]).filter(tag => /rel="stylesheet"/.test(tag)).join('\n');
@@ -25,7 +26,7 @@ async function buildFixture(syntheticTracking = false, cameraSuite = false) {
     stub('poseTracking', `export { isInFrameLandmark, isVisiblePoseLandmark } from ${JSON.stringify(tracker)};
       export function createPoseTracking() {
         let callback = null;
-        window.handTest = { emit(frame) { callback?.({ ...frame, handednessConfidence: frame.handedness.map(() => 1) }, [{ start: 0, end: 1 }], [{ start: 4, end: 8 }]); } };
+        window.handTest = { emit(frame) { callback?.({ ...frame, handednessConfidence: frame.handednessConfidence ?? frame.handedness.map(() => 1) }, [{ start: 0, end: 1 }], [{ start: 4, end: 8 }]); } };
         return { async start(video, onFrame) { callback = onFrame; }, stop() { callback = null; } };
       }`);
   }
@@ -71,7 +72,9 @@ async function buildFixture(syntheticTracking = false, cameraSuite = false) {
     }, async destroy() { await unmount(instance); await tick(); } };`);
   const compiler = rspack({
     context: app, mode: 'development', devtool: false, entry,
-    output: { path: directory, filename: 'fixture.js', publicPath: '/__skeleton-fixture/' },
+    ...rspackClientOutputContract({ isClient: true, isNative: false }),
+    output: { ...rspackClientOutputContract({ isClient: true, isNative: false }).output,
+      path: directory, filename: 'fixture.js', publicPath: '/__skeleton-fixture/' },
     resolve: { extensions: ['.ts', '.js', '.svelte'], conditionNames: ['svelte', 'browser', 'import', 'default'], modules: [path.join(app, 'node_modules'), 'node_modules'] },
     module: { rules: [
       { test: /\.svelte$/, use: [{ loader: require.resolve('./loaders/svelte-loader-wrapper.cjs'), options: { compilerOptions: { dev: true } } }] },
@@ -100,8 +103,10 @@ test('live demo runs real local inference and releases the camera on stop, exit 
   const page = await browser.newPage();
   const errors = [];
   const externalRequests = [];
+  let bodyModelRequests = 0;
+  page.on('request', request => { if (new URL(request.url()).pathname === '/mediapipe/pose_landmarker_full.task') bodyModelRequests++; });
   page.on('pageerror', error => errors.push(error.message));
-  // A blank canvas is synthetic camera input; inference must report no body.
+  // A blank canvas is synthetic camera input; inference must report no hands.
   await page.addInitScript(() => {
     window.cameraTest = { streams: [], denied: false, unavailable: false, requestedAudio: false, selections: [] };
     Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', { value: async () =>
@@ -113,7 +118,10 @@ test('live demo runs real local inference and releases the camera on stop, exit 
       if (window.cameraTest.denied) throw new DOMException('Synthetic denial', 'NotAllowedError');
       if (window.cameraTest.unavailable) throw new DOMException('Synthetic missing camera', 'OverconstrainedError');
       const rear = deviceId === 'rear';
-      const canvas = document.createElement('canvas'); canvas.width = rear ? 480 : 640; canvas.height = rear ? 640 : 480;
+      if ('width' in options.video || 'height' in options.video || options.video.resizeMode?.exact !== 'none') {
+        throw Error('Capture must acquire the native camera without a requested crop');
+      }
+      const canvas = document.createElement('canvas'); canvas.width = rear ? 480 : 1280; canvas.height = rear ? 640 : 720;
       const context = canvas.getContext('2d');
       context.fillStyle = 'white'; context.fillRect(0, 0, canvas.width, canvas.height);
       const stream = canvas.captureStream(15);
@@ -191,12 +199,20 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     await checkMobileLayout();
     assert.equal(await page.evaluate(() => window.fixture.practiceMounts), 0);
     await page.getByRole('button', { name: 'Start camera', exact: true }).click();
-    await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor({ timeout: 45000 });
-    assert.equal(await page.locator('video').evaluate(video => video.videoWidth), 640);
+    await page.getByRole('status').filter({ hasText: 'No hands detected' }).waitFor({ timeout: 45000 });
+    assert.deepEqual(await page.locator('video').evaluate(video => [video.videoWidth, video.videoHeight]), [1280, 720],
+      'Native widescreen input remains widescreen throughout capture and preview');
+    await checkMobileLayout();
+    assert.equal(bodyModelRequests, 0, 'Hand tracking does not request a body model');
+    const bodyModel = page.waitForResponse(response => new URL(response.url()).pathname === '/mediapipe/pose_landmarker_full.task');
+    await page.getByText('3D pose matcher comparison', { exact: true }).click();
+    await bodyModel;
+    assert.equal(bodyModelRequests, 1, 'Opening body comparison explicitly loads its model');
+    await page.getByText('3D pose matcher comparison', { exact: true }).click();
     assert.equal(await page.locator('svg circle').count(), 0, 'No fabricated body on blank camera input');
     assert.equal(await page.evaluate(() => window.cameraTest.requestedAudio), false);
     await page.getByRole('button', { name: 'Switch camera' }).click();
-    await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
+    await page.getByRole('status').filter({ hasText: 'No hands detected' }).waitFor();
     assert.equal(await page.evaluate(() => window.cameraTest.selections.at(-1)), 'rear');
     for (const layer of ['video', 'svg']) {
       assert.equal(await page.locator(`.pose-camera-mirror > ${layer}`).evaluate(element => getComputedStyle(element).transform), 'none');
@@ -214,7 +230,7 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     }
     await page.setViewportSize({ width: 390, height: 667 });
     await page.getByRole('button', { name: 'Switch camera' }).click();
-    await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
+    await page.getByRole('status').filter({ hasText: 'No hands detected' }).waitFor();
     assert.equal(await page.evaluate(() => window.cameraTest.selections.at(-1)), 'front');
     for (const layer of ['video', 'svg']) {
       assert.equal(await page.locator(`.pose-camera-mirror > ${layer}`).evaluate(element => getComputedStyle(element).transform), 'matrix(-1, 0, 0, 1, 0, 0)');
@@ -226,12 +242,12 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     assert.equal(await page.locator('video').evaluate(video => video.srcObject), null);
     await page.evaluate(() => { window.cameraTest.unavailable = false; });
     await page.getByRole('button', { name: 'Start camera', exact: true }).click();
-    await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
+    await page.getByRole('status').filter({ hasText: 'No hands detected' }).waitFor();
     await page.getByRole('button', { name: 'Stop camera', exact: true }).click();
     assert.equal(await page.evaluate(() => window.cameraTest.streams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true);
     assert.equal(await page.locator('video').evaluate(video => video.srcObject), null);
     await page.getByRole('button', { name: 'Start camera', exact: true }).click();
-    await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
+    await page.getByRole('status').filter({ hasText: 'No hands detected' }).waitFor();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     assert.equal(await page.evaluate(() => window.fixture.completions), 1);
     assert.equal(await page.evaluate(() => window.cameraTest.streams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true);
@@ -294,7 +310,7 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
       assert.equal(await miniature.locator('.figure-length-label').textContent(), 'AB = 1 unit');
     }
     await page.getByRole('button', { name: 'Start camera', exact: true }).click();
-    await page.getByRole('status').filter({ hasText: 'Looking for a person' }).waitFor();
+    await page.getByRole('status').filter({ hasText: 'Looking for hands' }).waitFor();
     let timestamp = 0;
     async function emit(options = {}) {
       await page.evaluate(({ timestamp, options }) => {
@@ -328,13 +344,14 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
         if (rememberOwner) window.handTest.owner = { image, world };
         const owner = window.handTest.owner;
         window.handTest.emit({ landmarks: [{ x: .4, y: .3, z: 0, visibility: 1 }, { x: .6, y: .7, z: 0, visibility: 1 }], hands: keepOwner ? [owner.image, image] : [image],
-          handWorldLandmarks: keepOwner ? [owner.world, world] : [world], handedness: keepOwner ? ['Right', 'Left'] : ['Right'], timestamp, width: 640, height: 480 });
+          handWorldLandmarks: keepOwner ? [owner.world, world] : [world], handedness: keepOwner ? ['Right', 'Left'] : ['Right'],
+          handednessConfidence: keepOwner ? [1, options.confidence ?? 1] : [options.confidence ?? 1], timestamp, width: 640, height: 480 });
       }, { timestamp, options });
       timestamp += 100;
     }
     const geometry = () => page.locator('.figure-wireframe g[data-edge]').evaluateAll(edges => edges.map(edge => edge.outerHTML).join(''));
     // A pinch arriving with no middle fingertip selects immediately.
-    await emit({ target: 'Cube', gesture: 'pinch', missingTip: 12 });
+    await emit({ target: 'Cube', gesture: 'pinch', missingTip: 12, tilt: 180, confidence: .51 });
     await page.locator('.figure-wireframe').waitFor();
     assert.equal(await page.locator('.pose-camera-mirror > svg > line, .pose-camera-mirror > svg > circle').count(), 0,
       'Visible body landmarks and connections do not render a body wireframe');
@@ -427,7 +444,7 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
     await page.getByRole('button', { name: 'Stop camera', exact: true }).click();
     assert.equal(await geometry(), preserved, 'Stopping retains figure state');
     await page.getByRole('button', { name: 'Start camera', exact: true }).click();
-    await page.getByRole('status').filter({ hasText: 'Looking for a person' }).waitFor();
+    await page.getByRole('status').filter({ hasText: 'Looking for hands' }).waitFor();
     await page.evaluate(() => {
       Object.defineProperty(document, 'hidden', { configurable: true, value: true }); document.dispatchEvent(new Event('visibilitychange'));
     });
@@ -453,8 +470,8 @@ test('real WebGazer and MediaPipe hand off one synthetic camera and return throu
   const page = await browser.newPage();
   const errors = [];
   const external = [];
-  let holdPoseModel = true;
-  let releasePoseModel;
+  let holdHandModel = true;
+  let releaseHandModel;
   let modelRequested;
   const waitingModel = new Promise(resolve => { modelRequested = resolve; });
   const logs = [];
@@ -476,9 +493,9 @@ test('real WebGazer and MediaPipe hand off one synthetic camera and return throu
   await page.route('**/*', route => {
     const url = new URL(route.request().url());
     if (url.origin !== 'http://localhost:3200') { external.push(url.origin); return route.abort(); }
-    if (url.pathname === '/mediapipe/pose_landmarker_full.task' && holdPoseModel) {
+    if (url.pathname === '/mediapipe/hand_landmarker.task' && holdHandModel) {
       modelRequested();
-      return new Promise(resolve => { releasePoseModel = async () => { holdPoseModel = false; await route.continue(); resolve(); }; });
+      return new Promise(resolve => { releaseHandModel = async () => { holdHandModel = false; await route.continue(); resolve(); }; });
     }
     if (url.pathname === '/__skeleton-fixture') return route.fulfill({ contentType: 'text/html',
       body: '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src &apos;self&apos; &apos;wasm-unsafe-eval&apos;; worker-src &apos;self&apos;"></head><body><div id="content-root"></div><script src="/__skeleton-fixture/fixture.js"></script></body></html>' });
@@ -506,14 +523,14 @@ test('real WebGazer and MediaPipe hand off one synthetic camera and return throu
     await waitingModel;
     await page.getByRole('button', { name: 'Stop camera', exact: true }).click();
     await cancelledWorker;
-    await releasePoseModel();
+    await releaseHandModel();
     assert.equal(await page.evaluate(() => window.cameraSuite.streams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true, 'Stopping pending models releases the camera');
     const secondWorker = page.waitForEvent('worker');
     await page.getByRole('button', { name: 'Start camera', exact: true }).click();
     const runningWorker = await secondWorker;
     const stoppedWorker = new Promise(resolve => runningWorker.once('close', resolve));
-    await page.waitForFunction(() => [...document.querySelectorAll('[role=status], [role=alert]')].some(el => /No body detected|unavailable/.test(el.textContent)), { timeout: 45000 });
-    assert.match(await page.locator('body').innerText(), /No body detected/, JSON.stringify({ errors, logs }));
+    await page.waitForFunction(() => [...document.querySelectorAll('[role=status], [role=alert]')].some(el => /No hands detected|unavailable/.test(el.textContent)), { timeout: 45000 });
+    assert.match(await page.locator('body').innerText(), /No hands detected/, JSON.stringify({ errors, logs }));
     assert.equal(await page.evaluate(() => window.fixture.state().calibrated), false);
     assert.equal(await page.locator('#webgazerVideoFeed').count(), 0);
     assert.equal(await page.evaluate(() => window.cameraSuite.streams[0].getTracks()[0].readyState), 'ended');
@@ -525,10 +542,27 @@ test('real WebGazer and MediaPipe hand off one synthetic camera and return throu
     assert.equal(await page.evaluate(() => window.cameraSuite.streams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true);
     await page.getByRole('button', { name: 'Start calibration', exact: true }).click();
     await page.getByRole('button', { name: 'Calibration target 1', exact: true }).waitFor({ timeout: 45000 });
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.getByRole('button', { name: 'Restart calibration', exact: true }).click();
+      await page.getByRole('button', { name: 'Calibration target 1', exact: true }).waitFor();
+      assert.equal(await page.evaluate(() => {
+        const preview = document.querySelector('.calibration-preview #webgazerVideoContainer');
+        if (!preview || getComputedStyle(preview).position !== 'relative') return false;
+        const rect = preview.getBoundingClientRect();
+        return [...document.querySelectorAll('.calibration button')].every(button => {
+          const box = button.getBoundingClientRect();
+          const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+          return button.contains(hit) && (button.classList.contains('target') ||
+            box.right <= rect.left || box.left >= rect.right || box.bottom <= rect.top || box.top >= rect.bottom);
+        });
+      }), true, `Preview leaves calibration controls clickable at ${width}px`);
+    }
     assert.equal(await page.evaluate(() => window.fixture.state().calibrated), false, 'A reacquired camera is not yet calibrated');
     assert.equal(await page.evaluate(() => window.cameraSuite.streams.length), 4);
     await page.getByRole('button', { name: 'Continue without tracking', exact: true }).click();
     assert.equal(await page.evaluate(() => window.fixture.practiceMounts), 2);
+    assert.equal(await page.locator('#webgazerVideoFeed').count(), 1, 'Hidden camera remains owned by the gaze service');
     await page.evaluate(() => { window.fixture.leave(); });
     assert.equal(await page.evaluate(() => window.cameraSuite.streams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true);
     assert.equal(await page.locator('#webgazerVideoFeed').count(), 0);

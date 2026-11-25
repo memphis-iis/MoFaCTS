@@ -126,6 +126,41 @@ async function ciphers({ address }) {
 
 export const EXTERNAL_PROBE_IO_V2 = Object.freeze({ resolve, scan, handshake, request, websocket, ciphers });
 
+// The full producer and targeted recovery checks share these exact HTTP probes.
+// This returns only its four owned observations, not a complete report or scan.
+export async function acquireExternalHttpObservationsV2({ env = process.env, io = EXTERNAL_PROBE_IO_V2 } = {}) {
+  const target = new URL(auditTargetOrigin(env.AUDIT_TARGET)), observations = {};
+  if (typeof io?.request !== 'function') throw new Error('Invalid HTTP acquisition configuration');
+  observations['external.http-redirect'] = await capture(async () => {
+    const paths = ['/', '/auth/login', '/.well-known/security.txt?audit=1'];
+    const pass = await Promise.all(paths.map(async pathname => {
+      const url = new URL(pathname, target); url.protocol = 'http:';
+      const result = await io.request(url);
+      if (!Number.isInteger(result.status) || result.status < 100 || result.status > 599 || !(result.headers instanceof Headers)) return malformed();
+      const location = result.headers.get('location');
+      if (result.status < 301 || result.status > 308 || !location) return false;
+      let redirected; try { redirected = new URL(location, url); } catch { return false; }
+      return redirected.origin === target.origin && redirected.pathname + redirected.search === pathname;
+    }));
+    return { testedPathCount: paths.length, passingPathCount: pass.filter(Boolean).length };
+  });
+  const headers = await capture(async () => {
+    const response = await io.request(target);
+    if (!Number.isInteger(response.status) || response.status < 100 || response.status > 599 || !(response.headers instanceof Headers)) return malformed();
+    return response.headers;
+  });
+  for (const id of ['hsts', 'csp', 'security-headers']) observations[`external.${id}`] = headers.state !== 'observed' ? headers : (() => {
+    const h = headers.value, hsts = h.get('strict-transport-security') || '', csp = h.get('content-security-policy') || '';
+    const matches = id === 'hsts' ? [Number(hsts.match(/max-age=(\d+)/i)?.[1]) >= 31536000]
+      : id === 'csp' ? [...['frame-ancestors', 'object-src', 'base-uri', 'form-action'].map(name => csp.includes(name)),
+        !/(?:^|[;\s])\*(?=[;\s]|$)|http:/i.test(csp)]
+        : [/^deny$/i.test(h.get('x-frame-options') || ''), /^nosniff$/i.test(h.get('x-content-type-options') || ''),
+          h.get('referrer-policy') === 'strict-origin-when-cross-origin', h.get('permissions-policy') === 'geolocation=(), microphone=(self)'];
+    return observed({ requiredRestrictionCount: matches.length, matchingRestrictionCount: matches.filter(Boolean).length });
+  })();
+  return observations;
+}
+
 export async function acquireExternalObservationsV2({ env = process.env, now = new Date(), io = EXTERNAL_PROBE_IO_V2 } = {}) {
   const target = new URL(auditTargetOrigin(env.AUDIT_TARGET));
   if (target.port || !(now instanceof Date) || !Number.isFinite(now.getTime())
@@ -174,19 +209,7 @@ export async function acquireExternalObservationsV2({ env = process.env, now = n
       observedResultCount: valid.reduce((sum, scan) => sum + scan.testedEndpointCount - scan.inconclusiveEndpointCount, 0),
       openSelectedUdpPortCount: valid.reduce((sum, scan) => sum + scan.openPorts.length, 0) });
   }
-  observations['external.http-redirect'] = await capture(async () => {
-    const paths = ['/', '/auth/login', '/.well-known/security.txt?audit=1'];
-    const pass = await Promise.all(paths.map(async pathname => {
-      const url = new URL(pathname, target); url.protocol = 'http:';
-      const result = await io.request(url);
-      if (!Number.isInteger(result.status) || result.status < 100 || result.status > 599 || !(result.headers instanceof Headers)) return malformed();
-      const location = result.headers.get('location');
-      if (result.status < 301 || result.status > 308 || !location) return false;
-      let redirected; try { redirected = new URL(location, url); } catch { return false; }
-      return redirected.origin === target.origin && redirected.pathname + redirected.search === pathname;
-    }));
-    return { testedPathCount: paths.length, passingPathCount: pass.filter(Boolean).length };
-  });
+  Object.assign(observations, await acquireExternalHttpObservationsV2({ env, io }));
   const protocols = ['TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3'];
   const handshakes = inventory.state === 'observed' ? await Promise.all(addresses.map(async address =>
     Promise.all(protocols.map(protocol => capture(async () => {
@@ -230,19 +253,5 @@ export async function acquireExternalObservationsV2({ env = process.env, now = n
     return { addressCount: addresses.length, secureUpgradeCount: results.filter(row => row[0] === 101).length,
       insecureUpgradeCount: results.filter(row => row[1] === 101).length };
   });
-  const headers = await capture(async () => {
-    const response = await io.request(target);
-    if (!Number.isInteger(response.status) || response.status < 100 || response.status > 599 || !(response.headers instanceof Headers)) return malformed();
-    return response.headers;
-  });
-  for (const id of ['hsts', 'csp', 'security-headers']) observations[`external.${id}`] = headers.state !== 'observed' ? headers : (() => {
-    const h = headers.value, hsts = h.get('strict-transport-security') || '', csp = h.get('content-security-policy') || '';
-    const matches = id === 'hsts' ? [Number(hsts.match(/max-age=(\d+)/i)?.[1]) >= 31536000]
-      : id === 'csp' ? [...['frame-ancestors', 'object-src', 'base-uri', 'form-action'].map(name => csp.includes(name)),
-        !/(?:^|[;\s])\*(?=[;\s]|$)|http:/i.test(csp)]
-        : [/^deny$/i.test(h.get('x-frame-options') || ''), /^nosniff$/i.test(h.get('x-content-type-options') || ''),
-          h.get('referrer-policy') === 'strict-origin-when-cross-origin', h.get('permissions-policy') === 'geolocation=(), microphone=(self)'];
-    return observed({ requiredRestrictionCount: matches.length, matchingRestrictionCount: matches.filter(Boolean).length });
-  })();
   return { observations, udp };
 }

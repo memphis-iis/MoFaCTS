@@ -2,8 +2,11 @@ import { modelPracticeHistorySelector, operationalHistorySelector } from '../../
 import { expect } from 'chai';
 import { progressiveRevisionId } from '../lib/progressiveAssignmentRevision';
 import { HistoryCommitConflictError } from '../lib/historyCommitStorage';
-import { SparcContentAlreadyUsedError } from '../lib/sparcContentUse';
-import { createAnalyticsMethods } from './analyticsMethods';
+import { SparcPresentationConflictError } from '../lib/sparcContentUse';
+import { createAnalyticsMethodRegistration } from './analyticsMethods';
+
+const createAnalyticsMethods = (deps: Parameters<typeof createAnalyticsMethodRegistration>[0]) =>
+  createAnalyticsMethodRegistration(deps).methods;
 
 function createMeteorErrorClass() {
   return class MeteorError extends Error {
@@ -186,8 +189,6 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
     },
     syncUsernameCaches: () => {},
     getClassPerformanceByTdfWorkflow: async () => ({}),
-    getStimuliSetById: async () => [],
-    hasMeaningfulProgressSignal: () => false,
     ...overrides,
   };
 
@@ -207,11 +208,13 @@ describe('analyticsMethods', function() {
     ]) {
       let writes = 0;
       const { deps } = createAnalyticsDeps({ GlobalExperimentStates: {
-        findOneAsync: async () => ({ _id: 'old-state', ...previous, experimentState: { progress: 99 } }),
+        findOneAsync: async (_selector: unknown, options?: { fields?: unknown }) => options?.fields
+          ? { userId: 'learner-1', TDFId: 'tdf-1' }
+          : { _id: 'old-state', ...previous, experimentState: { progress: 99 } },
         updateAsync: async () => { writes++; return 1; },
       } });
       let error: any;
-      try { await createAnalyticsMethods(deps as any).setExperimentState.call({ userId: 'learner-1' }, 'learner-1', 'tdf-1', 'old-state', {}, 'test'); }
+      try { await createAnalyticsMethods(deps as any).updateExperimentState.call({ userId: 'learner-1' }, {}, 'old-state'); }
       catch (caught) { error = caught; }
       expect(error?.error).to.equal(403);
       expect(writes).to.equal(0);
@@ -268,7 +271,7 @@ describe('analyticsMethods', function() {
       commitHistory: async (userId: string, record: Record<string, unknown>) => {
         calls.push({ userId, record });
         if (outcome === 'conflict') throw new HistoryCommitConflictError();
-        if (outcome === 'used') throw new SparcContentAlreadyUsedError();
+        if (outcome === 'used') throw new SparcPresentationConflictError();
         return outcome === 'inserted';
       },
     });
@@ -291,8 +294,8 @@ describe('analyticsMethods', function() {
     outcome = 'used';
     let used: any;
     try { await methods.insertHistory.call({ userId: 'learner-1' }, choice('question')); } catch (error) { used = error; }
-    expect(used?.error).to.equal('sparc-content-already-used');
-    expect(used?.reason).to.match(/already been used/);
+    expect(used?.error).to.equal('sparc-presentation-conflict');
+    expect(used?.reason).to.match(/conflicts with its saved/);
     let denied: any;
     try { await methods.insertHistory.call({ userId: 'learner-2' }, choice('question')); } catch (error) { denied = error; }
     expect(denied?.error).to.equal(403);

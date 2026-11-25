@@ -1,3 +1,4 @@
+import { participantActivity } from '../../../../lib/participantPrivacy';
 /**
  * History Logging Service
  *
@@ -447,6 +448,7 @@ export function calculateTrialTimings(
   if (!timestampsAreFinite || !feedbackTimingIsValid || firstAction < 0 || trialEndTimeStamp < 0 ||
     trialStartTimeStamp <= 0 || endLatency < 0) {
 
+    if (participantActivity()) throw new Error('Your response could not be saved. Stay on this page and try again.');
     const errorDescription = `One or more timestamps were set to 0 or null.
     firstActionTimestamp: ${firstActionTimestamp}
     trialEndTimeStamp: ${trialEndTimeStamp}

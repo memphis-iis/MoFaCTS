@@ -1,7 +1,9 @@
 import { Meteor } from 'meteor/meteor';
 import fs from 'fs/promises';
+import { createReadStream } from 'node:fs';
+import { hashFile } from './packageFileStorage';
 
-import { parsePackageZip, type UploadedPackageFile } from './packageParser';
+import { parsePackageZip, disposeParsedPackage, type UploadedPackageFile } from './packageParser';
 import {
   failPackageUpload,
   type DynamicAssetLike,
@@ -18,6 +20,7 @@ import { applyPackageUploadSideEffects } from './packageUploadSideEffects';
 import { preflightPackageTdfIdentities, type PackageTdfIdentityMode } from './packageTdfIdentity';
 import { assertValidTdfExpressions } from '../../common/lib/tdfExpressionValidation';
 import { isPublicDemoTutor } from '../../common/publicDemoContract';
+import { validatePackagedSimulations } from './packageSimulations';
 
 const INCOMPLETE_UPLOAD_MESSAGE = 'The uploaded ZIP appears incomplete or truncated. Please upload the file again.';
 
@@ -113,12 +116,6 @@ async function getStableFileStats(zipPath: string, expectedSize?: number) {
   throw new Error(INCOMPLETE_UPLOAD_MESSAGE);
 }
 
-function computeFileSha256(zipPath: string) {
-  const fs = Npm.require('fs');
-  const crypto = Npm.require('crypto');
-  return crypto.createHash('sha256').update(fs.readFileSync(zipPath)).digest('hex');
-}
-
 async function mirrorPackageAssetToS3(fileObj: DynamicAssetLike, deps: ProcessPackageUploadDeps) {
   if (deps.storageBoundary.backend !== 's3') {
     return;
@@ -131,7 +128,7 @@ async function mirrorPackageAssetToS3(fileObj: DynamicAssetLike, deps: ProcessPa
   }
   const name = String(fileObj.name || fileObj.fileName || `${fileObj._id}.${fileObj.ext || 'zip'}`).trim();
   const key = `dynamic-assets/${fileObj._id}/${name}`;
-  await deps.storageBoundary.putObject(key, await fs.readFile(fileObj.path), fileObj.type || 'application/zip');
+  await deps.storageBoundary.putObject(key, createReadStream(fileObj.path), fileObj.type || 'application/zip', (await fs.stat(fileObj.path)).size);
   await deps.DynamicAssets.collection.updateAsync(
     { _id: fileObj._id },
     {
@@ -158,7 +155,7 @@ async function validateUploadedPackageFile(
     throw new Error(`${INCOMPLETE_UPLOAD_MESSAGE} Stored ${storedSize} of ${expectedSize} bytes.`);
   }
 
-  const actualSha256 = computeFileSha256(zipPath);
+  const actualSha256 = await hashFile(zipPath);
   if (expectedSha256) {
     if (actualSha256 !== expectedSha256) {
       throw new Error(`Uploaded package checksum mismatch. Expected ${expectedSha256}, got ${actualSha256}. Please upload the file again.`);
@@ -210,7 +207,7 @@ export async function processPackageUploadWorkflow(
 
   const actingUserIsAdmin = await deps.userIsInRoleAsync(context.userId, ['admin']);
   const assetOwnerId = typeof fileObj.userId === 'string' ? fileObj.userId.trim() : '';
-  if (assetOwnerId && assetOwnerId !== context.userId && !actingUserIsAdmin) {
+  if (assetOwnerId !== context.userId && !actingUserIsAdmin) {
     throw new Meteor.Error(403, 'Can only process package assets you uploaded');
   }
   const uploadPurpose = typeof fileObj.meta?.uploadPurpose === 'string' ? fileObj.meta.uploadPurpose : '';
@@ -252,6 +249,7 @@ export async function processPackageUploadWorkflow(
     await mirrorPackageAssetToS3(fileObj, deps);
     unzippedFiles = await parsePackageZip(zipPath, packageFile, deps.serverConsole);
     await policy.prepareParsedPackage?.({ unzippedFiles, owner, isTeacherOrAdmin });
+    await validatePackagedSimulations(unzippedFiles);
     for (const tdfFile of unzippedFiles.filter((file) => file.type === 'tdf')) {
       const contents = typeof tdfFile.contents === 'string' ? JSON.parse(tdfFile.contents) : tdfFile.contents;
       if (!actingUserIsAdmin && isPublicDemoTutor((contents as { tutor?: unknown })?.tutor)) {
@@ -311,7 +309,7 @@ export async function processPackageUploadWorkflow(
     }
 
     failureStage = 'content processing';
-    const { results, touchedStimuliSetIds } = await processParsedPackageTdfs({
+    const { results, touchedStimuliSetIds, stimulusScopesByName } = await processParsedPackageTdfs({
       unzippedFiles,
       fileObj,
       packageFile,
@@ -333,7 +331,8 @@ export async function processPackageUploadWorkflow(
       emailToggle,
       deps,
       state,
-      touchedStimuliSetIds
+      touchedStimuliSetIds,
+      stimulusScopesByName
     });
     failureStage = 'content post-processing';
     await postProcessUploadedTdfs({ unzippedFiles, deps, state });
@@ -382,31 +381,11 @@ export async function processPackageUploadWorkflow(
           { _id: mediaMutation.newAssetId, 'meta.mutationJobId': state.mutationJobId },
           { $unset: { 'meta.mutationJobId': '' } },
         );
-        for (const previousAsset of mediaMutation.previousAssets) {
-          await deps.DynamicAssets.removeAsync?.({ _id: previousAsset._id, 'meta.mutationBackupFor': state.mutationJobId });
-        }
       } catch (cleanupError) {
         deps.serverConsole('Committed package media cleanup failed:', mediaMutation.newAssetId, cleanupError);
       }
     }
-    const supersededPackageAssetIds = new Set(
-      identityPlan.entries
-        .map((entry) => deps.normalizeCanonicalId(entry.beforeImage?.packageAssetId))
-        .filter((assetId): assetId is string => Boolean(assetId) && assetId !== packageAssetId),
-    );
-    for (const supersededAssetId of supersededPackageAssetIds) {
-      try {
-        const remainingReferences = await deps.Tdfs.find(
-          { packageAssetId: supersededAssetId },
-          { fields: { _id: 1 } },
-        ).fetchAsync();
-        if (remainingReferences.length === 0 && typeof deps.DynamicAssets.removeAsync === 'function') {
-          await deps.DynamicAssets.removeAsync({ _id: supersededAssetId });
-        }
-      } catch (cleanupError) {
-        deps.serverConsole('Superseded package asset cleanup failed:', supersededAssetId, cleanupError);
-      }
-    }
+    // Previously published archives can still be linked by ID or filename.
     return terminalResult;
   } catch (error: unknown) {
     const domainErrorCode = error && typeof error === 'object' ? String((error as { error?: unknown }).error || '') : '';
@@ -447,15 +426,7 @@ export async function processPackageUploadWorkflow(
           $unset: { confirmationExpiresAt: '' },
         },
       );
-      if (!rollbackFailed) {
-        const remainingReferences = await deps.Tdfs.find(
-          { packageAssetId },
-          { fields: { _id: 1 } },
-        ).fetchAsync();
-        if (remainingReferences.length === 0 && typeof deps.DynamicAssets.removeAsync === 'function') {
-          await deps.DynamicAssets.removeAsync({ _id: packageAssetId });
-        }
-      }
+
     }
     deps.serverConsole(
       `Package upload ${failureStage} failure details:`,
@@ -472,14 +443,6 @@ export async function processPackageUploadWorkflow(
       'message=',
       message
     );
-    if (!state.stimSetId && fileObj?._id && typeof deps.DynamicAssets.removeAsync === 'function') {
-      try {
-        await deps.DynamicAssets.removeAsync({ _id: fileObj._id });
-        deps.serverConsole('Removed package asset after failed initialization:', fileObj._id);
-      } catch (cleanupError: unknown) {
-        deps.serverConsole('Could not remove package asset after failed initialization:', fileObj._id, cleanupError);
-      }
-    }
     if (
       domainErrorCode === 'package-upload-failed'
       || domainErrorCode === 'generated-package-name-conflict'
@@ -495,5 +458,7 @@ export async function processPackageUploadWorkflow(
       errorTextPrefix: `package upload failed at ${failureStage}: `,
       logPrefix: '3'
     });
+  } finally {
+    await disposeParsedPackage(unzippedFiles);
   }
 }

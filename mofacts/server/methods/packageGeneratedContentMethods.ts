@@ -1,3 +1,4 @@
+import { requireAuthenticatedUser } from '../lib/methodAuthorization';
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
 import {
@@ -42,7 +43,6 @@ type PackageGeneratedContentDeps = {
   normalizeCanonicalId: (value: unknown) => string | null;
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
   legacyTrim: (value: unknown) => string;
-  updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
 };
 
 type PackageGeneratedContentCallbacks = {
@@ -158,6 +158,10 @@ export function prepareAiGeneratedPackage(
   };
 }
 
+export const generatedPackagePolicy = Object.freeze({
+  kind: 'package-upload', operation: 'generated-archive', authorize: requireAuthenticatedUser,
+} as const);
+
 export function createPackageGeneratedContentMethods(
   deps: PackageGeneratedContentDeps,
   callbacks: PackageGeneratedContentCallbacks
@@ -165,10 +169,7 @@ export function createPackageGeneratedContentMethods(
   return {
     saveAiGeneratedPackageContent: async function(this: MethodContext, payload: AiGeneratedPackageSavePayload) {
       check(payload, Object);
-      const actingUserId = deps.normalizeCanonicalId(this.userId);
-      if (!actingUserId) {
-        throw new Meteor.Error(401, 'Must be logged in to save generated content');
-      }
+      const actingUserId = generatedPackagePolicy.authorize(this.userId, 'Must be logged in to save generated content');
       await callbacks.requireCreatorDisplayName(actingUserId);
 
       let contract: AiContentSaveContract;
@@ -195,7 +196,7 @@ export function createPackageGeneratedContentMethods(
       }
       const assetOwnerId = typeof packageAsset.userId === 'string' ? packageAsset.userId.trim() : '';
       const isAdmin = await deps.userIsInRoleAsync(actingUserId, ['admin']);
-      if (assetOwnerId && assetOwnerId !== actingUserId && !isAdmin) {
+      if (assetOwnerId !== actingUserId && !isAdmin) {
         throw new Meteor.Error(403, 'Can only save generated packages you uploaded');
       }
       if (packageAsset.meta?.uploadPurpose !== 'package') {

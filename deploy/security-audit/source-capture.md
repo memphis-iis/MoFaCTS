@@ -64,10 +64,55 @@ Protection begins before application dependencies/tests run and preserves native
 source bytes and modes. It prevents ordinary same-user file writes, chmod and
 path replacement through the protected tree. It does not protect against a
 privileged process remounting the files or authenticate a compromised runner.
-Complete test discovery/outcome authentication remains a separate qualification
-gate. An image-build retry normally repeats the combined suite and requires fresh
-single-use Meteor authorization. Only bounded observation metadata is uploaded;
-raw captured source, test workspaces and build profiles remain private/ephemeral.
+### Opt-in source proof for a captured build
+
+The capture helper's `compose-proof` action accepts the existing `--builder` and `--workspace`, plus `--native-results` (the isolated worker's retained results directory), `--native-receipt-sha256` (the independently recorded receipt digest) and `--registry` (a `RegistryProjectionDeclarationV1` JSON file containing the production `profile` and `registrationProjection: "same-reviewed-owner-descriptors"`). It re-verifies the exact capture and test inputs before writing `verification-bundle.json` once in that workspace. The native worker retains the test-mode startup descriptors and binds their bytes to its exact-source receipt. The declaration is a separate reviewed input confirming the registrations for that production profile follow the same descriptors. Configuration inside already registered provider handlers does not affect this declaration. A configuration that changes the registered descriptors needs its own reviewed projection. The helper pairs each case with its catalog surface and rehashes the descriptors with the declared profile. A successful composition records source evidence only. The deployed production-profile inventory still needs an independent comparison.
+
+The existing `build` action accepts `--verification-bundle` pointing to that file. The helper uses a build-only Docker file mount and a separate digest argument to keep the proof outside the source snapshot. The build checks canonical bytes, the digest, the catalog, the captured source and the pinned production profile before writing the image's proof file. The temporary Compose override and file copy are removed after success or failure. The exact-image smoke and running registry comparison are required separately.
+
+`node scripts/security-audit/qualification/compareRuntimeVerification.mjs <runtime-observation> <expected-proof>` compares the administrator observation with the independently retained expectation containing `buildIdentity`, `profile`, `inventorySha256` and `bundleDigestSha256`. It recomputes the digests and checks the exact case set. The output is one bounded match record for the image and release verification steps.
+
+On staging2, `node scripts/security-audit/qualification/observeStaging2Registry.mjs <protected-admin-binding> <verification-bundle> <result-file>` reuses the existing private audit browser login and the read-only administrator inventory method. Supply the retained canonical bundle from the exact image build and a private file containing just the approved administrator binding. The helper checks the origin and bound administrator before and after the read, writes only the compact comparison result, and closes the private browser. Image, host and release identity still have their separate evidence checks.
+
+After the existing staged acceptance transaction, `node scripts/security-audit/qualification/bindStaging2ReleaseRegistry.mjs <protected-evidence-directory> <accepted-release-record> <result-file>` joins those results for later environment verification. The evidence directory holds the browser acceptance, embedded bundle, publication mapping, running-image observation and retained host receipt. This command reads only those artifacts and writes a new compact binding.
+
+For a coordinated catalog v2 rehearsal, add `--report-readback` after the same
+three arguments. The protected evidence directory also holds `report.json`
+from the writer and `receiver-readback.json` from an independent authenticated
+read. The verifier joins the exact matching report to the accepted release
+record, running platform manifest, scanner revision and embedded registry
+proof. The report must have started at or after the accepted deployment time.
+This also applies when the same image is deployed again. A report with
+execution errors records `executionComplete: false`.
+Keep the binding in protected evidence with the separate fixture and enabled
+provider results.
+
+For complete release qualification, run the same command on the approved key
+owner's workstation with `--report-archive <accepted-key-fingerprint-file>
+<offline-private-key-path>` in place of `--report-readback`. Supply
+`report-encrypted.json` and the writer's `archive-receipt.json` in the protected
+evidence directory. The separately retained fingerprint file contains only
+`{"publicKeySha256":"<accepted SHA-256>"}`. This mode matches the archive to the
+writer and receiver report, checks the saved key against the accepted fingerprint,
+and compares the decrypted archive to the exact writer bytes in memory. It adds
+only hashes and the decrypt result to the binding file. Keep the key at its
+approved location. Run cleanup separately after recording the qualification
+receipts.
+
+For the full repository report, the existing `emit-repository-producer-v2.mjs`
+command accepts two additional positional arguments after the image context and
+canary inputs: the protected release evidence directory and the exact accepted
+release record. It revalidates those same release and registry observations,
+matches the independently observed application revision and platform manifest,
+and requires a clean scanner checkout at that revision and a passing static
+registration-ownership check. The coverage result counts required Meteor
+verification cases. Missing or mismatched proof leaves the surface coverage
+control in `ERROR` and the independent repository controls still run.
+
+The hosted combined job still needs fresh authorization if it invokes Meteor
+again. A build-only retry through the capture helper can reuse the same retained
+proof while its verified inputs and expected profile match. Keep raw source,
+receipts and test workspaces in the local evidence store.
 
 `qualification/ciComposeProfile.mjs` owns a short-lived build-only env profile,
 marker and generated replica-set keyfile outside the checkout. Existing public
@@ -184,6 +229,9 @@ verification. Docker owns this filtering for both builds and CI round trips.
 | `mofacts/scripts/security-audit/qualification/ciComposeProfile.mjs` | Temporary synthetic CI build-only interpolation profile and fixed-child cleanup; not a source capture or protected release record |
 | `mofacts/scripts/security-audit/qualification/sealCapture.mjs` | Linux CI mount/probe lifecycle for retained inputs, partial-failure teardown and explicit unseal before cleanup; no release qualification or privileged-runner attestation |
 | `mofacts/scripts/security-audit/qualification/testInputs.mjs` | Reviewed supplemental test readers, bounded collection and rejection of conflicting build-file bytes or modes |
+| `mofacts/scripts/security-audit/qualification/nativeCaseEvidence.mjs` | Matches the retained native receipt and raw passing cases to verified test inputs, the discovered test modules and the independently recorded receipt digest |
+| `mofacts/scripts/security-audit/qualification/composeVerificationBundle.mjs` | Composes a canonical source proof from the matched cases and a separately declared registry expectation; rejects a different source snapshot or incomplete coverage |
+| `mofacts/scripts/security-audit/qualification/imageVerificationBundle.mjs` | Validates and embeds the canonical proof against the captured identity and pinned Meteor release; leaves an ordinary build without a proof file |
 | `mofacts/common/securityAudit/buildIdentity.ts` | Existing shared source identity contract; not a second release record |
 
 `capture.json` is private temporary acquisition state, not a production release receipt. Its Docker-observed source digest uses exact file bytes, native archive modes and directory entries. Its separate local-tree digest detects local changes; Windows filesystem modes are not substituted for Linux/Docker modes. Verification requires a fresh Docker re-export to match the original source digest.
@@ -301,6 +349,16 @@ disposal remains responsible for interrupted job lifetime, not the local watcher
 - Only the root `.dockerignore` form is supported initially. An existing `Dockerfile.dockerignore` causes an explicit acquisition error, not use of the wrong policy. Nested ignore files are not reinterpreted. Unsupported `ADD`, mount inputs or direct context copies outside the shared input owner also fail acquisition.
 - The helper exports only the declared copied roots and recipe metadata, not the config repo or a broad `COPY .`. Docker filtering is not secret detection: verify that included source roots contain no private runtime material before authorizing capture. This prototype must not be used to export production data/settings.
 - Cleanup validates the exact owned temporary root and rejects links before recursive removal. It does not remove the live checkout, arbitrary directories, images, builders, volumes or containers. Successful captures persist until explicit cleanup. A stopped native client does not prove remote BuildKit work was cancelled; interrupted Docker cleanup belongs to the authorized runtime check.
+
+## Runtime inventory observation
+
+The administrator-only `admin.securityAudits.surfaceInventory` method reports
+the startup registry and its profile and inventory digests. It separately
+reports the embedded build identity and verification bundle. A source build
+can report a sealed registry while its build metadata or bundle is unavailable.
+The receiver returns a bounded observation. The qualification lane must
+compare it with the expected source identity, executed evidence, and exact
+image before recording acceptance.
 
 ## Verification and remaining work
 

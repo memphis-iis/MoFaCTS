@@ -30,7 +30,7 @@ secure_directory() {
     target="$(dirname -- "$target")"
   done
 }
-[[ $# -eq 1 && ( "$1" == read || "$1" == install || "$1" == read-v2 || "$1" == install-v2 ) ]] || fail invalid-action
+[[ $# -eq 1 && ( "$1" == read || "$1" == install || "$1" == read-v2 || "$1" == install-v2 || "$1" == observe-image ) ]] || fail invalid-action
 [[ "$(id -u)" == 0 ]] || fail root-required
 # Both schema generations share one kernel lock on the existing root-private
 # configuration inode. Version-specific lock paths cannot serialize their absence
@@ -39,7 +39,7 @@ secure_directory "$(dirname -- "$CONFIG_FILE")" || fail unsafe-directory
 secure_file "$CONFIG_FILE" 600 || fail protected-config-unavailable
 command -v flock >/dev/null || fail flock-required
 exec {receipt_lock_fd}< "$CONFIG_FILE" || fail receipt-lock-unavailable
-if [[ "$action" == read || "$action" == read-v2 ]]; then
+if [[ "$action" == read || "$action" == read-v2 || "$action" == observe-image ]]; then
   flock --shared --nonblock "$receipt_lock_fd" || fail receipt-writer-busy
 else
   flock --exclusive --nonblock "$receipt_lock_fd" || fail receipt-writer-busy
@@ -51,7 +51,7 @@ if [[ "$action" == read-v2 || "$action" == install-v2 ]]; then
   receipt_cli=runReceiptV2Cli
   [[ -d "$(dirname "$RECEIPT_FILE")" && ! -L "$(dirname "$RECEIPT_FILE")"
     && "$(stat -c '%u:%g:%a' "$(dirname "$RECEIPT_FILE")")" == 0:0:700 ]] || fail unsafe-directory
-else
+elif [[ "$action" != observe-image ]]; then
   [[ ! -e "$V2_RECEIPT_FILE" && ! -L "$V2_RECEIPT_FILE" ]] || fail v2-receipt-is-active
 fi
 secure_directory /etc || fail unsafe-directory
@@ -83,6 +83,13 @@ image_observation="$(timeout 120 docker image save "$engine_image_id" 2>/dev/nul
 image_id="$(jq -er 'select(keys == ["configDigest","platform"] and .platform == "linux/amd64") | .configDigest | select(test("^sha256:[a-f0-9]{64}$"))' <<<"$image_observation" 2>/dev/null)" || fail running-image-unavailable
 revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$engine_image_id" 2>/dev/null)" || fail running-image-unavailable
 [[ "$revision" =~ ^[a-f0-9]{40}$ ]] || fail running-image-unavailable
+if [[ "$action" == observe-image ]]; then
+  # Root deployment owner only. This returns the existing runningImage tuple,
+  # independent of either receipt. No sudo/forced-command permission is added.
+  [[ "$(docker inspect --format '{{.Id}} {{.State.Running}} {{.Image}}' "$MOFACTS_APP_CONTAINER" 2>/dev/null)" == "$identity" ]] || fail running-image-unavailable
+  jq -cn --arg config "$image_id" --arg revision "$revision" '{configDigest:$config,platform:"linux/amd64",baseCommit:$revision}'
+  exit 0
+fi
 module_source="$(cat -- "$MODULE_FILE")"
 observe() {
   local result

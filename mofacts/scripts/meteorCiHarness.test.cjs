@@ -133,7 +133,8 @@ test('emits injected client bundles with a browser-owned library target', () => 
     externalsType: 'commonjs2',
     output: {
       library: CLIENT_LIBRARY_NAME,
-      libraryTarget: 'window',
+      libraryTarget: 'global',
+      globalObject: 'globalThis',
     },
   };
 

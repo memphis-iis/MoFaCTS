@@ -1,33 +1,70 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { Transform } from 'node:stream';
 import { evidenceCommand } from './collectCiEvidence.mjs';
 import { parseCiEvidenceJson } from './ciEvidence.mjs';
-import { parseDockerImageInspection, readDockerArchiveIdentity } from './imageArchiveIdentity.mjs';
+import { IMAGE_ARCHIVE_LIMITS, parseDockerImageInspection, readDockerArchiveIdentity } from './imageArchiveIdentity.mjs';
 
 // Older Engine APIs omit Descriptor entirely. Keyed lookup emits explicit null
 // without a template error; classic identity still requires hashing config bytes.
 const format = '{"nativeId":{{json .Id}},"platform":"{{.Os}}/{{.Architecture}}","descriptor":{{json (index . "Descriptor")}}}';
 const invalid = () => { throw new Error('Docker image identity is unavailable'); };
 
-export async function streamDockerImageIdentity(inspection, environment = process.env, spawnProcess = spawn) {
+export function imageStreamOptions(options = {}) {
+  if (!options || typeof options !== 'object' || Array.isArray(options)
+      || Object.keys(options).some(key => !['timeoutMs', 'onDiagnostic'].includes(key))) invalid();
+  const timeoutMs = options.timeoutMs ?? 120000;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600000
+      || (options.onDiagnostic !== undefined && typeof options.onDiagnostic !== 'function')) invalid();
+  return { timeoutMs, onDiagnostic: options.onDiagnostic };
+}
+
+export async function streamDockerImageIdentity(inspection, environment = process.env, spawnProcess = spawn, options = {}) {
+  const { timeoutMs, onDiagnostic } = imageStreamOptions(options);
+  const started = Date.now();
+  let bytesRead = 0, stderrBytes = 0, exitCode = null, closedSettled = false;
+  let category = 'archive-rejected', killed = false, terminationTimer;
+  const diagnostic = () => Object.freeze({ category, timeoutMs, elapsedMs: Date.now() - started,
+    bytesRead, stderrBytes, exitCode, terminationConfirmed: closedSettled });
   const child = spawnProcess('docker', ['--context', 'default', 'image', 'save', inspection.nativeId], {
     stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: environment,
   });
-  let stderrBytes = 0;
-  let killed = false;
-  const stop = () => { killed = true; child.kill(); child.stdout.destroy(); child.stderr.destroy(); };
-  const timer = setTimeout(stop, 120000);
-  child.stderr.on('data', chunk => { stderrBytes += chunk.length; if (stderrBytes > 65536) stop(); });
+  const measured = new Transform({ transform(chunk, encoding, done) {
+    bytesRead += chunk.length;
+    done(null, chunk);
+  } });
+  const stop = reason => {
+    if (killed) return;
+    category = reason; killed = true; child.kill(); child.stdout.destroy(); measured.destroy(); child.stderr.destroy();
+  };
+  const timer = setTimeout(() => stop('timeout'), timeoutMs);
+  child.stderr.on('data', chunk => { stderrBytes += chunk.length; if (stderrBytes > 65536) stop('stderr-limit'); });
+  child.stdout.on('error', () => { if (!killed) category = 'stream-failed'; measured.destroy(new Error('Image stream failed')); });
   const closed = new Promise((resolve, reject) => {
-    child.once('error', () => reject(new Error('Docker image identity is unavailable')));
-    child.once('close', code => { if (code === 0 && !killed) resolve(); else reject(new Error('Docker image identity is unavailable')); });
+    child.once('error', () => { if (!killed) category = 'spawn-failed'; reject(new Error('Docker image identity is unavailable')); });
+    child.once('close', code => {
+      exitCode = code; closedSettled = true;
+      if (code === 0 && !killed) resolve();
+      else { if (!killed) category = 'process-failed'; reject(new Error('Docker image identity is unavailable')); }
+    });
   });
+  child.stdout.pipe(measured);
   try {
-    const [result] = await Promise.all([readDockerArchiveIdentity(child.stdout, inspection), closed]);
+    const [result] = await Promise.all([readDockerArchiveIdentity(measured, inspection), closed]);
+    category = 'complete';
     return result;
-  } catch { stop(); await closed.catch(() => {}); invalid(); }
-  finally { clearTimeout(timer); }
+  } catch {
+    if (bytesRead > IMAGE_ARCHIVE_LIMITS.bytes && !killed) category = 'archive-size-limit';
+    stop(category);
+    await Promise.race([closed.catch(() => {}), new Promise(resolve => { terminationTimer = setTimeout(resolve, 5000); })]);
+    const error = new Error('Docker image identity is unavailable');
+    error.code = 'DOCKER_IMAGE_STREAM_FAILED'; error.diagnostic = diagnostic();
+    throw error;
+  } finally {
+    clearTimeout(timer); clearTimeout(terminationTimer);
+    onDiagnostic?.(diagnostic());
+  }
 }
 
 // The requested digest is an immutable engine reference, not necessarily a

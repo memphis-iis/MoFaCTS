@@ -23,11 +23,12 @@ import {
 } from './dashboardCacheShared';
 import { ADMIN_API_KEY_SETTINGS_KEY } from '../lib/apiKeyResolution';
 import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
-import { assignmentMemberTdfIds } from '../../common/progressiveAssignments';
+import { enrolledCourseLessonIds } from '../lib/enrolledCourseLessons';
 
 type DashboardPracticeSnapshotDeps = {
   Meteor: any;
   Tdfs: any;
+  Courses: any;
   Assignments?: any;
   Sections?: any;
   SectionUserMap?: any;
@@ -47,71 +48,23 @@ type DashboardPracticeSnapshotDeps = {
 // Original AutoTutor metadata remains readable for saved lessons; launch rejects it.
 type FirstContentUnitType = 'video' | 'autotutor' | 'assessment' | 'learning' | 'sparc' | 'conditionPool' | null;
 
-async function resolveAssignedRootTdfIdsForUser({
-  Assignments,
-  Sections,
-  SectionUserMap,
-}: Pick<DashboardPracticeSnapshotDeps, 'Assignments' | 'Sections' | 'SectionUserMap'>, userId: string) {
-  if (!Assignments || !Sections || !SectionUserMap) {
-    throw new Error('Practice dashboard snapshot requires Assignments, Sections, and SectionUserMap dependencies');
-  }
-  const enrollmentRows = await SectionUserMap.find(
-    { userId },
-    { fields: { sectionId: 1 } }
-  ).fetchAsync();
-  const sectionIds = enrollmentRows
-    .map((row: any) => normalizeOptionalString(row?.sectionId))
-    .filter((id: string | null): id is string => !!id);
-  if (sectionIds.length === 0) return [];
-
-  const sections = await Sections.find(
-    { _id: { $in: sectionIds } },
-    { fields: { courseId: 1 } }
-  ).fetchAsync();
-  const courseIds = sections
-    .map((section: any) => normalizeOptionalString(section?.courseId))
-    .filter((id: string | null): id is string => !!id);
-  if (courseIds.length === 0) return [];
-
-  const assignmentRows = await Assignments.find(
-    { courseId: { $in: [...new Set(courseIds)] } },
-    { fields: { assignmentType: 1, TDFId: 1, memberTdfIds: 1, releaseAt: 1 } }
-  ).fetchAsync();
-  return assignmentRows
-    .flatMap((row: any) => {
-      const releaseAt = row.assignmentType === 'progressive' && row.releaseAt ? new Date(row.releaseAt) : null;
-      if (releaseAt && Number.isFinite(releaseAt.getTime()) && releaseAt.getTime() > Date.now()) return [];
-      return assignmentMemberTdfIds(row);
-    })
-    .map((id: string) => normalizeOptionalString(id))
-    .filter((id: string | null): id is string => !!id);
-}
-
 async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, userId: string) {
   const [assignedRootIds, user, adminApiKeySettings] = await Promise.all([
-    resolveAssignedRootTdfIdsForUser(deps, userId),
+    enrolledCourseLessonIds({ SectionUserMap: deps.SectionUserMap, Sections: deps.Sections, Courses: deps.Courses, Assignments: deps.Assignments }, userId, true),
     deps.usersCollection.findOneAsync(
       { _id: userId },
-      { fields: { accessedTDFs: 1, speechAPIKey: 1, textToSpeechAPIKey: 1, ttsAPIKey: 1 } }
+      { fields: { speechAPIKey: 1, textToSpeechAPIKey: 1, ttsAPIKey: 1 } }
     ),
     deps.DynamicSettings.findOneAsync({ key: ADMIN_API_KEY_SETTINGS_KEY })
   ]);
 
-  const explicitDashboardIds = [
-    ...new Set([
-      ...assignedRootIds,
-      ...(Array.isArray(user?.accessedTDFs) ? user.accessedTDFs : [])
-        .map((id: unknown) => normalizeOptionalString(id))
-        .filter((id: string | null): id is string => !!id)
-    ])
-  ];
   const visibilityTerms: any[] = [
     { ownerId: userId },
     { 'accessors.userId': userId },
     { 'content.tdfs.tutor.setspec.userselect': 'true' },
   ];
-  if (explicitDashboardIds.length > 0) {
-    visibilityTerms.push({ _id: { $in: explicitDashboardIds } });
+  if (assignedRootIds.length > 0) {
+    visibilityTerms.push({ _id: { $in: assignedRootIds } });
   }
 
   const projection = {
