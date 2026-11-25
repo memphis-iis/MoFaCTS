@@ -82,8 +82,20 @@ from the writer and `receiver-readback.json` from an independent authenticated
 read. The verifier joins the exact matching report to the accepted release
 record, running platform manifest, scanner revision and embedded registry
 proof. A report with execution errors records `executionComplete: false`.
-Keep the binding in protected evidence with the separate fixture, enabled
-provider and encrypted archive results.
+Keep the binding in protected evidence with the separate fixture and enabled
+provider results.
+
+For complete release qualification, run the same command on the approved key
+owner's workstation with `--report-archive <accepted-key-fingerprint-file>
+<offline-private-key-path>` in place of `--report-readback`. Supply
+`report-encrypted.json` and the writer's `archive-receipt.json` in the protected
+evidence directory. The separately retained fingerprint file contains only
+`{"publicKeySha256":"<accepted SHA-256>"}`. This mode matches the archive to the
+writer and receiver report, checks the saved key against the accepted fingerprint,
+and compares the decrypted archive to the exact writer bytes in memory. It adds
+only hashes and the decrypt result to the binding file. Keep the key at its
+approved location. Run cleanup separately after recording the qualification
+receipts.
 
 For the full repository report, the existing `emit-repository-producer-v2.mjs`
 command accepts two additional positional arguments after the image context and

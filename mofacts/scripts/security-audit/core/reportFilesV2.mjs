@@ -3,13 +3,17 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { auditTargetOrigin, parseSecurityAuditReportV2 } from '../../../common/securityAudit/reportV2.ts';
 import { canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
+import { contentDigest, proofRecord } from '../../../common/securityAudit/proofFields.ts';
 import { AUDIT_V2_MAX_BODY_BYTES } from '../../../server/securityAudit/securityAuditIngestionV2.ts';
 import { realDirectory } from '../qualification/collectCiEvidence.mjs';
-import { encryptReportBuffer } from '../report-crypto.mjs';
+import { decryptReportEnvelope, encryptReportBuffer } from '../report-crypto.mjs';
 import { readAuditFileV2, parseAuditFileV2 } from './producerFilesV2.mjs';
 
-const maxPublicKeyBytes = 65536;
-const maxEncryptedBytes = Math.ceil(AUDIT_V2_MAX_BODY_BYTES / 3) * 4 + 2 * maxPublicKeyBytes + 16384;
+const maxKeyBytes = 65536;
+const maxEncryptedBytes = Math.ceil(AUDIT_V2_MAX_BODY_BYTES / 3) * 4 + 2 * maxKeyBytes + 16384;
+const reportCoordinates = ['reportId', 'catalogId', 'catalogVersion', 'catalogDigestSha256', 'digestSha256'];
+const archiveReceiptFields = [...reportCoordinates, 'reportBytesSha256', 'encryptedBytesSha256',
+  'publicKeySha256', 'savedBytesVerified'];
 
 async function readReport(reportPath, env) {
   const target = auditTargetOrigin(env.AUDIT_TARGET);
@@ -27,7 +31,7 @@ export async function encryptAuditReportFileV2({ reportPath, encryptedPath, env 
   try { await fs.lstat(output); throw new Error('V2 encrypted output already exists'); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
   const key = env.AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY;
-  if (typeof key !== 'string' || !key.length || Buffer.byteLength(key) > maxPublicKeyBytes) throw new Error('V2 report encryption configuration is unavailable');
+  if (typeof key !== 'string' || !key.length || Buffer.byteLength(key) > maxKeyBytes) throw new Error('V2 report encryption configuration is unavailable');
   const { report, bytes } = await readReport(reportPath, env);
   let encrypted, publicKeySha256;
   try {
@@ -63,7 +67,10 @@ function publicKeyFingerprintV2(pem) {
   // A private PEM is not an acceptable source even though createPublicKey can
   // derive its public part. The scanner must never receive a private key.
   if (typeof pem !== 'string' || !pem.startsWith('-----BEGIN PUBLIC KEY-----')) throw new Error('V2 public key is unavailable');
-  const key = crypto.createPublicKey(pem);
+  return archiveKeyFingerprint(crypto.createPublicKey(pem));
+}
+
+function archiveKeyFingerprint(key) {
   if (key.asymmetricKeyType !== 'rsa' || Number(key.asymmetricKeyDetails?.modulusLength) < 3072) throw new Error('V2 public key is unavailable');
   return crypto.createHash('sha256').update(key.export({ type: 'spki', format: 'der' })).digest('hex');
 }
@@ -83,14 +90,59 @@ export async function retainPinnedAuditArchiveV2({ expectedPublicKeySha256, ...o
 // The expected digest is the writer's retained receipt, not a digest freshly
 // calculated from this readback path. This also supports a separately stored
 // encrypted copy without ever loading an offline decryption key.
-export async function verifySavedAuditArchiveV2({ encryptedPath, expectedEncryptedBytesSha256 }) {
+async function readSavedAuditArchiveV2({ encryptedPath, expectedEncryptedBytesSha256 }) {
   if (typeof expectedEncryptedBytesSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(expectedEncryptedBytesSha256)) {
     throw new Error('V2 archive readback digest is unavailable');
   }
   const bytes = await readAuditFileV2(encryptedPath, maxEncryptedBytes);
   const encryptedBytesSha256 = crypto.createHash('sha256').update(bytes).digest('hex');
   if (encryptedBytesSha256 !== expectedEncryptedBytesSha256) throw new Error('V2 saved archive readback does not match');
+  return { bytes, encryptedBytesSha256 };
+}
+
+export async function verifySavedAuditArchiveV2(options) {
+  const { encryptedBytesSha256 } = await readSavedAuditArchiveV2(options);
   return { encryptedBytesSha256, savedBytesVerified: true };
+}
+
+async function readBoundAuditArchiveV2({ source, encryptedPath, archiveReceipt, expectedPublicKeySha256 }) {
+  const receipt = proofRecord(archiveReceipt, archiveReceiptFields);
+  if (receipt.savedBytesVerified !== true || receipt.publicKeySha256 !== contentDigest(expectedPublicKeySha256)) {
+    throw new Error('V2 offline-key retention preconditions are unavailable');
+  }
+  const reportBytesSha256 = crypto.createHash('sha256').update(source.bytes).digest('hex');
+  if (reportBytesSha256 !== receipt.reportBytesSha256 || reportCoordinates.some(key => source.report[key] !== receipt[key])) {
+    throw new Error('V2 archive receipt does not bind this report');
+  }
+  const archive = await readSavedAuditArchiveV2({ encryptedPath, expectedEncryptedBytesSha256: receipt.encryptedBytesSha256 });
+  return { ...archive, reportBytesSha256 };
+}
+
+// Workstation-only release qualification. The approved saved key stays in place
+// and the decrypted report exists only in memory during the exact byte check.
+export async function qualifySavedAuditArchiveV2({ reportPath, expectedReportDigestSha256, encryptedPath,
+  archiveReceipt, expectedPublicKeySha256, privateKeyPath, env }) {
+  const source = await readReport(reportPath, env);
+  if (source.report.digestSha256 !== contentDigest(expectedReportDigestSha256)) {
+    throw new Error('V2 archive source differs from the verified receiver report');
+  }
+  const { bytes, encryptedBytesSha256, reportBytesSha256 } = await readBoundAuditArchiveV2({
+    source, encryptedPath, archiveReceipt, expectedPublicKeySha256,
+  });
+  const keyBytes = await readAuditFileV2(privateKeyPath, maxKeyBytes);
+  try {
+    const fingerprint = archiveKeyFingerprint(crypto.createPublicKey(crypto.createPrivateKey(keyBytes)));
+    if (fingerprint !== expectedPublicKeySha256) throw new Error('V2 offline key does not match the accepted fingerprint');
+    const restored = decryptReportEnvelope(parseAuditFileV2(bytes), keyBytes);
+    try {
+      if (!restored.equals(source.bytes)) throw new Error('V2 saved archive decrypted to different report bytes');
+    } finally {
+      restored.fill(0);
+    }
+  } finally {
+    keyBytes.fill(0);
+  }
+  return { publicKeySha256: expectedPublicKeySha256, encryptedBytesSha256, reportBytesSha256, savedArchiveDecrypted: true };
 }
 
 // Network acquisition/authentication remains with the existing receiver reader.
@@ -118,21 +170,13 @@ export async function verifyAuditReportReadbackV2(options) {
 // owns recovery if an interrupted cleanup leaves either temporary path present.
 export async function completeOfflineKeyRetentionV2({ reportPath, readbackPath, encryptedPath,
   archiveReceipt, expectedPublicKeySha256, env = process.env }) {
-  const keys = ['reportId', 'catalogId', 'catalogVersion', 'catalogDigestSha256', 'digestSha256',
-    'reportBytesSha256', 'encryptedBytesSha256', 'publicKeySha256', 'savedBytesVerified'];
-  if (!archiveReceipt || Object.keys(archiveReceipt).sort().join(',') !== keys.sort().join(',')
-    || archiveReceipt.savedBytesVerified !== true || !/^[a-f0-9]{64}$/.test(expectedPublicKeySha256 ?? '')
-    || archiveReceipt.publicKeySha256 !== expectedPublicKeySha256
-    || publicKeyFingerprintV2(env.AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY) !== expectedPublicKeySha256) {
+  if (publicKeyFingerprintV2(env.AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY) !== expectedPublicKeySha256) {
     throw new Error('V2 offline-key retention preconditions are unavailable');
   }
   const before = await fs.lstat(reportPath, { bigint: true });
   const readbackBefore = await fs.lstat(readbackPath, { bigint: true });
   const source = await readReport(reportPath, env);
-  if (crypto.createHash('sha256').update(source.bytes).digest('hex') !== archiveReceipt.reportBytesSha256
-    || ['reportId', 'catalogId', 'catalogVersion', 'catalogDigestSha256', 'digestSha256']
-      .some(key => source.report[key] !== archiveReceipt[key])) throw new Error('V2 archive receipt does not bind this report');
-  await verifySavedAuditArchiveV2({ encryptedPath, expectedEncryptedBytesSha256: archiveReceipt.encryptedBytesSha256 });
+  const { encryptedBytesSha256 } = await readBoundAuditArchiveV2({ source, encryptedPath, archiveReceipt, expectedPublicKeySha256 });
   const readback = await verifyAuditReportReadbackV2({ reportPath, readbackPath, env });
   for (const [file, original] of [[reportPath, before], [readbackPath, readbackBefore]]) {
     const after = await fs.lstat(file, { bigint: true });
@@ -145,7 +189,7 @@ export async function completeOfflineKeyRetentionV2({ reportPath, readbackPath, 
     try { await fs.lstat(file); throw new Error('V2 temporary report cleanup did not verify'); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
-  return { ...readback, encryptedBytesSha256: archiveReceipt.encryptedBytesSha256,
+  return { ...readback, encryptedBytesSha256,
     publicKeySha256: expectedPublicKeySha256, savedBytesVerified: true, temporaryPlaintextRemoved: true };
 }
 

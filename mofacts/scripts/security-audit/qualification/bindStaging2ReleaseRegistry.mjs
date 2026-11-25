@@ -8,7 +8,7 @@ import { proofRecord } from '../../../common/securityAudit/proofFields.ts';
 import { compareReleaseReceiptV2, parseReleaseReceiptV2 } from '../../../common/securityAudit/releaseReceipt.mjs';
 import { parseRunningImageObservation } from '../../../common/securityAudit/releaseQualification.ts';
 import { MAX_VERIFICATION_BUNDLE_BYTES, parseVerificationBundle } from '../../../common/securityAudit/verificationBundle.ts';
-import { readMatchedAuditReportV2 } from '../core/reportFilesV2.mjs';
+import { qualifySavedAuditArchiveV2, readMatchedAuditReportV2 } from '../core/reportFilesV2.mjs';
 import { readCiFile, realDirectory, writeNew } from './collectCiEvidence.mjs';
 import { parseCiEvidenceJson } from './ciEvidence.mjs';
 import { projectReleaseReceiptV2, readReleaseBytes } from './releaseRecordStore.mjs';
@@ -68,9 +68,10 @@ export async function bindStaging2ReleaseRegistry({ authorityBytes, publication,
 
 // Verify previously collected evidence for the coordinated cutover. The operator
 // supplies the independently acquired receiver copy in the protected workspace.
-export async function bindStaging2ReportReadback({ releaseEvidence, reportPath, readbackPath }) {
+export async function bindStaging2ReportReadback({ releaseEvidence, reportPath, readbackPath, archiveEvidence }) {
   const binding = await bindStaging2ReleaseRegistry(releaseEvidence);
-  const report = await readMatchedAuditReportV2({ reportPath, readbackPath, env: { AUDIT_TARGET: binding.target } });
+  const env = { AUDIT_TARGET: binding.target };
+  const report = await readMatchedAuditReportV2({ reportPath, readbackPath, env });
   const { buildIdentity } = binding;
   const platformImage = staging2PlatformImage(binding.publishedImage);
   if (buildIdentity.includedUncommittedLocalChanges || report.reportType !== 'full'
@@ -80,13 +81,18 @@ export async function bindStaging2ReportReadback({ releaseEvidence, reportPath, 
     || report.deployedImageDigest.state !== 'observed' || report.deployedImageDigest.value !== platformImage) {
     throw new Error('Full report and staging2 release identity do not match');
   }
-  return {
+  const reportBinding = {
     schema: 'Staging2ReportReleaseBindingV1', reportId: report.reportId, reportDigestSha256: report.digestSha256,
     catalogDigestSha256: report.catalogDigestSha256, scannerSourceRevision: report.scannerSourceRevision,
     platformImage, recordDigestSha256: binding.recordDigestSha256, inventorySha256: binding.inventorySha256,
     bundleDigestSha256: binding.bundleDigestSha256,
     executionComplete: report.counts.error === 0 && report.executionErrors.length === 0,
   };
+  if (archiveEvidence === undefined) return reportBinding;
+  const archive = await qualifySavedAuditArchiveV2({
+    ...archiveEvidence, reportPath, expectedReportDigestSha256: report.digestSha256, env,
+  });
+  return { ...reportBinding, archive };
 }
 
 export async function readStaging2ReleaseRegistryEvidence(evidenceDirectory, authorityFile) {
@@ -101,15 +107,27 @@ export async function readStaging2ReleaseRegistryEvidence(evidenceDirectory, aut
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [evidenceDirectory, authorityFile, outputFile, mode, ...extra] = process.argv.slice(2);
+  const [evidenceDirectory, authorityFile, outputFile, mode, ...options] = process.argv.slice(2);
   try {
-    if (!evidenceDirectory || !authorityFile || !outputFile || extra.length
-      || (mode !== undefined && mode !== '--report-readback')) throw Error();
-    const releaseEvidence = await readStaging2ReleaseRegistryEvidence(evidenceDirectory, authorityFile);
-    const result = mode === '--report-readback'
-      ? await bindStaging2ReportReadback({ releaseEvidence, reportPath: path.join(evidenceDirectory, 'report.json'),
-        readbackPath: path.join(evidenceDirectory, 'receiver-readback.json') })
-      : await bindStaging2ReleaseRegistry(releaseEvidence);
+    if (!evidenceDirectory || !authorityFile || !outputFile
+      || ![undefined, '--report-readback', '--report-archive'].includes(mode)) throw Error();
+    const qualifyArchive = mode === '--report-archive';
+    if (options.length !== (qualifyArchive ? 2 : 0) || !options.every(Boolean)) throw Error();
+    const root = await realDirectory(evidenceDirectory);
+    const releaseEvidence = await readStaging2ReleaseRegistryEvidence(root, authorityFile);
+    let archiveEvidence;
+    if (qualifyArchive) {
+      const [fingerprintPath, privateKeyPath] = options;
+      const pin = proofRecord(parseCiEvidenceJson(await readCiFile(fingerprintPath, 1024), 1024), ['publicKeySha256']);
+      archiveEvidence = {
+        encryptedPath: path.join(root, 'report-encrypted.json'),
+        archiveReceipt: parseCiEvidenceJson(await readCiFile(path.join(root, 'archive-receipt.json'), 4096), 4096),
+        expectedPublicKeySha256: pin.publicKeySha256, privateKeyPath,
+      };
+    }
+    const result = mode === undefined ? await bindStaging2ReleaseRegistry(releaseEvidence)
+      : await bindStaging2ReportReadback({ releaseEvidence, reportPath: path.join(root, 'report.json'),
+        readbackPath: path.join(root, 'receiver-readback.json'), archiveEvidence });
     await writeNew(outputFile, Buffer.from(canonicalAuditJson(result) + '\n'));
   } catch {
     process.stderr.write('Staging2 qualification evidence did not match.\n');

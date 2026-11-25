@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 import test from 'node:test';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { AUDIT_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
@@ -20,6 +22,7 @@ import { observeStaging2Registry } from '../qualification/observeStaging2Registr
 import { bindStaging2ReleaseRegistry, bindStaging2ReportReadback } from '../qualification/bindStaging2ReleaseRegistry.mjs';
 import { projectReleaseReceiptV2 } from '../qualification/releaseRecordStore.mjs';
 import { writeAuditFileV2 } from '../core/producerFilesV2.mjs';
+import { retainPinnedAuditArchiveV2 } from '../core/reportFilesV2.mjs';
 import { envelope } from './fixtures/v2Fixtures.mjs';
 
 const hash = data => createHash('sha256').update(data).digest('hex');
@@ -286,11 +289,13 @@ test('binds the verified registry and report readback to the staged image and ex
     await writeAuditFileV2(readbackPath, await finalizeAuditReport(receiver));
     return { releaseEvidence: input, reportPath, readbackPath };
   }
-  const reportBinding = await bindStaging2ReportReadback(await pair('matched', payload));
+  const matched = await pair('matched', payload);
+  const reportBinding = await bindStaging2ReportReadback(matched);
   assert.equal(reportBinding.platformImage, platformImage);
   assert.equal(reportBinding.recordDigestSha256, binding.recordDigestSha256);
   assert.equal(reportBinding.inventorySha256, registry.inventorySha256);
   assert.equal(reportBinding.executionComplete, false);
+  assert.equal(Object.hasOwn(reportBinding, 'archive'), false);
   await assert.rejects(bindStaging2ReportReadback(await pair('different-readback', payload,
     { ...payload, reportId: 'synthetic-different-report' })), /readback does not match/);
   for (const [name, change] of [
@@ -301,6 +306,50 @@ test('binds the verified registry and report readback to the staged image and ex
   ]) {
     await assert.rejects(bindStaging2ReportReadback(await pair(name, { ...payload, ...change })), /release identity do not match/);
   }
+
+  const keyPair = generateKeyPairSync('rsa', { modulusLength: 3072 });
+  const expectedPublicKeySha256 = hash(keyPair.publicKey.export({ type: 'spki', format: 'der' }));
+  const privateKeyPath = path.join(directory, 'synthetic-key.pem');
+  const encryptedPath = path.join(directory, 'report-encrypted.json');
+  await fs.writeFile(privateKeyPath, keyPair.privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
+  const env = { AUDIT_TARGET: binding.target, AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY: keyPair.publicKey.export({ type: 'spki', format: 'pem' }) };
+  const archiveReceipt = await retainPinnedAuditArchiveV2({
+    reportPath: matched.reportPath, encryptedPath, expectedPublicKeySha256, env,
+  });
+  const archiveEvidence = { archiveReceipt, encryptedPath, privateKeyPath, expectedPublicKeySha256 };
+  const boundArchive = await bindStaging2ReportReadback({ ...matched, archiveEvidence });
+  assert.deepEqual(boundArchive, {
+    ...reportBinding, archive: { publicKeySha256: expectedPublicKeySha256,
+      encryptedBytesSha256: archiveReceipt.encryptedBytesSha256,
+      reportBytesSha256: hash(await fs.readFile(matched.reportPath)), savedArchiveDecrypted: true },
+  });
+  await assert.rejects(bindStaging2ReportReadback({ ...matched, archiveEvidence: {
+    ...archiveEvidence, expectedPublicKeySha256: '0'.repeat(64),
+  } }), /retention preconditions/);
+  const unrelatedArchive = path.join(directory, 'other-report-encrypted.json');
+  const unrelatedPair = await pair('other-archive', { ...payload, reportId: 'synthetic-other-archive' });
+  const unrelatedReceipt = await retainPinnedAuditArchiveV2({
+    reportPath: unrelatedPair.reportPath, encryptedPath: unrelatedArchive, expectedPublicKeySha256, env,
+  });
+  await assert.rejects(bindStaging2ReportReadback({ ...matched, archiveEvidence: {
+    ...archiveEvidence, encryptedPath: unrelatedArchive,
+    archiveReceipt: { ...archiveReceipt, encryptedBytesSha256: unrelatedReceipt.encryptedBytesSha256 },
+  } }), /decrypted to different report bytes/);
+
+  const keptFiles = { 'accepted.json': bytes(input.acceptance), 'publication.json': bytes(publication),
+    'running-image.json': bytes(input.runningImage), 'host-receipt.json': bytes(input.hostReceipt),
+    'verification-bundle.json': input.bundleBytes, 'authority.json': authorityBytes,
+    'archive-receipt.json': bytes(archiveReceipt), 'key-pin.json': bytes({ publicKeySha256: expectedPublicKeySha256 }) };
+  await Promise.all(Object.entries(keptFiles).map(([name, data]) => fs.writeFile(path.join(directory, name), data)));
+  await fs.copyFile(matched.reportPath, path.join(directory, 'report.json'));
+  await fs.copyFile(matched.readbackPath, path.join(directory, 'receiver-readback.json'));
+  const resultPath = path.join(directory, 'archive-binding.json');
+  const command = fileURLToPath(new URL('../qualification/bindStaging2ReleaseRegistry.mjs', import.meta.url));
+  execFileSync(process.execPath, [command, directory, path.join(directory, 'authority.json'), resultPath,
+    '--report-archive', path.join(directory, 'key-pin.json'), privateKeyPath], { stdio: 'pipe' });
+  assert.deepEqual(JSON.parse(await fs.readFile(resultPath, 'utf8')), boundArchive);
+  assert.deepEqual(await fs.readFile(path.join(directory, 'report.json')), await fs.readFile(matched.reportPath));
+  assert.deepEqual(await fs.readFile(path.join(directory, 'receiver-readback.json')), await fs.readFile(matched.readbackPath));
 });
 
 test('reads the installed staging2 registry through the bound administrator and returns only hashes', async () => {
