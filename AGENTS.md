@@ -72,8 +72,8 @@ Lint includes the security surface contract. Changes to server methods, publicat
 - Keep Meteor routing, collections, publications, methods, app shell, persistence, logging, and migrations in `mofacts/`; unit engines and pedagogical extensions in `learning-components/`.
 - New unit types should use the unit-engine registry with explicit lifecycle methods. Keep `mofacts/client/views/experiment/unitEngine.ts` an app dependency facade, without duplicating legacy behavior.
 - Learning components use explicit runtime dependency/context interfaces. Avoid deep Meteor imports unless a documented, behavior-preserving temporary facade already exists.
-- SPARC must not deliver previously used instructional content to the same user in a new turn, across lessons/sessions. This covers every explanation, written support, question, feedback, other tutor utterance, image, and video, including generated output and components embedded in matched instructions. Restoring a saved turn preserves its accepted output. Prior-content links and fresh library IDs do not satisfy no-repeat. See `docs/sparc-instructional-cycle.md` for the approved requirement and implementation status.
-- SPARC retrieval and embedding caches belong to the browser. Search uses the single maximum cosine similarity among eligible unseen content in the requested category; images/videos compete in one local search at 0.95. Independent generation calls must not coordinate through locks, polling, or shared in-flight work.
+- SPARC can reuse saved instructional content across turns, sessions, lessons, and orientation modes, including for the same learner. Restoring a saved turn preserves its accepted output. See `docs/sparc-instructional-cycle.md`.
+- SPARC retrieval and embedding caches belong to the browser. Search uses the highest cosine similarity among usable content in the requested category; images/videos compete in one local search at 0.95. Independent generation calls must not coordinate through locks, polling, or shared in-flight work.
 - Server image/library services own persistence, exact-ID reads, authorization, and secret-bearing provider calls. Administrative deletion preserves learner decisions and model/history records, removes catalog content/media, and leaves content-free receipts that render "Administrative removal" on reload. See `docs/sparc-instructional-cycle.md`.
 - Name intentional alternate runtime paths by their domain behavior; do not call them fallbacks. Recovery must obey Critical Invariants.
 
@@ -150,7 +150,7 @@ Helper ownership is documented in `deploy/hotfix/README.md`.
 ## Server Method Design
 
 - Minimize server work. Add methods only for database access, authentication/authorization, encryption, secrets, or external API calls unsafe for the client. Keep pure computation client-side where safe, and avoid server reshaping of data the client already holds.
-- SPARC explanation and requested support form one matched instruction under the no-repeat contract. Persist composition before media resolution; accept both display nodes before generating the question.
+- SPARC explanation and requested support form one matched instruction. Persist composition before media resolution; accept both display nodes before generating the question.
 - Practice history saves must not rebuild dashboard/course summaries. On dashboard entry, apply newly committed history to changed lessons; reconstruct fully only at initialization or explicit repair. Persist last-used unit and resume state during practice. See `docs/architecture.md`.
 - Lint enforces that production server modules cannot directly/transitively import learner-executable `learning-components/models/` or `learning-components/units/` code; type-only server-interface imports are excluded.
 - Keep pure-compute methods out of server method modules. Prefer batched queries/aggregations over N+1 round-trips. Do not return full collection scans. Rate-limit public/unauthenticated methods.

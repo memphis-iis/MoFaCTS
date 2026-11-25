@@ -92,7 +92,7 @@ describe('SPARC figure library Mongo contracts', function() {
   const syntheticInstruction = (text: string, assetId: string) => ({ text,
     support: { text: `${text} worked example.`, figure: { assetId, description: 'Synthetic teaching figure' } } });
 
-  it('accepts same-event media composition and resume while rejecting later reuse without changing dashboard checkpoints', async function() {
+  it('accepts same-event media composition and resume and later reuse without changing dashboard checkpoints', async function() {
     const userId = 'test-library-user-continuation';
     const otherUserId = 'test-library-user-other';
     const assetId = 'testLibraryImage';
@@ -106,24 +106,24 @@ describe('SPARC figure library Mongo contracts', function() {
     const restored = await service.lookup(userId, query, null, [1, 0]);
     assert.equal(restored.status, 'hit');
     if (restored.status === 'hit') assert.deepEqual(restored.content, accepted.content);
-    const beforeFailure = await HistoryCommitState.findOneAsync(userId);
     const next = instructionQuery('test-library-later-event');
     next.tdfId = 'test-library-another-lesson';
     next.sessionId = 'test-library-another-session';
-    await assert.rejects(service.publish(userId, { query: next, embedding: [1, 0] },
-      syntheticInstruction('Synthetic different explanation.', assetId)), /already been used/);
-    const afterFailure = await HistoryCommitState.findOneAsync(userId);
-    assert.deepEqual(afterFailure, beforeFailure, 'A rejected claim must roll back its state revision');
-    assert.equal(await SparcMoveRequests.find({ userId, entryId: { $exists: true } }).countAsync(), 1);
+    next.context.orientationOwned = true;
+    const reused = await service.lookup(userId, next, { entryId: accepted.reference.entryId, similarity: 1 }, [1, 0]);
+    assert.equal(reused.status, 'hit');
+    if (reused.status === 'hit') assert.deepEqual(reused.content, content);
+    const afterReuse = await HistoryCommitState.findOneAsync(userId);
+    assert.equal(await SparcMoveRequests.find({ userId, entryId: { $exists: true } }).countAsync(), 2);
     assert.equal(await SparcFigureRequests.find({ userId, kind: 'decision' }).countAsync(), 1);
-    assert.equal(afterFailure?.sequence, 0);
-    assert.equal(afterFailure?.repairRevision, 0);
-    assert.ok(Number(afterFailure?.contentUseRevision) > 0);
+    assert.equal(afterReuse?.sequence, 0);
+    assert.equal(afterReuse?.repairRevision, 0);
+    assert.ok(Number(afterReuse?.contentUseRevision) > 0);
     const other = await service.publish(otherUserId, { query: next, embedding: [1, 0] }, content);
     assert.deepEqual(other.content, content, 'A different learner remains eligible for this catalog content');
   });
 
-  it('commits only one of concurrent cross-store claims for the same learner and media', async function() {
+  it('commits both concurrent cross-store claims for the same learner and media', async function() {
     const userId = 'test-library-user-race';
     const assetId = 'testLibraryRace';
     const visualQuery = instructionQuery('test-library-visual-event');
@@ -134,19 +134,16 @@ describe('SPARC figure library Mongo contracts', function() {
       store.saveDecision(visualDecision(userId, visualQuery, assetId)),
       service.publish(userId, { query: instruction, embedding: [1, 0] }, syntheticInstruction('Synthetic racing explanation.', assetId)),
     ]);
-    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
-    const rejected = results.find(result => result.status === 'rejected');
-    assert.equal(rejected?.status, 'rejected');
-    if (rejected?.status === 'rejected') assert.match(String(rejected.reason?.message), /already been used/);
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 2);
     const moves = await SparcMoveRequests.find({ userId, entryId: { $exists: true } }).countAsync();
     const visuals = await SparcFigureRequests.find({ userId, kind: 'decision' }).countAsync();
-    assert.equal(moves + visuals, 1, 'Concurrent acceptance must not leave two committed uses');
+    assert.equal(moves + visuals, 2);
     const checkpoint = await HistoryCommitState.findOneAsync(userId);
     assert.equal(checkpoint?.sequence, 0);
     assert.equal(checkpoint?.repairRevision, 0);
   });
 
-  it('commits uncached tutor presentation use with its history row and rolls back a later exact repetition', async function() {
+  it('commits uncached tutor presentation use with its history row and records a later exact repetition', async function() {
     const userId = 'test-library-user-presentation';
     const pageKey = 'test-library-page';
     function presentedSummary(eventId: string) {
@@ -176,13 +173,13 @@ describe('SPARC figure library Mongo contracts', function() {
     const baseline = await HistoryCommitState.findOneAsync(userId);
     assert.equal(baseline?.sequence, 1);
     const repeated = presentedSummary('test-library-next-summary');
-    await assert.rejects(historyCommitStorage.insert(userId, [repeated]), /already been used/);
-    assert.equal(await Histories.findOneAsync(repeated._id), undefined);
-    assert.deepEqual(await HistoryCommitState.findOneAsync(userId), baseline,
-      'History allocation and content-use revision must both roll back on rejection');
-    assert.equal(await SparcMoveRequests.find({ userId, kind: 'presentation-use' }).countAsync(), 1);
+    await historyCommitStorage.insert(userId, [repeated]);
+    assert.ok(await Histories.findOneAsync(repeated._id));
+    const afterRepeat = await HistoryCommitState.findOneAsync(userId);
+    assert.equal(afterRepeat?.sequence, 2);
+    assert.equal(await SparcMoveRequests.find({ userId, kind: 'presentation-use' }).countAsync(), 2);
     assert.deepEqual(await historyCommitStorage.insert(userId, [first]), [], 'A saved-row retry must remain idempotent');
-    assert.deepEqual(await HistoryCommitState.findOneAsync(userId), baseline);
+    assert.deepEqual(await HistoryCommitState.findOneAsync(userId), afterRepeat);
   });
 
   it('initializes an old accepted primitive from its saved presentation before an exact-event read without a publication', async function() {

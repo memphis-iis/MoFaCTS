@@ -15,8 +15,7 @@ export function sparcRetrievalSelector(value: unknown): Record<string, unknown> 
     { kind: 'video', embeddingVersion: SPARC_VIDEO_EMBEDDING_VERSION },
   ] };
   const selector: Record<string, unknown> = { kind: category.kind, version: SPARC_MOVE_LIBRARY_VERSION,
-    embeddingModel: SPARC_EMBEDDING_MODEL, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
-    'context.orientationOwned': category.orientationOwned === true ? true : { $ne: true } };
+    embeddingModel: SPARC_EMBEDDING_MODEL, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION };
   if (category.kind === 'question') selector['context.responseFormat'] = category.responseFormat;
   return selector;
 }

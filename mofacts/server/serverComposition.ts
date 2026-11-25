@@ -6,6 +6,7 @@ import { createSparcLibraryCurationMethods } from './methods/sparcLibraryCuratio
 import { SPARC_PROMPT_IMAGE_PURPOSE } from '../common/lib/sparcPromptImage';
 import { createSparcLibraryCuration, isSparcAdministrativeRemoval, readSparcAdministrativeRemovals } from './lib/sparcLibraryCurationStorage';
 import { ensureSparcVideoCatalogIndexes, sparcVideoReuseStatus } from './lib/sparcVideoCatalog';
+import { SparcCandidateUnusableError } from './lib/sparcMoveLibraryService';
 import { createSparcMoveLibraryMethods } from './methods/sparcMoveLibraryMethods';
 import { createSparcInstructionalBrowseMethods } from './methods/sparcInstructionalBrowseMethods';
 import { createInstructionalBrowseStore } from './lib/sparcInstructionalBrowseStorage';
@@ -1089,7 +1090,7 @@ export const asyncMethods: Record<string, unknown> = {
   ...createSparcMoveLibraryMethods({ store: createSparcMoveStore(), getMethodAuthorizationDeps,
     videoReuseStatus: sparcVideoReuseStatus,
     async verifyFigure(assetId) {
-      if (!await DynamicAssets.collection.findOneAsync({ _id: assetId, 'meta.ready': true, 'meta.figureLibraryVersion': { $exists: true } })) throw new Error('Reusable figure asset is unavailable');
+      if (!await DynamicAssets.collection.findOneAsync({ _id: assetId, 'meta.ready': true, 'meta.figureLibraryVersion': { $exists: true } })) throw new SparcCandidateUnusableError('Reusable figure asset is unavailable');
     } }),
   ...createSparcInstructionalBrowseMethods({ getMethodAuthorizationDeps,
     ...createInstructionalBrowseStore(async ids => new Map((await DynamicAssets.collection.find({ _id: { $in: ids }, 'meta.ready': true,

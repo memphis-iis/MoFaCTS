@@ -2,7 +2,7 @@ import { modelPracticeHistorySelector, operationalHistorySelector } from '../../
 import { expect } from 'chai';
 import { progressiveRevisionId } from '../lib/progressiveAssignmentRevision';
 import { HistoryCommitConflictError } from '../lib/historyCommitStorage';
-import { SparcContentAlreadyUsedError } from '../lib/sparcContentUse';
+import { SparcPresentationConflictError } from '../lib/sparcContentUse';
 import { createAnalyticsMethodRegistration } from './analyticsMethods';
 
 const createAnalyticsMethods = (deps: Parameters<typeof createAnalyticsMethodRegistration>[0]) =>
@@ -271,7 +271,7 @@ describe('analyticsMethods', function() {
       commitHistory: async (userId: string, record: Record<string, unknown>) => {
         calls.push({ userId, record });
         if (outcome === 'conflict') throw new HistoryCommitConflictError();
-        if (outcome === 'used') throw new SparcContentAlreadyUsedError();
+        if (outcome === 'used') throw new SparcPresentationConflictError();
         return outcome === 'inserted';
       },
     });
@@ -294,8 +294,8 @@ describe('analyticsMethods', function() {
     outcome = 'used';
     let used: any;
     try { await methods.insertHistory.call({ userId: 'learner-1' }, choice('question')); } catch (error) { used = error; }
-    expect(used?.error).to.equal('sparc-content-already-used');
-    expect(used?.reason).to.match(/already been used/);
+    expect(used?.error).to.equal('sparc-presentation-conflict');
+    expect(used?.reason).to.match(/conflicts with its saved/);
     let denied: any;
     try { await methods.insertHistory.call({ userId: 'learner-2' }, choice('question')); } catch (error) { denied = error; }
     expect(denied?.error).to.equal(403);

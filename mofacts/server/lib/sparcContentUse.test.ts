@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { createSparcContentUseStorage, ensureSparcContentUseCatalog, sparcContentUseKeys, sparcCatalogUseKeys, SparcContentAlreadyUsedError } from './sparcContentUse';
+import { createSparcContentUseStorage, sparcContentUseKeys, sparcCatalogUseKeys } from './sparcContentUse';
 import type { SparcContentUseCollection } from './sparcContentUse';
 import type { SparcPrimitiveContent } from '../../../learning-components/runtime/sparcMoveLibraryContract';
 
@@ -137,16 +137,16 @@ describe('SPARC durable content-use boundary', () => {
     assert.notDeepEqual(sparcContentUseKeys({ text: 'A principle.' }), sparcContentUseKeys({ text: 'A principle. ' }));
   });
 
-  it('denies repeated text under a new entry across lessons and sessions while allowing another user', async () => {
+  it('accepts repeated text under a new entry across lessons and sessions while allowing another user', async () => {
     const f = fixture();
     const a = entry('a', { text: 'The original explanation.' });
     const b = entry('b', { text: 'The original explanation.' }, 'feedback');
     f.rows.entries.set(a._id, a); f.rows.entries.set(b._id, b);
     f.rows.states.set('learner', { _id: 'learner', sequence: 31, repairRevision: 4 });
     await f.storage.saveRequest(request('first', a));
-    await assert.rejects(f.storage.saveRequest(request('next', b, 'next', 'learner', 'another-lesson', 'later-session')), SparcContentAlreadyUsedError);
+    await f.storage.saveRequest(request('next', b, 'next', 'learner', 'another-lesson', 'later-session'));
     await f.storage.saveRequest(request('other-user', b, 'next', 'another-user'));
-    assert.equal(f.rows.requests.has('next'), false);
+    assert.equal(f.rows.requests.has('next'), true);
     assert.equal(f.rows.requests.has('other-user'), true);
     assert.equal(f.rows.states.get('learner')!.sequence, 31);
     assert.equal(f.rows.states.get('learner')!.repairRevision, 4);
@@ -162,20 +162,20 @@ describe('SPARC durable content-use boundary', () => {
     await assert.rejects(f.storage.saveRequest(selected), /changed before/);
   });
 
-  it('arbitrates concurrent exact copies and rolls back the rejected claim without touching history freshness', async () => {
+  it('commits concurrent copies in separate events without touching history freshness', async () => {
     const f = fixture(); const a = entry('a', { text: 'Same content.' }); const b = entry('b', { text: 'Same content.' });
     f.rows.entries.set(a._id, a); f.rows.entries.set(b._id, b);
     await f.storage.ensureUser('learner');
     const before = f.rows.states.get('learner')!.contentUseRevision;
     const results = await Promise.allSettled([f.storage.saveRequest(request('one', a)), f.storage.saveRequest(request('two', b))]);
-    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
-    assert.equal(f.rows.requests.size, 1);
-    assert.equal(f.rows.states.get('learner')!.contentUseRevision, before + 1);
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 2);
+    assert.equal(f.rows.requests.size, 2);
+    assert.equal(f.rows.states.get('learner')!.contentUseRevision, before + 2);
     assert.equal(f.rows.states.get('learner')!.sequence, 0);
     assert.equal(f.rows.states.get('learner')!.repairRevision, 0);
   });
 
-  it('allows a turn to accept its own resolved visual, but rejects that image or video on another turn in either store', async () => {
+  it('allows a turn to accept its own resolved visual, and accepts that image or video on another turn in either store', async () => {
     const f = fixture();
     const item = entry('instruction', { text: 'Explanation.', support: { text: 'Visual support.', figure: { assetId: 'picture', description: 'Picture', displayWidth: 300 } } });
     f.rows.entries.set(item._id, item);
@@ -184,20 +184,20 @@ describe('SPARC durable content-use boundary', () => {
     await f.storage.saveRequest(request('instruction-request', item, 'turn'));
     await f.storage.saveDecision({ ...decision, assetId: 'different-unaccepted-draft' });
     assert.equal(f.rows.figures.get(decision._id)!.assetId, 'picture');
-    await assert.rejects(f.storage.saveDecision(visual('picture', 'later')), SparcContentAlreadyUsedError);
+    await f.storage.saveDecision(visual('picture', 'later'));
     const next = entry('next', { text: 'Another explanation.', support: { text: 'Another case.', figure: { assetId: 'picture', description: 'Picture', displayWidth: 300 } } });
     f.rows.entries.set(next._id, next);
-    await assert.rejects(f.storage.saveRequest(request('next-request', next, 'next-turn')), SparcContentAlreadyUsedError);
+    await f.storage.saveRequest(request('next-request', next, 'next-turn'));
     const video = { ...visual('segment', 'video-turn'), video: { segmentId: 'segment' } };
     await f.storage.saveDecision(video);
-    await assert.rejects(f.storage.saveDecision({ ...visual('segment', 'another-video-turn'), video: { segmentId: 'segment' } }), SparcContentAlreadyUsedError);
+    await f.storage.saveDecision({ ...visual('segment', 'another-video-turn'), video: { segmentId: 'segment' } });
   });
 
-  it('does not exempt repeated explanation or feedback text merely because two component requests share a turn', async () => {
+  it('allows repeated explanation or feedback text when two component requests share a turn', async () => {
     const f = fixture(); const a = entry('explanation', { text: 'Shared body.' }, 'explanation'); const b = entry('feedback', { text: 'Shared body.' }, 'feedback');
     f.rows.entries.set(a._id, a); f.rows.entries.set(b._id, b);
     await f.storage.saveRequest(request('explanation-request', a, 'same-turn'));
-    await assert.rejects(f.storage.saveRequest(request('feedback-request', b, 'same-turn')), SparcContentAlreadyUsedError);
+    await f.storage.saveRequest(request('feedback-request', b, 'same-turn'));
   });
 
   it('reconstructs use from actual historical snapshots, not an edited catalog, and leaves conversations unchanged', async () => {
@@ -214,8 +214,8 @@ describe('SPARC durable content-use boundary', () => {
     assert.ok(!claimed.includes(sparcContentUseKeys(current.content).find(key => key.startsWith('text:'))));
     assert.equal([...f.rows.requests.values()].filter(row => row.kind === 'presentation-use').length, 1);
     const replacement = entry('new-copy', { text: 'The original delivered explanation.' }); f.rows.entries.set(replacement._id, replacement);
-    await assert.rejects(f.storage.saveRequest(request('new-copy-request', replacement)), SparcContentAlreadyUsedError);
-    await assert.rejects(f.storage.saveDecision(visual('old-image', 'new-picture-turn')), SparcContentAlreadyUsedError);
+    await f.storage.saveRequest(request('new-copy-request', replacement));
+    await f.storage.saveDecision(visual('old-image', 'new-picture-turn'));
   });
 
   it('retains historical proof when a backup lacks its accepted request, and never fabricates a request or original text', async () => {
@@ -227,7 +227,7 @@ describe('SPARC durable content-use boundary', () => {
     const receipt = [...f.rows.requests.values()].find(row => row.kind === 'presentation-use')!;
     assert.equal(receipt.query, undefined); assert.equal(receipt.sourceHistoryId, 'snapshot');
     const item = entry('missing-request-entry', { text: 'Seen before the backup.' }); f.rows.entries.set(item._id, item);
-    await assert.rejects(f.storage.saveRequest(request('replacement-request', item, 'saved-event')), SparcContentAlreadyUsedError);
+    await assert.rejects(f.storage.saveRequest(request('replacement-request', item, 'saved-event')), /already has a saved presentation/);
   });
 
   it('initializes legacy figure decisions and a large account in bounded pages, once, without rewriting source records', async () => {
@@ -266,23 +266,6 @@ describe('SPARC durable content-use boundary', () => {
     assert.equal(f.rows.states.get('learner')!.contentUseInitialization.phase, 'complete');
   });
 
-  it('initializes catalog keys with indexed keyset pages and refuses a concurrently changed unannotated entry', async () => {
-    const f = fixture();
-    for (let index = 0; index < 251; index++) {
-      const id = String(index).padStart(4, '0'); f.rows.entries.set(id, entry(id, { text: `Catalog text ${id}` }, 'explanation'));
-    }
-    await ensureSparcContentUseCatalog(f.collections.entries);
-    const paged = f.reads.filter(read => read.name === 'entries' && read.options.limit === 100);
-    assert.equal(paged.length, 4);
-    assert.deepEqual(paged.slice(1).map(read => read.selector._id.$gt), ['0099', '0199', '0250']);
-    const raced = fixture(); raced.rows.entries.set('changed', entry('changed', { text: 'Before.' }, 'explanation'));
-    let once = true;
-    raced.hook((name, _selector, _modifier) => { if (name === 'entries' && once) { once = false; raced.rows.entries.set('changed', entry('changed', { text: 'After.' }, 'explanation')); } });
-    await assert.rejects(ensureSparcContentUseCatalog(raced.collections.entries), /changed during/);
-    await ensureSparcContentUseCatalog(raced.collections.entries);
-    assert.deepEqual(raced.rows.entries.get('changed')!.contentUseKeys, sparcContentUseKeys({ text: 'After.' }, 'changed'));
-  });
-
   it('rejects corrupt progress metadata and an exhausted source counter without advancing either', async () => {
     const f = fixture(); f.rows.states.set('learner', { _id: 'learner', contentUseInitialization: { version: 1, phase: 'complete' } });
     await assert.rejects(f.storage.ensureUser('learner'), /checkpoint/);
@@ -291,16 +274,16 @@ describe('SPARC durable content-use boundary', () => {
     assert.equal(f.rows.states.get('learner')!.contentUseRevision, Number.MAX_SAFE_INTEGER);
   });
 
-  it('commits direct tutor output and its use receipt with history, and rolls all three back on a later repeat', async () => {
+  it('commits direct tutor output and its use receipt with history, also on a later repeat', async () => {
     const f = fixture();
     await f.present([history('first-summary', { text: 'A direct summary which bypassed the catalog.' })]);
     assert.equal(f.rows.histories.size, 1);
     assert.equal(f.rows.states.get('learner')!.sequence, 1);
     assert.equal([...f.rows.requests.values()].filter(row => row.kind === 'presentation-use').length, 1);
-    await assert.rejects(f.present([history('another-summary', { text: 'A direct summary which bypassed the catalog.' })]), SparcContentAlreadyUsedError);
-    assert.equal(f.rows.histories.size, 1);
-    assert.equal(f.rows.states.get('learner')!.sequence, 1);
-    assert.equal(f.rows.requests.size, 1);
+    await f.present([history('another-summary', { text: 'A direct summary which bypassed the catalog.' })]);
+    assert.equal(f.rows.histories.size, 2);
+    assert.equal(f.rows.states.get('learner')!.sequence, 2);
+    assert.equal(f.rows.requests.size, 2);
   });
 
   it('journals orientation bridges across lessons without treating repeated headings as tutor content', async () => {
@@ -315,14 +298,14 @@ describe('SPARC durable content-use boundary', () => {
       return row;
     };
     await f.present([orientation('first-orientation', bridge, 'lesson-a', 'attempt-a')]);
-    await assert.rejects(f.present([orientation('repeated-orientation', bridge, 'lesson-b', 'attempt-b')]), SparcContentAlreadyUsedError);
+    await f.present([orientation('repeated-orientation', bridge, 'lesson-b', 'attempt-b')]);
     await f.present([orientation('fresh-orientation', 'Let us use that foundation to explore sample size.', 'lesson-b', 'attempt-b')]);
     const headingOnly = orientation('continuation-heading', '', 'lesson-b', 'attempt-b');
     headingOnly.sparc.stateTransition.writes[0].value.node.atomType = 'html-block';
     delete headingOnly.sparc.stateTransition.writes[0].value.node.speaker;
     await f.present([headingOnly]);
-    assert.equal(f.rows.histories.size, 3);
-    assert.equal([...f.rows.requests.values()].filter(row => row.kind === 'presentation-use').length, 2);
+    assert.equal(f.rows.histories.size, 4);
+    assert.equal([...f.rows.requests.values()].filter(row => row.kind === 'presentation-use').length, 3);
     assert.equal(f.rows.entries.size, 0, 'Personalized bridges never enter the reusable catalog');
   });
 
@@ -340,13 +323,13 @@ describe('SPARC durable content-use boundary', () => {
     await f.present([row]);
     assert.equal(f.rows.histories.size, 1);
     assert.equal([...f.rows.requests.values()].filter(record => record.kind === 'presentation-use').length, 2);
-    await assert.rejects(f.present([history('copied-feedback', { text: content.text }, undefined, 'later-turn')]), SparcContentAlreadyUsedError);
+    await f.present([history('copied-feedback', { text: content.text }, undefined, 'later-turn')]);
   });
 
   it('does not let a journal write replace the content reserved by its own accepted primitive', async () => {
     const f = fixture(); const item = entry('item', { text: 'Accepted original.' }); f.rows.entries.set(item._id, item);
     await f.storage.saveRequest(request('accepted', item, 'turn'));
-    await assert.rejects(f.present([history('changed-output', { text: 'An unaccepted replacement.' }, item._id, 'turn')]), SparcContentAlreadyUsedError);
+    await assert.rejects(f.present([history('changed-output', { text: 'An unaccepted replacement.' }, item._id, 'turn')]), /differs from the accepted/);
     assert.equal(f.rows.histories.size, 0);
     assert.equal([...f.rows.requests.values()].filter(row => row.kind === 'presentation-use').length, 0);
   });

@@ -15,13 +15,13 @@ describe('Embedding-only descriptive matching', () => {
       }
     }
   });
-  it('partitions text by orientation ownership while sharing descriptive labels within each pool', () => {
+  it('shares the same text pool across orientation modes', () => {
     for (const kind of ['feedback', 'instruction', 'question'] as const) {
       const reference: SparcRetrievalCategory = { kind, responseFormat: 'text' };
       const owned: SparcRetrievalCategory = { ...reference, orientationOwned: true };
-      assert.deepEqual(sparcRetrievalSelector(reference)['context.orientationOwned'], { $ne: true });
-      assert.equal(sparcRetrievalSelector(owned)['context.orientationOwned'], true);
-      assert.notEqual(sparcRetrievalCategoryKey(owned), sparcRetrievalCategoryKey(reference));
+      assert.equal(sparcRetrievalSelector(reference)['context.orientationOwned'], undefined);
+      assert.equal(sparcRetrievalSelector(owned)['context.orientationOwned'], undefined);
+      assert.equal(sparcRetrievalCategoryKey(owned), sparcRetrievalCategoryKey(reference));
       const labelled: SparcRetrievalCategory = { ...owned, readingLevel: 'college-freshman', supportKind: 'visual' };
       assert.deepEqual(sparcRetrievalSelector(labelled), sparcRetrievalSelector(owned));
       assert.equal(sparcRetrievalCategoryKey(labelled), sparcRetrievalCategoryKey(owned));

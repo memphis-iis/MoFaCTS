@@ -10,9 +10,6 @@ function fixture() {
     const entries = new Map<string, MoveEntry>(), requests = new Map<string, MoveRequest>(), removed = new Set<string>(), reads: string[] = [];
     const store: MoveStore = { request: async (id) => requests.get(id), saveRequest: async (r) => {
             if (requests.get(r._id)?.entryId) return requests.get(r._id)!;
-            if (r.entryId && [...requests.values()].some(previous => previous.userId === r.userId
-              && (previous.query.tdfId !== r.query.tdfId || previous.query.sessionId !== r.query.sessionId || previous.query.eventId !== r.query.eventId)
-              && previous.contentUseKeys?.some(key => r.contentUseKeys?.includes(key)))) throw new Error('SPARC content has already been used by this learner');
             requests.set(r._id, structuredClone(r)); return requests.get(r._id)!;
         }, entry: async (id) => { reads.push(id); return entries.get(id); }, saveEntry: async (e) => { entries.set(e._id, structuredClone(e)); }, list: async () => [...entries.values()], removed: async (id) => removed.has(id), revise: async (e) => { entries.set(e._id, e); } };
     return { entries, requests, removed, reads, service: createMoveLibraryService({ store, embeddingModel: 'fixture', videoReuseStatus: async videos => new Map(videos.map(video => [video.segmentId, true])), verifyFigure: async () => { } }) };
@@ -39,17 +36,17 @@ describe('Client-selected instructional persistence', () => {
         await assert.rejects(f.service.lookup('learner', { ...next, eventId: 'missing-support' }, { entryId: partial.reference.entryId, similarity: 1 }, [1, 0]), /composition/);
         assert.equal(f.requests.size, 3, 'Blocked content must not become an accepted request');
     });
-    it('separates orientation-owned text and restores accepted old requests exactly', async () => {
+    it('shares orientation-owned text and restores accepted old requests exactly', async () => {
         for (const kind of ['explanation', 'question', 'feedback'] as const) {
             const f = fixture();
             const original = query('old-event', kind);
             const old = await f.service.publish('author', { query: original, embedding: [1, 0] }, { text: 'An old introduction with the original teaching content.' });
             const owned = query('new-event', kind); owned.context.orientationOwned = true;
-            await assert.rejects(f.service.lookup('first-learner', owned, { entryId: old.reference.entryId, similarity: 1 }, [1, 0]), /category/);
+            assert.equal((await f.service.lookup('first-learner', owned, { entryId: old.reference.entryId, similarity: 1 }, [1, 0])).status, 'hit');
             const current = await f.service.publish('author', { query: owned, embedding: [1, 0] }, { text: 'Substantive teaching content without a transition.' });
             const hit = await f.service.lookup('learner', owned, { entryId: current.reference.entryId, similarity: 1 }, [1, 0]);
             assert.equal(hit.status, 'hit');
-            await assert.rejects(f.service.lookup('another-learner', query('reference-event', kind), { entryId: current.reference.entryId, similarity: 1 }, [1, 0]), /category/);
+            assert.equal((await f.service.lookup('another-learner', query('reference-event', kind), { entryId: current.reference.entryId, similarity: 1 }, [1, 0])).status, 'hit');
             const resumed = await f.service.lookup('author', { ...original, context: { ...original.context, orientationOwned: true } }, null, [1, 0]);
             assert.equal(resumed.status, 'hit');
             if (resumed.status === 'hit') assert.equal(resumed.content.text, 'An old introduction with the original teaching content.');
@@ -117,28 +114,28 @@ describe('Client-selected instructional persistence', () => {
         assert.notEqual(saved[0]!.reference.entryId, saved[1]!.reference.entryId);
         assert.equal(f.entries.size, 2);
     });
-    it('rejects repeated explanation, question and feedback for the same learner across lessons while preserving same-event resume', async () => {
+    it('retrieves repeated explanation, question and feedback for the same learner across lessons while preserving same-event resume', async () => {
         for (const kind of ['explanation', 'question', 'feedback'] as const) {
             const f = fixture(), q = query('first', kind);
             const saved = await f.service.publish('learner', { query: q, embedding: [1, 0] }, { text: `The accepted ${kind}.` });
             const next = query('next', kind); next.tdfId = 'another-lesson'; next.sessionId = 'another-attempt';
-            await assert.rejects(f.service.lookup('learner', next, { entryId: saved.reference.entryId, similarity: 1 }, [1, 0]), /already been used/);
-            await assert.rejects(f.service.publish('learner', { query: next, embedding: [1, 0] }, { text: `The accepted ${kind}.` }), /already been used/);
-            assert.equal(f.requests.size, 1, 'Rejected reuse cannot create an accepted decision');
+            await f.service.lookup('learner', next, { entryId: saved.reference.entryId, similarity: 1 }, [1, 0]);
+            await f.service.publish('learner', { query: next, embedding: [1, 0] }, { text: `The accepted ${kind}.` });
+            assert.equal(f.requests.size, 2, 'Both events have a durable decision');
             const resumed = await f.service.lookup('learner', q, null, [1, 0]);
             assert.equal(resumed.status, 'hit');
             if (resumed.status === 'hit') assert.deepEqual(resumed.content, saved.content);
         }
     });
-    it('rejects a matched instruction when either its explanation or written support was already used under another entry', async () => {
+    it('accepts a matched instruction when either its explanation or written support was already used under another entry', async () => {
         for (const component of ['explanation', 'support'] as const) {
             const f = fixture(), q = query('first', 'instruction'); q.context.components = ['explanation', 'richContent', 'question']; q.context.supportKind = 'written';
             await f.service.publish('learner', { query: q, embedding: [1, 0] }, { text: 'Original governing idea.', support: { text: 'Original teaching case.' } });
             const next = query('next', 'instruction'); next.context.components = q.context.components; next.context.supportKind = 'written';
             const content = { text: component === 'explanation' ? 'Original governing idea.' : 'A new governing explanation.',
               support: { text: component === 'support' ? 'Original teaching case.' : 'A new teaching case.' } };
-            await assert.rejects(f.service.publish('learner', { query: next, embedding: [1, 0] }, content), /already been used/);
-            assert.equal(f.requests.size, 1);
+            await f.service.publish('learner', { query: next, embedding: [1, 0] }, content);
+            assert.equal(f.requests.size, 2);
         }
     });
     it('publishes a visual directly using the existing resource vector, without an empty-vector catalog entry', async () => {

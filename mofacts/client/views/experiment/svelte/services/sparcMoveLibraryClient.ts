@@ -37,10 +37,15 @@ export function createSparcMoveLibraryClient(
       if (kind !== 'instruction' && supportKind === 'visual') return Meteor.callAsync('lookupSparcPrimitive', query, null, []);
       const [embedding] = await embedSparcTexts(query.tdfId, [query.queryText]);
       // Visual resources have one combined image/video index, searched once after the brief exists.
-      const selection = (await prepare({ kind, responseFormat, ...(query.context.orientationOwned === true ? { orientationOwned: true } : {}) }))
-        .maximum(embedding!, sparcLibraryMinimumSimilarity(kind));
-      // Accepted events stay resumable even after their content leaves this user's eligible index.
-      return Meteor.callAsync('lookupSparcPrimitive', query, selection, embedding);
+      const index = await prepare({ kind, responseFormat });
+      for (const selection of index.ranked(embedding!, sparcLibraryMinimumSimilarity(kind))) {
+        try {
+          return await Meteor.callAsync('lookupSparcPrimitive', query, selection, embedding);
+        } catch (error) {
+          if ((error as { error?: string } | null)?.error !== 'sparc-candidate-unusable') throw error;
+        }
+      }
+      return Meteor.callAsync('lookupSparcPrimitive', query, null, embedding);
     },
     async publish({ query }, content) {
       const embedding = query.context.kind !== 'instruction' && query.context.supportKind === 'visual'

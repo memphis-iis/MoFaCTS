@@ -8,7 +8,7 @@ type Callbacks = {
 };
 
 describe('SPARC retrieval publication lifecycle', () => {
-  function fixture(options: { unauthorized?: boolean; stopDuringInitialization?: boolean; invalidCatalog?: boolean } = {}) {
+  function fixture(options: { unauthorized?: boolean; invalidCatalog?: boolean } = {}) {
     const events: Array<{ operation: string; id?: string; fields?: Record<string, unknown> }> = [];
     const queries: Array<{ source: string; selector: unknown; fields: unknown }> = [];
     const observers = new Map<string, Callbacks>();
@@ -25,10 +25,9 @@ describe('SPARC retrieval publication lifecycle', () => {
     const observe = (name: string) => async (selector: unknown, settings: { fields: unknown }, callbacks: Callbacks) => {
       queries.push({ source: name, selector, fields: settings.fields });
       observers.set(name, callbacks);
-      if (name === 'moves') callbacks.added('historical-output', { contentUseKeys: ['text:seen'] });
       if (name === 'catalog') {
         callbacks.added('already-used', { embedding: [1, 0], contentUseKeys: ['text:seen'] });
-        callbacks.added('unseen', { embedding: [.99, .1], ...(options.invalidCatalog ? {} : { contentUseKeys: ['text:fresh'] }) });
+        callbacks.added('unseen', { embedding: options.invalidCatalog ? [] : [.99, .1] });
       }
       return { stop: () => { stoppedHandles++; } };
     };
@@ -40,12 +39,7 @@ describe('SPARC retrieval publication lifecycle', () => {
         return 'synthetic-learner';
       },
       createSparcRetrievalPublicationHandler({
-        initializeCatalog: async () => { events.push({ operation: 'catalog-metadata' }); },
-        initializeUser: async userId => {
-          assert.equal(userId, publication.userId); events.push({ operation: 'user-metadata' });
-          if (options.stopDuringInitialization) for (const callback of stopCallbacks) callback();
-        },
-        observeMoves: observe('moves'), observeVisuals: observe('visuals'), observeEntries: observe('catalog'),
+        observeEntries: observe('catalog'),
         unavailableError: () => new Error('Its content eligibility is unavailable.'),
       }),
     );
@@ -54,36 +48,29 @@ describe('SPARC retrieval publication lifecycle', () => {
       run: () => handler.call(publication, { kind: 'instruction', readingLevel: 'unbiased', responseFormat: 'text' }, 'synthetic-lesson') };
   }
 
-  it('authorizes and initializes historical eligibility before publishing unseen vector-only rows', async () => {
+  it('publishes vectors for both previously used and fresh entries after authorization', async () => {
     const f = fixture(); await f.run();
-    assert.deepEqual(f.events.map(event => event.operation), ['authorize', 'catalog-metadata', 'user-metadata', 'added', 'ready']);
-    assert.deepEqual(f.queries[0], { source: 'moves', selector: { userId: 'synthetic-learner', $or: [{ entryId: { $exists: true } }, { kind: 'presentation-use' }] }, fields: { contentUseKeys: 1 } });
-    assert.deepEqual(f.queries[1], { source: 'visuals', selector: { kind: 'decision', userId: 'synthetic-learner' }, fields: { contentUseKeys: 1 } });
-    assert.deepEqual(f.queries[2]?.fields, { embedding: 1, contentUseKeys: 1 });
-    assert.deepEqual(f.events.find(event => event.operation === 'added')?.fields, { embedding: [.99, .1] });
-    f.observers.get('moves')!.added('next-turn', { contentUseKeys: ['text:fresh'] });
+    assert.deepEqual(f.events.map(event => event.operation), ['authorize', 'added', 'added', 'ready']);
+    assert.deepEqual(f.queries.map(query => [query.source, query.fields]), [['catalog', { embedding: 1 }]]);
+    assert.deepEqual(f.events[1]?.fields, { embedding: [1, 0] });
+    f.observers.get('catalog')!.removed('already-used');
     assert.equal(f.events.at(-1)?.operation, 'removed');
     f.stop(); await Promise.resolve();
-    assert.equal(f.stoppedHandles(), 3);
+    assert.equal(f.stoppedHandles(), 1);
   });
 
-  it('does not read source metadata for unauthorized subscriptions or open observers after stop', async () => {
+  it('does not read source metadata for unauthorized subscriptions', async () => {
     const denied = fixture({ unauthorized: true });
     await assert.rejects(denied.run(), /Not authorized/);
     assert.deepEqual(denied.events, [{ operation: 'authorize' }]);
     assert.equal(denied.queries.length, 0);
-    const stopped = fixture({ stopDuringInitialization: true });
-    await stopped.run();
-    assert.equal(stopped.queries.length, 0);
-    assert.equal(stopped.events.some(event => event.operation === 'ready'), false);
   });
 
-  it('fails closed and stops every observer when catalog metadata is incomplete', async () => {
+  it('fails closed and stops every observer when an embedding is invalid', async () => {
     const f = fixture({ invalidCatalog: true }); await f.run(); await Promise.resolve();
-    assert.equal(f.events.some(event => event.operation === 'added'), false);
     assert.equal(f.events.at(-1)?.operation, 'error');
     assert.equal(f.events.some(event => event.operation === 'ready'), false);
-    assert.equal(f.stoppedHandles(), 3);
+    assert.equal(f.stoppedHandles(), 1);
     assert.match(String(f.events.at(-1)?.fields?.message), /content eligibility is unavailable/);
   });
 });

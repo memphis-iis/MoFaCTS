@@ -38,6 +38,8 @@ function bounded(value: unknown, label: string, max: number): asserts value is s
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error(`Invalid ${label}`);
 }
 
+export class SparcCandidateUnusableError extends Error {}
+
 export class SparcAcceptedContentChangedError extends Error {
   constructor() { super('Saved instructional content changed after acceptance.'); this.name = 'SparcAcceptedContentChangedError'; }
 }
@@ -70,11 +72,16 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
   const existing = async (request: MoveRequest, selected?: MoveEntry): Promise<SparcPrimitiveLookup> => request.entryId
     ? { status: 'hit', content: selected?._id === request.entryId ? assignedContent(request, selected.content) : await acceptedContent(request), reference: reference(request) }
     : { status: 'generate', ticket: { query: request.query, embedding: request.embedding }, previousQuestions: request.query.previousQuestions };
-  const verifyContent = async (content: SparcPrimitiveContent, context: SparcPrimitiveContext) => {
-    validatePrimitiveContent(content, context);
+  const verifyContent = async (content: SparcPrimitiveContent, context: SparcPrimitiveContext, lookup = false) => {
+    try { validatePrimitiveContent(content, context); }
+    catch (error) {
+      if (lookup && error instanceof Error) throw new SparcCandidateUnusableError(error.message);
+      throw error;
+    }
     const media = context.kind === 'instruction' ? content.support : content;
-    if (media?.video && (!deps.videoReuseStatus || (await deps.videoReuseStatus([media.video])).get(media.video.segmentId) !== true)) {
-      throw new Error('The selected video is unavailable');
+    if (media?.video) {
+      if (!deps.videoReuseStatus) throw new Error('Video verification unavailable');
+      if ((await deps.videoReuseStatus([media.video])).get(media.video.segmentId) !== true) throw new SparcCandidateUnusableError('The selected video is unavailable');
     }
     if (media?.figure) {
       if (!deps.verifyFigure) throw new Error('Figure verification unavailable');
@@ -114,22 +121,17 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
         return existing(saved);
       }
       if (!selection) return { status: 'generate', ticket: { query, embedding }, previousQuestions: query.previousQuestions };
-      let selected: MoveEntry | undefined;
-      if (selection) {
-        const entry = await store.entry(selection.entryId);
-        if (!entry) throw new Error('The locally selected component was removed; refresh its cache');
-        if (entry.kind !== query.context.kind || entry.version !== SPARC_MOVE_LIBRARY_VERSION
-          || (entry.context.orientationOwned === true) !== (query.context.orientationOwned === true)
-          || entry.embeddingModel !== deps.embeddingModel || entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION
-          || (entry.kind === 'question' && entry.context.responseFormat !== query.context.responseFormat)
-        ) throw new Error('Local selection is outside the requested category');
-        await verifyContent(entry.content, query.context);
-        selected = entry;
-      }
+      const entry = await store.entry(selection.entryId);
+      if (!entry) throw new SparcCandidateUnusableError('The locally selected component was removed');
+      if (entry.kind !== query.context.kind || entry.version !== SPARC_MOVE_LIBRARY_VERSION
+        || entry.embeddingModel !== deps.embeddingModel || entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION
+        || (entry.kind === 'question' && entry.context.responseFormat !== query.context.responseFormat)
+      ) throw new Error('Local selection is outside the requested category');
+      await verifyContent(entry.content, query.context, true);
       const request: MoveRequest = { _id: id, userId, query, embedding, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
-        ...(selection ? { entryId: selection.entryId, source: 'retrieved', similarity: selection.similarity,
-          contentUseKeys: sparcContentUseKeys(selected!.content, selection.entryId) } : {}) };
-      return existing(await store.saveRequest(request), selected);
+        entryId: selection.entryId, source: 'retrieved', similarity: selection.similarity,
+        contentUseKeys: sparcContentUseKeys(entry.content, entry._id) };
+      return existing(await store.saveRequest(request), entry);
     },
     async publish(userId: string, ticket: SparcPrimitiveTicket, content: SparcPrimitiveContent) {
       const { query, embedding } = ticket;

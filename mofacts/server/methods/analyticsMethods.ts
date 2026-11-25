@@ -5,7 +5,7 @@ import { isSparcAdminPolicy, SPARC_INSTRUCTIONAL_POLICY_IDS } from '../../../lea
 import { worksheetHistoryWriteId } from '../lib/worksheetHistoryWrite';
 import { sparcHistoryWriteId } from '../lib/sparcHistoryWrite';
 import { HistoryCommitConflictError } from '../lib/historyCommitStorage';
-import { SparcContentAlreadyUsedError } from '../lib/sparcContentUse';
+import { SparcPresentationConflictError } from '../lib/sparcContentUse';
 import { Meteor } from 'meteor/meteor';
 import { progressiveRevisionPrefix } from '../lib/progressiveAssignmentRevision';
 import {
@@ -749,8 +749,8 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
     try {
       if (!(await deps.commitHistory(actingUserId, sanitizedHistoryRecord))) return;
     } catch (error) {
-      if (error instanceof SparcContentAlreadyUsedError) {
-        throw new Meteor.Error('sparc-content-already-used', 'The selected instructional content has already been used. This turn was not accepted.');
+      if (error instanceof SparcPresentationConflictError) {
+        throw new Meteor.Error('sparc-presentation-conflict', 'This turn conflicts with its saved instructional content.');
       }
       if (error instanceof HistoryCommitConflictError && durableId) {
         throw new Meteor.Error(worksheetId ? 'worksheet-history-conflict' : 'sparc-history-conflict', 'History changed in another session. Reload before continuing.');
