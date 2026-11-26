@@ -222,8 +222,12 @@ Microsoft. The Google attempt returned to MoFaCTS and displayed `Username
 already exists [403]`. The application derives the username from the canonical
 email and the installed Meteor package rejects duplicates on insert. The
 application's pre-insert guidance skipped the unresolved account lookup promises.
-Keep Google open until an approved identity completes a signed-in return. These
-provider results sit alongside the 70 catalog control outcomes.
+A read-only check matched one password account with no linked Google identity.
+It is the configured staging2 owner and administrator, with lessons, uploads,
+learner history and saved progress. User Admin protects that account from
+deletion. The live Google check now targets a verified link to this existing
+account using the operator's regular Gmail and requires a signed-in return to
+the same account. These provider results sit alongside the 70 catalog controls.
 
 On pinned Node 24.22.1, the catalog v2 validators accepted 52 measured outcomes
 from 14 retained receipts, including all four findings. The 25 repository and
