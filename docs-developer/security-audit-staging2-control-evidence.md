@@ -198,6 +198,20 @@ and browser observation. The staging2 login button opened the Microsoft sign-in
 page with the new app registration and exact staging2 callback. A successful
 account sign-in with an approved Microsoft test identity remains open.
 
+The signed-out Google browser check reached Google's account sign-in page
+with the exact staging2 callback and a configured client. The protected
+`google-runtime-20261126.json` receipt retains this observation. A complete
+Google or Microsoft account round trip still requires an approved test identity.
+
+On pinned Node 24.22.1, the catalog v2 validators accepted 52 measured outcomes
+from 14 retained receipts, including all four findings. The 25 repository and
+image controls form a complete canonical producer file. The private packet
+`attempt2/catalog-v2-full-inputs-20261126` retains those bytes and the per-control
+receipt references and hashes. It also names the 18 missing observations. The
+retained runtime measurements keep their original observation windows. The
+Full report needs the remaining live evidence, a compatible catalog v2 writer
+and independent receiver readback.
+
 The exact catalog v2 policy set was unavailable at the installed host path.
 The review used temporary root-private copies of the exact source policies and
 verified their removal. The formatted Docker inventory was incomplete, so the
