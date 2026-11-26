@@ -3,7 +3,7 @@
 Reviewed November 25, 2026 for the accepted staging2 deployment. The application source is
 `e9d14a25b21eaece8cea377c787052e7896d0bfe`, and its deployed Linux/amd64 image is
 `ppavlikmemphis/mofacts-staging2@sha256:6699dc3fac40d9ca84564c265aa9cd587eb2628f50268f1ed79c1e7879079887`.
-The report gate uses the deployment start `2026-11-25T18:08:10.948Z`.
+The next Full report uses the current application start `2026-11-26T13:33:40.888254819Z`, after the Microsoft settings change.
 
 | Section | Passed | Findings | Needs evidence |
 | --- | ---: | ---: | ---: |
@@ -187,10 +187,16 @@ callback at the staging2 address above and supports organizational and
 personal accounts, matching the installed sign-in flow. The ungranted default
 Microsoft Graph `User.Read` configuration remains because automatic approval
 review required specific approval to remove it. The app requests OpenID
-scopes. Staging2 preflight matched the accepted release using the installed
-image observer. Its application and HTTPS health were good, and its settings
-file was root-owned, mode 0600 and mounted read-only. Credential custody,
-staging2 configuration and live Microsoft sign-in evidence remain open.
+scopes. The new 90-day credential was saved and verified in the protected
+Desktop store, then delivered over pinned SSH. The prior settings were backed
+up before installing the Microsoft block. The app restarted on the accepted
+image with its root-owned, mode 0600 settings mounted read-only. HTTPS returned
+200 and the enforced CSP and other Compose services matched their prior state.
+
+The protected `microsoft-runtime-20261126.json` receipt records the configuration
+and browser observation. The staging2 login button opened the Microsoft sign-in
+page with the new app registration and exact staging2 callback. A successful
+account sign-in with an approved Microsoft test identity remains open.
 
 The exact catalog v2 policy set was unavailable at the installed host path.
 The review used temporary root-private copies of the exact source policies and
