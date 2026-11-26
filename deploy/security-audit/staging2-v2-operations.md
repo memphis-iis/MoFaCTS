@@ -127,18 +127,25 @@ staging2 account or whose email is unused on staging2.
 ## Catalog v2 Full report qualification
 
 Use the reviewed report-tool commit from a clean Linux checkout with the
-repository-pinned Node runtime. Supply the same tool revision pin and clean
-deployed application checkout for assembly and final qualification. The tool
-checks both Git revisions, validates the verification bundle against the deployed
-source's catalog and binds the reported application and Linux/amd64 image to the
-accepted staging2 release evidence. Use the current application start recorded in the
+repository-pinned Node and npm. Install its locked dependencies from the
+checkout's `mofacts/` directory with `npm ci --ignore-scripts --no-audit --no-fund`.
+Run the report command from the checkout root. Use the same tool revision pin
+and clean deployed application checkout for assembly and final qualification.
+The tool checks both Git revisions, validates the verification bundle against
+the deployed source's catalog and binds the reported application and Linux/amd64
+image to the accepted staging2 release evidence. Use the current application start
+recorded in the
 [audit status](../../docs-developer/security-audit-durable-redesign-status.md)
 when setting the report window.
 
 Use a protected evidence directory with `accepted.json`, `publication.json`,
 `running-image.json`, `host-receipt.json`, `verification-bundle.json`,
 `metadata.json` and the catalog v2 producer files under `producers/`. Supply
-the exact accepted workstation release authority as a separate argument.
+the exact accepted workstation release authority as a separate argument. The
+metadata writer reads a canonical host observation with state `observed` and
+result `MATCH`. If a captured envelope uses different whitespace, first verify
+its parsed receipt against the accepted release authority. Keep the original
+and supply a canonical copy to the metadata writer.
 
 ```sh
 node mofacts/scripts/security-audit/qualification/bindStaging2ReleaseRegistry.mjs \
@@ -147,11 +154,13 @@ node mofacts/scripts/security-audit/qualification/bindStaging2ReleaseRegistry.mj
 ```
 
 The assembler retains findings and records unavailable producer evidence as
-execution errors. For live qualification, use all 70 controls with zero execution
-errors. Use the approved staging2 signing and archive workflow. Download the
-stored JSON independently from Security Audits into `receiver-readback.json`
-in the evidence directory. Keep `report-encrypted.json` and `archive-receipt.json`
-from the writer, plus the separately retained key fingerprint and offline key.
+execution errors. Keep an offline review unsigned and preserve each retained
+observation's original time window. For live qualification, use all 70 controls
+with zero execution errors and the approved staging2 signing and archive
+workflow. Download the stored JSON independently from Security Audits into
+`receiver-readback.json` in the evidence directory. Keep `report-encrypted.json`
+and `archive-receipt.json` from the writer, plus the separately retained key
+fingerprint and offline key.
 
 ```sh
 node mofacts/scripts/security-audit/qualification/bindStaging2ReleaseRegistry.mjs \
@@ -164,12 +173,10 @@ Require `executionComplete: true` and verified archive evidence in the binding
 before checking off Full qualification. The [control register](../../docs-developer/security-audit-staging2-control-evidence.md)
 records which observations are still due.
 
-The retained preparation index names the outstanding controls and the original
-observation times. Supply protected results for those exact controls with the
-target, application revision, platform image and observation times. The current
-gaps are 13 authentication controls, four external controls and one MongoDB
-host control. Provider round trips also belong in the Phase III acceptance
-record. See the [per-control register](../../docs-developer/security-audit-staging2-control-evidence.md).
+Supply protected results for the outstanding controls with the target,
+application revision, platform image and observation times. The
+[per-control register](../../docs-developer/security-audit-staging2-control-evidence.md)
+lists the current gaps, retained evidence and separate provider sign-in results.
 
 ## Remaining evidence limits
 

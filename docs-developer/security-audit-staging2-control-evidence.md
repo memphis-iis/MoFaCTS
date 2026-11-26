@@ -1,17 +1,17 @@
 # Staging2 catalog v2 control evidence
 
-Reviewed November 25, 2026 for the accepted staging2 deployment. The application source is
+Reviewed November 25–26, 2026 for the accepted staging2 deployment. The application source is
 `e9d14a25b21eaece8cea377c787052e7896d0bfe`, and its deployed Linux/amd64 image is
 `ppavlikmemphis/mofacts-staging2@sha256:6699dc3fac40d9ca84564c265aa9cd587eb2628f50268f1ed79c1e7879079887`.
 The next Full report uses the current application start `2026-11-26T21:53:15.59940657Z`, after the accepted image was restored following Google owner enrollment.
 
 | Section | Passed | Findings | Needs evidence |
 | --- | ---: | ---: | ---: |
-| External | 8 | 0 | 4 |
+| External | 9 | 0 | 3 |
 | Authentication | 9 | 0 | 13 |
 | Host | 10 | 0 | 1 |
 | Repository and image | 21 | 4 | 0 |
-| **Total** | **48** | **4** | **18** |
+| **Total** | **49** | **4** | **17** |
 
 The existing Phase III gate still requires one matched catalog v2 Full report,
 independent receiver readback and saved archive verification. These individual
@@ -29,7 +29,7 @@ qualification and synthetic integration results retain their original scope.
 | [x] Pass | `external.http-redirect` | All three catalog requests redirected to the same HTTPS host, preserving path and query. |
 | [x] Pass | `external.tls-protocols` | The public endpoint returned explicit protocol-version alerts for TLS 1.0 and 1.1. Trusted TLS 1.2 and 1.3 handshakes succeeded. All four outcomes were observed on the sole public address. |
 | [x] Pass | `external.certificate` | Hostname and trust-chain validation passed on both supported modern connections. The certificate had 67 days remaining. |
-| [ ] Needs evidence | `external.tls-ciphers` | Needs a complete accepted-cipher inventory and its weak-cipher classification for the resolved public address. |
+| [x] Pass | `external.tls-ciphers` | Named HTTPS handshakes on the sole public address found six accepted cipher suites and zero weak suites across TLS 1.2 and 1.3. The installed image graph verifier matched the accepted app configuration after the observation. |
 | [x] Pass | `external.websocket-tls` | The sole address upgraded the HTTPS request with HTTP 101 and redirected the HTTP request with HTTP 301. |
 | [x] Pass | `external.hsts` | The live HTTPS response met the one-year HSTS requirement. |
 | [x] Pass | `external.csp` | All five CSP conditions matched the existing evaluator. |
@@ -242,10 +242,21 @@ receipt references and hashes. It also names the 18 missing observations. The
 retained runtime measurements keep their original observation windows. A
 November 26 recheck matched all 14 retained receipt hashes and validated the
 existing outcomes against all five catalog v2 producer contracts in memory.
-That check preserved all 18 missing measurements as execution errors. The
-separately pinned writer has passed offline verification. Live Full
-qualification still requires the missing observations, independent receiver
-readback and archive verification.
+The first unsigned review preserved all 18 missing measurements as execution
+errors. At 22:12 UTC on November 26, the TLS cipher observation supplied one
+additional measurement. The protected receipt `tls-cipher-observation.json` has
+SHA-256 `1eff22f8425a1b396692bf4eb240528e927b2d006a012e1e1ff597fce01cdb13`.
+The installed staging2 image graph verifier then matched the accepted
+configuration digest and the restored application start.
+
+Pinned tool `b38039d8d9ca3ccc733b821c0315f25672ff880e` assembled and read back the
+revised unsigned review in `/var/tmp/mofacts-full-review.1aZZUDhK/review-with-verified-tls`.
+The report SHA-256 is `50c266bbbd411c88cde1874bd147c9bce65b5a5faedafad9792f922a4468a9d3`. Its 70 rows
+hold 49 passes, four findings and 17 execution errors for outstanding observations.
+The receiver had zero catalog v2 Full reports for the restored release at the
+metadata check. Live qualification still requires the 17 observations in the
+tables above, signed ingestion, independent receiver readback and verified saved
+archive.
 
 The exact catalog v2 policy set was unavailable at the installed host path.
 The review used temporary root-private copies of the exact source policies and
