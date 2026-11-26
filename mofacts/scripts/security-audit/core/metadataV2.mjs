@@ -3,6 +3,12 @@ import { parseReleaseReceiptV2, receiptPlatformImage } from '../../../common/sec
 import { proofRecord } from '../../../common/securityAudit/proofFields.ts';
 import { readAuditFileV2, parseAuditFileV2, writeAuditFileV2 } from './producerFilesV2.mjs';
 
+export async function readAuditMetadataV2(metadataPath) {
+  return proofRecord(parseAuditFileV2(await readAuditFileV2(metadataPath)), [
+    'reportId', 'reportType', 'startedAt', 'completedAt', 'deployedApplicationRevision', 'deployedImageDigest', 'toolVersions',
+  ]);
+}
+
 export async function readAuditImageContextV2(releaseReceiptPath) {
   let receipt;
   try {

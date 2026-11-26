@@ -99,6 +99,46 @@ and HTML hashes matched. The separate sealed three-image synthetic trial also
 verified positive existing V1 and V2 records; do not confuse these two datasets.
 Both fixture attempts' four accounts, role assignments and seven rows are absent.
 
+## Catalog v2 Full report qualification
+
+Use the reviewed report-tool commit from a clean Linux checkout with the
+repository-pinned Node runtime. Supply the same tool revision pin and clean
+deployed application checkout for assembly and final qualification. The tool
+checks both Git revisions, validates the verification bundle against the deployed
+source's catalog and binds the reported application and Linux/amd64 image to the
+accepted staging2 release evidence. Use the current application start recorded in the
+[audit status](../../docs-developer/security-audit-durable-redesign-status.md)
+when setting the report window.
+
+Use a protected evidence directory with `accepted.json`, `publication.json`,
+`running-image.json`, `host-receipt.json`, `verification-bundle.json`,
+`metadata.json` and the catalog v2 producer files under `producers/`. Supply
+the exact accepted workstation release authority as a separate argument.
+
+```sh
+node mofacts/scripts/security-audit/qualification/bindStaging2ReleaseRegistry.mjs \
+  "$evidence_dir" "$release_authority" "$evidence_dir/report.json" \
+  --assemble-full "$report_tool_revision" "$deployed_source_checkout"
+```
+
+The assembler retains findings and records unavailable producer evidence as
+execution errors. For live qualification, use all 70 controls with zero execution
+errors. Use the approved staging2 signing and archive workflow. Download the
+stored JSON independently from Security Audits into `receiver-readback.json`
+in the evidence directory. Keep `report-encrypted.json` and `archive-receipt.json`
+from the writer, plus the separately retained key fingerprint and offline key.
+
+```sh
+node mofacts/scripts/security-audit/qualification/bindStaging2ReleaseRegistry.mjs \
+  "$evidence_dir" "$release_authority" "$evidence_dir/report-release-binding.json" \
+  --report-archive "$key_fingerprint_file" "$offline_key_file" \
+  "$report_tool_revision" "$deployed_source_checkout"
+```
+
+Require `executionComplete: true` and verified archive evidence in the binding
+before checking off Full qualification. The [control register](../../docs-developer/security-audit-staging2-control-evidence.md)
+records which observations are still due.
+
 ## Remaining evidence limits
 
 The accepted exposure report has 22 PASS and one UDP ERROR. All seven selected
