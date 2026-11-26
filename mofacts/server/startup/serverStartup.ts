@@ -7,6 +7,7 @@ import { ServiceConfiguration } from 'meteor/service-configuration';
 import { WebApp } from 'meteor/webapp';
 import { HTTP_MIDDLEWARE_VERIFICATIONS } from '../../common/securityAudit/verificationCatalog.ts';
 import { bindAccountServiceOwner, bindNativeAccountMethods, registerAccountLifecycleHook } from '../securitySurfaces/registerFrameworkAuth';
+import { linkConfiguredGoogleOwner } from './googleOwnerLink';
 import { registerHttpMiddleware } from '../securitySurfaces/registerHttpRoutes.ts';
 import { curSemester } from '../../common/Definitions';
 import { displayify } from '../../common/globalHelpers';
@@ -830,6 +831,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     return user;
   });
 
+  registerAccountLifecycleHook(Accounts, 'setAdditionalFindUserOnExternalLogin', linkConfiguredGoogleOwner);
   bindAccountServiceOwner(Accounts as unknown as Parameters<typeof bindAccountServiceOwner>[0]);
   deps.serverConsole('Password hash runtime info:', deps.getPasswordHashRuntimeInfo());
 

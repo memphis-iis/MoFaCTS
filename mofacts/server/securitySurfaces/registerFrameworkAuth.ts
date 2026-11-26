@@ -6,6 +6,7 @@ const hooks = {
   onLogin: { policy: 'allowed-login-lifecycle', dataEgress: 'none' },
   validateLoginAttempt: { policy: 'login-admission', dataEgress: 'login-admission-result' },
   onCreateUser: { policy: 'canonical-account-creation', dataEgress: 'framework-account-document' },
+  setAdditionalFindUserOnExternalLogin: { policy: 'verified-configured-google-owner-link', dataEgress: 'framework-account-document' },
 } as const;
 
 type HookName = keyof typeof hooks;
