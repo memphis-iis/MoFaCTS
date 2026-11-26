@@ -8,7 +8,7 @@ import { acquireOperatorExposureV2, finishOperatorExposureV2 } from '../core/ope
 import { errorReport } from './fixtures/v2Fixtures.mjs';
 import { finalizeAuditReport } from '../../../common/securityAudit/reportV2.ts';
 import { writeAuditFileV2 } from '../core/producerFilesV2.mjs';
-import { decryptReportEnvelope } from '../report-crypto.mjs';
+import { decryptReportEnvelope } from '../report/reportCrypto.mjs';
 
 const target = 'https://staging2.optimallearning.org';
 async function fixture(t) {

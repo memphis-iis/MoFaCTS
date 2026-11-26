@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { auditTargetOrigin, parseSecurityAuditReportV2,
   AUDIT_MAX_COMPLETION_AHEAD_MS, AUDIT_MAX_UPLOAD_DELAY_MS } from '../../../common/securityAudit/reportV2.ts';
 import { signAuditRequestV2 } from '../../../server/securityAudit/securityAuditIngestionV2.ts';
-import { readAuditFileV2, parseAuditFileV2 } from './producerFilesV2.mjs';
+import { readAuditFileV2, parseAuditFileV2 } from '../core/producerFilesV2.mjs';
 
 // This Node caller reuses the actual runtime-neutral V2 HMAC implementation.
 // It makes one request; no redirect, retry, alternate endpoint or target input.

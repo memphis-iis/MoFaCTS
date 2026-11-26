@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { canonicalJson } from './audit-lib.mjs';
+import { canonicalJson } from '../audit-lib.mjs';
 
 export const ENCRYPTED_REPORT_SCHEMA = 'SecurityAuditEncryptedEnvelopeV1';
 const MAX_REPORT_BYTES = 2 * 1024 * 1024;

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { uploadAuditReportFileV2 } from './core/uploadV2.mjs';
+import { uploadAuditReportFileV2 } from './report/uploadV2.mjs';
 
 // Explicit, uninvoked V2 entry point. The active scheduled V1 workflow is intact.
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

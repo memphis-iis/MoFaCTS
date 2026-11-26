@@ -234,3 +234,16 @@ removed after inspection. [Gitleaks release assets](https://github.com/gitleaks/
 [Trivy release assets](https://github.com/aquasecurity/trivy/releases/expanded_assets/v0.69.3)
 
 [Canonical audit status](security-audit-durable-redesign-status.md#phase-3-remaining-work-reconciled-2026-11-21)
+
+## Findings retained for remediation
+
+Repository ownership follows the [project code owner](../.github/CODEOWNERS).
+These priorities use the catalog severity. Remediation and verification
+belong to the affected component's next release.
+
+| Finding | Priority | Owner | Acceptance condition |
+| --- | --- | --- | --- |
+| `repository.runtime-image-vulnerabilities.high` | High | Release maintainer | The pinned image scanner finds zero high-severity vulnerabilities on the replacement Linux/amd64 manifest and the release receipt matches that manifest. |
+| `repository.dependencies-application-runtime.medium` | Moderate | Application dependency maintainer | The reviewed runtime dependency audit for the exact replacement app lockfile reports zero moderate-severity affected package records. |
+| `repository.dependencies-sidecar-mongo-runtime.medium` | Moderate | Mongo sidecar maintainer | The reviewed runtime dependency audit for the exact replacement sidecar lockfile reports zero moderate-severity affected package records. |
+| `repository.dependencies-application-runtime.low` | Low | Application dependency maintainer | The reviewed runtime dependency audit for the exact replacement app lockfile reports zero low-severity affected package records. |

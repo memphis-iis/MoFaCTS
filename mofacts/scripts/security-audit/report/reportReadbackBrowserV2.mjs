@@ -1,7 +1,7 @@
 import { auditReportId, auditTargetOrigin, parseSecurityAuditReportV2 } from '../../../common/securityAudit/reportV2.ts';
 import { AUDIT_V2_MAX_BODY_BYTES } from '../../../server/securityAudit/securityAuditIngestionV2.ts';
 import { validateAuthorizationActorPageV2 } from '../authentication/browserV2.mjs';
-import { parseAuditFileV2 } from './producerFilesV2.mjs';
+import { parseAuditFileV2 } from '../core/producerFilesV2.mjs';
 
 // Reuse an explicitly supplied, already authenticated operator page. This helper
 // grants no login/access, lists no reports and requests only the selected ID.

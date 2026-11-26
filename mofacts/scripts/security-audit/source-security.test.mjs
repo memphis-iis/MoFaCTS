@@ -75,7 +75,7 @@ import {
   decryptReportEnvelope,
   encryptReportBuffer,
   verifyCanonicalReportDigest,
-} from './report-crypto.mjs';
+} from './report/reportCrypto.mjs';
 import {
   assertUniqueSemanticProbeIds,
   classifyAuthenticationTiming,

@@ -22,7 +22,7 @@ import { observeStaging2Registry } from '../qualification/observeStaging2Registr
 import { assembleStaging2FullReport, bindStaging2ReleaseRegistry, bindStaging2ReportReadback } from '../qualification/bindStaging2ReleaseRegistry.mjs';
 import { projectReleaseReceiptV2 } from '../qualification/releaseRecordStore.mjs';
 import { writeAuditFileV2 } from '../core/producerFilesV2.mjs';
-import { retainPinnedAuditArchiveV2 } from '../core/reportFilesV2.mjs';
+import { retainPinnedAuditArchiveV2 } from '../report/reportFilesV2.mjs';
 import { envelope } from './fixtures/v2Fixtures.mjs';
 
 const hash = data => createHash('sha256').update(data).digest('hex');

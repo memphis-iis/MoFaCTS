@@ -74,14 +74,14 @@ live acceptance remain separately tracked.
 
 ## Implementation owners
 
-`core/reportFilesV2.mjs` owns the pinned archive write, saved-byte verification,
+`report/reportFilesV2.mjs` owns the pinned archive write, saved-byte verification,
 exact validated receiver comparison and gated temporary-plaintext cleanup.
 The receipt reuses the accepted `publicKeySha256`, `reportBytesSha256` and
 `encryptedBytesSha256` names. Its hash pins are not calculated from an untrusted
 readback and then accepted as expected values. Keep the accepted fingerprint
 separate from the supplied public PEM.
 
-`core/reportReadbackBrowserV2.mjs` reads only the selected staging2 report through
+`report/reportReadbackBrowserV2.mjs` reads only the selected staging2 report through
 the existing admin-protected JSON download. It creates no account or access,
 validates the operator before/after, rejects redirects/foreign URLs, bounds the
 stream and verifies the download hash before strict V2 parsing. Its returned

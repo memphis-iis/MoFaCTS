@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { decryptReportEnvelope, verifyCanonicalReportDigest } from './report-crypto.mjs';
+import { decryptReportEnvelope, verifyCanonicalReportDigest } from './report/reportCrypto.mjs';
 
 const [encryptedPath, outputPath, privateKeyPath] = process.argv.slice(2);
 if (!encryptedPath || !outputPath || !privateKeyPath) {

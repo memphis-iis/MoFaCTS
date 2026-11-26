@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertAuditExecutionCompleteFileV2 } from './core/reportFilesV2.mjs';
+import { assertAuditExecutionCompleteFileV2 } from './report/reportFilesV2.mjs';
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [reportPath, ...extra] = process.argv.slice(2);

@@ -12,7 +12,7 @@ import { parseSecurityAuditReportV2 } from '../../../common/securityAudit/report
 import { verifyAuditRequestV2, AUDIT_V2_MAX_BODY_BYTES } from '../../../server/securityAudit/securityAuditIngestionV2.ts';
 import { assembleAuditReportFilesV2, readAuditFileV2, parseAuditFileV2,
   writeAuditFileV2, writeAuditProducerFileV2 } from '../core/producerFilesV2.mjs';
-import { uploadAuditReportFileV2 } from '../core/uploadV2.mjs';
+import { uploadAuditReportFileV2 } from '../report/uploadV2.mjs';
 import { runAssemblyCommandV2 } from '../assemble-report-v2.mjs';
 import { writeHostProducerFilesV2 } from '../internal/producerFilesV2.mjs';
 import { hostFixture, unavailableFact } from './fixtures/hostFixtures.mjs';

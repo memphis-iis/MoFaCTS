@@ -10,7 +10,7 @@ import { parseRunningImageObservation } from '../../../common/securityAudit/rele
 import { MAX_VERIFICATION_BUNDLE_BYTES, parseVerificationBundle } from '../../../common/securityAudit/verificationBundle.ts';
 import { readAuditMetadataV2 } from '../core/metadataV2.mjs';
 import { assembleAuditReportFromProducerFilesV2, writeAuditFileV2 } from '../core/producerFilesV2.mjs';
-import { qualifySavedAuditArchiveV2, readMatchedAuditReportV2 } from '../core/reportFilesV2.mjs';
+import { qualifySavedAuditArchiveV2, readMatchedAuditReportV2 } from '../report/reportFilesV2.mjs';
 import { evidenceCommand, readCiFile, realDirectory, writeNew } from './collectCiEvidence.mjs';
 import { parseCiEvidenceJson } from './ciEvidence.mjs';
 import { projectReleaseReceiptV2, readReleaseBytes } from './releaseRecordStore.mjs';
