@@ -89,7 +89,7 @@ Use the evidence entries below for individual completed bindings. These are the 
 
 The reconciled checklist has 52 completed top-level items and two open groups. Registration migration and the installed source checks are complete. The remaining groups cover linking the exact release to its protected scanner and fixture evidence, and qualifying the complete matched run on staging2. Count checklist rows as work groups, since their sizes differ.
 
-The accepted staging2 application is `e9d14a25`. Reuse slot 108 and the exact-source and image evidence tied to that release. The [control register](security-audit-staging2-control-evidence.md) has 48 passes, four findings and 18 controls awaiting evidence. Complete the 13 remaining authentication observations in one staged fixture window and join the four external and one host observations as applicable. Use the reviewed catalog v2 report tool to produce one matched Full report and verify independent readback for both open groups. Earlier browser evidence retains its recorded release and scope.
+The accepted staging2 application is `e9d14a25`. Use slot 108 and the exact-source and image evidence tied to that release. The [control register](security-audit-staging2-control-evidence.md) tracks the current row outcomes and required observations. The two open groups share the same live Full report gate. See the [closeout blockers](#staging2-closeout-blockers) for the remaining evidence and required readback. Earlier browser evidence retains its recorded release and scope.
 
 Run `npm run security:surfaces` from `mofacts/` for source registration ownership. Runtime inventories and their classified policies come from the sealed application registry. The historical manual manifest is retained in Git at `2982f477` for interpreting the comparisons below.
 
@@ -337,6 +337,30 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
 - [x] Verify the source and handoff. Full typecheck and lint passed. Pinned Linux Node V2 source tests recorded 479 passes and seven environment-dependent skips. The retained compatibility and release checks recorded 152 passes and one environment-dependent skip. All four immutable scanner-selection checks and three direct Node token, HMAC and identity tests passed. The Meteor allowance remains available for its recorded scope.
 - [x] Verify the offline review procedure with the pinned tool. Installed its locked dependencies in the isolated checkout and removed the generated dependencies after assembly. Verified the host receipt against the accepted release authority and used a canonical copy for metadata generation. The original capture remains available. The [operator runbook](../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification) records the setup and distinguishes the review from live qualification.
 - [ ] Complete the final evidence record after Phase 3's live Full report gate. It requires the remaining 17 measurements, signed ingestion, independent receiver download and saved archive verification. P1-D9 assigns final production acceptance to a separately authorized coordinated cutover.
+
+### Staging2 closeout blockers
+
+Phase 3 and Phase 4 remain open under the existing acceptance criteria. On
+November 26 at 22:37 UTC, staging2 returned healthy on the verified image
+reference with the same `21:53:15.59940657Z` application start. The approved
+tool revision reread the protected 70-row review and its final execution check
+rejected the 17 missing measurements. The four measured findings retain their
+current remediation owners.
+
+| Open requirement | Why it remains open |
+| --- | --- |
+| 13 authentication controls | The November 18 authentication qualification passed all 22 controls in its earlier window. The current deployment has evidence for ordinary sign-in and selected passwordless behavior. The remaining comparison, reset and session, authorization, and throttling cases lack matching live outcomes and their required positive baselines. |
+| 2 public TCP controls | The evaluator requires a complete result for all 65,535 TCP ports on each public address. HTTP, HTTPS and host firewall evidence cover parts of that requirement. The retained packet has no complete outside-network result for this release. |
+| 1 public UDP control | The prior external observation was inconclusive for all seven selected endpoints. Host listener, publication and firewall results establish the host policy. The catalog also needs conclusive external observations. |
+| 1 MongoDB access control | The runtime proves authentication is configured. Automatic approval review blocked the direct credential-free data read, and the retained packet has no observed denial of that operation. |
+| Signed Full report and archive | The exact-release receiver history contained zero catalog v2 Full reports. Once the missing measurements are verified, the live report still needs signed ingestion, an independent receiver download and saved encrypted-archive verification. |
+
+Use the [exact list of outstanding controls](security-audit-staging2-control-evidence.md)
+for the next evidence intake. The protected results must identify the target,
+application revision, platform image and actual observation times. The
+[operator runbook](../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification)
+owns assembly and independent readback. The current review is unsigned and
+retains its 17 execution errors.
 
 ## Phase 3 HTTP characterization started (2026-11-18)
 
