@@ -3,7 +3,7 @@
 Reviewed November 25, 2026 for the accepted staging2 deployment. The application source is
 `e9d14a25b21eaece8cea377c787052e7896d0bfe`, and its deployed Linux/amd64 image is
 `ppavlikmemphis/mofacts-staging2@sha256:6699dc3fac40d9ca84564c265aa9cd587eb2628f50268f1ed79c1e7879079887`.
-The next Full report uses the current application start `2026-11-26T13:33:40.888254819Z`, after the Microsoft settings change.
+The next Full report uses the current application start `2026-11-26T18:51:45.827427509Z`, after the Google settings change.
 
 | Section | Passed | Findings | Needs evidence |
 | --- | ---: | ---: | ---: |
@@ -207,6 +207,16 @@ app’s private settings have neither Google credential field. The Google OAuth
 client must authorize the exact staging2 callback before a complete round trip
 is possible. The operator approved both provider test accounts. See the
 [operator handoff](../deploy/security-audit/staging2-v2-operations.md#provider-sign-in-evidence).
+
+The operator approved a separate **MoFaCTS Staging2** Google Web client. The
+encrypted Desktop credential and root-private settings backup passed actual
+readback. Only the staging2 app was recreated. It restarted at
+`2026-11-26T18:51:45.827427509Z` with the same previously accepted image and
+matching HTTPS health and CSP. A clean Chrome session matched the outgoing
+client ID and callback. Google returned HTTP 302 to its signed-out identifier
+page. The protected `google-installed-20261126.json` receipt records that
+scope. The approved Google and Microsoft sign-ins still require the signed-in
+return to staging2.
 
 On pinned Node 24.22.1, the catalog v2 validators accepted 52 measured outcomes
 from 14 retained receipts, including all four findings. The 25 repository and
