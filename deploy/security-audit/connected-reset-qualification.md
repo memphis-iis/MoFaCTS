@@ -117,6 +117,17 @@ This proves operator-assisted connected mail and the current reset/session
 branch. Unused genuinely aged-token expiry, the catalog-complete authentication
 artifact, scheduled mail and alert acceptance remain separate unfinished gates.
 
+## Reset expiry evidence
+
+The `expiry` worker scope collects only the expired-reset control. It uses the
+same two owned accounts, mail windows, cleanup and real one-hour age check.
+For the current-token baseline it submits the fresh reset once and verifies
+ordinary sign-in with the new password. The other fixture makes one first-use
+submission after its unused link has expired and confirms that its original
+password remains valid. The worker reports expiry separately and leaves the
+single-use and replay controls as `ERROR`. Keep both accounts disposable and
+retain independent cleanup and exact deployment identity with the result.
+
 ## Complete reset protocol preparation
 
 The worker's explicit `protocol` scope adds the separate `-expiry` actor required

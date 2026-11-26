@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withScannerMailHandoffV2 } from './connection/scannerClient.mjs';
 import { fixtureNamespaceV2 } from '../../mofacts/scripts/security-audit/authentication/stagingFixturesV2.mjs';
-import { captureCurrentResetV2 } from '../../mofacts/scripts/security-audit/authentication/currentResetV2.mjs';
+import { captureCurrentResetV2, captureFreshResetBaselineV2 } from '../../mofacts/scripts/security-audit/authentication/currentResetV2.mjs';
 import { createCurrentResetBrowserTransportV2 } from '../../mofacts/scripts/security-audit/authentication/currentResetBrowserV2.mjs';
 import { parseResetMailboxBindingV2, readVerificationMailboxMessageV2 } from '../../mofacts/scripts/security-audit/authentication/mailboxV2.mjs';
 import { captureUnusedExpiredResetV2 } from '../../mofacts/scripts/security-audit/authentication/expiredResetV2.mjs';
@@ -20,9 +20,10 @@ const unavailable = () => new Error('Connected reset qualification requires owne
 export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketPath, leaseDirectory,
   scope = 'current', input = process.stdin, output = process.stdout }, dependencies = {}) {
   fixtureNamespaceV2(namespace);
-  const coupleExpiry = scope === 'protocol' || scope === 'integrated';
+  const expiryOnly = scope === 'expiry';
+  const coupleExpiry = expiryOnly || scope === 'protocol' || scope === 'integrated';
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= Date.now() || deadlineMs - Date.now() > 7200000) throw unavailable();
-  if (!['current', 'protocol', 'comparison', 'integrated'].includes(scope)
+  if (!['current', 'protocol', 'comparison', 'integrated', 'expiry'].includes(scope)
     || coupleExpiry && deadlineMs - Date.now() < (scope === 'integrated' ? 4200000 : 3900000)) throw unavailable();
   let pending, buffer = Buffer.alloc(0), failed = false;
   const reject = () => { failed = true; if (pending) { const current = pending; pending = undefined; current.reject(unavailable()); } };
@@ -45,7 +46,8 @@ export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketP
   input.on('data', receive); input.on('error', reject); input.on('end', reject); output.on('error', reject);
   const timer = setTimeout(reject, Math.max(1, deadlineMs - Date.now()));
   const own = dependencies.withHandoff ?? withScannerMailHandoffV2;
-  const capture = dependencies.capture ?? captureCurrentResetV2;
+  const capture = expiryOnly ? dependencies.captureFresh ?? captureFreshResetBaselineV2
+    : dependencies.capture ?? captureCurrentResetV2;
   const captureExpiry = dependencies.captureExpiry ?? captureUnusedExpiredResetV2;
   const captureComparisons = dependencies.captureComparisons ?? captureAuthenticationComparisonsV2;
   const captureLogout = dependencies.captureLogout ?? captureLogoutRevocationV2;
@@ -103,8 +105,10 @@ export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketP
             },
           }));
           if (!coupleExpiry) return current;
-          const cases = RESET_PROTOCOL_VERIFICATIONS.filter(row => row.verificationId.startsWith('authn.reset.current.'));
-          const vector = evaluateSourceVerificationVector(current.current.results.map(({ verificationId, outcome }) => ({ verificationId, outcome })), cases);
+          const cases = RESET_PROTOCOL_VERIFICATIONS.filter(row => row.verificationId.startsWith('authn.reset.current.')
+            && (!expiryOnly || row.expectedPolicy === 'allow'));
+          const baseline = expiryOnly ? current.freshResetBaseline : current.current;
+          const vector = evaluateSourceVerificationVector(baseline.results.map(({ verificationId, outcome }) => ({ verificationId, outcome })), cases);
           if (!currentMetadataVerified || vector.status === 'ERROR' || vector.results.some(row => ['authn.reset.current.password-before', 'authn.reset.current.accepted'].includes(row.verificationId)
             && row.outcome !== 'ALLOWED')) throw unavailable();
           await beginExpiryWindow();
@@ -154,7 +158,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     if (extra.length || process.version !== 'v24.22.1') throw unavailable();
     const result = await runConnectedResetWorkerV2({ namespace, deadlineMs: Number(rawDeadline), socketPath, leaseDirectory, scope });
-    if (scope === 'comparison' ? result?.proofs?.length !== 2 || result.proofs.some(row => row.status === 'ERROR')
+    if (scope === 'expiry') {
+      if (!['PASS', 'FAIL'].includes(result?.protocol?.expired?.status)) process.exitCode = 1;
+    } else if (scope === 'comparison' ? result?.proofs?.length !== 2 || result.proofs.some(row => row.status === 'ERROR')
       : ['current', 'session', 'lifetime'].some(key => !result?.[key] || result[key].status === 'ERROR')) process.exitCode = 1;
     if (['protocol', 'integrated'].includes(scope)
       && ['current', 'replay', 'expired'].some(key => !result?.protocol?.[key] || result.protocol[key].status === 'ERROR')) process.exitCode = 1;

@@ -11,11 +11,20 @@ import { sessionResumeOutcomeV2 } from './sessionBrowserV2.mjs';
 
 const invalid = () => { throw new Error('Current reset acquisition is invalid'); };
 const currentCases = RESET_PROTOCOL_VERIFICATIONS.filter(row => RESET_PROTOCOL_CONTROL_CASES['authentication.reset-token.current-single-use'].includes(row.verificationId));
+const freshCases = currentCases.filter(row => row.expectedPolicy === 'allow');
 
 // The fixture/lease owner provides private transport callbacks and owns cleanup.
 // This scenario never creates credentials or acquires a mailbox authorization.
 // Only an exact run-owned account may reach a password-changing callback.
-export async function captureCurrentResetV2({ namespace, target, actor, newPassword, transport, acquireMail }) {
+export async function captureCurrentResetV2(options) {
+  return captureOwnedResetV2(options, false);
+}
+
+export async function captureFreshResetBaselineV2(options) {
+  return captureOwnedResetV2(options, true);
+}
+
+async function captureOwnedResetV2({ namespace, target, actor, newPassword, transport, acquireMail }, freshBaselineOnly) {
   fixtureNamespaceV2(namespace);
   const user = parseAuthorizationActorBindingV2(actor);
   if (target !== 'https://staging2.optimallearning.org'
@@ -40,25 +49,37 @@ export async function captureCurrentResetV2({ namespace, target, actor, newPassw
   }
   const mail = await acquireMail(binding);
   const delivery = readResetMailboxMessageV2(binding, mail.metadata, mail.plainText);
-  const accepted = resetAttemptOutcome(await transport.reset(user.username, delivery.token, newPassword));
-  const resetResults = [{ verificationId: 'authn.reset.current.password-before', outcome: baselineOutcome },
-    { verificationId: 'authn.reset.current.accepted', outcome: accepted }];
-  // A failed mutation cannot qualify replay or revocation and must not issue
-  // further password attempts. The owner still cleans the same fixture.
-  if (accepted !== 'ALLOWED') return { delivery: delivery.receipt, lifetime,
-    current: evaluateSourceVerificationVector(resetResults, currentCases), session: { status: 'ERROR' } };
-  const newLogin = methodAuthorizationOutcome(await transport.newPasswordLogin({ ...user, password: newPassword }), []);
-  const oldLogin = methodAuthorizationOutcome(await transport.oldPasswordLogin(user), ['403']);
-  const revoked = await transport.revokedSessions();
-  if (!Array.isArray(revoked) || revoked.length !== 2) invalid();
-  const sessions = revoked.map(value => {
-    const row = proofRecord(value, ['method', 'resume']);
-    return { method: methodAuthorizationOutcome(row.method, ['401']), resume: sessionResumeOutcomeV2(row.resume) };
-  });
-  resetResults.push({ verificationId: 'authn.reset.current.replay',
-    outcome: resetAttemptOutcome(await transport.reset(user.username, delivery.token, newPassword)) });
-  return { delivery: delivery.receipt, lifetime, current: evaluateSourceVerificationVector(resetResults, currentCases),
-    session: evaluateCurrentResetSessionsV2({ newLogin, oldLogin, sessions }) };
+  mail.plainText = '';
+  try {
+    const accepted = resetAttemptOutcome(await transport.reset(user.username, delivery.token, newPassword));
+    const resetResults = [{ verificationId: 'authn.reset.current.password-before', outcome: baselineOutcome },
+      { verificationId: 'authn.reset.current.accepted', outcome: accepted }];
+    if (freshBaselineOnly) {
+      // The expiry control needs a successful ordinary first use in its
+      // window. Confirm the changed password using the same owned account.
+      if (accepted === 'ALLOWED'
+        && methodAuthorizationOutcome(await transport.newPasswordLogin({ ...user, password: newPassword }), []) !== 'ALLOWED') {
+        throw new Error('Fresh reset password login is unavailable');
+      }
+      return { delivery: delivery.receipt, freshResetBaseline: evaluateSourceVerificationVector(resetResults, freshCases) };
+    }
+    // A failed mutation cannot qualify replay or revocation and must not issue
+    // further password attempts. The owner still cleans the same fixture.
+    if (accepted !== 'ALLOWED') return { delivery: delivery.receipt, lifetime,
+      current: evaluateSourceVerificationVector(resetResults, currentCases), session: { status: 'ERROR' } };
+    const newLogin = methodAuthorizationOutcome(await transport.newPasswordLogin({ ...user, password: newPassword }), []);
+    const oldLogin = methodAuthorizationOutcome(await transport.oldPasswordLogin(user), ['403']);
+    const revoked = await transport.revokedSessions();
+    if (!Array.isArray(revoked) || revoked.length !== 2) invalid();
+    const sessions = revoked.map(value => {
+      const row = proofRecord(value, ['method', 'resume']);
+      return { method: methodAuthorizationOutcome(row.method, ['401']), resume: sessionResumeOutcomeV2(row.resume) };
+    });
+    resetResults.push({ verificationId: 'authn.reset.current.replay',
+      outcome: resetAttemptOutcome(await transport.reset(user.username, delivery.token, newPassword)) });
+    return { delivery: delivery.receipt, lifetime, current: evaluateSourceVerificationVector(resetResults, currentCases),
+      session: evaluateCurrentResetSessionsV2({ newLogin, oldLogin, sessions }) };
+  } finally { delivery.token = ''; }
 }
 
 export function evaluateCurrentResetSessionsV2(value) {

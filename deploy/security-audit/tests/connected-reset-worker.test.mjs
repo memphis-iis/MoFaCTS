@@ -6,7 +6,8 @@ import { runConnectedResetWorkerV2 } from '../connected-reset-worker.mjs';
 const namespace = 'mofacts_audit_fixture_0123456789ab';
 async function run(mode) {
   const integrated = mode === 'integrated';
-  const protocol = integrated || mode.startsWith('protocol-');
+  const expiryOnly = mode === 'expiry';
+  const protocol = integrated || expiryOnly || mode.startsWith('protocol-');
   const comparison = mode === 'comparison';
   const input = new PassThrough(), output = new PassThrough();
   let text = '', ready = false, launched = 0, transportClosed = 0, browserClosed = 0, cleanupAccepted = false;
@@ -36,7 +37,7 @@ async function run(mode) {
   let result, error;
   try {
     result = await runConnectedResetWorkerV2({ namespace, deadlineMs: Date.now() + (protocol ? 6000000 : 2000),
-      scope: integrated ? 'integrated' : protocol ? 'protocol' : comparison ? 'comparison' : 'current',
+      scope: expiryOnly ? 'expiry' : integrated ? 'integrated' : protocol ? 'protocol' : comparison ? 'comparison' : 'current',
       socketPath: '/private/scanner.sock', leaseDirectory: '/private/lease', input, output }, {
       withHandoff: async options => {
         if (mode === 'lease-denied') throw new Error('PRIVATE_LEASE_DETAIL');
@@ -69,7 +70,17 @@ async function run(mode) {
         sequence.push('logout');
         return { result: { status: 'PASS' } };
       },
+      captureFresh: async options => {
+        assert.equal(expiryOnly, true);
+        await options.acquireMail({});
+        sequence.push('fresh-reset');
+        return { freshResetBaseline: { status: 'PASS', results: [
+          { verificationId: 'authn.reset.current.password-before', outcome: 'ALLOWED' },
+          { verificationId: 'authn.reset.current.accepted', outcome: 'ALLOWED' },
+        ] } };
+      },
       capture: async options => {
+        assert.equal(expiryOnly, false);
         assert.equal(options.actor.password, 'PRIVATE_SYNTHETIC_PASSWORD');
         assert.equal(options.newPassword, 'PRIVATE_SYNTHETIC_NEW_PASSWORD');
         if (mode === 'capture-error') throw new Error('PRIVATE_CAPTURE_DETAIL');
@@ -105,6 +116,16 @@ test('integrated reset, comparison and logout execute in the observed lease orde
   assert.equal(value.result.protocol.expired.status, 'PASS');
   assert.equal(value.result.comparisons.proofs.length, 2);
   assert.equal(value.result.logout.result.status, 'PASS');
+  assert.equal(value.cleanupAccepted, true);
+});
+
+test('expiry scope uses only the fresh baseline and the owned unused expired capability', async () => {
+  const value = await run('expiry');
+  assert.equal(value.error, undefined);
+  assert.deepEqual(value.sequence, ['fresh-reset', 'expiry']);
+  assert.equal(value.result.protocol.expired.status, 'PASS');
+  assert.equal(value.result.protocol.current.status, 'ERROR');
+  assert.equal(value.result.protocol.replay.status, 'ERROR');
   assert.equal(value.cleanupAccepted, true);
 });
 
