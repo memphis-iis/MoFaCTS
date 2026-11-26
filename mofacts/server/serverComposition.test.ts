@@ -136,6 +136,19 @@ function createServerHistoryRecord(overrides: Record<string, unknown> = {}) {
 }
 
 describe('server auth and session methods', function() {
+  type ExternalLoginResult = { type: 'google' | 'microsoft'; userId: string };
+  const accounts = Accounts as typeof Accounts & {
+    updateOrCreateUserFromExternalService(
+      provider: ExternalLoginResult['type'],
+      identity: { id: string; email: string; verified_email?: boolean },
+      options: Record<string, never>,
+    ): Promise<ExternalLoginResult>;
+    _attemptLogin(
+      invocation: { connection: null }, methodName: string, args: unknown[], result: ExternalLoginResult,
+    ): Promise<{ id: string; type: ExternalLoginResult['type'] }>;
+    _loginUser(invocation: { connection: null }, userId: string): Promise<{ id: string }>;
+  };
+
   beforeEach(async function() {
     await clearServerCompositionCollections();
     await Roles.createRoleAsync('admin', { unlessExists: true });
@@ -153,14 +166,39 @@ describe('server auth and session methods', function() {
     );
   });
 
+  it('creates and grants admin to the configured owner on their first Google sign-in', async function() {
+    const email = `google-owner-${Random.id().toLowerCase()}@example.com`;
+    const settings = Meteor.settings as any;
+    const previousSettings = { owner: settings.owner, initRoles: settings.initRoles, auth: settings.auth };
+    // Stub only the DDP session handoff. The real MongoDB account and admission hooks run.
+    const loginUser = sinon.stub(accounts, '_loginUser').callsFake(async (_invocation, userId) => ({ id: userId }));
+    try {
+      settings.owner = email;
+      settings.initRoles = { admins: [email] };
+      settings.auth = { ...settings.auth, allowPublicSignup: false, requireEmailVerification: true };
+      expect(await MeteorUsersAny.find().countAsync()).to.equal(0);
+
+      const identity = { id: Random.id(), email, verified_email: true };
+      const result = await accounts.updateOrCreateUserFromExternalService('google', identity, {});
+      const user = await MeteorUsersAny.findOneAsync(result.userId);
+      expect(user.username).to.equal(email);
+      expect(user.emails).to.deep.equal([{ address: email, verified: true }]);
+      expect(user.services.google.id).to.equal(identity.id);
+      expect(user.services.password).to.equal(undefined);
+      expect(await Roles.userIsInRoleAsync(result.userId, 'admin')).to.equal(false);
+
+      expect(await accounts._attemptLogin({ connection: null }, 'login', [], result))
+        .to.deep.equal({ id: result.userId, type: 'google' });
+      expect(await Roles.userIsInRoleAsync(result.userId, 'admin')).to.equal(true);
+      expect(await accounts.updateOrCreateUserFromExternalService('google', identity, {})).to.deep.equal(result);
+      expect(await MeteorUsersAny.find().countAsync()).to.equal(1);
+    } finally {
+      loginUser.restore();
+      Object.assign(settings, previousSettings);
+    }
+  });
+
   it('reports an OAuth email conflict and preserves sign-in for a distinct Google identity', async function() {
-    const accounts = Accounts as typeof Accounts & {
-      updateOrCreateUserFromExternalService(
-        provider: 'google' | 'microsoft',
-        identity: { id: string; email: string },
-        options: Record<string, never>,
-      ): Promise<{ userId: string }>;
-    };
     const email = `microsoft-${Random.id().toLowerCase()}@example.com`;
     const microsoftIdentity = { id: Random.id(), email };
     const microsoft = await accounts.updateOrCreateUserFromExternalService('microsoft', microsoftIdentity, {});
