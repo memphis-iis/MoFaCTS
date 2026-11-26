@@ -3,7 +3,7 @@
 Reviewed November 25, 2026 for the accepted staging2 deployment. The application source is
 `e9d14a25b21eaece8cea377c787052e7896d0bfe`, and its deployed Linux/amd64 image is
 `ppavlikmemphis/mofacts-staging2@sha256:6699dc3fac40d9ca84564c265aa9cd587eb2628f50268f1ed79c1e7879079887`.
-The next Full report uses the current application start `2026-11-26T18:51:45.827427509Z`, after the Google settings change.
+The next Full report uses the current application start `2026-11-26T21:53:15.59940657Z`, after the accepted image was restored following Google owner enrollment.
 
 | Section | Passed | Findings | Needs evidence |
 | --- | ---: | ---: | ---: |
@@ -225,9 +225,14 @@ application's pre-insert guidance skipped the unresolved account lookup promises
 A read-only check matched one password account with no linked Google identity.
 It is the configured staging2 owner and administrator, with lessons, uploads,
 learner history and saved progress. User Admin protects that account from
-deletion. The live Google check now targets a verified link to this existing
-account using the operator's regular Gmail and requires a signed-in return to
-the same account. These provider results sit alongside the 70 catalog controls.
+deletion. A temporary staging2 enrollment image required Google's verification
+of the exact approved Gmail address. It bound that identity to the existing
+owner on a successful live sign-in. The operator confirmed the signed-in
+return. The controller matched the owner's successful Google audit event,
+administrator role and ownership checks. It restored the accepted image,
+verified the same binding after restoration and removed the temporary settings.
+Both provider sign-ins now have live acceptance evidence. Their results sit
+alongside the 70 catalog controls.
 
 On pinned Node 24.22.1, the catalog v2 validators accepted 52 measured outcomes
 from 14 retained receipts, including all four findings. The 25 repository and
