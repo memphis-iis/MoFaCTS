@@ -175,6 +175,14 @@ Google sign-in evidence requires an approved test identity. Microsoft also
 requires a provider registration that permits the staging2 callback and a
 protected runtime configuration for that registration.
 
+On November 26, the signed-in Entra portal matched the application ID in
+staging's settings to the existing MoFaCTS registration. Its two Web callbacks
+serve staging and production. Adding
+`https://staging2.optimallearning.org/_oauth/microsoft` there would extend the
+registration that serves production. The review was read-only. A separate
+staging2 registration and credential await approval. Live Microsoft sign-in
+evidence remains open.
+
 The exact catalog v2 policy set was unavailable at the installed host path.
 The review used temporary root-private copies of the exact source policies and
 verified their removal. The formatted Docker inventory was incomplete, so the
