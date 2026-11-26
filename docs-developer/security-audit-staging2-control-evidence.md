@@ -179,9 +179,18 @@ On November 26, the signed-in Entra portal matched the application ID in
 staging's settings to the existing MoFaCTS registration. Its two Web callbacks
 serve staging and production. Adding
 `https://staging2.optimallearning.org/_oauth/microsoft` there would extend the
-registration that serves production. The review was read-only. A separate
-staging2 registration and credential await approval. Live Microsoft sign-in
-evidence remains open.
+registration that serves production. The review was read-only.
+
+The operator approved a separate **MoFaCTS Staging2** registration and the
+Microsoft platform policies. The saved registration has exactly one Web
+callback at the staging2 address above and supports organizational and
+personal accounts, matching the installed sign-in flow. The ungranted default
+Microsoft Graph `User.Read` configuration remains because automatic approval
+review required specific approval to remove it. The app requests OpenID
+scopes. Staging2 preflight matched the accepted release using the installed
+image observer. Its application and HTTPS health were good, and its settings
+file was root-owned, mode 0600 and mounted read-only. Credential custody,
+staging2 configuration and live Microsoft sign-in evidence remain open.
 
 The exact catalog v2 policy set was unavailable at the installed host path.
 The review used temporary root-private copies of the exact source policies and
