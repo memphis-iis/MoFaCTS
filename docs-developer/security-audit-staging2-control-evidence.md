@@ -198,12 +198,14 @@ and browser observation. The staging2 login button opened the Microsoft sign-in
 page with the new app registration and exact staging2 callback. A successful
 account sign-in with an approved Microsoft test identity remains open.
 
-The signed-out Google browser check reached Google's account sign-in page
-with the exact staging2 callback and a configured client. The protected
-`google-runtime-20261126.json` receipt retains this observation. A complete
-Google or Microsoft round trip requires the signed-in return to staging2. The
-operator confirmed approved test accounts for both providers on November 26.
-The signed-in outcomes are pending. See the
+The protected `google-runtime-20261126.json` receipt records the expected
+staging2 callback and the presence of a client parameter. On the operator’s
+approved test sign-in, Google returned `401 invalid_client`. A fresh Chrome
+session reproduced a request with the expected callback and
+`client_id=undefined`. A pinned read-only check confirmed the running staging2
+app’s private settings have neither Google credential field. The Google OAuth
+client must authorize the exact staging2 callback before a complete round trip
+is possible. The operator approved both provider test accounts. See the
 [operator handoff](../deploy/security-audit/staging2-v2-operations.md#provider-sign-in-evidence).
 
 On pinned Node 24.22.1, the catalog v2 validators accepted 52 measured outcomes

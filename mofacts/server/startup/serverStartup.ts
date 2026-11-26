@@ -34,6 +34,7 @@ import { cleanupAbandonedExternalSortRuns } from '../lib/boundedExternalSort';
 import { getLocalStoragePaths, getStorageBackend } from '../lib/storageBoundary';
 import { bootstrapPrivateRepoContentIfNeeded } from './bootstrapPrivateRepoContent';
 import { startConfiguredMofactsCronJobs } from './mofactsCronRuntime';
+import { syncGoogleOAuthConfiguration } from './googleOAuthConfiguration';
 import { reconcileInterruptedTdfMutationJobs } from '../lib/tdfMutationRecovery';
 import { applyDdpContainment } from '../lib/ddpContainment';
 import {
@@ -455,13 +456,15 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     deps.serverConsole('Removed deprecated testLoginsEnabled setting');
   }
 
-  deps.serverConsole('Configuring Google OAuth service...');
-  const google = (Meteor.settings as any)?.google;
   const serviceConfigurations = ServiceConfiguration.configurations as unknown as {
     upsertAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
+    removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
-  await serviceConfigurations.upsertAsync({ service: 'google' }, { $set: { clientId: google?.clientId, secret: google?.secret } });
-  deps.serverConsole('Google OAuth service configured');
+  const google = (Meteor.settings as { google?: unknown } | undefined)?.google;
+  const googleConfigured = await syncGoogleOAuthConfiguration(serviceConfigurations, google);
+  deps.serverConsole(googleConfigured
+    ? 'Google OAuth service configured'
+    : 'Google OAuth unavailable. Set google.clientId and google.secret in private settings.');
 
   if ((Meteor.settings as any).microsoft) {
     deps.serverConsole('Configuring Microsoft OAuth service...');

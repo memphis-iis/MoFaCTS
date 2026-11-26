@@ -112,6 +112,13 @@ The operator handles the provider prompts in their own browser.
    release. A passing observation requires the signed-in return to staging2.
    Use only a sanitized outcome or error summary in the evidence record.
 
+For `401 invalid_client`, inspect the outgoing client identifier and check
+whether the private staging2 settings contain both `google.clientId` and
+`google.secret`. Verify a Google Auth Platform Web client has the exact
+`https://staging2.optimallearning.org/_oauth/google` callback before installing
+its pair. Verify the corrected authorization request before asking the operator
+to retry. [Google OAuth Web client configuration](https://developers.google.com/identity/protocols/oauth2/web-server#creatingcred)
+
 ## Catalog v2 Full report qualification
 
 Use the reviewed report-tool commit from a clean Linux checkout with the

@@ -44,7 +44,7 @@ Required environment:
 
 Optional integrations:
 
-- `google.clientId` and `google.secret`: required only when Google OAuth is enabled.
+- `google.clientId` and `google.secret` are a pair. Supply both in private settings to enable Google sign-in. The Google OAuth Web client must authorize the installation’s exact `/_oauth/google` callback.
 - `microsoft.clientId` and `microsoft.secret`: required only when Microsoft OAuth is enabled.
 - `saml.memphis`: required only when `saml.memphis.enabled` is true.
 - `storage.backend`: `local` by default; `s3` enables the S3-compatible object storage adapter and must not silently fall back to local storage.
