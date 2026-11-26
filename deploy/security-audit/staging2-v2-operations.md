@@ -99,6 +99,19 @@ and HTML hashes matched. The separate sealed three-image synthetic trial also
 verified positive existing V1 and V2 records; do not confuse these two datasets.
 Both fixture attempts' four accounts, role assignments and seven rows are absent.
 
+## Provider sign-in evidence
+
+Use the approved Google and Microsoft test accounts in a regular Chrome tab.
+The operator handles the provider prompts in their own browser.
+
+1. Open the [staging2 sign-in page](https://staging2.optimallearning.org/auth/login).
+   Choose Google and confirm that the browser returns to staging2 and MoFaCTS
+   displays an authenticated session.
+2. Sign out of MoFaCTS and repeat with Microsoft.
+3. Record the provider outcomes and test times with the observed staging2
+   release. A passing observation requires the signed-in return to staging2.
+   Use only a sanitized outcome or error summary in the evidence record.
+
 ## Catalog v2 Full report qualification
 
 Use the reviewed report-tool commit from a clean Linux checkout with the
@@ -138,6 +151,13 @@ node mofacts/scripts/security-audit/qualification/bindStaging2ReleaseRegistry.mj
 Require `executionComplete: true` and verified archive evidence in the binding
 before checking off Full qualification. The [control register](../../docs-developer/security-audit-staging2-control-evidence.md)
 records which observations are still due.
+
+The retained preparation index names the outstanding controls and the original
+observation times. Supply protected results for those exact controls with the
+target, application revision, platform image and observation times. The current
+gaps are 13 authentication controls, four external controls and one MongoDB
+host control. Provider round trips also belong in the Phase III acceptance
+record. See the [per-control register](../../docs-developer/security-audit-staging2-control-evidence.md).
 
 ## Remaining evidence limits
 

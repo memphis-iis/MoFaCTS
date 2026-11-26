@@ -201,16 +201,23 @@ account sign-in with an approved Microsoft test identity remains open.
 The signed-out Google browser check reached Google's account sign-in page
 with the exact staging2 callback and a configured client. The protected
 `google-runtime-20261126.json` receipt retains this observation. A complete
-Google or Microsoft account round trip still requires an approved test identity.
+Google or Microsoft round trip requires the signed-in return to staging2. The
+operator confirmed approved test accounts for both providers on November 26.
+The signed-in outcomes are pending. See the
+[operator handoff](../deploy/security-audit/staging2-v2-operations.md#provider-sign-in-evidence).
 
 On pinned Node 24.22.1, the catalog v2 validators accepted 52 measured outcomes
 from 14 retained receipts, including all four findings. The 25 repository and
 image controls form a complete canonical producer file. The private packet
 `attempt2/catalog-v2-full-inputs-20261126` retains those bytes and the per-control
 receipt references and hashes. It also names the 18 missing observations. The
-retained runtime measurements keep their original observation windows. The
-Full report needs the remaining live evidence, a compatible catalog v2 writer
-and independent receiver readback.
+retained runtime measurements keep their original observation windows. A
+November 26 recheck matched all 14 retained receipt hashes and validated the
+existing outcomes against all five catalog v2 producer contracts in memory.
+That check preserved all 18 missing measurements as execution errors. The
+separately pinned writer has passed offline verification. Live Full
+qualification still requires the missing observations, independent receiver
+readback and archive verification.
 
 The exact catalog v2 policy set was unavailable at the installed host path.
 The review used temporary root-private copies of the exact source policies and
