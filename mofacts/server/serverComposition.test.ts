@@ -153,6 +153,32 @@ describe('server auth and session methods', function() {
     );
   });
 
+  it('reports an OAuth email conflict and preserves sign-in for a distinct Google identity', async function() {
+    const accounts = Accounts as typeof Accounts & {
+      updateOrCreateUserFromExternalService(
+        provider: 'google' | 'microsoft',
+        identity: { id: string; email: string },
+        options: Record<string, never>,
+      ): Promise<{ userId: string }>;
+    };
+    const email = `microsoft-${Random.id().toLowerCase()}@example.com`;
+    const microsoftIdentity = { id: Random.id(), email };
+    const microsoft = await accounts.updateOrCreateUserFromExternalService('microsoft', microsoftIdentity, {});
+    const conflict = await accounts.updateOrCreateUserFromExternalService('google', { id: Random.id(), email }, {})
+      .catch((error: unknown) => error);
+    expect(conflict).to.be.instanceOf(Meteor.Error).and.to.include({ error: 'oauth-account-exists-microsoft' });
+
+    const existing = await MeteorUsersAny.findOneAsync(microsoft.userId);
+    expect(existing.services.microsoft.id).to.equal(microsoftIdentity.id);
+    expect(existing.services.google).to.equal(undefined);
+    expect(await MeteorUsersAny.find({ username: email }).countAsync()).to.equal(1);
+
+    const googleIdentity = { id: Random.id(), email: `google-${Random.id().toLowerCase()}@example.com` };
+    const google = await accounts.updateOrCreateUserFromExternalService('google', googleIdentity, {});
+    expect(google.userId).to.be.a('string').and.not.equal(microsoft.userId);
+    expect(await accounts.updateOrCreateUserFromExternalService('google', googleIdentity, {})).to.include(google);
+  });
+
   it('serves only public sign-in configuration and active help with per-connection limits', async function() {
     const observed = registeredMeteorMethodSurfaces();
     if (observed.state !== 'observed') throw new Error('Expected installed public reads');

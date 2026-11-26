@@ -215,8 +215,15 @@ readback. Only the staging2 app was recreated. It restarted at
 matching HTTPS health and CSP. A clean Chrome session matched the outgoing
 client ID and callback. Google returned HTTP 302 to its signed-out identifier
 page. The protected `google-installed-20261126.json` receipt records that
-scope. The approved Google and Microsoft sign-ins still require the signed-in
-return to staging2.
+scope.
+
+On November 26, the operator confirmed a signed-in return to staging2 with
+Microsoft. The Google attempt returned to MoFaCTS and displayed `Username
+already exists [403]`. The application derives the username from the canonical
+email and the installed Meteor package rejects duplicates on insert. The
+application's pre-insert guidance skipped the unresolved account lookup promises.
+Keep Google open until an approved identity completes a signed-in return. These
+provider results sit alongside the 70 catalog control outcomes.
 
 On pinned Node 24.22.1, the catalog v2 validators accepted 52 measured outcomes
 from 14 retained receipts, including all four findings. The 25 repository and

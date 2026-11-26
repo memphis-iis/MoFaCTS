@@ -26,7 +26,11 @@ type AugmentedMeteorUserServices = {
 type AugmentedOnCreateUserCallback = (
   options: { profile?: {} | undefined },
   user: Meteor.User
-) => Meteor.User;
+) => Meteor.User | Promise<Meteor.User>;
+
+// The installed Meteor server awaits account creation hooks and account lookups.
+type AccountLookupOptions = { fields?: Mongo.FieldSpecifier | undefined };
+type AccountLookupResult = Promise<Meteor.User | null | undefined>;
 
 declare namespace Meteor {
   interface UserProfile extends AugmentedMeteorUserProfile {}
@@ -35,6 +39,8 @@ declare namespace Meteor {
 
 declare namespace Accounts {
   function onCreateUser(func: AugmentedOnCreateUserCallback): void;
+  function findUserByEmail(email: string, options?: AccountLookupOptions): AccountLookupResult;
+  function findUserByUsername(username: string, options?: AccountLookupOptions): AccountLookupResult;
 }
 
 declare module 'meteor/meteor' {
@@ -47,5 +53,7 @@ declare module 'meteor/meteor' {
 declare module 'meteor/accounts-base' {
   namespace Accounts {
     function onCreateUser(func: AugmentedOnCreateUserCallback): void;
+    function findUserByEmail(email: string, options?: AccountLookupOptions): AccountLookupResult;
+    function findUserByUsername(username: string, options?: AccountLookupOptions): AccountLookupResult;
   }
 }

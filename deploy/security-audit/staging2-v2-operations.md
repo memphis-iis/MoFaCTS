@@ -119,6 +119,11 @@ whether the private staging2 settings contain both `google.clientId` and
 its pair. Verify the corrected authorization request before asking the operator
 to retry. [Google OAuth Web client configuration](https://developers.google.com/identity/protocols/oauth2/web-server#creatingcred)
 
+For `Username already exists [403]` after returning from the provider, use the
+existing MoFaCTS account's established sign-in method. To complete a separate
+Google qualification, use an approved Google identity already bound to its own
+staging2 account or whose email is unused on staging2.
+
 ## Catalog v2 Full report qualification
 
 Use the reviewed report-tool commit from a clean Linux checkout with the

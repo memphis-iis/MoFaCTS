@@ -283,7 +283,7 @@ async function purgeLegacyAiContentDraftStorage(deps: RunServerStartupDeps) {
   if (legacyDrafts.length > 0) deps.serverConsole(`[AI CONTENT CREATOR] Removed ${legacyDrafts.length} obsolete server-side working record(s).`);
 }
 
-function getExistingAccountMethod(user: any): 'password' | 'google' | 'microsoft' | 'memphisSaml' | 'different-method' {
+function getExistingAccountMethod(user: Meteor.User): 'password' | 'google' | 'microsoft' | 'memphisSaml' | 'different-method' {
   if (user?.services?.password) return 'password';
   if (user?.services?.google) return 'google';
   if (user?.services?.microsoft) return 'microsoft';
@@ -291,7 +291,7 @@ function getExistingAccountMethod(user: any): 'password' | 'google' | 'microsoft
   return 'different-method';
 }
 
-function throwOAuthExistingAccountError(existingUser: any, attemptedProvider: string, deps: RunServerStartupDeps) {
+function throwOAuthExistingAccountError(existingUser: Meteor.User, attemptedProvider: string, deps: RunServerStartupDeps) {
   const existingMethod = getExistingAccountMethod(existingUser);
   deps.serverConsole('[ACCOUNTS] OAuth sign-in blocked by existing account method', {
     attemptedProvider,
@@ -310,35 +310,6 @@ function throwOAuthExistingAccountError(existingUser: any, attemptedProvider: st
     throw new Meteor.Error('oauth-account-exists-memphis-saml', 'This email is already registered with institutional sign-in.');
   }
   throw new Meteor.Error('oauth-account-exists-different-method', 'This email is already registered with a different sign-in method.');
-}
-
-function summarizeAccountLookupForLog(user: any) {
-  if (!user) {
-    return null;
-  }
-  return {
-    found: true,
-    services: user?.services ? Object.keys(user.services).sort() : [],
-    existingMethod: getExistingAccountMethod(user),
-  };
-}
-
-function isRealUserDocument(user: any): user is { _id: string } {
-  return !!user && typeof user._id === 'string' && user._id.trim().length > 0;
-}
-
-function findExistingUserByCanonicalEmail(canonicalEmail: string) {
-  const accountsUserByEmail = Accounts.findUserByEmail(canonicalEmail);
-  const accountsUserByUsername = Accounts.findUserByUsername(canonicalEmail);
-  const existingUserByEmail = isRealUserDocument(accountsUserByEmail) ? accountsUserByEmail : null;
-  const existingUserByUsername = isRealUserDocument(accountsUserByUsername) ? accountsUserByUsername : null;
-  return {
-    accountsUserByEmail,
-    accountsUserByUsername,
-    existingUserByEmail,
-    existingUserByUsername,
-    existingUser: existingUserByEmail || existingUserByUsername,
-  };
 }
 
 export async function runServerStartup(deps: RunServerStartupDeps) {
@@ -748,7 +719,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     });
   }
 
-  registerAccountLifecycleHook(Accounts, 'onCreateUser', function(options: { profile?: {} | undefined }, user: Meteor.User) {
+  registerAccountLifecycleHook(Accounts, 'onCreateUser', async function(options: { profile?: {} | undefined }, user: Meteor.User) {
     deps.serverConsole('[ACCOUNTS] onCreateUser called');
     deps.serverConsole('[ACCOUNTS] User services:', Object.keys(user.services || {}));
 
@@ -797,21 +768,12 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
 
     const normalizedEmail = deps.normalizeCanonicalEmail(email);
     if (serviceName !== 'password') {
-      const {
-        accountsUserByEmail,
-        accountsUserByUsername,
-        existingUserByEmail,
-        existingUserByUsername,
-        existingUser,
-      } = findExistingUserByCanonicalEmail(normalizedEmail.canonical);
-      deps.serverConsole('[ACCOUNTS] OAuth existing-account lookup', {
-        attemptedProvider: serviceName,
-        accountsEmailMatch: summarizeAccountLookupForLog(accountsUserByEmail),
-        accountsNameMatch: summarizeAccountLookupForLog(accountsUserByUsername),
-        appEmailMatch: summarizeAccountLookupForLog(existingUserByEmail),
-        appNameMatch: summarizeAccountLookupForLog(existingUserByUsername),
-      });
-      if (existingUser && !(existingUser as any)?.services?.[serviceName]) {
+      const [userByEmail, userByUsername] = await Promise.all([
+        Accounts.findUserByEmail(normalizedEmail.canonical),
+        Accounts.findUserByUsername(normalizedEmail.canonical),
+      ]);
+      const existingUser = userByEmail ?? userByUsername;
+      if (existingUser && !existingUser.services?.[serviceName]) {
         throwOAuthExistingAccountError(existingUser, serviceName, deps);
       }
     }
