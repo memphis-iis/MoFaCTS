@@ -47,10 +47,5 @@ declare module 'meteor/meteor' {
 declare module 'meteor/accounts-base' {
   namespace Accounts {
     function onCreateUser(func: AugmentedOnCreateUserCallback): void;
-    function setAdditionalFindUserOnExternalLogin(
-      resolve: (
-        identity: { serviceName: string; serviceData: Record<string, unknown> }
-      ) => Promise<Pick<Meteor.User, '_id'> | undefined>
-    ): void;
   }
 }

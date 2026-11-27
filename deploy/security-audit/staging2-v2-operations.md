@@ -99,27 +99,6 @@ and HTML hashes matched. The separate sealed three-image synthetic trial also
 verified positive existing V1 and V2 records; do not confuse these two datasets.
 Both fixture attempts' four accounts, role assignments and seven rows are absent.
 
-## Connecting Google to an existing owner
-
-The temporary owner-enrollment release accepts a private `google.ownerLink`
-request with `userId`, `email`, `issuedAt` and `expiresAt`. Set it only for the
-operator-approved staging2 owner. The email must be the owner's Gmail address
-in both `owner` and `initRoles.admins`. Select the existing password-based
-administrator by exact stored account ID. Use UTC timestamps within a window
-of up to one hour and retain the prior protected configuration.
-
-The operator starts a normal **Sign in with Google** in their browser. The
-installed Google OAuth service verifies the account. The enrollment matches
-Google's verified Gmail address to the exact authorized owner and records the
-Google account ID on that existing record. Verify a successful Google login
-on that same ID, administration access and ownership metadata before closing
-the window. Remove the temporary settings and return to the accepted
-staging2 release. Normal Google sign-in uses the recorded ID.
-
-If the authorization expires before the operator signs in, restore the prior
-settings and release. Verify the exact owner and original link state before
-preparing a new window.
-
 ## Remaining evidence limits
 
 The accepted exposure report has 22 PASS and one UDP ERROR. All seven selected

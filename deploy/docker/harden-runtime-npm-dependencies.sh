@@ -9,6 +9,7 @@ ACCOUNTS_NPM_ROOT="$SERVER_NPM_ROOT/accounts-password/node_modules"
 EMAIL_NPM_ROOT="$SERVER_NPM_ROOT/email/node_modules"
 MINIFIER_CSS_NPM_ROOT="$SERVER_NPM_ROOT/minifier-css/node_modules"
 WEBAPP_NPM_ROOT="$SERVER_NPM_ROOT/webapp/node_modules"
+REPLACEMENT_MANIFEST="$(dirname -- "${BASH_SOURCE[0]}")/runtime-npm"
 HARDENING_WORKDIR="$(mktemp -d)"
 
 cleanup() {
@@ -22,9 +23,24 @@ assert_package_version() {
   node -e '
     const packageJson = require(process.argv[1]);
     if (packageJson.version !== process.argv[2]) {
-      throw new Error(`Expected ${packageJson.name}@${process.argv[2]}, found ${packageJson.name}@${packageJson.version}`);
+      throw new Error("Expected " + packageJson.name + "@" + process.argv[2] + ", found " + packageJson.version);
     }
   ' "$package_json" "$expected_version"
+}
+
+replace_package() {
+  local root="$1"
+  local name="$2"
+  local source="$HARDENING_WORKDIR/node_modules/$name"
+  local destination="$root/$name"
+  local version
+  version="$(node -e 'process.stdout.write(require(process.argv[1]).dependencies[process.argv[2]])' \
+    "$HARDENING_WORKDIR/package.json" "$name")"
+  assert_package_version "$source/package.json" "$version"
+  test -f "$destination/package.json"
+  rm -rf -- "$destination"
+  mv -- "$source" "$destination"
+  assert_package_version "$destination/package.json" "$version"
 }
 
 echo '[Function] Verify the upstream Meteor accounts-password native dependencies'
@@ -38,69 +54,48 @@ node -e '
     .catch((error) => { console.error(error); process.exit(1); });
 ' "$ACCOUNTS_NPM_ROOT/bcrypt" "$ACCOUNTS_NPM_ROOT/argon2"
 
-echo '[Function] Replace vulnerable OpenPGP runtime with the upstream patched release'
+echo '[Function] Verify Meteor bundle versions before replacing runtime packages'
 assert_package_version "$EMAIL_NPM_ROOT/openpgp/package.json" '5.11.1'
-npm install --prefix "$HARDENING_WORKDIR/email" \
-  --omit=dev --no-save --package-lock=false \
-  openpgp@5.11.3
-rm -rf "$EMAIL_NPM_ROOT/openpgp"
-mv "$HARDENING_WORKDIR/email/node_modules/openpgp" "$EMAIL_NPM_ROOT/openpgp"
-assert_package_version "$EMAIL_NPM_ROOT/openpgp/package.json" '5.11.3'
-
-echo '[Function] Replace vulnerable Meteor bundle dependencies with patched releases'
+assert_package_version "$EMAIL_NPM_ROOT/nodemailer/package.json" '8.0.3'
 assert_package_version "$WEBAPP_NPM_ROOT/tmp/package.json" '0.2.3'
 assert_package_version "$MINIFIER_CSS_NPM_ROOT/postcss/package.json" '8.5.1'
 assert_package_version "$MINIFIER_CSS_NPM_ROOT/nanoid/package.json" '3.3.15'
+assert_package_version "$MINIFIER_CSS_NPM_ROOT/source-map-js/package.json" '1.2.1'
 assert_package_version "$MINIFIER_CSS_NPM_ROOT/svgo/package.json" '2.8.2'
 assert_package_version "$MINIFIER_CSS_NPM_ROOT/browserslist/package.json" '4.28.4'
-assert_package_version "$EMAIL_NPM_ROOT/nodemailer/package.json" '8.0.3'
-npm install --prefix "$HARDENING_WORKDIR/patched-runtime" \
-  --omit=dev --no-save --package-lock=false \
-  tmp@0.2.7 postcss@8.5.18 nanoid@3.3.18 svgo@2.8.3 nodemailer@9.0.1 \
-  browserslist@4.28.8 baseline-browser-mapping@2.11.20 caniuse-lite@1.0.30001810 \
-  electron-to-chromium@1.5.420 node-releases@2.0.54 update-browserslist-db@1.3.2
-for replacement in \
-  "$WEBAPP_NPM_ROOT/tmp:$HARDENING_WORKDIR/patched-runtime/node_modules/tmp" \
-  "$MINIFIER_CSS_NPM_ROOT/postcss:$HARDENING_WORKDIR/patched-runtime/node_modules/postcss" \
-  "$MINIFIER_CSS_NPM_ROOT/nanoid:$HARDENING_WORKDIR/patched-runtime/node_modules/nanoid" \
-  "$MINIFIER_CSS_NPM_ROOT/svgo:$HARDENING_WORKDIR/patched-runtime/node_modules/svgo" \
-  "$MINIFIER_CSS_NPM_ROOT/browserslist:$HARDENING_WORKDIR/patched-runtime/node_modules/browserslist" \
-  "$MINIFIER_CSS_NPM_ROOT/baseline-browser-mapping:$HARDENING_WORKDIR/patched-runtime/node_modules/baseline-browser-mapping" \
-  "$MINIFIER_CSS_NPM_ROOT/caniuse-lite:$HARDENING_WORKDIR/patched-runtime/node_modules/caniuse-lite" \
-  "$MINIFIER_CSS_NPM_ROOT/electron-to-chromium:$HARDENING_WORKDIR/patched-runtime/node_modules/electron-to-chromium" \
-  "$MINIFIER_CSS_NPM_ROOT/node-releases:$HARDENING_WORKDIR/patched-runtime/node_modules/node-releases" \
-  "$MINIFIER_CSS_NPM_ROOT/update-browserslist-db:$HARDENING_WORKDIR/patched-runtime/node_modules/update-browserslist-db" \
-  "$EMAIL_NPM_ROOT/nodemailer:$HARDENING_WORKDIR/patched-runtime/node_modules/nodemailer"
+
+echo '[Function] Install the locked runtime replacements with their own dependencies'
+cp -- "$REPLACEMENT_MANIFEST/package.json" "$REPLACEMENT_MANIFEST/package-lock.json" "$HARDENING_WORKDIR/"
+npm ci --prefix "$HARDENING_WORKDIR" --install-strategy=nested --omit=dev \
+  --ignore-scripts --no-audit --no-fund
+
+replace_package "$EMAIL_NPM_ROOT" openpgp
+replace_package "$EMAIL_NPM_ROOT" nodemailer
+replace_package "$WEBAPP_NPM_ROOT" tmp
+for package in postcss nanoid source-map-js svgo browserslist baseline-browser-mapping \
+  caniuse-lite electron-to-chromium node-releases update-browserslist-db
 do
-  destination="${replacement%%:*}"
-  source="${replacement#*:}"
-  rm -rf "$destination"
-  mv "$source" "$destination"
+  replace_package "$MINIFIER_CSS_NPM_ROOT" "$package"
 done
-assert_package_version "$WEBAPP_NPM_ROOT/tmp/package.json" '0.2.7'
-assert_package_version "$MINIFIER_CSS_NPM_ROOT/postcss/package.json" '8.5.18'
-assert_package_version "$MINIFIER_CSS_NPM_ROOT/nanoid/package.json" '3.3.18'
-assert_package_version "$MINIFIER_CSS_NPM_ROOT/svgo/package.json" '2.8.3'
-assert_package_version "$MINIFIER_CSS_NPM_ROOT/browserslist/package.json" '4.28.8'
-assert_package_version "$MINIFIER_CSS_NPM_ROOT/baseline-browser-mapping/package.json" '2.11.20'
-assert_package_version "$MINIFIER_CSS_NPM_ROOT/caniuse-lite/package.json" '1.0.30001810'
-assert_package_version "$MINIFIER_CSS_NPM_ROOT/electron-to-chromium/package.json" '1.5.420'
-assert_package_version "$MINIFIER_CSS_NPM_ROOT/node-releases/package.json" '2.0.54'
-assert_package_version "$MINIFIER_CSS_NPM_ROOT/update-browserslist-db/package.json" '1.3.2'
-assert_package_version "$EMAIL_NPM_ROOT/nodemailer/package.json" '9.0.1'
+
 node - "$WEBAPP_NPM_ROOT" "$MINIFIER_CSS_NPM_ROOT" "$EMAIL_NPM_ROOT" <<'NODE'
 const [webappRoot, minifierRoot, emailRoot] = process.argv.slice(2);
-const tmp = require(`${webappRoot}/tmp`);
-const postcss = require(`${minifierRoot}/postcss`);
-const { nanoid } = require(`${minifierRoot}/nanoid`);
-const { optimize } = require(`${minifierRoot}/svgo`);
-const browserslist = require(`${minifierRoot}/browserslist`);
-const nodemailer = require(`${emailRoot}/nodemailer`);
+const tmp = require(webappRoot + '/tmp');
+const postcss = require(minifierRoot + '/postcss');
+const { nanoid } = require(minifierRoot + '/nanoid');
+const { optimize } = require(minifierRoot + '/svgo');
+const browserslist = require(minifierRoot + '/browserslist');
+const nodemailer = require(emailRoot + '/nodemailer');
 const temporaryFile = tmp.fileSync();
 temporaryFile.removeCallback();
-if (postcss.parse('a{color:red}').nodes.length !== 1) throw new Error('Patched postcss failed its runtime load check');
+const css = postcss.parse('a{color:red}', { from: 'input.css' }).toResult({ map: { inline: false } });
+if (css.root.nodes.length !== 1 || css.map.toJSON().sources.length !== 1) throw new Error('Patched PostCSS source map check failed');
 if (nanoid(8).length !== 8) throw new Error('Patched nanoid failed its runtime load check');
-if (!optimize('<svg xmlns="http://www.w3.org/2000/svg"/>').data) throw new Error('Patched svgo failed its runtime load check');
+if (!optimize('<svg xmlns="http://www.w3.org/2000/svg"/>').data) throw new Error('Patched SVGO failed its runtime load check');
 if (!Array.isArray(browserslist('defaults')) || browserslist('defaults').length === 0) throw new Error('Patched browserslist failed its runtime load check');
-if (typeof nodemailer.createTransport !== 'function') throw new Error('Patched nodemailer failed its runtime load check');
+const transport = nodemailer.createTransport({ jsonTransport: true });
+transport.sendMail({ from: 'sender@example.invalid', to: 'recipient@example.invalid',
+  subject: 'Runtime mail composition check', text: 'MoFaCTS runtime' }).then(result => {
+  if (JSON.parse(result.message).text !== 'MoFaCTS runtime') throw new Error('Patched Nodemailer message check failed');
+}).catch(error => { console.error(error); process.exitCode = 1; });
 NODE

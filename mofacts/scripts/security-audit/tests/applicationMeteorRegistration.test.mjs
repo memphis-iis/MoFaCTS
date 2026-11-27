@@ -56,8 +56,6 @@ test('detects WebApp registration and aliases without flagging unrelated middlew
 });
 
 test('recognizes account hook and OAuth registrations through aliases', () => {
-  assert.deepEqual(members("Accounts.setAdditionalFindUserOnExternalLogin(resolve);", 'accounts.ts'),
-    ['Accounts.setAdditionalFindUserOnExternalLogin']);
   assert.deepEqual(members("import {Accounts as A} from 'meteor/accounts-base'; const {oauth: service} = A; service.registerService('x'); const hook = A.validateLoginAttempt;", 'accounts.ts'),
     ['Accounts.oauth.registerService', 'Accounts.validateLoginAttempt']);
   assert.deepEqual(members("import * as packageApi from 'meteor/oauth'; const { ['registerService']: register } = packageApi.OAuth; register('x');", 'oauth.js'),

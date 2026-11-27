@@ -3,8 +3,7 @@ import { compile, parse } from 'svelte/compiler';
 import ts from 'typescript';
 
 const CLIENT_ACCOUNT_NOTIFICATIONS = new Set(['onLogin', 'onLoginFailure', 'onLogout']);
-const ACCOUNT_HOOKS = new Set(['onLogin', 'onLoginFailure', 'onLogout', 'onCreateUser', 'validateLoginAttempt',
-  'registerLoginHandler', 'setAdditionalFindUserOnExternalLogin']);
+const ACCOUNT_HOOKS = new Set(['onLogin', 'onLoginFailure', 'onLogout', 'onCreateUser', 'validateLoginAttempt', 'registerLoginHandler']);
 const HTTP_STACKS = new Set(['connectHandlers', 'rawConnectHandlers', 'handlers']);
 
 // A reference to a registration function can be retained and called later.
