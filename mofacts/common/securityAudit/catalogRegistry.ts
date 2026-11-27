@@ -109,8 +109,9 @@ export const AUDIT_CATALOG_V3: AuditCatalogCoordinates = Object.freeze({
   catalogVersion: REPRODUCIBLE_QUALIFICATION_CATALOG.catalogVersion,
   catalogDigestSha256: retained[2]!.digest,
 });
-// Activation follows complete producer and receiver qualification. Registering
-// V3 here preserves V1/V2 readback without changing current ingestion early.
+// The scheduled producer remains on its released catalog until its own
+// coordinated cutover. Receiver selection is owned explicitly by the server
+// composition, so accepting V3 does not silently reinterpret V1 producers.
 export const ACTIVE_AUDIT_CATALOG = AUDIT_CATALOG_V1;
 
 export async function readAuditCatalog(value: unknown, purpose: 'ingestion' | 'retained',

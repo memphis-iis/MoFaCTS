@@ -8,7 +8,7 @@ import { AUDIT_ADMIN_METHOD_VERIFICATIONS, HTTP_AUDIT_VERIFICATIONS } from '../.
 import { registeredHttpSurfaces } from '../securitySurfaces/registerHttpRoutes.ts';
 import { registeredMeteorMethodSurfaces } from '../securitySurfaces/registerMeteorMethods.ts';
 import { auditDigest, canonicalAuditJson } from '../../common/securityAudit/canonicalReport.ts';
-import { ACTIVE_AUDIT_CATALOG, AUDIT_CATALOG_V1, AUDIT_CATALOG_V2 } from '../../common/securityAudit/catalogRegistry.ts';
+import { ACTIVE_AUDIT_CATALOG, AUDIT_CATALOG_V1, AUDIT_CATALOG_V3 } from '../../common/securityAudit/catalogRegistry.ts';
 import type { SecurityAuditReportV2 } from '../../common/securityAudit/reportV2.ts';
 import { errorReport, fullReportFixture, ingestionContext } from '../../scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
 import { SecurityAuditReportsV2 } from './securityAuditCollectionsV2.ts';
@@ -84,11 +84,11 @@ describe('activated V2 audit application boundaries', function() {
     expect((await fetch(`${origin}/admin/security-audits/download/invalid/name.json`, options)).status).to.equal(404);
   });
 
-  it('uses catalog v2 for signed uploads on the installed staging receiver', async function() {
+  it('uses catalog v3 for signed uploads on the installed staging receiver', async function() {
     this.timeout(10000);
     const suffix = randomBytes(8).toString('hex'), clock = new Date();
     const priorCatalog = await fullReportFixture(AUDIT_CATALOG_V1, 'synthetic-staging-v1-' + suffix, clock);
-    const current = await fullReportFixture(AUDIT_CATALOG_V2, 'synthetic-staging-v2-' + suffix, clock);
+    const current = await fullReportFixture(AUDIT_CATALOG_V3, 'synthetic-staging-v3-' + suffix, clock);
     const signingFixture = 'synthetic-staging-receiver-signing-fixture';
     const priorEnvironment = {
       ROOT_URL: process.env.ROOT_URL,
@@ -114,7 +114,7 @@ describe('activated V2 audit application boundaries', function() {
       const accepted = await submit(current);
       expect(accepted.status).to.equal(201);
       expect(await accepted.json()).to.deep.equal({ stored: true });
-      const store = createAuditReportStoreV2(SecurityAuditReportsV2, () => new Date(), AUDIT_CATALOG_V2);
+      const store = createAuditReportStoreV2(SecurityAuditReportsV2, () => new Date(), AUDIT_CATALOG_V3);
       expect(await store.get(priorCatalog.reportId)).to.equal(null);
       expect(await store.get(current.reportId)).to.deep.equal(current);
     } finally {

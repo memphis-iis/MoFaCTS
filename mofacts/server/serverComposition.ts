@@ -84,7 +84,7 @@ import { createDeploymentReadinessRegistration } from './methods/deploymentReadi
 import { createBackupMethodRegistration, createBackupRegistry } from './methods/backupMethods';
 import { createSecurityAuditRuntimeV2 } from './securityAudit/securityAuditRuntimeV2';
 import { SecurityAuditReportsV2 } from './securityAudit/securityAuditCollectionsV2';
-import { AUDIT_CATALOG_V2 } from '../common/securityAudit/catalogRegistry';
+import { AUDIT_CATALOG_V3 } from '../common/securityAudit/catalogRegistry';
 import { registerSecurityAuditHttp } from './http/securityAudits';
 import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
 import { createExperimentMethodRegistration, issueExperimentLoginToken } from './methods/experimentMethods';
@@ -273,7 +273,7 @@ const authSupport = createAuthSupport({
   getMethodAuthorizationDeps,
 });
 const securityAuditRuntime = createSecurityAuditRuntimeV2({
-  catalog: AUDIT_CATALOG_V2,
+  catalog: AUDIT_CATALOG_V3,
   createReports: () => SecurityAuditReportsV2,
   requireAdminUser: authSupport.requireAdminUser,
   targetOrigin: () => new URL(String(process.env.ROOT_URL || '')).origin,
