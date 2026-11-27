@@ -6,6 +6,7 @@ import { runConnectedResetWorkerV2 } from '../connected-reset-worker.mjs';
 const namespace = 'mofacts_audit_fixture_0123456789ab';
 async function run(mode) {
   const integrated = mode === 'integrated';
+  const freshOnly = mode === 'first-use';
   const expiryOnly = mode === 'expiry';
   const protocol = integrated || expiryOnly || mode.startsWith('protocol-');
   const comparison = mode === 'comparison';
@@ -37,16 +38,16 @@ async function run(mode) {
   let result, error;
   try {
     result = await runConnectedResetWorkerV2({ namespace, deadlineMs: Date.now() + (protocol ? 6000000 : 2000),
-      scope: expiryOnly ? 'expiry' : integrated ? 'integrated' : protocol ? 'protocol' : comparison ? 'comparison' : 'current',
+      scope: freshOnly ? 'first-use' : expiryOnly ? 'expiry' : integrated ? 'integrated' : protocol ? 'protocol' : comparison ? 'comparison' : 'current',
       socketPath: '/private/scanner.sock', leaseDirectory: '/private/lease', input, output }, {
       withHandoff: async options => {
         if (mode === 'lease-denied') throw new Error('PRIVATE_LEASE_DETAIL');
         ready = true;
         let value, failure;
-        try { value = await options.run({ acquireMail: async () => { if (!protocol) throw new Error('Unexpected mail'); return {plainText:'PRIVATE'}; },
+        try { value = await options.run({ acquireMail: async () => { if (!protocol && !freshOnly) throw new Error('Unexpected mail'); return {plainText:'PRIVATE'}; },
           acquireVerificationMail: async binding => ({ metadata: { messageId: 'owned', recipients: [binding.recipient], receivedAtMs: binding.requestedAtMs },
             plainText: `${binding.target}/auth/verify-email?token=PRIVATE_NATIVE_TOKEN` }),
-          beginResetWindow: async () => { assert.equal(comparison, false); }, beginExpiryWindow:async()=>{}, confirmMailLease:async()=>{} }); }
+          beginResetWindow: async () => { assert.equal(comparison, false); }, beginExpiryWindow:async()=>{ assert.equal(freshOnly, false); }, confirmMailLease:async()=>{} }); }
         catch (caught) { failure = caught; }
         cleanupAccepted = await options.verifyClean();
         if (!cleanupAccepted) throw new Error('Cleanup not verified');
@@ -71,7 +72,7 @@ async function run(mode) {
         return { result: { status: 'PASS' } };
       },
       captureFresh: async options => {
-        assert.equal(expiryOnly, true);
+        assert.equal(freshOnly || expiryOnly, true);
         await options.acquireMail({});
         sequence.push('fresh-reset');
         return { freshResetBaseline: { status: 'PASS', results: [
@@ -80,7 +81,7 @@ async function run(mode) {
         ] } };
       },
       capture: async options => {
-        assert.equal(expiryOnly, false);
+        assert.equal(freshOnly || expiryOnly, false);
         assert.equal(options.actor.password, 'PRIVATE_SYNTHETIC_PASSWORD');
         assert.equal(options.newPassword, 'PRIVATE_SYNTHETIC_NEW_PASSWORD');
         if (mode === 'capture-error') throw new Error('PRIVATE_CAPTURE_DETAIL');
@@ -117,6 +118,17 @@ test('integrated reset, comparison and logout execute in the observed lease orde
   assert.equal(value.result.comparisons.proofs.length, 2);
   assert.equal(value.result.logout.result.status, 'PASS');
   assert.equal(value.cleanupAccepted, true);
+});
+
+test('first-use scope verifies one fresh reset and removes its single owned fixture', async () => {
+  const value = await run('first-use');
+  assert.equal(value.error, undefined);
+  assert.deepEqual(value.sequence, ['fresh-reset']);
+  assert.equal(value.result.freshResetBaseline.status, 'PASS');
+  assert.deepEqual(Object.keys(value.result), ['freshResetBaseline']);
+  assert.equal(value.cleanupAccepted, true);
+  assert.equal(value.transportClosed, 1);
+  assert.equal(value.browserClosed, 1);
 });
 
 test('expiry scope uses only the fresh baseline and the owned unused expired capability', async () => {

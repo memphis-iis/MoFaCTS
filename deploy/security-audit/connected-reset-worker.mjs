@@ -20,10 +20,11 @@ const unavailable = () => new Error('Connected reset qualification requires owne
 export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketPath, leaseDirectory,
   scope = 'current', input = process.stdin, output = process.stdout }, dependencies = {}) {
   fixtureNamespaceV2(namespace);
+  const freshOnly = scope === 'first-use';
   const expiryOnly = scope === 'expiry';
   const coupleExpiry = expiryOnly || scope === 'protocol' || scope === 'integrated';
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= Date.now() || deadlineMs - Date.now() > 7200000) throw unavailable();
-  if (!['current', 'protocol', 'comparison', 'integrated', 'expiry'].includes(scope)
+  if (!['first-use', 'current', 'protocol', 'comparison', 'integrated', 'expiry'].includes(scope)
     || coupleExpiry && deadlineMs - Date.now() < (scope === 'integrated' ? 4200000 : 3900000)) throw unavailable();
   let pending, buffer = Buffer.alloc(0), failed = false;
   const reject = () => { failed = true; if (pending) { const current = pending; pending = undefined; current.reject(unavailable()); } };
@@ -46,7 +47,7 @@ export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketP
   input.on('data', receive); input.on('error', reject); input.on('end', reject); output.on('error', reject);
   const timer = setTimeout(reject, Math.max(1, deadlineMs - Date.now()));
   const own = dependencies.withHandoff ?? withScannerMailHandoffV2;
-  const capture = expiryOnly ? dependencies.captureFresh ?? captureFreshResetBaselineV2
+  const capture = freshOnly || expiryOnly ? dependencies.captureFresh ?? captureFreshResetBaselineV2
     : dependencies.capture ?? captureCurrentResetV2;
   const captureExpiry = dependencies.captureExpiry ?? captureUnusedExpiredResetV2;
   const captureComparisons = dependencies.captureComparisons ?? captureAuthenticationComparisonsV2;
@@ -94,7 +95,7 @@ export async function runConnectedResetWorkerV2({ namespace, deadlineMs, socketP
             }
           };
           const current = await scenario('fixture-needed', 'reset', options => capture({ ...options,
-            acquireMail: scope === 'current' ? acquireMail : async binding => {
+            acquireMail: freshOnly || scope === 'current' ? acquireMail : async binding => {
               const mail = await acquireMail(binding), frame = await ask('current-age-needed');
               if (Object.keys(frame).sort().join(',') !== 'metadata,operation') throw unavailable();
               const metadata = frame.metadata;
@@ -158,7 +159,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     if (extra.length || process.version !== 'v24.22.1') throw unavailable();
     const result = await runConnectedResetWorkerV2({ namespace, deadlineMs: Number(rawDeadline), socketPath, leaseDirectory, scope });
-    if (scope === 'expiry') {
+    if (scope === 'first-use') {
+      if (result?.freshResetBaseline?.status !== 'PASS') process.exitCode = 1;
+    } else if (scope === 'expiry') {
       if (!['PASS', 'FAIL'].includes(result?.protocol?.expired?.status)) process.exitCode = 1;
     } else if (scope === 'comparison' ? result?.proofs?.length !== 2 || result.proofs.some(row => row.status === 'ERROR')
       : ['current', 'session', 'lifetime'].some(key => !result?.[key] || result[key].status === 'ERROR')) process.exitCode = 1;

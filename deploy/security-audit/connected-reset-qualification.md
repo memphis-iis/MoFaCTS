@@ -117,6 +117,14 @@ This proves operator-assisted connected mail and the current reset/session
 branch. Unused genuinely aged-token expiry, the catalog-complete authentication
 artifact, scheduled mail and alert acceptance remain separate unfinished gates.
 
+## Fresh reset first-use evidence
+
+The explicit `first-use` worker scope opens one verified disposable account and
+uses its fresh reset once. It confirms that the new password works and requires
+verified cleanup before releasing the lease. Its receipt records the live
+mail, first-use and ordinary login baseline. The complete single-use and
+session controls retain their existing evidence requirements.
+
 ## Reset expiry evidence
 
 The `expiry` worker scope collects only the expired-reset control. It uses the
