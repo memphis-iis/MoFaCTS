@@ -19,9 +19,11 @@ These scripts support the canonical root `deploy/` workflow. They should fail cl
 `harden-runtime-npm-dependencies.sh` owns the reviewed dependency replacements
 in the pinned Meteor server bundle. It checks expected upstream versions,
 installs replacements from `runtime-npm/package-lock.json`, and verifies that
-they load before the bundle audit runs. The nested install keeps dependencies with each replacement
-when it moves into the bundle. Keep these targets aligned with the selected
-Meteor packages.
+they load before the bundle audit runs. The nested install keeps dependencies
+with each replacement when it moves into the bundle. The
+[Meteor email package](../../mofacts/packages/email/MOFACTS.md) pins
+Nodemailer before compilation. Keep the hardener's version assertion and
+message checks aligned with that package.
 
 Update the manifest and its lockfile together in `runtime-npm/` with the
 repository-pinned npm and

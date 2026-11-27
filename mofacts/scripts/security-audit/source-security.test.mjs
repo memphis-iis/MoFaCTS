@@ -669,6 +669,8 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   const runtimeNpmHardening = fs.readFileSync(new URL('../../../deploy/docker/harden-runtime-npm-dependencies.sh', import.meta.url), 'utf8');
   const replacementManifest = JSON.parse(fs.readFileSync(new URL('../../../deploy/docker/runtime-npm/package.json', import.meta.url), 'utf8'));
   const replacementLock = JSON.parse(fs.readFileSync(new URL('../../../deploy/docker/runtime-npm/package-lock.json', import.meta.url), 'utf8'));
+  const emailPackage = fs.readFileSync(new URL('../../packages/email/package.js', import.meta.url), 'utf8');
+  const emailSource = fs.readFileSync(new URL('../../packages/email/email.js', import.meta.url), 'utf8');
   const mongoReadiness = fs.readFileSync(new URL('../../../deploy/docker/connect-to-mongo.sh', import.meta.url), 'utf8');
   assert.match(dockerfile, /apk update && apk upgrade --no-cache && apk add --no-cache/);
   assert.match(dockerfile, /harden-runtime-npm-dependencies\.sh/);
@@ -682,7 +684,7 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   assert.doesNotMatch(runtimeNpmHardening, /rm -rf "\$ACCOUNTS_NPM_ROOT"/);
   assert.deepEqual(Object.keys(replacementManifest.dependencies).sort(), [
     'baseline-browser-mapping', 'browserslist', 'caniuse-lite', 'electron-to-chromium', 'nanoid',
-    'node-releases', 'nodemailer', 'openpgp', 'postcss', 'source-map-js', 'svgo', 'tmp', 'update-browserslist-db',
+    'node-releases', 'openpgp', 'postcss', 'source-map-js', 'svgo', 'tmp', 'update-browserslist-db',
   ]);
   assert.deepEqual(replacementLock.packages[''].dependencies, replacementManifest.dependencies);
   for (const [name, version] of Object.entries(replacementManifest.dependencies)) {
@@ -692,6 +694,13 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   assert.match(runtimeNpmHardening, /npm ci .*--install-strategy=nested --omit=dev/);
   assert.doesNotMatch(runtimeNpmHardening, /ostrio_files|lodash/);
   assert.match(runtimeNpmHardening, /Patched browserslist failed its runtime load check/);
+  const nodemailerVersion = /\bnodemailer: '(\d+\.\d+\.\d+)'/.exec(emailPackage)?.[1];
+  assert.ok(nodemailerVersion, 'Meteor email must pin Nodemailer at build time');
+  assert.ok(runtimeNpmHardening.includes(`assert_package_version "$EMAIL_NPM_ROOT/nodemailer/package.json" '${nodemailerVersion}'`));
+  assert.doesNotMatch(runtimeNpmHardening, /replace_package .*nodemailer/);
+  assert.match(emailSource, /Npm\.require\('nodemailer'\)/);
+  assert.match(emailSource, /requireNodemailerExport\('\.\/lib\/well-known'\)/);
+  assert.match(emailSource, /requireNodemailerExport\('\.\/lib\/mail-composer'\)/);
   assert.match(runtimeNpmHardening, /Patched Nodemailer message check failed/);
   assert.match(runtimeNpmHardening, /assert_package_version/);
   assert.match(mongoReadiness, /meteor\/npm-mongo\/node_modules\/mongodb/);

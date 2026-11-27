@@ -8,7 +8,6 @@
     "electron-to-chromium": "1.5.420",
     "nanoid": "3.3.18",
     "node-releases": "2.0.54",
-    "nodemailer": "10.6.1",
     "openpgp": "5.11.3",
     "postcss": "8.5.33",
     "source-map-js": "1.2.2",
