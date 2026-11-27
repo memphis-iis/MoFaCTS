@@ -162,6 +162,7 @@ const reproducibleAuthenticationTest = <const VerificationId extends string, con
     expectedOutcome: 'pass' as const, mutation: 'none' as const });
 const passwordTimingSuite = 'password timing defense';
 const serverAuthSuite = 'server auth and session methods';
+const publicTdfSuite = 'public TDF and stimulus method authorization';
 const progressPrivacySuite = 'approved progress-privacy selection on the registered Meteor publication';
 const progressDdpCase = 'resumes a passwordless study session and scopes progress on its real DDP connection';
 export const REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS = Object.freeze({
@@ -181,7 +182,7 @@ export const REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS = Object.freeze({
     'publication:userExperimentState', progressPrivacySuite,
     progressDdpCase),
   modifiedTarget: reproducibleAuthenticationTest('reproducible.authn.passwordless-modified-target',
-    'method:provisionExperimentUser', serverAuthSuite,
+    'method:provisionExperimentUser', publicTdfSuite,
     'retains the recorded experiment binding when a progress-backed participant tries another target'),
   passwordlessContainment: reproducibleAuthenticationTest('reproducible.authn.passwordless-containment',
     'publication:userExperimentState', progressPrivacySuite,

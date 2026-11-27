@@ -2029,7 +2029,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 112 total, 107 consumed, 1 reserved, 3 generally available,
+**Current allowance: 112 total, 108 consumed, 1 reserved, 2 generally available,
 and 1 separately restricted to the earlier `/health` batch.**
 
 On 2026-11-27 the operator authorized up to five additional Meteor integration
@@ -2053,14 +2053,26 @@ and log SHA-256
 The failed receipt is not qualification evidence. Four slots remain available
 for the corrected exact source and any necessary retries.
 
-Slot 109 is reserved for the published correction that binds each reproducible
+Slot 109 passed the complete suite on the published correction that binds each reproducible
 authentication proof to its real installed framework, method or publication
 surface and projects every Meteor proof owned by that surface into the startup
 inventory. The correction passed full TypeScript and lint checks. The focused
 receipt-composition checks passed; the Windows source suite passed 186 checks
 and reached only its six Linux-only firewall fixtures, which Windows attempted
-against the unrelated default WSL distribution. The exact slot 109 revision is
-the commit containing this reservation record.
+against the unrelated default WSL distribution. Exact revision
+`4d91a0c8ecb6e202c894b15253fe84a898ec5759` ran from retained job
+`/var/tmp/mofacts-integration.V3A875D619` from 18:43:44 to 18:45:51 UTC.
+Server recorded 1,165 passed and 15 pending; Chromium recorded 1,256 passed and
+seven pending, with zero failures or failed hooks. Cleanup completed. Native
+receipt SHA-256
+`05dac8aabd0ed37a60c144a71ceb3838f4fa9ddd41a484715c5e713c8187476c`;
+startup-registry SHA-256
+`5b769b326693dff5158852767959c395aaa55e0cd336789c861be4a445598259`.
+The source-proof composer then correctly rejected one catalog-to-case mismatch:
+the passed modified-target case belongs to `public TDF and stimulus method
+authorization`, not `server auth and session methods`. Slot 109 therefore does
+not qualify the source bundle. Slot 110 is reserved for the exact published
+suite-label correction; two general slots remain unreserved.
 
 Slot 107 passed on exact receiver candidate `946af9ac415b105f1ed7c1fe0c0cf3f73f0410e8` on November 25, 17:05:04–17:07:11 UTC. Server 1,160 passed and 15 pending. Chromium 1,256 passed and seven pending. Zero test or hook failures. The server receiver case ID `de861bceccf65ec6bda886fb03891dee72036aceed922bcfd6c462f6249e468c` passed in the receipt-bound run data. The existing 6 GiB/two-CPU worker checked 266.9 GiB free on C: and 13.7 GiB available guest memory and reused its pinned tool image. Cleanup verified exit 0, absence of job-labelled containers, volumes and network, and removal of generated dependencies and Meteor build state. Retained job `/var/tmp/mofacts-integration.egvE7ZsC`, native receipt SHA-256 `1a1d86ac2c56cb0b93a911973cc6726bc13db9d5d5c06743afb575aecd0f56c2` and startup registry SHA-256 `4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63`. The verified source bundle is in `tmp/mofacts-qualified-build-jhqeIp/verification-bundle.json` under the retained job.
 
