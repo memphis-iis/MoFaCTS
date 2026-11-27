@@ -168,6 +168,8 @@ describe('approved progress-privacy selection on the registered Meteor publicati
       const ordinary = await method(ws, 'login', { resume: ordinaryToken });
       expect(ordinary.error).to.equal(undefined);
       expect(ordinary.result.id).to.equal(userId);
+      const adminDenied = await method(ws, 'admin.securityAudits.list');
+      expect(adminDenied.error).to.include({ error: 'not-authorized' });
 
       const subId = Random.id();
       const publishedIds: string[] = [];

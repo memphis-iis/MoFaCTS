@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import raw from '../../../common/securityAudit/catalogs/control-catalog.v1.json' with { type: 'json' };
+import qualified from '../../../common/securityAudit/catalogs/control-catalog.v2.json' with { type: 'json' };
+import reproducible from '../../../common/securityAudit/catalogs/control-catalog.v3.json' with { type: 'json' };
 import legacy from './fixtures/v1-membership.json' with { type: 'json' };
-import { ACTIVE_AUDIT_CATALOG, parseAuditCatalog, profileControls, readAuditCatalog } from '../../../common/securityAudit/catalogRegistry.ts';
+import { ACTIVE_AUDIT_CATALOG, AUDIT_CATALOG_V3, parseAuditCatalog, profileControls, readAuditCatalog } from '../../../common/securityAudit/catalogRegistry.ts';
 import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
 import { AUDIT_EVIDENCE_CONTRACT_IDS, parseAuditEvidence } from '../../../common/securityAudit/evidenceContracts.ts';
 
@@ -34,6 +36,24 @@ test('V2 catalog: approved splits preserve 44 original identities and never repu
   const levels = prefix => raw.controls.filter(row => row.controlId.startsWith(prefix)).map(row => row.failureSeverity);
   assert.deepEqual(levels('repository.dependencies-application-runtime.'), ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
   assert.deepEqual(levels('repository.dependencies-application-development.'), ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
+});
+
+test('V3 catalog: the approved reproducible closure changes only the fifteen evidence contracts', async () => {
+  const parsed = await readAuditCatalog(AUDIT_CATALOG_V3, 'retained');
+  assert.equal(await auditDigest(reproducible), AUDIT_CATALOG_V3.catalogDigestSha256);
+  assert.equal(AUDIT_CATALOG_V3.catalogDigestSha256, '38812fb9bd06a62634db20d69295cd46f82d417e3edc525ded0758bfa77fca12');
+  assert.equal(profileControls(parsed, 'full').length, 70);
+  const oldById = new Map(qualified.controls.map(row => [row.controlId, row]));
+  const changed = parsed.controls.filter(row => row.evidenceContract !== oldById.get(row.controlId)?.evidenceContract);
+  assert.equal(changed.length, 15);
+  assert.deepEqual(changed.filter(row => row.sectionId === 'authentication').map(row => row.controlId).sort(), [
+    'authentication.authorization', 'authentication.enumeration',
+    'authentication.passwordless.admin-denied', 'authentication.passwordless.cross-user-method-denied',
+    'authentication.passwordless.cross-user-publication-contained',
+    'authentication.passwordless.modified-target-rejected', 'authentication.reset-token.current-single-use',
+    'authentication.reset-token.replay-rejected', 'authentication.session-revocation',
+    'authentication.throttling', 'authentication.timing',
+  ]);
 });
 
 test('V2 catalog: reject unresolved/duplicate/wrong-section metadata and profile mutations', () => {
@@ -121,6 +141,9 @@ test('V2 evidence: every released proof shape accepts complete observations and 
     'session-lifetime-v1': { lifetimeDays: 30, authenticated: true },
     'session-lifetime-v2': { lifetimeDays: 30, authenticated: true, freshSessionVerified: true },
     'verification-observations-v1': { expectedCaseCount: 2, completedCaseCount: 2, matchedCaseCount: 2, domainRejectionCount: 0, transportErrorCount: 0, inconclusiveCaseCount: 0 },
+    'reproducible-authentication-v1': { requiredCaseCount: 1, passedCaseCount: 1, ordinaryLoginSmokePassed: true, resetSmokePassed: true, passwordlessSmokePassed: true },
+    'deployment-network-attestation-v1': { cloudUnexpectedAllowRuleCount: 0, hostUnexpectedAllowRuleCount: 0, unexpectedListenerCount: 0, unexpectedDockerPublicationCount: 0, httpReachable: true, httpsReachable: true },
+    'mongodb-deployment-attestation-v1': { disposableUnauthenticatedReadRejected: true, disposableAuthenticatedReadSucceeded: true, authEnabled: true, privateBinding: true, unexpectedDockerPublicationCount: 0, authenticatedHealthPassed: true },
     'host-configuration-v1': { requiredSettingCount: 3, presentSettingCount: 3, rootOwned: true, rootOnly: true },
     'host-listeners-v1': { inspectedListenerCount: 5, unexpectedListenerCount: 0, unexpectedUdpListenerCount: 0 },
     'application-listener-v1': { expectedListenerPresent: true },

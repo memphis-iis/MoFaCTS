@@ -53,6 +53,9 @@ const contracts: Readonly<Record<string, Readonly<Record<string, Field>>>> = {
   'enumeration-observations-v2': { ...comparisonFields, loginResponseMatch: 'boolean', resetResponseMatch: 'boolean' },
   'timing-observations-v2': { ...comparisonFields, ...timingComparisonFields },
   'verification-observations-v1': { expectedCaseCount: 'count', completedCaseCount: 'count', matchedCaseCount: 'count', domainRejectionCount: 'count', transportErrorCount: 'count', inconclusiveCaseCount: 'count' },
+  'reproducible-authentication-v1': { requiredCaseCount: 'count', passedCaseCount: 'count', ordinaryLoginSmokePassed: 'boolean', resetSmokePassed: 'boolean', passwordlessSmokePassed: 'boolean' },
+  'deployment-network-attestation-v1': { cloudUnexpectedAllowRuleCount: 'count', hostUnexpectedAllowRuleCount: 'count', unexpectedListenerCount: 'count', unexpectedDockerPublicationCount: 'count', httpReachable: 'boolean', httpsReachable: 'boolean' },
+  'mongodb-deployment-attestation-v1': { disposableUnauthenticatedReadRejected: 'boolean', disposableAuthenticatedReadSucceeded: 'boolean', authEnabled: 'boolean', privateBinding: 'boolean', unexpectedDockerPublicationCount: 'count', authenticatedHealthPassed: 'boolean' },
   ...HOST_EVIDENCE_FIELDS,
 };
 
@@ -126,6 +129,25 @@ export function parseAuditEvidence(id: string, status: AuditControlStatus, value
     : hasHostEvidenceContract(id) ? parseHostEvidenceMeasurements(id, status, record.metrics, record.observations)
       : auditMeasurements(record.metrics, fields);
   const result: AuditEvidence = { summary: auditText(record.summary, 500), metrics };
+  if (id === 'reproducible-authentication-v1') {
+    const complete = Number(metrics.requiredCaseCount) > 0 && metrics.passedCaseCount === metrics.requiredCaseCount
+      && metrics.ordinaryLoginSmokePassed === true && metrics.resetSmokePassed === true
+      && metrics.passwordlessSmokePassed === true;
+    if (status !== (complete ? 'PASS' : 'FAIL')) throw new Error('Reproducible authentication evidence contradicts status');
+  }
+  if (id === 'deployment-network-attestation-v1') {
+    const complete = metrics.cloudUnexpectedAllowRuleCount === 0 && metrics.hostUnexpectedAllowRuleCount === 0
+      && metrics.unexpectedListenerCount === 0 && metrics.unexpectedDockerPublicationCount === 0
+      && metrics.httpReachable === true && metrics.httpsReachable === true;
+    if (status !== (complete ? 'PASS' : 'FAIL')) throw new Error('Deployment network evidence contradicts status');
+  }
+  if (id === 'mongodb-deployment-attestation-v1') {
+    const complete = metrics.disposableUnauthenticatedReadRejected === true
+      && metrics.disposableAuthenticatedReadSucceeded === true && metrics.authEnabled === true
+      && metrics.privateBinding === true && metrics.unexpectedDockerPublicationCount === 0
+      && metrics.authenticatedHealthPassed === true;
+    if (status !== (complete ? 'PASS' : 'FAIL')) throw new Error('MongoDB deployment evidence contradicts status');
+  }
   if (id === 'session-lifetime-v2' && (metrics.authenticated !== true || metrics.freshSessionVerified !== true
       || status !== sessionLifetimeStatus(Number(metrics.lifetimeDays)))) {
     throw new Error('Session lifetime evidence cannot establish the claimed status');

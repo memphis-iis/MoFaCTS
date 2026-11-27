@@ -1,5 +1,6 @@
 import catalogV1 from './catalogs/control-catalog.v1.json' with { type: 'json' };
 import catalogV2 from './catalogs/control-catalog.v2.json' with { type: 'json' };
+import catalogV3 from './catalogs/control-catalog.v3.json' with { type: 'json' };
 import { auditDigest } from './canonicalReport.ts';
 import { auditText, hasEvidenceContract } from './evidenceContracts.ts';
 import { contentDigest, proofRecord, proofString } from './proofFields.ts';
@@ -83,12 +84,16 @@ export function parseAuditCatalog(value: unknown): AuditCatalog {
 // use ACTIVE_AUDIT_CATALOG. The receiver can select a registered catalog at
 // composition time for isolated report storage qualification.
 export const AUTHENTICATION_QUALIFICATION_CATALOG = parseAuditCatalog(catalogV2);
+export const REPRODUCIBLE_QUALIFICATION_CATALOG = parseAuditCatalog(catalogV3);
 const retained = Object.freeze([Object.freeze({
   catalog: parseAuditCatalog(catalogV1),
   digest: '6a9cd0c985bdec14b0d78d2b731975005ed8cd69e76bb7597c8ada2564ba688d',
 }), Object.freeze({
   catalog: AUTHENTICATION_QUALIFICATION_CATALOG,
   digest: '00825a1d183e3b1b3d1014273e49c3f1de17c3bd0a8207299e5778d4c44e5ac4',
+}), Object.freeze({
+  catalog: REPRODUCIBLE_QUALIFICATION_CATALOG,
+  digest: '38812fb9bd06a62634db20d69295cd46f82d417e3edc525ded0758bfa77fca12',
 })]);
 export const AUDIT_CATALOG_V1: AuditCatalogCoordinates = Object.freeze({
   catalogId: 'mofacts-security-audit-controls', catalogVersion: 1,
@@ -99,6 +104,13 @@ export const AUDIT_CATALOG_V2: AuditCatalogCoordinates = Object.freeze({
   catalogVersion: AUTHENTICATION_QUALIFICATION_CATALOG.catalogVersion,
   catalogDigestSha256: retained[1]!.digest,
 });
+export const AUDIT_CATALOG_V3: AuditCatalogCoordinates = Object.freeze({
+  catalogId: REPRODUCIBLE_QUALIFICATION_CATALOG.catalogId,
+  catalogVersion: REPRODUCIBLE_QUALIFICATION_CATALOG.catalogVersion,
+  catalogDigestSha256: retained[2]!.digest,
+});
+// Activation follows complete producer and receiver qualification. Registering
+// V3 here preserves V1/V2 readback without changing current ingestion early.
 export const ACTIVE_AUDIT_CATALOG = AUDIT_CATALOG_V1;
 
 export async function readAuditCatalog(value: unknown, purpose: 'ingestion' | 'retained',

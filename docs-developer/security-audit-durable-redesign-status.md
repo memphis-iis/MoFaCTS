@@ -81,6 +81,39 @@ four-section report, unattended scheduling and the coordinated production
 cutover remain separate gates. The Phase 1 production recording gate (P1-04)
 remains with that production window.
 
+## Reproducible closure contract for the final 15 staging2 controls (approved 2026-11-27)
+
+- [x] Identify and remove the circular acceptance rule. The prior rule required a
+  second operator to create fifteen fresh black-box observations, while the
+  prepared handoff and independent reviewer could only inspect supplied evidence.
+  Repeating that review could never change its result.
+- [x] Approve one replacement path that closes the original control IDs. This is
+  a normative amendment to catalog acceptance, not a second defensive profile.
+  The former live-observation-only requirements are superseded when the complete
+  replacement evidence passes.
+- [x] Implement the append-only V3 catalog and strict closeout path. Catalog V3
+  changes exactly the fifteen approved evidence contracts; V1/V2 remain readable.
+  The assembler now accepts an explicitly selected registered catalog, requires
+  all five complete reviewed producer artifacts, replaces exactly fifteen rows,
+  rejects a non-passing unchanged row and emits exactly seventy unique controls.
+  On 2026-11-27 full typecheck and lint passed, and seventeen focused catalog,
+  assembly and closeout tests passed. The complete Windows source suite reached
+  the V3 cases but its Linux-only firewall fixtures could not run because that
+  session had no default WSL distribution; the required Linux execution remains
+  part of the exact-source gate and is not recorded as a product failure or pass.
+- [ ] Bind eleven authentication controls to exact-revision deterministic Meteor
+  cases and an ordinary staging2 sign-in/reset/passwordless smoke observation.
+- [ ] Bind the three public-network controls to the effective Lightsail and host
+  firewalls, Docker publications, host listeners and successful HTTP/HTTPS
+  observations.
+- [ ] Bind MongoDB unauthenticated-access to an equivalent disposable service
+  test plus deployed private binding, authentication configuration, Docker
+  publication state and authenticated health evidence.
+- [ ] Produce and accept one signed 70-control report with zero execution errors,
+  independently read it back, verify its archive and mark the fifteen replacement
+  contracts complete. Do not retain a parallel open list for the superseded
+  requirements.
+
 ## Phase 3 remaining work (reconciled 2026-11-21)
 
 Use the evidence entries below for individual completed bindings. These are the remaining groups from the Phase 3 deliverables and exit gates.

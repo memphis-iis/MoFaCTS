@@ -4,8 +4,8 @@ import { auditSectionStatus, finalizeAuditReport, parseSecurityAuditReportV2 } f
 
 // Named recovery boundary: a missing/invalid slot invalidates that producer's
 // entire catalog-owned subset. It cannot repair an already assembled report.
-export async function assembleAuditReportV2({ artifacts, ...envelope }) {
-  const catalog = await readAuditCatalog(ACTIVE_AUDIT_CATALOG, 'ingestion');
+export async function assembleAuditReportV2({ artifacts, acceptedCatalog = ACTIVE_AUDIT_CATALOG, ...envelope }) {
+  const catalog = await readAuditCatalog(acceptedCatalog, 'ingestion', acceptedCatalog);
   const producers = expectedAuditProducers(catalog, envelope.reportType);
   if (!Array.isArray(artifacts) || artifacts.length > producers.length * 2
     || artifacts.some(slot => !slot || Object.keys(slot).length !== 2
@@ -41,9 +41,9 @@ export async function assembleAuditReportV2({ artifacts, ...envelope }) {
     }));
     return [sectionId, { sectionId, status: auditSectionStatus(controls), controls }];
   }));
-  const report = await finalizeAuditReport({ ...envelope, schema: 'SecurityAuditReportV2', ...ACTIVE_AUDIT_CATALOG,
+  const report = await finalizeAuditReport({ ...envelope, schema: 'SecurityAuditReportV2', ...acceptedCatalog,
     sections, executionErrors: [...executionErrors] });
   // Use the same strict parser as the receiver. Invalid identity/envelope data
   // is rejected here; assembly never guesses identities or control policy.
-  return parseSecurityAuditReportV2(report, { purpose: 'retained' });
+  return parseSecurityAuditReportV2(report, { purpose: 'retained' }, acceptedCatalog);
 }

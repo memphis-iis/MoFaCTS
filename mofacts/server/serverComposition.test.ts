@@ -20,6 +20,7 @@ import { CONDITION_COUNT_VERIFICATIONS, STIMULUS_FILE_VERIFICATION } from '../co
 import { FRAMEWORK_AUTH_VERIFICATIONS } from '../common/securityAudit/verificationCatalog';
 import { registeredFrameworkAuthSurfaces } from './securitySurfaces/registerFrameworkAuth';
 import { registeredMeteorMethodSurfaces } from './securitySurfaces/registerMeteorMethods';
+import { LOGIN_AUTH_THROTTLE_POLICY } from './startup/serverStartup';
 
 const MeteorAny = Meteor as any;
 const MeteorUsersAny = Meteor.users as any;
@@ -196,6 +197,23 @@ describe('server auth and session methods', function() {
     }
     const result = await MeteorAny.server.method_handlers.resendVerificationEmail.call({ userId: null }, Random.id() + '@example.invalid');
     expect(result).to.deep.equal({ success: true });
+  });
+
+  it('binds password login connection, identifier and IP throttle policies', async function() {
+    const limiter = DDPRateLimiter as typeof DDPRateLimiter & {
+      findAllMatchingRulesAsync(input: {
+        type: string; name: string; connectionId: string; userId: null;
+      }): Promise<unknown[]>;
+    };
+    const rules = await limiter.findAllMatchingRulesAsync({
+      type: 'method', name: 'login', connectionId: Random.id(), userId: null,
+    });
+    expect(rules.length).to.be.greaterThan(0);
+    expect(LOGIN_AUTH_THROTTLE_POLICY).to.deep.equal({
+      ip: { limit: 20, windowMs: 900000 },
+      identifier: { limit: 10, windowMs: 900000 },
+      softLock: { threshold: 8, windowMs: 900000, lockMs: 900000 },
+    });
   });
 
   it('keeps installed account settings and sign-in updates scoped to the caller', async function() {

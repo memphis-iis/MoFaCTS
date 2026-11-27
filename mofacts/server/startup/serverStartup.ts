@@ -166,6 +166,12 @@ const WebAppAny = WebApp as unknown as {
   };
 };
 
+export const LOGIN_AUTH_THROTTLE_POLICY = Object.freeze({
+  ip: Object.freeze({ limit: 20, windowMs: 15 * 60 * 1000 }),
+  identifier: Object.freeze({ limit: 10, windowMs: 15 * 60 * 1000 }),
+  softLock: Object.freeze({ threshold: 8, windowMs: 15 * 60 * 1000, lockMs: 15 * 60 * 1000 }),
+});
+
 function registerSecurityHeaders() {
   registerHttpMiddleware(WebAppAny, 'handlers', {
     surfaceId: 'middleware:security-headers',
@@ -665,9 +671,11 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     const clientIp = deps.getAuthClientIp(attempt);
     if (attempt.type === 'password') {
       await deps.assertSoftLock(`login-lock:${identifier || clientIp}`);
-      await deps.assertAuthThrottle('login', `login:ip:${clientIp}`, 20, 15 * 60 * 1000);
+      await deps.assertAuthThrottle('login', `login:ip:${clientIp}`,
+        LOGIN_AUTH_THROTTLE_POLICY.ip.limit, LOGIN_AUTH_THROTTLE_POLICY.ip.windowMs);
       if (identifier) {
-        await deps.assertAuthThrottle('login', `login:id:${identifier}`, 10, 15 * 60 * 1000);
+        await deps.assertAuthThrottle('login', `login:id:${identifier}`,
+          LOGIN_AUTH_THROTTLE_POLICY.identifier.limit, LOGIN_AUTH_THROTTLE_POLICY.identifier.windowMs);
       }
     }
     if (!attempt.allowed) {
@@ -681,7 +689,9 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
         if (identifier) {
           const failureBucket = `login:id:${identifier}`;
           await deps.recordAuthThrottle(failureBucket);
-          await deps.recordSoftLockFailure(`login-lock:${identifier}`, failureBucket, 8, 15 * 60 * 1000, 15 * 60 * 1000);
+          await deps.recordSoftLockFailure(`login-lock:${identifier}`, failureBucket,
+            LOGIN_AUTH_THROTTLE_POLICY.softLock.threshold, LOGIN_AUTH_THROTTLE_POLICY.softLock.windowMs,
+            LOGIN_AUTH_THROTTLE_POLICY.softLock.lockMs);
         }
       }
       Meteor.defer(() => {

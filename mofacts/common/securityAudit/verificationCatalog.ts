@@ -151,6 +151,52 @@ export const AUTHENTICATION_SESSION_VERIFICATIONS = Object.freeze([
 ].map(row => Object.freeze({ ...row, kind: 'protocolQualification' as const, lane: 'remote' as const,
   requiredBaselineIds: Object.freeze([AUTHENTICATION_COMPARISON_BASELINE.verificationId]) })));
 
+// Approved 2026-11-27. These exact-revision Meteor cases replace the circular
+// requirement for a second operator to reacquire eleven black-box observations.
+// A final staging smoke observation remains a separate required input.
+const reproducibleAuthenticationTest = (verificationId: string, suite: string, ...cases: [string, ...string[]]) =>
+  Object.freeze({ verificationId, kind: 'integrationTest' as const, lane: 'meteor' as const,
+    surfaceId: `qualification:${verificationId}` as const, suite, cases: Object.freeze(cases),
+    expectedOutcome: 'pass' as const, mutation: 'none' as const });
+const passwordTimingSuite = 'password timing defense';
+const serverAuthSuite = 'server auth and session methods';
+const progressPrivacySuite = 'approved progress-privacy selection on the registered Meteor publication';
+const progressDdpCase = 'resumes a passwordless study session and scopes progress on its real DDP connection';
+export const REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS = Object.freeze({
+  enumeration: reproducibleAuthenticationTest('reproducible.authn.enumeration', passwordTimingSuite,
+    'equalizes unknown, bcrypt, and Argon2 failures with the missing verifier work',
+    'holds failed password responses to an outcome-independent target'),
+  timing: reproducibleAuthenticationTest('reproducible.authn.timing', passwordTimingSuite,
+    'holds failed password responses to an outcome-independent target',
+    'does not delay successful password logins or non-password login methods',
+    'reports rather than masking work that exceeds the selected envelope'),
+  reset: reproducibleAuthenticationTest('reproducible.authn.reset-and-session-revocation', serverAuthSuite,
+    'rejects an unused aged reset token and verifies current reset, replay denial and stored-session revocation'),
+  authorization: reproducibleAuthenticationTest('reproducible.authn.authorization', progressPrivacySuite,
+    progressDdpCase),
+  modifiedTarget: reproducibleAuthenticationTest('reproducible.authn.passwordless-modified-target', serverAuthSuite,
+    'retains the recorded experiment binding when a progress-backed participant tries another target'),
+  passwordlessContainment: reproducibleAuthenticationTest('reproducible.authn.passwordless-containment', progressPrivacySuite,
+    progressDdpCase),
+  throttling: reproducibleAuthenticationTest('reproducible.authn.throttling', serverAuthSuite,
+    'acknowledges unknown verification recipients and binds public account limits',
+    'binds password login connection, identifier and IP throttle policies'),
+});
+
+export const REPRODUCIBLE_AUTHENTICATION_CONTROL_CASES = Object.freeze({
+  'authentication.enumeration': Object.freeze([REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS.enumeration.verificationId]),
+  'authentication.timing': Object.freeze([REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS.timing.verificationId]),
+  'authentication.reset-token.current-single-use': Object.freeze([REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS.reset.verificationId]),
+  'authentication.reset-token.replay-rejected': Object.freeze([REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS.reset.verificationId]),
+  'authentication.session-revocation': Object.freeze([REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS.reset.verificationId]),
+  'authentication.authorization': Object.freeze([REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS.authorization.verificationId]),
+  'authentication.passwordless.modified-target-rejected': Object.freeze([REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS.modifiedTarget.verificationId]),
+  'authentication.passwordless.admin-denied': Object.freeze([REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS.passwordlessContainment.verificationId]),
+  'authentication.passwordless.cross-user-method-denied': Object.freeze([REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS.passwordlessContainment.verificationId]),
+  'authentication.passwordless.cross-user-publication-contained': Object.freeze([REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS.passwordlessContainment.verificationId]),
+  'authentication.throttling': Object.freeze([REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS.throttling.verificationId]),
+});
+
 export type AuditActorAlias = 'anonymous' | 'learnerA' | 'learnerB' | 'teacherA' | 'teacherB' | 'admin';
 export type AuthorizationProofShape = 'own-settings-v1' | 'self-performance-v1' | 'audit-summary-v2'
   | 'progress-snapshot-v1' | 'settings-snapshot-v1' | 'rendered-route-v1' | 'single-use-download-v1';
@@ -1019,7 +1065,7 @@ export const AUTHORIZATION_VERIFICATIONS = Object.freeze(entries);
 export const AUDIT_VERIFICATIONS = Object.freeze([...AUTHORIZATION_VERIFICATIONS,
   AUTHENTICATION_COMPARISON_BASELINE, ...AUTHENTICATION_PROTOCOL_VERIFICATIONS, ...RESET_PROTOCOL_VERIFICATIONS,
   ...PASSWORDLESS_PROTOCOL_VERIFICATIONS, ...AUTHENTICATION_THROTTLE_CASES, ...AUTHENTICATION_MATERIAL_CASES,
-  ...AUTHENTICATION_SESSION_VERIFICATIONS,
+  ...AUTHENTICATION_SESSION_VERIFICATIONS, ...Object.values(REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS),
   ...HTTP_HEALTH_VERIFICATIONS.endpoints, HTTP_HEALTH_VERIFICATIONS.fallthrough,
   HTTP_AUDIT_VERIFICATIONS.ingest, HTTP_AUDIT_VERIFICATIONS.download, ...Object.values(HTTP_FILE_VERIFICATIONS),
   ...Object.values(DIRECT_WRITE_VERIFICATIONS), ...Object.values(FRAMEWORK_AUTH_VERIFICATIONS), HTTP_FRAMEWORK_RUNTIME_CONFIG_VERIFICATION, ...Object.values(DEFAULT_PUBLICATION_VERIFICATIONS),
