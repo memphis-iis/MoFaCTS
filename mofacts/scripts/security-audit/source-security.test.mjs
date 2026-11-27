@@ -667,9 +667,12 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   ]);
   const dockerfile = fs.readFileSync(new URL('../../../Dockerfile', import.meta.url), 'utf8');
   const runtimeNpmHardening = fs.readFileSync(new URL('../../../deploy/docker/harden-runtime-npm-dependencies.sh', import.meta.url), 'utf8');
+  const replacementManifest = JSON.parse(fs.readFileSync(new URL('../../../deploy/docker/runtime-npm/package.json', import.meta.url), 'utf8'));
+  const replacementLock = JSON.parse(fs.readFileSync(new URL('../../../deploy/docker/runtime-npm/package-lock.json', import.meta.url), 'utf8'));
   const mongoReadiness = fs.readFileSync(new URL('../../../deploy/docker/connect-to-mongo.sh', import.meta.url), 'utf8');
   assert.match(dockerfile, /apk update && apk upgrade --no-cache && apk add --no-cache/);
   assert.match(dockerfile, /harden-runtime-npm-dependencies\.sh/);
+  assert.match(dockerfile, /rm -rf "\$SCRIPTS_FOLDER\/runtime-npm"/);
   assert.match(dockerfile, /rm -rf \/docker\/node_modules \/docker\/package\.json \/docker\/package-lock\.json/);
   assert.match(dockerfile, /rm -rf \/usr\/local\/lib\/node_modules\/npm \/usr\/local\/bin\/npm \/usr\/local\/bin\/npx/);
   assert.match(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$MOFACTS_SOURCE_REVISION/);
@@ -677,13 +680,19 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   assert.match(runtimeNpmHardening, /assert_package_version "\$ACCOUNTS_NPM_ROOT\/argon2\/package\.json" '0\.44\.0'/);
   assert.match(runtimeNpmHardening, /assert_package_version "\$ACCOUNTS_NPM_ROOT\/node-gyp-build\/package\.json" '4\.8\.4'/);
   assert.doesNotMatch(runtimeNpmHardening, /rm -rf "\$ACCOUNTS_NPM_ROOT"/);
-  assert.match(runtimeNpmHardening, /openpgp@5\.11\.3/);
-  assert.match(runtimeNpmHardening, /tmp@0\.2\.7 postcss@8\.5\.18 nanoid@3\.3\.18 svgo@2\.8\.3 nodemailer@9\.0\.1/);
+  assert.deepEqual(Object.keys(replacementManifest.dependencies).sort(), [
+    'baseline-browser-mapping', 'browserslist', 'caniuse-lite', 'electron-to-chromium', 'nanoid',
+    'node-releases', 'nodemailer', 'openpgp', 'postcss', 'source-map-js', 'svgo', 'tmp', 'update-browserslist-db',
+  ]);
+  assert.deepEqual(replacementLock.packages[''].dependencies, replacementManifest.dependencies);
+  for (const [name, version] of Object.entries(replacementManifest.dependencies)) {
+    assert.match(version, /^\d+\.\d+\.\d+$/);
+    assert.equal(replacementLock.packages[`node_modules/${name}`]?.version, version);
+  }
+  assert.match(runtimeNpmHardening, /npm ci .*--install-strategy=nested --omit=dev/);
   assert.doesNotMatch(runtimeNpmHardening, /ostrio_files|lodash/);
-  assert.match(runtimeNpmHardening, /browserslist@4\.28\.8 baseline-browser-mapping@2\.11\.20 caniuse-lite@1\.0\.30001810/);
-  assert.match(runtimeNpmHardening, /electron-to-chromium@1\.5\.420 node-releases@2\.0\.54 update-browserslist-db@1\.3\.2/);
   assert.match(runtimeNpmHardening, /Patched browserslist failed its runtime load check/);
-  assert.match(runtimeNpmHardening, /Patched nodemailer failed its runtime load check/);
+  assert.match(runtimeNpmHardening, /Patched Nodemailer message check failed/);
   assert.match(runtimeNpmHardening, /assert_package_version/);
   assert.match(mongoReadiness, /meteor\/npm-mongo\/node_modules\/mongodb/);
   assert.doesNotMatch(mongoReadiness, /require\('mongodb'\)/);

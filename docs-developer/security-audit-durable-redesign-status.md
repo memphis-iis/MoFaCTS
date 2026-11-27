@@ -2066,7 +2066,9 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 112 total, 109 consumed, 0 reserved, 2 available for the staging2 release, and 1 for the earlier `/health` batch only.**
+**Current allowance: 112 total, 110 consumed, 0 reserved, 1 available for the staging2 release, and 1 for the earlier `/health` batch only.**
+
+Slot 111 passed on exact staging2 remediation source `a2921f7a7948b3ff3908ab96484f8f3429abceb4` from 01:01:21 to 01:03:32 UTC on November 27 (November 26 local). The isolated 6 GiB/two-CPU worker recorded 1,161 server passes and 1,256 Chromium passes, 15 and seven pending respectively, and zero test or hook failures. The app lock change required a new hashed test image. The worker verified the source and isolated mounts, removed its generated files and job resources, and retained `/var/tmp/mofacts-integration.MfaC6d1c/results/native-verification.json` with SHA-256 `e27cb2d9bc243e61910a55690a38eb31abd48f148761027823d69121d8552a6a`. The exact Meteor result precedes the separate image scan and staging2 deployment gates.
 
 Slot 110 passed on exact source `e67e7f141b1d99b48aed39c8d4fe1330a8189ee6` on November 26, 20:14:47–20:16:59 UTC. The isolated 6 GiB/two-CPU worker recorded 1,162 server and 1,258 Chromium passes, 15 and seven pending respectively, and zero test or hook failures. Independent readback matched the new first-Google-owner case `268b0e0cd5fc58a7cbbb630e233f9b8a827a977d711347823143f7c25d15704f` to `passed` in the receipt-bound report. The worker reused its image, removed job resources and generated files, and retained `/var/tmp/mofacts-integration.SjknSfOB/results/native-verification.json` with SHA-256 `d78f2e9a81ca735d7fd9f1f179434c79a5b2cd4d2cff37d69d787cb10fce0890`.
 
