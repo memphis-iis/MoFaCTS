@@ -147,6 +147,7 @@ RUN cd $APP_BUNDLE_FOLDER/bundle/programs/server && \
 # on external Node header downloads.
 RUN bash $SCRIPTS_FOLDER/build-meteor-npm-dependencies.sh && \
     bash $SCRIPTS_FOLDER/harden-runtime-npm-dependencies.sh && \
+    rm -rf "$SCRIPTS_FOLDER/runtime-npm" && \
     echo "[Function] Install bundle npm dependencies and audit" && \
     cd $APP_BUNDLE_FOLDER/bundle/programs/server && \
     npm audit --audit-level=high
