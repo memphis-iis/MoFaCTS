@@ -119,7 +119,7 @@ synthetic integration results retain their original scope.
 | [x] Pass | `repository.source-security-tests` | The approved paired verifier matched all 478 required cases on the same commit and pinned runtime. The unfiltered Linux transcript recorded 474 passes. The Windows transcript passed exactly the four matched Windows-only cases. |
 | [x] Pass | `repository.runtime-image-vulnerabilities.high` | Trivy 0.69.3 found zero high-severity vulnerabilities on the published immutable `8e3a0a48` Linux/amd64 manifest. The accepted staging2 receipt matches that manifest. The preceding manifest had four. |
 | [x] Pass | `repository.runtime-image-vulnerabilities.critical` | The same exact release scan found zero critical vulnerabilities. |
-| [x] Pass | `repository.client-bundle-canaries` | The exact staging2 platform image had 498 files across `web.browser` and `web.browser.legacy`. None contained the approved synthetic server-only encryption value from `mofacts/settings.ci.json`. |
+| [x] Pass | `repository.client-bundle-canaries` | The published `8e3a0a48` platform image had 498 files across `web.browser` and `web.browser.legacy`. None contained the approved synthetic server-only encryption value from `mofacts/settings.ci.json`. Verified the scanner container and temporary files were removed. |
 
 ## Retained evidence
 
@@ -164,7 +164,15 @@ session-storage contract after the first observer looked in local storage.
 Verified logout and the same deployed image before and after the accepted run.
 Password reset retains its separate controls and evidence requirements.
 
-The `browser-bundle-canaries.json` receipt records 498 inspected files and zero
+The current `current-client-bundle-canaries.json` receipt in
+`staging2-closeout-8e3a0a48-20261127` binds 498 inspected files and zero matches
+to the published `8e3a0a48` Linux/amd64 manifest. The scan used the approved
+synthetic CI input in a read-only, network-disabled container. Its temporary
+container, files and locked tooling installation were removed. Receipt SHA-256
+`1a4077281be3c67cb50a4d5bdce0c602368781d124b1d58ede6b242fa5258fe8`.
+
+The earlier `browser-bundle-canaries.json` receipt for `e9d14a25` records 498
+inspected files and zero
 matches for the approved CI test value. The scan verified the selected image's
 configuration digest against the accepted release, ran as a non-root user in a
 read-only container without networking, and confirmed its container and

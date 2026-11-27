@@ -353,6 +353,37 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
 - [x] Verify the offline review procedure with the pinned tool. Installed its locked dependencies in the isolated checkout and removed the generated dependencies after assembly. Verified the host receipt against the accepted release authority and used a canonical copy for metadata generation. The original capture remains available. The [operator runbook](../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification) records the setup and distinguishes the review from live qualification.
 - [ ] Complete the final evidence record after Phase 3's live Full report gate. It requires the [outstanding observations](security-audit-staging2-control-evidence.md), signed ingestion, independent receiver download and saved archive verification. P1-D9 assigns final production acceptance to a separately authorized coordinated cutover.
 
+### Staging2 closeout preparation (2026-11-27)
+
+- [x] Pin the staging2 release and evidence list. The running app was healthy on
+  `8e3a0a48` with the recorded `2026-11-27T02:38:41.183140486Z`
+  start, unchanged immutable image and matching host receipt bytes. The evidence
+  index names all 70 controls, the retained inputs for 55 recorded passes, and
+  the 15 outstanding observations for one independent-review batch. The
+  observations retain their original deployment and measurement windows.
+- [x] Prepare the report inputs and handoff. Pinned writer `b38039d8` and
+  Node 24.22.1/npm 11.19.1 matched the exact release authority and installed
+  registry proof, validated all five saved producer files, and read back
+  canonical metadata for the accepted image. The existing mail connection
+  returned idle, the staging2 fixture lease was absent, and the saved public
+  encryption-key fingerprint matched. The offline key file was present.
+  The protected `staging2-closeout-8e3a0a48-20261127` folder contains the
+  intake directory, preparation proof and handoff for the 15 open controls.
+  The evidence index SHA-256 is
+  `121c52947f66504c1b3941c79599727bdc5967d73aad55cb517a066dc5ee54aa`.
+  The handoff SHA-256 is
+  `f68835c3f82706d90573c9e523672a52c982203166dd8f9fb3009969fc250859`.
+- [x] Refresh the image-bound canary receipt for the repaired image. The
+  existing read-only, network-disabled scanner examined 498 compiled browser
+  files and found zero matches for the approved synthetic value. The exact
+  platform manifest and cleanup passed. Receipt SHA-256
+  `1a4077281be3c67cb50a4d5bdce0c602368781d124b1d58ede6b242fa5258fe8`.
+  The total remains 55 recorded passes and 15 awaiting evidence.
+- [ ] Open the agreed staging2 qualification window and accept the complete
+  Full report. No audit timer was present during preflight. The scheduled Full
+  run, live Gmail carriage, independent readback, archive verification, and
+  failed-run/missed-run notifications remain acceptance work.
+
 ### Staging2 closeout blockers
 
 Phase 3 and Phase 4 remain open under the existing acceptance criteria. The
