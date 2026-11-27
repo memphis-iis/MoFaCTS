@@ -309,6 +309,39 @@ belong to the affected component's next release.
 | Repair | Finding | Priority | Owner | Acceptance condition |
 | --- | --- | --- | --- | --- |
 | [ ] Open | `repository.runtime-image-vulnerabilities.high` | High | Release maintainer | The pinned image scanner finds zero high-severity vulnerabilities on the replacement Linux/amd64 manifest and the release receipt matches that manifest. |
-| [ ] Open | `repository.dependencies-application-runtime.medium` | Moderate | Application dependency maintainer | The reviewed runtime dependency audit for the exact replacement app lockfile reports zero moderate-severity affected package records. |
-| [ ] Open | `repository.dependencies-sidecar-mongo-runtime.medium` | Moderate | Mongo sidecar maintainer | The reviewed runtime dependency audit for the exact replacement sidecar lockfile reports zero moderate-severity affected package records. |
-| [ ] Open | `repository.dependencies-application-runtime.low` | Low | Application dependency maintainer | The reviewed runtime dependency audit for the exact replacement app lockfile reports zero low-severity affected package records. |
+| [x] Verified | `repository.dependencies-application-runtime.medium` | Moderate | Application dependency maintainer | The exact replacement app lockfile reports zero moderate-severity affected package records. |
+| [x] Verified | `repository.dependencies-sidecar-mongo-runtime.medium` | Moderate | Mongo sidecar maintainer | The exact replacement sidecar lockfile reports zero moderate-severity affected package records. |
+| [x] Verified | `repository.dependencies-application-runtime.low` | Low | Application dependency maintainer | The exact replacement app lockfile reports zero low-severity affected package records. |
+
+The standard operator Security run for replacement source
+`461dc2a5ed1ef88454df49e986fe7a7171158c31` passed all four jobs at
+`2026-11-27T01:13:33.381Z`. Both runtime lock audits reported zero affected
+packages at every severity. The summary SHA-256 is
+`b00b9a36b88e1e1280b94dea31aa08a7e9d965cd3dfc1cd67cc6031b60aa8d2a`.
+These checks establish the three lockfile repairs. The observations above
+retain the original application image and measurement window.
+
+The initial replacement image had zero high and zero critical Trivy findings.
+Its isolated startup stopped in Meteor's email package because the compiler had
+embedded the Nodemailer 8 entry path before the image replaced that package.
+The image stayed local and the startup fixture was removed.
+
+Replacement source `8e3a0a484d146ce85b9733d6065a9d2806296e82` pins Nodemailer
+in the [maintained Meteor email package](../mofacts/packages/email/MOFACTS.md)
+before compilation. A network-disabled isolated Meteor 3.5.4 production
+bundle loaded the package and composed a synthetic message through
+`Email.sendAsync`. The replacement lock also passed its runtime npm audit.
+
+The corrected source passed all four operator Security jobs. Both audited lock
+inventories matched the prior passing bytes. The canonical Compose build
+produced Linux/amd64 engine image
+`sha256:6f5c23e067a4fcdbd0a3c7c235dd5786e638f0a8d60b6f6637244532ea65ec6a`.
+This exact local image returned HTTP 200 in the private Change Streams smoke,
+and Trivy 0.69.3 found zero high and zero critical vulnerabilities. The
+protected scan and health receipts have SHA-256
+`99904f6f64a68049388aa9a266f47fc541aa343311dc6516e310c54cd453ce0c` and
+`7e3a9e0dde4c70434553f124d20142b4c0534bfa9fe335cb0877ccf46d07b065`.
+The isolated containers and network were removed. The image remains a local
+validation build. The fourth item stays open pending exact-source Meteor
+verification, the release build and an accepted staging2 receipt for the
+scanned platform manifest.

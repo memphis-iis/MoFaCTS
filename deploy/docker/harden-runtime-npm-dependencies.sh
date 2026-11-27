@@ -56,7 +56,7 @@ node -e '
 
 echo '[Function] Verify Meteor bundle versions before replacing runtime packages'
 assert_package_version "$EMAIL_NPM_ROOT/openpgp/package.json" '5.11.1'
-assert_package_version "$EMAIL_NPM_ROOT/nodemailer/package.json" '8.0.3'
+assert_package_version "$EMAIL_NPM_ROOT/nodemailer/package.json" '10.6.1'
 assert_package_version "$WEBAPP_NPM_ROOT/tmp/package.json" '0.2.3'
 assert_package_version "$MINIFIER_CSS_NPM_ROOT/postcss/package.json" '8.5.1'
 assert_package_version "$MINIFIER_CSS_NPM_ROOT/nanoid/package.json" '3.3.15'
@@ -70,7 +70,6 @@ npm ci --prefix "$HARDENING_WORKDIR" --install-strategy=nested --omit=dev \
   --ignore-scripts --no-audit --no-fund
 
 replace_package "$EMAIL_NPM_ROOT" openpgp
-replace_package "$EMAIL_NPM_ROOT" nodemailer
 replace_package "$WEBAPP_NPM_ROOT" tmp
 for package in postcss nanoid source-map-js svgo browserslist baseline-browser-mapping \
   caniuse-lite electron-to-chromium node-releases update-browserslist-db
@@ -86,6 +85,7 @@ const { nanoid } = require(minifierRoot + '/nanoid');
 const { optimize } = require(minifierRoot + '/svgo');
 const browserslist = require(minifierRoot + '/browserslist');
 const nodemailer = require(emailRoot + '/nodemailer');
+const emailRequire = require('node:module').createRequire(emailRoot + '/package.json');
 const temporaryFile = tmp.fileSync();
 temporaryFile.removeCallback();
 const css = postcss.parse('a{color:red}', { from: 'input.css' }).toResult({ map: { inline: false } });
@@ -93,6 +93,7 @@ if (css.root.nodes.length !== 1 || css.map.toJSON().sources.length !== 1) throw 
 if (nanoid(8).length !== 8) throw new Error('Patched nanoid failed its runtime load check');
 if (!optimize('<svg xmlns="http://www.w3.org/2000/svg"/>').data) throw new Error('Patched SVGO failed its runtime load check');
 if (!Array.isArray(browserslist('defaults')) || browserslist('defaults').length === 0) throw new Error('Patched browserslist failed its runtime load check');
+if (emailRequire('nodemailer/lib/well-known')('gmail')?.host !== 'smtp.gmail.com') throw new Error('Nodemailer service lookup check failed');
 const transport = nodemailer.createTransport({ jsonTransport: true });
 transport.sendMail({ from: 'sender@example.invalid', to: 'recipient@example.invalid',
   subject: 'Runtime mail composition check', text: 'MoFaCTS runtime' }).then(result => {
