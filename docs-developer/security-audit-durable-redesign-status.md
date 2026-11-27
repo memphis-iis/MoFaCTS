@@ -2245,7 +2245,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 118 total, 116 consumed, 1 reserved, 0 generally available,
+**Current allowance: 118 total, 117 consumed, 0 reserved, 0 generally available,
 and 1 separately restricted to the earlier `/health` batch.**
 
 Slot 113 passed for exact source `8e3a0a484d146ce85b9733d6065a9d2806296e82`
@@ -2306,9 +2306,16 @@ source snapshot
 Cleanup completed; retained job
 `/var/tmp/mofacts-integration.V3C41E02B2`.
 
-Slot 118 is reserved for the exact combined release candidate that merges the
-completed V3 audit work with current main before regular-staging qualification.
-Record the committed revision and result here immediately after the run.
+Slot 118 passed exact combined release candidate
+`248858525c0cd78d67a9c257c1584bc868c2cf90` from 23:48:04 to 23:50:13 UTC
+on November 27. The isolated 6 GiB/two-CPU worker reused its tool image and
+recorded 1,167 server passes and 1,258 Chromium passes, with 15/seven pending,
+zero failures and zero failed hooks. Exact source snapshot SHA-256
+`661cf59c2367fe26d8c23d35412e095ffc29afee0218087c2fcf65dc81cd8121`;
+native receipt SHA-256
+`1188f160e080aa223b72d1c8888faab7dc258de1a106de42b379da8f8a44fe4d`.
+Cleanup completed with exit zero. Retained job
+`/var/tmp/mofacts-integration.RELEASE24885852B`.
 
 Slot 107 passed on exact receiver candidate `946af9ac415b105f1ed7c1fe0c0cf3f73f0410e8` on November 25, 17:05:04–17:07:11 UTC. Server 1,160 passed and 15 pending. Chromium 1,256 passed and seven pending. Zero test or hook failures. The server receiver case ID `de861bceccf65ec6bda886fb03891dee72036aceed922bcfd6c462f6249e468c` passed in the receipt-bound run data. The existing 6 GiB/two-CPU worker checked 266.9 GiB free on C: and 13.7 GiB available guest memory and reused its pinned tool image. Cleanup verified exit 0, absence of job-labelled containers, volumes and network, and removal of generated dependencies and Meteor build state. Retained job `/var/tmp/mofacts-integration.egvE7ZsC`, native receipt SHA-256 `1a1d86ac2c56cb0b93a911973cc6726bc13db9d5d5c06743afb575aecd0f56c2` and startup registry SHA-256 `4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63`. The verified source bundle is in `tmp/mofacts-qualified-build-jhqeIp/verification-bundle.json` under the retained job.
 
