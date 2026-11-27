@@ -115,6 +115,39 @@ The CI runner cleans transient test-generated `meteortesting:*` resolutions from
 - Required verification failures block staging, commit, and push until the user explicitly accepts the identified failure and its relevance/risk.
 - Under the security-audit standing mandate, diagnose and repair routine failures without another approval. When clean committed source is required for the supported retest, publish the locally verified correction and record the failed result honestly. Staging deployment and acceptance still require the applicable checks to pass; this exception does not authorize waiving a failure.
 
+## Release Promotion Standard
+
+- Batch coherent changes and freeze one exact clean release-candidate commit. Run
+  required focused checks throughout development, but reserve full Meteor
+  integration for the final candidate unless an earlier run is needed to
+  diagnose a material failure.
+- Build the canonical Docker image once from that exact candidate. Record the
+  immutable image digest, source identity and required verification evidence.
+- Deploy that exact immutable image to staging2 first. Preserve the prior
+  staging2 image/configuration and verify health, ordinary login/learning and
+  the behavior affected by the release. Run provider or specialized browser
+  checks when their corresponding boundary changed.
+- Promote the identical tested image digest to production only with explicit
+  production-release authorization. Never rebuild a separate production image,
+  patch the live server or substitute a newer unqualified commit.
+- Before production promotion, retain the current production image,
+  configuration and release receipt as one rollback unit. After promotion,
+  verify readiness, HTTPS, login, ordinary learner operation, changed features,
+  exact running-image identity and the protected release receipt. Roll back the
+  complete unit if a required gate fails; repair source and repeat the pipeline.
+- Keep source-test, Meteor, image, staging2, production and full-audit evidence
+  distinct. A result from one boundary cannot be relabeled as another.
+- Run the complete 70-control audit for changes to authentication, authorization,
+  sessions, server methods/publications/routes, uploads/downloads, sensitive
+  dependencies, Docker/network/database/proxy/host configuration, or audit
+  catalog/receiver/scanner/receipt/evidence handling, and for periodic production
+  qualification. Documentation-only, presentation-only and other changes that
+  cannot affect a security boundary use their normal required checks instead.
+- Staging2 remains the continuing qualification server after promotion; it is
+  not replaced by or converted into production. See
+  [the staging2 operating record](deploy/security-audit/staging2-v2-operations.md)
+  and [production audit guide](docs/deployment/security-audit.md).
+
 ## Persistence And Migration Safety
 
 - Learner histories, model state, course assignments, TDF content, and resume identity are durable contracts.
