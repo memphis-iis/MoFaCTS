@@ -51,6 +51,23 @@ failures from skipped/cancelled/TODO, empty-file, runner and import failures.
 The latter cannot count as completed policy matches. Other verification slots
 also require complete actual observations; command success alone supplies none.
 
+The unfiltered Linux run may have the four explicitly owned Windows-only skips.
+An operator can capture the corresponding four tests with the pinned Windows
+Node runtime from a clean checkout at the same commit. Run this from the
+repository and save the result to a new file in the private evidence directory.
+
+```text
+node mofacts/scripts/security-audit/repository/sourceSuiteV2.mjs <exact-clean-Windows-checkout> <private-Windows-evidence.json>
+```
+
+The existing repository producer accepts that file as a final optional argument
+after its protected release evidence directory and authority record. It verifies
+the clean Linux commit before and after the unfiltered run, then matches the
+Windows revision, Node version, and exact passing case names. Extra skips,
+missing or duplicate cases, and a changed source checkout leave the slot open.
+The ordinary single-run evidence path still accepts a complete unfiltered
+transcript.
+
 Run the synthetic cases with the pinned Node runtime:
 
 ```text

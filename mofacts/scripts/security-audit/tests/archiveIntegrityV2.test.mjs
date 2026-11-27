@@ -4,9 +4,9 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { retainPinnedAuditArchiveV2, verifySavedAuditArchiveV2, verifyAuditReportReadbackV2, completeOfflineKeyRetentionV2 } from '../core/reportFilesV2.mjs';
+import { retainPinnedAuditArchiveV2, verifySavedAuditArchiveV2, verifyAuditReportReadbackV2, completeOfflineKeyRetentionV2 } from '../report/reportFilesV2.mjs';
 import { readAuditFileV2, writeAuditFileV2 } from '../core/producerFilesV2.mjs';
-import { decryptReportEnvelope } from '../report-crypto.mjs';
+import { decryptReportEnvelope } from '../report/reportCrypto.mjs';
 import { finalizeAuditReport } from '../../../common/securityAudit/reportV2.ts';
 import { errorReport } from './fixtures/v2Fixtures.mjs';
 

@@ -11,6 +11,7 @@ type RecordData = Record<string, any>;
 type TransferStorage = {
   tdfs: LessonFamilyTdfCollection;
   userExists: (userId: string) => Promise<boolean>;
+  hasProlificBinding: (tdfIds: string[]) => Promise<boolean>;
   updateOwners: (tdfIds: string[], currentOwnerId: string, newOwnerId: string) => Promise<number>;
 };
 type TransferDeps = {
@@ -63,6 +64,9 @@ export function createTdfOwnershipTransfer(deps: TransferDeps) {
       throw new Meteor.Error('tdf-identity-repair-required', 'A condition is referenced by another experiment root.');
     }
     const ids = Array.from(members.keys());
+    if (newOwnerId !== actingUserId && await storage.hasProlificBinding(ids)) {
+      throw new Meteor.Error('prolific-study-bound', 'This lesson is linked to a Prolific study. Make a copy to transfer the lesson content.');
+    }
     if (await storage.updateOwners(ids, actingUserId, newOwnerId) !== ids.length) {
       throw new Meteor.Error('ownership-transfer-conflict', 'Lesson ownership changed during transfer. No ownership was transferred.');
     }

@@ -183,6 +183,13 @@ acceptance are complete. Historical dated checkpoints remain below so their
 earlier limitations are not silently rewritten. Do not resume an older open row;
 use this current checkpoint and the production-only P1-D9 gate.
 
+The main-line remediation checkpoint at `8e3a0a48` separately verified all four
+recorded remediation findings, both runtime lock audits and an image scan with
+zero high/critical findings. Those results remain bound to that revision. The
+combined post-merge release candidate requires its own exact-source and staging
+qualification before promotion; that release work does not reopen the completed
+staging2 audit checklist.
+
 Run `npm run security:surfaces` from `mofacts/` for source registration ownership. Runtime inventories and their classified policies come from the sealed application registry. The historical manual manifest is retained in Git at `2982f477` for interpreting the comparisons below.
 
 | Source inventory at 7b001cfe | Count |
@@ -366,6 +373,7 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
     image root digest `sha256:3515794a3335ab5f11400903c22f2cfa5a7e403968c478700eff5a4162c96fed`,
     installed receipt and host acquisition matched. The complete V3 report was
     accepted and independently read back in the same deployment window.
+  - [x] Read the live staging2 audit history as an administrator on `2026-11-25T18:36:07.229Z`. The history returned four rows, one Full summary and zero catalog v2 Full reports that began after the accepted deployment. This establishes the report availability checkpoint. Retain the bounded `full-report-inventory-20261125T183607Z.json` alongside the accepted release evidence.
 - [x] Verify static bypass detection across active source roots and retire the old manifest and inference checker after parity.
   - [x] Reconcile the current legacy manifest's categories before retirement. It still checks 198 methods, 21 publications, eight HTTP mounts, four middleware entries, 19 inferred export names, and 22 management-route presentation entries. The eight mounts must be compared as mounts because several catalog endpoint paths are more specific.
   - [x] Map all 19 legacy export names to exact method or parameterized HTTP integration declarations. The group contains 15 methods and four single-use download mounts. This proves coverage by name and leaves runtime-policy parity open.
@@ -402,6 +410,139 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   - [x] Verify exact candidate `946af9ac415b105f1ed7c1fe0c0cf3f73f0410e8` with the existing pinned Docker tool image. All 35 focused receiver and report source tests passed from the candidate's tracked bytes in a disposable network-disabled container using temporary memory storage. Checked that the container was removed. The existing tool image remains reusable for Meteor.
   - [x] Slot 107 passed on `946af9ac`. Independently matched the new HTTP/MongoDB case to its passing result in the native receipt. The isolated receiver accepted and downloaded a signed 70-control synthetic catalog v2 report, selected it as the latest full report, rejected uploads using the wrong catalog and returned the previously stored catalog v1 report unchanged. This completes the receiver-first rehearsal.
   - [x] Compose the exact slot 107 source bundle for all 248 required cases. The installed startup registry remains byte-identical to slot 106. The production projection is `1fec1fc446a3f370cb43cbaaa8a4e26a804c9c21689489b045f857fd35d73046` and the new bundle SHA-256 is `4b36885b70952db82f9c6853dec06aa539a7d3ca21159c539c86407224674972`. Reuse this evidence for its exact source. Resume at the matched staging2 release and full-report checks above.
+  - [x] Prepare exact live staging2 candidate `e9d14a25b21eaece8cea377c787052e7896d0bfe` on the existing staging2 branch. It includes the current app at main `274777b3`. Its two-file delta selects catalog v2 for the installed receiver and exercises that receiver with signed synthetic uploads. Full typecheck and lint passed. The six Meteor tool-image inputs match slot 107. Before deployment, public health returned HTTP 200, and a pinned operator SSH readback matched the healthy `dac554f2` container to the locally preserved rollback image, protected release receipt and three Compose inputs.
+  - [x] Verify exact staged receiver candidate `e9d14a25` on the isolated Linux worker. Slot 108 passed 2,417 tests with zero failures, 22 pending and zero hook failures. Independently matched the new signed catalog v2 receive case to its passing result. The worker reused the pinned test image, retained the results and removed the generated files and job-owned Docker resources.
+  - [x] Build and accept the catalog v2 receiver on staging2 using the guarded cutover. Source `e9d14a25b21eaece8cea377c787052e7896d0bfe`, start `2026-11-25T18:08:10.948Z`, tag `ppavlikmemphis/mofacts-staging2:phase3-e9d14a25-20261125175930`, registry index `sha256:2939e322f7b4a42888e1b6930e9206ca8157148282bdc7c55fa34683670934d1`, Linux/amd64 platform manifest `sha256:6699dc3fac40d9ca84564c265aa9cd587eb2628f50268f1ed79c1e7879079887`, configuration `sha256:3a5b092a442b8419a41649620953532f3ad111422e03b98c0582e6eb92857a63`. Canonical Compose and private Change Streams startup passed. The live release returned HTTPS health 200 with the same enforced CSP. Ordinary learner sign-in and reload, session cleanup, admin Security Audits and the 248-case registry comparison passed. The embedded bundle SHA-256 is `4483de222495a6f517d3447051d7e74823bf9709869a8ef1d21567b4998d7a5e`. The independently read host receipt matches the accepted workstation authority `756b03933ca7086cf2495fa323206b8a7b97b9a3afcde6616dd10ed9cac7e6a3`. The first attempt restored `dac554f2` after the writer's formatting changed the projected record digest. The same image passed the retry using the writer's canonical bytes for both receipts. Verified the previous image remains available and the other services and proxy configuration passed the unchanged-state guards. Protected evidence `staging2-phase3-e9d14a25/attempt2`.
+  - [x] Review all 70 catalog v2 controls for the accepted staging2 release. Verified 34 passes and three runtime dependency findings. Another 33 controls still need the observations named in the [per-control register](security-audit-staging2-control-evidence.md). Reused slot 108 and the accepted registry binding. The exact-source Node suite completed with 474 passes, zero failures and four Windows-only skips, leaving that catalog control open. Verified the current release receipt and temporary host measurement cleanup. The Full signed report and archive acceptance remain open.
+  - [x] Complete the approved paired source-security proof for `e9d14a25`. The verified Linux and Windows transcripts account for all 478 cases. The pinned redacted history scan covered 1,139 commits with zero findings. The pinned image scan found four high-severity findings and zero critical findings on the accepted Linux/amd64 manifest. The [control register](security-audit-staging2-control-evidence.md) recorded 37 passes, four findings and 29 controls still needing evidence at that checkpoint. Full lint and the native Linux regression suite passed with 475 passes, zero failures and four Windows-only skips. The actual Windows capture matched the four skipped case names for the deployed source. The broader Windows fixture run encountered existing platform restrictions, confirmed on the baseline.
+  - [x] Complete the TLS version and Redis authentication controls for `e9d14a25`. The public endpoint rejected TLS 1.0 and 1.1 with protocol-version alerts and accepted trusted TLS 1.2 and 1.3. The private Redis service required authentication for a health ping, accepted both authorized health checks and had zero published ports. The [control register](security-audit-staging2-control-evidence.md) retains both observations.
+  - [x] Prepare the three-record fixture for ordinary passwordless return under the current browser account-creation policy. Earlier preparation stopped before creating an account or data. Independently cleared each temporary fixture window. The operator helper now supports an explicitly selected participant, assigned lesson and saved progress scope. Full lint and all 14 focused fixture and authentication contract tests passed. Live control results require their own receipt.
+  - [x] Verify normal passwordless return on `e9d14a25`. Chrome established the existing synthetic participant's study session from saved progress, received its assigned lesson, retained its target and recovered the same progress after reload. The five disclosure channels passed for the issued token. The three-record helper at `b8c9c82a` supplied the owned fixture. Logout, namespace absence, lock removal and unchanged release identity were verified. Checked off seven controls in the [control register](security-audit-staging2-control-evidence.md).
+  - [x] Verify all five bounded authentication disclosure channels for the ordinary learner sign-in as well as passwordless return. Bound the ordinary sign-in to the confirmed synthetic learner and fresh session credential, and verified logout and release identity. The [control register](security-audit-staging2-control-evidence.md) recorded 47 passes, four findings and 19 controls requiring evidence at that checkpoint. No additional Meteor invocation.
+  - [x] Scan both compiled browser bundles in the exact `e9d14a25` staging2 image with the approved synthetic server-only CI encryption value. Verified 498 files and zero matches. The non-root scanner ran with a read-only filesystem and networking disabled. Operator fix `1b64b274` preserves scanner readability under a restrictive umask, with all 18 focused Linux tests and full lint passing. Verified unchanged deployment identity and removal of the temporary container, runtime and workspaces. The [control register](security-audit-staging2-control-evidence.md) recorded 48 passes, four findings and 18 controls requiring evidence at that checkpoint.
+  - [x] Verify the running MongoDB settings on `e9d14a25`. The private service had `--auth`, a replica-set keyfile and no host-published port. Operator change `4d3bf555` keeps the collector's privilege check free of records. Full lint and 16 focused Linux tests passed. Automatic approval review blocked live credential-free database access, leaving the direct denial control open.
+  - [x] Reconcile the exact-release report and provider prerequisites. The authenticated list had four recent rows, one historical Full report and zero active-catalog Full reports. The operator signed out. Google prepared the expected staging2 callback in an isolated browser with outside-origin requests blocked. The Microsoft startup marker confirmed its staging2 settings were missing. The public configuration reports Memphis SAML disabled. The reviewed staging records identified no designated provider test accounts. Microsoft setup requires an approved Entra registration for the staging2 callback and its protected settings. Live sign-in evidence remains open.
+  - [x] Verify the scope of staging's Microsoft registration. On November 26 the signed-in Entra portal matched staging's application ID and showed Web callbacks for staging and production. The review was read-only. The operator approved a separate staging2 registration.
+  - [x] Register MoFaCTS Staging2 in Entra with the operator's approval of the registration and platform policies. Verified its single Web callback is on staging2 and its audience matches the deployed Microsoft sign-in flow. Automatic approval review blocked removing the ungranted default Microsoft Graph User.Read configuration because that permission edit needed specific approval. Verified the accepted `e9d14a25` release is healthy with the root-private read-only settings mount. No runtime configuration change was made.
+  - [x] Store and install the dedicated 90-day Microsoft credential. Verified the encrypted operator copy and pinned SSH delivery to the root-private staging2 settings file, with a verified former-settings backup. Recreated only MoFaCTS on `e9d14a25`. The app recorded Microsoft OAuth startup, matched the installed registration, returned HTTPS 200 with its prior CSP and had the same other Compose services. That app start was `2026-11-26T13:33:40.888254819Z`. From the staging2 login button, Microsoft opened its sign-in page with the matching application and exact staging2 callback. No additional Meteor run was used.
+  - [x] Prepare reusable catalog v2 Full report inputs for `e9d14a25`. On pinned Node 24.22.1, validated 52 existing control outcomes from 14 release-bound receipts, including the four findings. Saved and read back the complete 25-control repository producer file and the preparation index under protected `attempt2/catalog-v2-full-inputs-20261126`. Their SHA-256 digests are `f08525d7cff9cb789a811df41a6a89279299685a41c89fb41e60f93624123ea0` and `ed07195fb5d4fcaf4b3b4b711d058bd92989a67965c8949a755ce4adb62ebfa8` respectively. The 18 listed observations remain open and the retained runtime evidence keeps its original window.
+  - [x] Diagnose Google’s `401 invalid_client` on staging2. The November 26 signed-out preparation had confirmed the callback and counted a client parameter as present. The operator’s real sign-in and an isolated ordinary browser click showed that staging2 supplied `client_id=undefined` with the correct callback. A pinned, read-only check of the running app’s mounted settings found both Google credential fields absent. The earlier result establishes callback preparation only.
+  - [x] Guard the optional Google configuration in source. Startup clears its stale service record when the private client and secret are incomplete. The sign-in action keeps the form open and reports loading or unavailability in the existing translated error area. Full typecheck and lint passed, with nine focused checks and 481 Linux source-security passes, seven environmental skips and zero failures. The staging2 credential repair still owns the live provider test.
+  - [x] Create and install the approved MoFaCTS Staging2 Google Web client. The existing MoFaCTS client lists localhost, older staging and production callbacks. The new client has exactly `https://staging2.optimallearning.org/_oauth/google` and zero JavaScript origins. The verified Desktop copy uses Windows encryption. The plaintext download was removed after readback. Pinned SSH updated only Google settings and recreated the single app on `e9d14a25`, with exact prior settings verified in a root-private backup. HTTPS health, CSP and neighboring Compose services matched the previous state. The app started at `2026-11-26T18:51:45.827427509Z`. The MoFaCTS operator owns the continuing credential and its eventual revocation in Google Auth Platform. Restore the retained settings through the same Compose service for rollback. The receipt `google-installed-20261126.json` has SHA-256 `d74d295a37274d7f602a270ccf119279d24d1e5566771fc2ef5f4bab17e5f90f`.
+  - [x] Verify the corrected outgoing Google authorization request after installation. It used the exact new client ID and callback. Google returned HTTP 302 to its signed-out identifier page and Chrome observed the sign-in title. The headless run did not verify an interactive input. The operator received a fresh browser retry link.
+  - [x] Verify the Microsoft signed-in return. On November 26, the operator confirmed that Microsoft sign-in worked on staging2 after the Google settings change on `e9d14a25`.
+  - [x] Diagnose the Google account collision. The operator returned to MoFaCTS and saw `Username already exists [403]`. The pinned Meteor package awaits the account creation hook and enforces username uniqueness on insert. The application hook checked the two asynchronous account lookups before they resolved, skipping the existing-method guidance and reaching the generic insert error.
+  - [x] Restore existing-method guidance in source. `f270b404` awaits the canonical email and username lookups before insertion and keeps the existing account's sign-in binding. Typecheck, lint, eleven focused source checks and the full slot 109 Meteor run passed. Its new installed case verified the Microsoft-conflict response, preserved the existing account and exercised new and returning Google identities using separate synthetic records. The source fix is ready for a subsequent release. Live provider qualification continues on `e9d14a25`.
+  - [x] Identify the existing username on staging2. The operator's regular Gmail maps to one pre-existing password account without a Google binding. The exact account is the configured site owner, has the administrator role and owns lessons, uploads, learner history and saved progress. The read-only check used the pinned staging2 operator path, the running `e9d14a25` image and only sign-in and ownership metadata. User Admin protects the configured owner and content ownership when deleting accounts.
+  - [x] Verify past password use for the exact staging2 owner. The earliest retained successful `password` sign-in was on October 4, 2026 at `13:38:18.910Z`. No Google or Microsoft successes were recorded for that owner in the retained audit trail. The check returned timestamps only. The event identifies the account and authentication method. It gives no evidence about who entered the password or whether that password was reused elsewhere.
+  - [x] Verify first-admin Google setup with an empty user collection. Slot 110 exercised installed Meteor external account creation, login admission and role assignment using a synthetic verified Google identity. The DDP session handoff was stubbed. With the same address in `owner` and `initRoles.admins` and password signup disabled, the first login created one Google-only account, assigned admin during that login and recognized the same account on a return. The [first-admin setup](../docs/deployment/first-admin-content.md) now documents choosing Google first with the new host's registered callback and private credentials.
+  - [x] Confirm Google sign-in to the existing staging2 owner account using the operator's regular Gmail. Approved temporary source `6f456798` built through canonical Compose and published as the staging2 Linux/amd64 manifest `sha256:b1e929e5d61667de4dd8bdc5b97664c6a1df0b271f8a018563ccb0d43b0cfc72`. The operator directed a live staging2 sign-in with the full Meteor suite waived. Typecheck, lint and 13 focused source checks passed. No Meteor invocation was used and the prepared worker was cleaned up. The temporary request authorized one exact owner ID and primary Gmail. It required Google's verified address, preserved the existing administrator role and recorded the external account ID. The operator confirmed the signed-in return. The independent server check matched the successful Google audit event to the original owner and verified ownership metadata. The controller restored the accepted `e9d14a25` image, HTTPS and CSP, verified the Google binding and owner metadata after restoration, and removed the temporary private settings and Compose overlay. The restored application started at `2026-11-26T21:53:15.59940657Z`. Sanitized status is retained in the root-owned staging2 job `/var/tmp/mofacts-google-owner.DsGidWgb/status.json`. The temporary image is outside the Full report release gate.
+  - [x] Resolve Full report writer compatibility. On November 26, Phil approved a separately pinned catalog v2 tool for the existing staging2 application. The [assembler and readback verifier](../mofacts/scripts/security-audit/qualification/bindStaging2ReleaseRegistry.mjs) confirm the reviewed tool revision and use the deployed source checkout to verify the original registry case catalog. Source tests cover independently pinned revisions, staged catalog selection, missing evidence, retained findings and rejection of mismatched tool, app, image and report identities. Full lint and 473 Linux V2 source tests passed, with seven environment-dependent skips and zero failures.
+  - [x] Verify the public staging2 TLS cipher control. At 22:12 UTC on November 26, named HTTPS handshakes found six accepted cipher suites and zero weak suites across TLS 1.2 and 1.3 on the sole public address. The installed image graph verifier matched the accepted Linux/amd64 configuration and confirmed the restored app start. The protected TLS observation receipt SHA-256 is `1eff22f8425a1b396692bf4eb240528e927b2d006a012e1e1ff597fce01cdb13`.
+  - [x] Assemble and independently parse the unsigned 70-control staging2 review. Tool `b38039d8d9ca3ccc733b821c0315f25672ff880e` accepted the 14 retained inputs and one new TLS observation. It recorded 49 passes, four findings and 17 execution errors for unavailable observations on `e9d14a25`. Report `/var/tmp/mofacts-full-review.1aZZUDhK/review-with-verified-tls/report.json` is protected on the Linux worker with SHA-256 `50c266bbbd411c88cde1874bd147c9bce65b5a5faedafad9792f922a4468a9d3`. The retained provenance preserves the original observation times. The staging2 receiver count for this release and catalog v2 was zero Full reports. The review remains offline and unsigned.
+  - [x] Verify unused reset-link expiry on the accepted staging2 release. Worker `63e902cb` matched all five catalog cases. The fresh link changed the disposable account's password and its new password worked. The other account's unused link was rejected after its real one-hour lifetime and its original password still worked. Independently verified both disposable accounts and reset records were removed, the administrator signed out, the temporary containers and authentication lease were absent and the same application remained healthy. Retained receipt SHA-256 `e7c97e5045e1319611ed94043b057209728a50e9947ebe4594e096b7e8cd6157`, completed `2026-11-27T00:17:49.447Z`. All 32 focused tool tests and full lint passed.
+  - [x] Reassemble and read back the unsigned review with the expiry observation. The accepted release `e9d14a25` now has 50 passes, four findings and 16 controls awaiting evidence. Protected review `/var/tmp/mofacts-full-review.1aZZUDhK/review-with-verified-expiry/report.json` has SHA-256 `20c83ccff0c73579ad1b38bfd9da703451b0a58918b18c20bab3549e9bc78a3d`. Only the expiry control changed in the 70-row review.
+  - [x] Accept the remediation release `8e3a0a484d146ce85b9733d6065a9d2806296e82` on staging2. It started at `2026-11-27T02:38:41.183140486Z` under tag `ppavlikmemphis/mofacts-staging2:audit-8e3a0a48-20261127023003`. The immutable registry index is `sha256:faaf371c69504e1def8f7f2c9d9dba490565b4575debb62a352799d9cbe54b1a`, Linux/amd64 manifest `sha256:749aaaa2c86113aa081aa0f58a4e09dd8a86867dcbbad07e7f7834fed9e700aa`, and configuration `sha256:b61d06b6862ac91601fccff3b06e60ac094c40d6701c0c8912d7b3082fa5c06e`. Exact slot 113, canonical Compose build, private Change Streams startup, published Trivy scan, public HTTPS 200, ordinary learner reload, session cleanup, admin Security Audits and the installed 248-case registry comparison passed. The first CSP check hashed the field value alone. Hashing the complete field line matched the previous receipt, and the proxy files passed the unchanged-state check. The embedded bundle SHA-256 is `e072f7436ddda43bb2b896a47d41bac5ae07590eeb27f89a9ef5e5cf8e081fbc`. Independent host readback matched workstation authority `1c06f0004c5c598b7449098ab5558d3421e76313e0e518282625aabf50535030`. Verified the previous image, proxy and other services after finalization. Protected evidence `audit-8e3a0a48-20261127023003` also contains the ordinary learner's own-settings baseline and the scoped inventory showing zero matching Full reports.
+  - [x] Verify the ordinary-account settings restriction on `8e3a0a48`. The ordinary learner read its own settings. One disposable participant signed in to its assigned study using the normal progress-backed account flow and received `experiment-account-restricted` for its own account settings. The catalog evaluator passed. The protected receipt `study-settings-control.json` in `audit-8e3a0a48-20261127023003` has SHA-256 `7606977d9e4e3cb7dc200b2def47b7d5ce31367d02ac9f0237f5c00fa9d6fdc6`. Independently verified namespace absence, session sign-out, lease release, temporary fixture file removal, and the same healthy application. The fixture request now uses the existing canonical JSON encoder after two write-free preflight failures; both earlier windows were verified empty and closed.
+  - [ ] Qualify the live Full report. Supply the protected writer JSON for all 70 catalog v2 controls and its stored report ID. Match the scanner to the separately reviewed tool commit and the deployed application to `8e3a0a484d146ce85b9733d6065a9d2806296e82` and its independently observed Linux/amd64 platform image. Require a start at or after `2026-11-27T02:38:41.183140486Z`. Keep the actual findings and require zero execution errors. In Security Audits, download JSON from the Recent 90-day history row with the matching report digest for the independent readback. Verify the writer and receiver copies and the saved encrypted archive before closing Phase 3.
+
+## Phase 4 closure and maintainer handoff (2026-11-26)
+
+- [x] Remove superseded V1 ingestion and presentation code. Tracked callers of both modules were tests. Preserve the five-minute single-use download token check and the V2 HMAC wire check, now against a fixed vector captured from the retired signer. Keep the V1 parser and fixed membership fixture for the existing synthetic rollback and immutable scanner checks.
+- [x] Retire seven Phase 0 defect witnesses. V2 producer/report membership, authorization outcomes, content-bound downloads and session lifetime have direct regression tests. The installed activation tests cover the V2 receiver and retired V1 route, replacing the current-source receiver regex in the scanner selection test. Keep the separate immutable production pin check.
+- [x] Place report encryption, upload, readback and retention implementations under `mofacts/scripts/security-audit/report/`. Existing command entry points keep their paths and import the owners directly.
+- [x] Reconcile the [maintainer guide](../mofacts/scripts/security-audit/README.md) and [public operator guide](../docs/deployment/security-audit.md) with the implemented pipeline and exact staging2 qualification. Run the documented test-only catalog extension through the repository producer validator. It rejects missing membership and preserves the released catalog digest.
+- [x] Record an owner, priority and acceptance condition for each of the four retained findings in the [per-control register](security-audit-staging2-control-evidence.md#findings-retained-for-remediation).
+- [x] Verify the source and handoff. Full typecheck and lint passed. Pinned Linux Node V2 source tests recorded 479 passes and seven environment-dependent skips. The retained compatibility and release checks recorded 152 passes and one environment-dependent skip. All four immutable scanner-selection checks and three direct Node token, HMAC and identity tests passed. The Meteor allowance remains available for its recorded scope.
+- [x] Verify the offline review procedure with the pinned tool. Installed its locked dependencies in the isolated checkout and removed the generated dependencies after assembly. Verified the host receipt against the accepted release authority and used a canonical copy for metadata generation. The original capture remains available. The [operator runbook](../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification) records the setup and distinguishes the review from live qualification.
+- [ ] Complete the final evidence record after Phase 3's live Full report gate. It requires the [outstanding observations](security-audit-staging2-control-evidence.md), signed ingestion, independent receiver download and saved archive verification. P1-D9 assigns final production acceptance to a separately authorized coordinated cutover.
+
+### Staging2 closeout preparation (2026-11-27)
+
+- [x] Pin the staging2 release and evidence list. The running app was healthy on
+  `8e3a0a48` with the recorded `2026-11-27T02:38:41.183140486Z`
+  start, unchanged immutable image and matching host receipt bytes. The evidence
+  index names all 70 controls, the retained inputs for 55 recorded passes, and
+  the 15 outstanding observations for one independent-review batch. The
+  observations retain their original deployment and measurement windows.
+- [x] Prepare the report inputs and handoff. Pinned writer `b38039d8` and
+  Node 24.22.1/npm 11.19.1 matched the exact release authority and installed
+  registry proof, validated all five saved producer files, and read back
+  canonical metadata for the accepted image. The existing mail connection
+  returned idle, the staging2 fixture lease was absent, and the saved public
+  encryption-key fingerprint matched. The offline key file was present.
+  The protected `staging2-closeout-8e3a0a48-20261127` folder contains the
+  intake directory, preparation proof and handoff for the 15 open controls.
+  The evidence index SHA-256 is
+  `121c52947f66504c1b3941c79599727bdc5967d73aad55cb517a066dc5ee54aa`.
+  The handoff SHA-256 is
+  `f68835c3f82706d90573c9e523672a52c982203166dd8f9fb3009969fc250859`.
+- [x] Refresh the image-bound canary receipt for the repaired image. The
+  existing read-only, network-disabled scanner examined 498 compiled browser
+  files and found zero matches for the approved synthetic value. The exact
+  platform manifest and cleanup passed. Receipt SHA-256
+  `1a4077281be3c67cb50a4d5bdce0c602368781d124b1d58ede6b242fa5258fe8`.
+  The total remains 55 recorded passes and 15 awaiting evidence.
+- [x] Record the second-thread review returned by Phil. Its release authority,
+  evidence-index and preflight hashes matched the protected preparation files.
+  The intake directory contained zero files. The review recorded zero newly
+  verified passes, zero newly verified findings and 15 controls needing
+  evidence. The 55 earlier observations retain their recorded scope. The
+  shared control register remains the list of open IDs. The next input is
+  eligible live evidence or an explicit change to the acceptance scope.
+- [x] Measure fresh reset first use on the repaired `8e3a0a48` image.
+  Worker `171de588` used the deployed MoFaCTS signup route and the existing
+  Gmail connection. Email verification, original login, fresh reset and
+  login with the new password passed. An authenticated scoped observation
+  confirmed the server marked the reset link used. The disposable account,
+  reset state, browser sessions, temporary worker and mail lease were
+  removed. The same deployment remained healthy. Initial setup omitted a
+  required source module. Two subsequent native signup attempts hit
+  MoFaCTS' disabled built-in signup route and were independently recovered
+  before the supported `signUpUser` run. The protected
+  `first-use-live-receipt.json` has SHA-256
+  `3d3d9638a55fa9fa9da4c3294353b9a8d200cf93439faf2ecdb30a1a1a699c86`.
+  This covers the positive baseline and consumed state. The catalog still
+  requires the direct negative outcomes. The register remains at 55
+  recorded passes and 15 controls awaiting evidence.
+- [ ] Open the agreed staging2 qualification window and accept the complete
+  Full report. No audit timer was present during preflight. The scheduled Full
+  run, live Gmail carriage, independent readback, archive verification, and
+  failed-run/missed-run notifications remain acceptance work.
+
+### Staging2 closeout blockers
+
+Phase 3 and Phase 4 remain open under the existing acceptance criteria. The
+[current control register](security-audit-staging2-control-evidence.md) now has
+55 verified observations, zero open repair findings and 15 controls that need
+evidence. The signed Full report still needs one qualification window on the
+accepted `8e3a0a48` release with independent receiver and archive verification.
+The earlier unsigned review preserves the previous release's measurements.
+
+| Open requirement | Why it remains open |
+| --- | --- |
+| Authentication | The November 18 qualification passed all 22 controls in its earlier window. Retained evidence covers ordinary sign-in, selected passwordless behavior and unused reset-link expiry. The new release also passed the study-session settings restriction. Eleven comparison, reset, session, authorization and throttling controls still need their required matching outcomes. |
+| Public TCP | The evaluator requires a complete result for all 65,535 TCP ports on each public address. HTTP, HTTPS and host firewall evidence cover parts of that requirement. The retained packet has no complete outside-network result for this release. |
+| Public UDP | The prior external observation was inconclusive for all seven selected endpoints. Host listener, publication and firewall results establish the host policy. The catalog also needs conclusive external observations. |
+| MongoDB access | The runtime proves authentication is configured. Automatic approval review blocked the direct credential-free data read, and the retained packet has no observed denial of that operation. |
+| Signed Full report and archive | The exact-release receiver history contained zero catalog v2 Full reports. Once the missing measurements are verified, the live report still needs signed ingestion, an independent receiver download and saved encrypted-archive verification. |
+
+Use the [exact list of outstanding controls](security-audit-staging2-control-evidence.md)
+for the next evidence intake. The protected results must identify the target,
+application revision, platform image and actual observation times. The
+[operator runbook](../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification)
+owns assembly and independent readback. The earlier unsigned review identifies
+its original release and retained execution errors.
+
+Resume this gate when a new receipt arrives or the acceptance methodology is
+explicitly approved. A completed evidence review remains checked off. The
+current catalog requires independent live evidence for the outstanding
+controls. A proposed defensive measurement profile would use actual
+configuration and permitted operations. It would measure approved ingress
+rules, host listeners and allowed web service readiness, owned normal account
+flows and scoped server-state checks, and private database configuration and
+authenticated access. Its controls would state those properties explicitly.
+The catalog v2 direct observations remain open under the existing plan.
 
 ## Phase 3 HTTP characterization started (2026-11-18)
 
@@ -2104,80 +2245,70 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 112 total, 110 consumed, 0 reserved, 1 generally available,
+**Current allowance: 118 total, 116 consumed, 1 reserved, 0 generally available,
 and 1 separately restricted to the earlier `/health` batch.**
 
-On 2026-11-27 the operator authorized up to five additional Meteor integration
-invocations for final audit closure (slots 108-112), including necessary retries.
-Slot 108 was consumed on exact committed V3 closeout source
-`f7d1206b03f3005dd55418466b87fde266d99cf7` in retained local Linux job
-`/var/tmp/mofacts-integration.V3F7D1206B`. Preparation checked 248.5 GiB free on
-C:, reused existing tool image
-`mofacts-local/integration:268faf92061051fe12b56b5b2c3dfd92dbd8cf9355eff4e454930c1321e42474`
-and completed without invoking Meteor. The actual suite passed 1,165 server
-tests with 15 pending and 1,256 Chromium tests with seven pending; it had zero
-test or hook failures and cleaned all transient resources. The qualification
-receipt nevertheless failed closed after execution because the seven new V3
-proof IDs named synthetic qualification surfaces that were not present in the
-installed startup registry. Retained run SHA-256
-`e66890c1cfdbb43569a5feab39b0fbefdb4fffe3f755e50c19b052bf87c87a25`,
-startup-registry SHA-256
-`4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63`,
-and log SHA-256
-`7b4f45cc5274bba189f77ede13847350e4563dbe6ebac5b69574aead51b9accc`.
-The failed receipt is not qualification evidence. Four slots remain available
-for the corrected exact source and any necessary retries.
+Slot 113 passed for exact source `8e3a0a484d146ce85b9733d6065a9d2806296e82`
+from 02:25:38 to 02:27:46 UTC on November 27 (November 26 local). The operator
+authorized it by continuing after the request for one fresh run of this commit.
+The isolated 6 GiB/two-CPU Linux worker reused the dependency image. It recorded
+1,161 server passes and 1,256 Chromium passes, 15 and seven pending respectively,
+and zero test or hook failures. Worker cleanup completed. The retained receipt
+`/var/tmp/mofacts-integration.cMFkOXtc/results/native-verification.json` has SHA-256
+`1d9b3bc04c62d26fd689f1abbc71054c6489845b41d0fa7e82c6636e720bf3ea`.
 
-Slot 109 passed the complete suite on the published correction that binds each reproducible
-authentication proof to its real installed framework, method or publication
-surface and projects every Meteor proof owned by that surface into the startup
-inventory. The correction passed full TypeScript and lint checks. The focused
-receipt-composition checks passed; the Windows source suite passed 186 checks
-and reached only its six Linux-only firewall fixtures, which Windows attempted
-against the unrelated default WSL distribution. Exact revision
-`4d91a0c8ecb6e202c894b15253fe84a898ec5759` ran from retained job
-`/var/tmp/mofacts-integration.V3A875D619` from 18:43:44 to 18:45:51 UTC.
-Server recorded 1,165 passed and 15 pending; Chromium recorded 1,256 passed and
-seven pending, with zero failures or failed hooks. Cleanup completed. Native
-receipt SHA-256
-`05dac8aabd0ed37a60c144a71ceb3838f4fa9ddd41a484715c5e713c8187476c`;
-startup-registry SHA-256
-`5b769b326693dff5158852767959c395aaa55e0cd336789c861be4a445598259`.
-The source-proof composer then correctly rejected one catalog-to-case mismatch:
-the passed modified-target case belongs to `public TDF and stimulus method
-authorization`, not `server auth and session methods`. Slot 109 therefore does
-not qualify the source bundle. Slot 110 was reserved for the exact published
-suite-label correction and is recorded below.
+Slot 112 passed for exact staging2 remediation source `461dc2a5ed1ef88454df49e986fe7a7171158c31` from 01:13:16 to 01:15:22 UTC on November 27 (November 26 local). The isolated 6 GiB/two-CPU worker reused the prior dependency image and recorded 1,161 server passes and 1,256 Chromium passes, 15 and seven pending respectively, and zero test or hook failures. Verified cleanup completed. The retained receipt `/var/tmp/mofacts-integration.jb8ErRZ3/results/native-verification.json` has SHA-256 `b9bd8c3c6a009cb34b54b91ac62aa152802d081589db7a67749e50f23ddb9131`. The separate operator Security gate passed all four jobs. The source test now checks the exact manifest and lock, replacing the stale inline command assertion that failed on slot 111's commit.
 
-Slot 110 passed the complete suite on exact published commit
+Slot 111 passed on exact staging2 remediation source `a2921f7a7948b3ff3908ab96484f8f3429abceb4` from 01:01:21 to 01:03:32 UTC on November 27 (November 26 local). The isolated 6 GiB/two-CPU worker recorded 1,161 server passes and 1,256 Chromium passes, 15 and seven pending respectively, and zero test or hook failures. The app lock change required a new hashed test image. The worker verified the source and isolated mounts, removed its generated files and job resources, and retained `/var/tmp/mofacts-integration.MfaC6d1c/results/native-verification.json` with SHA-256 `e27cb2d9bc243e61910a55690a38eb31abd48f148761027823d69121d8552a6a`. The exact Meteor result precedes the separate image scan and staging2 deployment gates.
+
+Slot 110 passed on exact source `e67e7f141b1d99b48aed39c8d4fe1330a8189ee6` on November 26, 20:14:47–20:16:59 UTC. The isolated 6 GiB/two-CPU worker recorded 1,162 server and 1,258 Chromium passes, 15 and seven pending respectively, and zero test or hook failures. Independent readback matched the new first-Google-owner case `268b0e0cd5fc58a7cbbb630e233f9b8a827a977d711347823143f7c25d15704f` to `passed` in the receipt-bound report. The worker reused its image, removed job resources and generated files, and retained `/var/tmp/mofacts-integration.SjknSfOB/results/native-verification.json` with SHA-256 `d78f2e9a81ca735d7fd9f1f179434c79a5b2cd4d2cff37d69d787cb10fce0890`.
+
+Slot 109 passed on exact source `f270b404550d7250752d8fabb6a9b6611c773ad4` on November 26, 19:20:17–19:22:29 UTC. The isolated 6 GiB/two-CPU worker reused its existing test image. Server 1,161 passed and 15 pending. Chromium 1,258 passed and seven pending. Zero test or hook failures. The receipt and executed account-collision regression case `67399bca69a6c93c99bf28cda5411ad6ad5b89751aee145ec1f374a60ba46466` matched the retained results. Receipt `/var/tmp/mofacts-integration.iBYJLJKA/results/native-verification.json` SHA-256 `80e2ab6b60bb8ad2e12c321c514595915af4e0fe9da12fb883ee1754a4f57427`. Verified completed cleanup, zero job containers, volumes or network, and removal of generated dependencies and build files. The first preparation stopped at the root-owned source capture, completed cleanup and consumed no invocation. The successful run used the same local Docker operator identity as slot 108.
+
+Phil authorized up to five more Meteor invocations for the staging2 release as needed. Slot 108 passed on exact published candidate `e9d14a25b21eaece8cea377c787052e7896d0bfe` on the existing 6 GiB/two-CPU worker. The suite recorded 1,161 server and 1,256 client passes, zero failures, 22 pending cases and zero hook failures. The installed staging receiver's signed catalog v2 case passed. The pinned tool image was reused. Exit status and resource checks confirmed cleanup, and the results remain in `/var/tmp/mofacts-integration.hoQ7qKKy/results`. The Meteor result SHA-256 is `dd6a0e4319440f75a2f05d276ddcd5d15ba693ce565d603ef6e1c231887e7a1a`.
+
+The later five-run closeout allowance is numbered 114-118 here to reconcile the
+parallel branch ledger with main's already consumed slots 108-113. The retained
+job directory names keep their original branch-local labels.
+
+Slot 114 ran exact V3 closeout source
+`f7d1206b03f3005dd55418466b87fde266d99cf7` in
+`/var/tmp/mofacts-integration.V3F7D1206B`. The suite passed 1,165 server and
+1,256 Chromium tests with 15/seven pending and zero failures/hooks. Cleanup
+completed. Qualification failed closed because seven synthetic proof IDs had no
+installed runtime surfaces; this receipt is not qualification evidence.
+
+Slot 115 ran exact correction
+`4d91a0c8ecb6e202c894b15253fe84a898ec5759` in
+`/var/tmp/mofacts-integration.V3A875D619`. The suite passed 1,165 server and
+1,256 Chromium tests with 15/seven pending and zero failures/hooks. The source
+composer then rejected the modified-target case's incorrect owning-suite label;
+the run is not source-bundle qualification.
+
+Slot 116 passed exact published commit
 `e89e10eb843ebbdc05c52b430e78d43b61cb2f6b` from 18:56:34 to 18:58:42 UTC.
-Server recorded 1,165 passed and 15 pending; Chromium recorded 1,256 passed and
-seven pending, with zero failures or failed hooks. Native receipt SHA-256
+Native receipt SHA-256
 `90f872dadf4d8f79309ecb75897ea45ab943ee648cc80d9d4a92dbe8dc429dee`;
 source snapshot
 `70225db9835262e39854d3659d40819bf504461087e9870c8d7a8f2199d3192b`;
-startup registry
-`5b769b326693dff5158852767959c395aaa55e0cd336789c861be4a445598259`.
-The exact-source composer accepted all 255 required cases and produced bundle
-SHA-256 `ee4ee9acbf871320bf9798f9944af07c37d06e0d852e6383376aea96129d8c3b`.
-This run qualified the suite-label correction; it did not qualify the later
-receiver-selection change.
+255-case bundle
+`ee4ee9acbf871320bf9798f9944af07c37d06e0d852e6383376aea96129d8c3b`.
 
-Slot 111 passed the complete suite on exact published commit
+Slot 117 passed exact published commit
 `41e02b2ed3b66256331e930c4dd02e1b1e3e7141` from 20:19:50 to 20:21:55 UTC.
 Server recorded 1,165 passed and 15 pending; Chromium recorded 1,256 passed and
-seven pending, with zero failures or failed hooks. Native receipt SHA-256
+seven pending, with zero failures/hooks. Native receipt SHA-256
 `40261493d95d4c8d7f0be144cb43937732724f000c9f055d82a354d553b1391a`;
 source snapshot
 `cbe3a8d1f8f6ef2bc6d26aa4c8bf75507b9f8761bbe7971526f5cb4f8dc460f7`;
-startup registry
-`5b769b326693dff5158852767959c395aaa55e0cd336789c861be4a445598259`.
-The exact-source composer accepted all 255 required cases and produced bundle
-SHA-256 `741a6ae2b65dca1585c12ae9b47b4100978e06d316fbe21dcf66154c314aad9b`.
-The worker reused the pinned tool image, enforced the 6 GiB/two-CPU limits and
-removed its job containers, volumes, network, installed dependencies and build
-state. The retained exact source and results remain under
+255-case bundle
+`741a6ae2b65dca1585c12ae9b47b4100978e06d316fbe21dcf66154c314aad9b`.
+Cleanup completed; retained job
 `/var/tmp/mofacts-integration.V3C41E02B2`.
+
+Slot 118 is reserved for the exact combined release candidate that merges the
+completed V3 audit work with current main before regular-staging qualification.
+Record the committed revision and result here immediately after the run.
 
 Slot 107 passed on exact receiver candidate `946af9ac415b105f1ed7c1fe0c0cf3f73f0410e8` on November 25, 17:05:04–17:07:11 UTC. Server 1,160 passed and 15 pending. Chromium 1,256 passed and seven pending. Zero test or hook failures. The server receiver case ID `de861bceccf65ec6bda886fb03891dee72036aceed922bcfd6c462f6249e468c` passed in the receipt-bound run data. The existing 6 GiB/two-CPU worker checked 266.9 GiB free on C: and 13.7 GiB available guest memory and reused its pinned tool image. Cleanup verified exit 0, absence of job-labelled containers, volumes and network, and removal of generated dependencies and Meteor build state. Retained job `/var/tmp/mofacts-integration.egvE7ZsC`, native receipt SHA-256 `1a1d86ac2c56cb0b93a911973cc6726bc13db9d5d5c06743afb575aecd0f56c2` and startup registry SHA-256 `4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63`. The verified source bundle is in `tmp/mofacts-qualified-build-jhqeIp/verification-bundle.json` under the retained job.
 
@@ -4183,9 +4314,10 @@ its individual image-bridge implementation box, not operational acceptance.
   app/shared TypeScript and dependencies are unchanged. No real Docker, live
   npm audit/Gitleaks/Trivy, Meteor, provider, staging2 or production operation,
   publication, release qualification or deployment occurred.
-- [ ] Perform a separately approved real-image canary run to establish actual
-  isolation/resource fit/cleanup and image observations. No such permission is
-  inferred from source-work continuation or prior consumed Meteor authorizations.
+- [x] Perform the separately approved real-image canary run. The exact
+  `e9d14a25` staging2 platform image passed both browser inventories with 498
+  files and zero matches. Verified isolation, resource limits and cleanup.
+  See the [control register](security-audit-staging2-control-evidence.md).
 - [ ] Compose the repository artifact and whole pipeline/workflow from these
   individual acquisition boundaries; finish remaining typed authentication work
   only after the pending sequencing choice. Complete registered-runtime,

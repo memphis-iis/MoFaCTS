@@ -99,6 +99,11 @@ only hashes and the decrypt result to the binding file. Keep the key at its
 approved location. Run cleanup separately after recording the qualification
 receipts.
 
+For the separately pinned staging2 Full report tool, use the
+[staging2 qualification procedure](staging2-v2-operations.md#catalog-v2-full-report-qualification).
+That procedure supplies the reviewed tool revision and the exact deployed
+application checkout for assembly, readback and archive verification.
+
 For the full repository report, the existing `emit-repository-producer-v2.mjs`
 command accepts two additional positional arguments after the image context and
 canary inputs: the protected release evidence directory and the exact accepted
@@ -351,6 +356,8 @@ disposal remains responsible for interrupted job lifetime, not the local watcher
 - Cleanup validates the exact owned temporary root and rejects links before recursive removal. It does not remove the live checkout, arbitrary directories, images, builders, volumes or containers. Successful captures persist until explicit cleanup. A stopped native client does not prove remote BuildKit work was cancelled; interrupted Docker cleanup belongs to the authorized runtime check.
 
 ## Runtime inventory observation
+
+Use the [staging2 Full report procedure](staging2-v2-operations.md#catalog-v2-full-report-qualification) for separately pinned writer and archive verification.
 
 The administrator-only `admin.securityAudits.surfaceInventory` method reports
 the startup registry and its profile and inventory digests. It separately

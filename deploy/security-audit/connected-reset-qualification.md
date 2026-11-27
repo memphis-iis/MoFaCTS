@@ -117,6 +117,31 @@ This proves operator-assisted connected mail and the current reset/session
 branch. Unused genuinely aged-token expiry, the catalog-complete authentication
 artifact, scheduled mail and alert acceptance remain separate unfinished gates.
 
+## Fresh reset first-use evidence
+
+The fixture owner uses MoFaCTS' `signUpUser` flow and confirms the existing
+signup and verification settings before opening the mail window. MoFaCTS
+intentionally disables Meteor's built-in client signup. Include the imported
+`mofacts/server/securityAudit/securityAuditIngestionV2.ts` module in the reviewed
+worker source packet and verify the import under its pinned runtime.
+
+The explicit `first-use` worker scope opens one verified disposable account and
+uses its fresh reset once. It confirms that the new password works and requires
+verified cleanup before releasing the lease. Its receipt records the live
+mail, first-use and ordinary login baseline. The complete single-use and
+session controls retain their existing evidence requirements.
+
+## Reset expiry evidence
+
+The `expiry` worker scope collects only the expired-reset control. It uses the
+same two owned accounts, mail windows, cleanup and real one-hour age check.
+For the current-token baseline it submits the fresh reset once and verifies
+ordinary sign-in with the new password. The other fixture makes one first-use
+submission after its unused link has expired and confirms that its original
+password remains valid. The worker reports expiry separately and leaves the
+single-use and replay controls as `ERROR`. Keep both accounts disposable and
+retain independent cleanup and exact deployment identity with the result.
+
 ## Complete reset protocol preparation
 
 The worker's explicit `protocol` scope adds the separate `-expiry` actor required

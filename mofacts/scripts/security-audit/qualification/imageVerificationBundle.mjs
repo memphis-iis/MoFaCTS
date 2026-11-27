@@ -24,18 +24,20 @@ export async function readBuildVerificationBundle(file) {
 
 // This validates the embedded source claim and its exact snapshot. The
 // independently collected runtime/host evidence still owns qualification.
-export async function validateBuildVerificationBundle(bytes, buildIdentity, release) {
+export async function validateBuildVerificationBundle(bytes, buildIdentity, release, sourceCatalog) {
   if (!Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > MAX_VERIFICATION_BUNDLE_BYTES) {
     throw Error('Verification bundle exceeds its byte limit');
   }
   const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   const bundle = parseVerificationBundle(JSON.parse(text));
   if (text !== canonicalAuditJson(bundle)) throw Error('Image requires a canonical verification bundle');
-  return requireMatchingSourceVerification(bundle, {
-    buildIdentity, profileSha256: await auditDigest({ mode: 'production', meteorRelease: release }),
+  const verification = sourceCatalog ?? {
     verificationCatalogSha256: await digestVerificationCatalog(),
-    expectedRegistrySha256: bundle.expectedRegistrySha256,
     sourceVerificationIds: new Set(requiredMeteorVerificationIds),
+  };
+  return requireMatchingSourceVerification(bundle, {
+    ...verification, buildIdentity, profileSha256: await auditDigest({ mode: 'production', meteorRelease: release }),
+    expectedRegistrySha256: bundle.expectedRegistrySha256,
   });
 }
 

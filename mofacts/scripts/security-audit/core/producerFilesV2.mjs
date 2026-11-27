@@ -70,11 +70,11 @@ export async function writeAuditProducerFileV2({ file, artifact, catalog, profil
 // AUDIT_TARGET is supplied by the selected protected environment. Callers cannot
 // override it through metadata or a CLI target option. Active V1 never imports
 // this module; activation belongs to the coordinated receiver/producer cutover.
-export async function assembleAuditReportFilesV2({ artifactDirectory, outputPath, envelope,
-  integratedAuthentication, env = process.env }) {
+export async function assembleAuditReportFromProducerFilesV2({ artifactDirectory, envelope,
+  integratedAuthentication, env = process.env, acceptedCatalog = ACTIVE_AUDIT_CATALOG }) {
   const target = auditTargetOrigin(env.AUDIT_TARGET);
   if (!envelope || Object.hasOwn(envelope, 'target')) invalid();
-  const catalog = await readAuditCatalog(ACTIVE_AUDIT_CATALOG, 'ingestion');
+  const catalog = await readAuditCatalog(acceptedCatalog, 'ingestion', acceptedCatalog);
   const producers = expectedAuditProducers(catalog, envelope.reportType);
   const artifacts = [];
   if (integratedAuthentication !== undefined) {
@@ -86,7 +86,7 @@ export async function assembleAuditReportFilesV2({ artifactDirectory, outputPath
       || image.state !== 'observed' || image.value.split('@')[1] !== runtime.platformImageDigest
       || auditTimestamp(startedAt) < auditTimestamp(envelope.startedAt)
       || auditTimestamp(completedAt) < startedAt || completedAt > auditTimestamp(envelope.completedAt)
-      || await auditDigest(integratedAuthentication.catalog) !== ACTIVE_AUDIT_CATALOG.catalogDigestSha256) {
+      || await auditDigest(integratedAuthentication.catalog) !== acceptedCatalog.catalogDigestSha256) {
       throw new Error('Integrated authentication does not match this report run and active catalog');
     }
     artifacts.push({ producerId: 'authentication',
@@ -114,7 +114,11 @@ export async function assembleAuditReportFilesV2({ artifactDirectory, outputPath
   for (const key of ['ino', 'dev', 'mode', 'nlink', 'size', 'mtimeNs', 'ctimeNs']) {
     if (stat[key] !== after[key]) invalid();
   }
-  const report = await assembleAuditReportV2({ ...envelope, target, artifacts });
+  return assembleAuditReportV2({ ...envelope, target, artifacts }, acceptedCatalog);
+}
+
+export async function assembleAuditReportFilesV2({ outputPath, ...inputs }) {
+  const report = await assembleAuditReportFromProducerFilesV2(inputs);
   await writeAuditFileV2(outputPath, report);
   return report;
 }

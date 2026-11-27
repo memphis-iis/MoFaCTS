@@ -188,7 +188,7 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
       return nextEventId;
     },
     syncUsernameCaches: () => {},
-    getClassPerformanceByTdfWorkflow: async () => ({}),
+    getClassPerformanceByTdfWorkflow: async (): Promise<[[], []]> => [[], []],
     ...overrides,
   };
 

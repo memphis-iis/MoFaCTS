@@ -26,6 +26,11 @@ BEGIN {
   }
 }
 
+# Treat a captured `ufw show added` file identically whether its lines were
+# retained with Linux or Windows line endings. This keeps the final field from
+# acquiring a carriage return during offline review on Windows.
+{ sub(/\r$/, "") }
+
 /^ufw allow/ {
   if ($1 == "ufw" && $2 == "allow" && ($3 == "80/tcp" || $3 == "443/tcp")) {
     web_rule_count[$3]++

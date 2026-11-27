@@ -48,8 +48,7 @@
         </div>
       </div>
 
-      {{#if selectedTdfDueDate}}
-      <!-- Practice Deadline Section -->
+      {{#with reportingTiming}}
       <div class="admin-section">
         <div class="card admin-card">
           <div class="card-body">
@@ -57,43 +56,43 @@
               <i class="fa fa-calendar admin-section-icon"></i>
               <h5>{{reportingText 'reporting.practiceDeadline'}}</h5>
             </div>
-            <label for="practice-deadline-date" class="form-label">{{reportingText 'reporting.practiceDeadline'}}</label>
-            <input type="date" id="practice-deadline-date" name="practice-deadline-date-select" value="{{deadlineDateValue}}" disabled="{{deadlineDisabled}}" class="form-control">
-          </div>
-        </div>
-      </div>
-
-      <!-- Filter By Due Date Section -->
-      <div class="admin-section">
-        <div class="card admin-card">
-          <div class="card-body">
-            <div class="admin-section-heading">
-              <i class="fa fa-filter admin-section-icon"></i>
-              <h5>{{reportingText 'reporting.filterByDueDate' date=selectedTdfDueDate}}</h5>
-            </div>
+            {{#if formattedCutoff}}
+              <p>{{reportingText 'reporting.filterByDueDate' date=formattedCutoff}}</p>
+            {{/if}}
             <div class="row g-3">
               <div class="col-12">
                 <div class="form-check">
-                  <input type="checkbox" class="form-check-input" id="due-date-filter" name="due-date-filter-select" checked="{{dueDateFilterChecked}}" disabled="{{performanceLoading}}">
+                  <input type="checkbox" class="form-check-input" id="due-date-filter" name="due-date-filter-select" checked="{{dueDateFilterChecked}}" disabled="{{deadlineFilterDisabled}}">
                   <label class="form-check-label" for="due-date-filter">
                     {{reportingText 'reporting.enableDueDateFilter'}}
                   </label>
                 </div>
               </div>
               <div class="col-12">
-                <label for="exception-date" class="form-label">{{reportingText 'reporting.exceptionDate'}}</label>
-                <input type="date" id="exception-date" name="exception-date-select" value="{{exceptionDateValue}}" class="form-control" disabled="{{exceptionBusy}}" {{exceptionDateAttrs}}>
-                {{#if exceptionDateError}}
-                  <div id="reporting-exception-date-error" class="admin-inline-feedback admin-form-row-xs">
-                    {{> adminStatus variant="error" text=exceptionDateError urgent=true}}
+                <label for="practice-deadline-date" class="form-label">{{reportingText 'reporting.customCutoff'}} ({{timezone}})</label>
+                <input type="datetime-local" id="practice-deadline-date" name="practice-deadline-date-select" value="{{deadlineDateValue}}" disabled="{{deadlineDisabled}}" class="form-control" {{deadlineDateAttrs}}>
+                {{#if deadlineDateError}}
+                  <div id="reporting-deadline-date-error" class="admin-inline-feedback admin-form-row-xs">
+                    {{> adminStatus variant="error" text=deadlineDateError urgent=true}}
                   </div>
                 {{/if}}
               </div>
+              {{#if dueDateFilter}}
+                <div class="col-12">
+                  <label for="exception-date" class="form-label">{{reportingText 'reporting.exceptionDate'}} ({{timezone}})</label>
+                  <input type="datetime-local" id="exception-date" name="exception-date-select" value="{{exceptionDateValue}}" class="form-control" disabled="{{exceptionBusy}}" {{exceptionDateAttrs}}>
+                  {{#if exceptionDateError}}
+                    <div id="reporting-exception-date-error" class="admin-inline-feedback admin-form-row-xs">
+                      {{> adminStatus variant="error" text=exceptionDateError urgent=true}}
+                    </div>
+                  {{/if}}
+                </div>
+              {{/if}}
             </div>
           </div>
         </div>
       </div>
-      {{/if}}
+      {{/with}}
 
       <!-- Class Data Section -->
       <div class="admin-section">
@@ -136,7 +135,10 @@
       {{else}}
         {{#if loadError}}
           <tr>
-            <td colspan="6" class="admin-table-status-cell"><div class="admin-table-feedback text-danger">{{loadError}}</div></td>
+            <td colspan="6" class="admin-table-status-cell">
+              <div class="admin-table-feedback text-danger">{{loadError}}</div>
+              <button type="button" id="retry-instructor-performance" class="btn btn-sm btn-outline-primary">{{reportingText 'common.tryAgain'}}</button>
+            </td>
           </tr>
         {{else}}
           {{#if dueDateFilter}}
@@ -148,7 +150,7 @@
           {{/if}}
           {{#if hasMetRows}}
             {{#each metRows}}
-              {{> instructorReportingStudentRow row=this commandStates=../commandStates exceptionDateError=../exceptionDateError exceptionDateValidationUserId=../exceptionDateValidationUserId allowAddException=false}}
+              {{> instructorReportingStudentRow row=this commandStates=../commandStates exceptionDateError=../exceptionDateError exceptionDateValidationUserId=../exceptionDateValidationUserId reportTimezone=../reportTimezone allowAddException=false}}
             {{/each}}
           {{else}}
             <tr><td colspan="6" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.noDataAvailable'}}</td></tr>
@@ -161,7 +163,7 @@
           </tr>
           {{#if hasNotMetRows}}
             {{#each notMetRows}}
-              {{> instructorReportingStudentRow row=this commandStates=../commandStates exceptionDateError=../exceptionDateError exceptionDateValidationUserId=../exceptionDateValidationUserId allowAddException=true}}
+              {{> instructorReportingStudentRow row=this commandStates=../commandStates exceptionDateError=../exceptionDateError exceptionDateValidationUserId=../exceptionDateValidationUserId reportTimezone=../reportTimezone allowAddException=true}}
             {{/each}}
           {{else}}
             <tr><td colspan="6" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.noDataAvailable'}}</td></tr>
@@ -195,7 +197,7 @@
     <td class="text-center">{{row.totalTimeMins}}</td>
     <td>
       {{#if row.exception}}
-        <span class="instructor-reporting-exception">{{row.exception}}</span>
+        <span class="instructor-reporting-exception">{{formattedException row.exception reportTimezone}}</span>
       {{/if}}
     </td>
     <td>

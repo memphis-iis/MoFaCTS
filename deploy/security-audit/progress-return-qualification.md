@@ -21,6 +21,13 @@ metadata and native learner ownership. Only the new learner's verification flag
 is set for its baseline. Keep the ID/name/creator/time ownership manifest before
 mutation. Missing experiment markers are not substituted for ownership checks.
 
+For a normal-return observation, the protected fixture request explicitly sets
+`foreignActor` to `null`. The datastore helper creates only the participant, its
+assigned lesson and its saved progress. This scope needs no ordinary account
+creation or email. Use the same ownership manifest, collision checks and guarded
+cleanup. The three-record fixture supports ordinary return, including reload and
+disclosure observation. The comparison cases still require their own fixtures.
+
 Use one environment-scoped window and private per-run evidence. The remote
 operator controller must hold staging2's existing qualification lock during the
 window, check the same container/image and retain a recovery marker if the owner

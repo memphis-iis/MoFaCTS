@@ -72,6 +72,6 @@ export async function assembleReproducibleCloseoutReportV3({ retainedArtifacts, 
   authenticationSmoke, network, mongodb, ...envelope }) {
   const artifacts = composeReproducibleCloseoutArtifactsV3({ retainedArtifacts, authenticationExecutions,
     authenticationSmoke, network, mongodb });
-  return assembleAuditReportV2({ ...envelope, acceptedCatalog: AUDIT_CATALOG_V3,
-    artifacts: artifacts.map(artifact => ({ producerId: artifact.producerId, artifact })) });
+  return assembleAuditReportV2({ ...envelope,
+    artifacts: artifacts.map(artifact => ({ producerId: artifact.producerId, artifact })) }, AUDIT_CATALOG_V3);
 }

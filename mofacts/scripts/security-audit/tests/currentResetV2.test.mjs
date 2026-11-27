@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { captureCurrentResetV2 as capture, evaluateCurrentResetSessionsV2 as evaluate } from '../authentication/currentResetV2.mjs';
+import { captureCurrentResetV2 as capture, captureFreshResetBaselineV2, evaluateCurrentResetSessionsV2 as evaluate } from '../authentication/currentResetV2.mjs';
 import { acquireConnectedGmailResetMessageV2 as acquire } from '../authentication/connectedGmailV2.mjs';
 
 function fixture() {
@@ -31,6 +31,19 @@ test('connected-mail scenario shares current reset cases and retains only bounde
   assert.deepEqual(calls, ['baseline', 'request', 'mail', 'reset', 'new-login', 'old-login', 'sessions', 'reset']);
   const serialized = JSON.stringify(result);
   for (const secret of [value.actor.username, value.actor.password, value.newPassword, 'a'.repeat(64)]) assert.ok(!serialized.includes(secret));
+});
+
+test('fresh reset baseline makes one password change and uses only the new password afterward', async () => {
+  const { value, calls } = fixture();
+  const result = await captureFreshResetBaselineV2(value);
+  assert.equal(result.freshResetBaseline.status, 'PASS');
+  assert.equal(result.freshResetBaseline.results.length, 2);
+  assert.deepEqual(calls, ['baseline', 'request', 'mail', 'reset', 'new-login']);
+  assert.equal(Object.hasOwn(result, 'session'), false);
+  const serialized = JSON.stringify(result);
+  for (const secret of [value.actor.username, value.actor.password, value.newPassword, 'a'.repeat(64)]) {
+    assert.equal(serialized.includes(secret), false);
+  }
 });
 
 test('connector acquisition composes with the current-reset protocol without changing its mail contract', async () => {

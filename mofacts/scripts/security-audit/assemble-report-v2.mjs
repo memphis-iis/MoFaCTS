@@ -3,8 +3,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { auditTargetOrigin } from '../../common/securityAudit/reportV2.ts';
-import { proofRecord, sourceCommit } from '../../common/securityAudit/proofFields.ts';
-import { assembleAuditReportFilesV2, parseAuditFileV2, readAuditFileV2 } from './core/producerFilesV2.mjs';
+import { sourceCommit } from '../../common/securityAudit/proofFields.ts';
+import { readAuditMetadataV2 } from './core/metadataV2.mjs';
+import { assembleAuditReportFilesV2 } from './core/producerFilesV2.mjs';
 
 const sourceRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const runGit = promisify(execFile);
@@ -13,9 +14,7 @@ export async function runAssemblyCommandV2(args, env, execute = runGit) {
   if (args.length !== 3) throw new Error('V2 assembly requires metadata, producer directory and output paths');
   const target = auditTargetOrigin(env.AUDIT_TARGET);
   const [metadataPath, artifactDirectory, outputPath] = args;
-  const metadata = proofRecord(parseAuditFileV2(await readAuditFileV2(metadataPath)), [
-    'reportId', 'reportType', 'startedAt', 'completedAt', 'deployedApplicationRevision', 'deployedImageDigest', 'toolVersions',
-  ]);
+  const metadata = await readAuditMetadataV2(metadataPath);
   const { stdout } = await execute('git', ['-C', sourceRoot, 'rev-parse', '--verify', 'HEAD'], {
     encoding: 'utf8', timeout: 10_000, maxBuffer: 1024,
     env: {

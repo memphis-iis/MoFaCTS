@@ -5,9 +5,13 @@ import raw from '../../../common/securityAudit/catalogs/control-catalog.v1.json'
 import qualified from '../../../common/securityAudit/catalogs/control-catalog.v2.json' with { type: 'json' };
 import reproducible from '../../../common/securityAudit/catalogs/control-catalog.v3.json' with { type: 'json' };
 import legacy from './fixtures/v1-membership.json' with { type: 'json' };
-import { ACTIVE_AUDIT_CATALOG, AUDIT_CATALOG_V3, parseAuditCatalog, profileControls, readAuditCatalog } from '../../../common/securityAudit/catalogRegistry.ts';
+import {
+  ACTIVE_AUDIT_CATALOG, AUDIT_CATALOG_V2, AUDIT_CATALOG_V3,
+  parseAuditCatalog, profileControls, readAuditCatalog,
+} from '../../../common/securityAudit/catalogRegistry.ts';
 import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
 import { AUDIT_EVIDENCE_CONTRACT_IDS, parseAuditEvidence } from '../../../common/securityAudit/evidenceContracts.ts';
+import { parseAuditProducerArtifact } from '../../../common/securityAudit/producerArtifact.ts';
 
 const golden = '6a9cd0c985bdec14b0d78d2b731975005ed8cd69e76bb7597c8ada2564ba688d';
 test('V2 catalog: pinned runtime JSON/TypeScript imports match the independently reviewed golden digest', async () => {
@@ -181,4 +185,30 @@ test('V2 evidence: every released proof shape accepts complete observations and 
     const metrics = { ...samples['verification-observations-v1'], [key]: 1 };
     assert.throws(() => parseAuditEvidence('verification-observations-v1', 'PASS', { summary: 'Incomplete verification.', metrics }));
   }
+});
+
+test('a maintainer can add a test-only Full control through its catalog and producer contract', async () => {
+  const qualified = await readAuditCatalog(AUDIT_CATALOG_V2, 'retained');
+  const draft = structuredClone(qualified);
+  const controlId = 'repository.maintainer-test-only';
+  const producerId = 'repository';
+  draft.catalogVersion++;
+  draft.controls.push({ controlId, producerId, sectionId: 'repository', title: 'Synthetic inventory check',
+    failureSeverity: 'LOW', evidenceContract: 'finding-inventory-v1', standardsReferences: [] });
+  draft.profiles.full.repository.push(controlId);
+  const candidate = parseAuditCatalog(draft);
+  const existing = profileControls(qualified, 'full').filter(definition => definition.producerId === producerId);
+  const artifact = {
+    artifactSchema: 'MoFaCTSSecurityAuditProducerArtifactV1', producerId, sectionId: 'repository',
+    controls: existing.map(definition => ({ controlId: definition.controlId, status: 'ERROR',
+      evidence: { summary: 'No external inputs in this test.', category: 'transport' } })),
+  };
+  assert.throws(() => parseAuditProducerArtifact(artifact, candidate, 'full', producerId));
+  const sample = { controlId, status: 'PASS',
+    evidence: { summary: 'Synthetic inventory completed.', metrics: { evaluatedCount: 1, findingCount: 0 } } };
+  artifact.controls.push(sample);
+  assert.deepEqual(parseAuditProducerArtifact(artifact, candidate, 'full', producerId).controls.at(-1), sample);
+  assert.throws(() => parseAuditProducerArtifact(artifact, qualified, 'full', producerId));
+  assert.equal(profileControls(candidate, 'exposure').some(row => row.controlId === controlId), false);
+  assert.equal(await auditDigest(qualified), AUDIT_CATALOG_V2.catalogDigestSha256);
 });

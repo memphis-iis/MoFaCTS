@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-import { signSecurityAuditRequest } from './securityAuditIngestion';
 import { signAuditRequestV2 } from './securityAuditIngestionV2.ts';
 import { auditReceiverRevision, createAuditReceiverIdentityLoader } from './securityAuditReceiverIdentity.ts';
 
@@ -7,8 +6,9 @@ describe('V2 audit transport Meteor parity', function() {
   it('preserves the exact V1 HMAC formula under the supported server runtime', function() {
     const body = Buffer.from('{"synthetic":"wire-formula-parity"}');
     const secret = 'synthetic-only-'.repeat(4);
+    // Captured from the retired V1 signer with these same synthetic inputs.
     expect(signAuditRequestV2(secret, '1793880120', 'synthetic-contract-nonce-0001', body))
-      .to.equal(signSecurityAuditRequest(secret, '1793880120', 'synthetic-contract-nonce-0001', body));
+      .to.equal('051bfcd031972215e00ab9701d0b0e525f35e06284d0ba5f7e9870e6d92b182c');
   });
 
   it('loads the existing image carrier once and keeps missing proof operational', async function() {

@@ -51,7 +51,7 @@ docker compose --env-file .env.self-hosted -f docker-compose.yml config
 docker compose --env-file .env.self-hosted -f docker-compose.yml up -d
 ```
 
-After startup, sign up with the email configured as `owner` and included in `initRoles.admins`. The existing login/startup role-assignment flow grants that account the admin role. Then open `/admin/tests` and run Deployment Readiness.
+Follow the [first administrator setup](first-admin-content.md) for the sign-in method you want to use. A Google owner can choose **Sign in with Google** on the first visit after configuring the new host's OAuth credentials and callback. Then open `/admin/tests` and run Deployment Readiness.
 
 Before inviting users or publicizing the URL, open **Theme → Branding and Landing Page** as that administrator. Complete every supported language, identity/icon asset, landing-page option, and legal destination, then publish the Brand Profile. Use its preview and public `/legal` page to confirm that the deployment identity and software license/source access are correct. Brand Profile publication is deployment-wide and independent of users' visual-theme choices.
 

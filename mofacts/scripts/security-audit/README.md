@@ -1,89 +1,90 @@
-# Security audit implementation
+# MoFaCTS security audit maintenance
 
-This directory owns the scanner-side acquisition, assembly, qualification and
-retention tools for the MoFaCTS security audit. Shared catalog and evidence
-contracts live in `common/securityAudit`; the Meteor receiver, storage and
-administrator presentation live in `server/securityAudit`; host/deployment
-procedures live in `deploy/security-audit`.
+The audit turns bounded observations into catalog-shaped reports. Controls
+identify a passed check, a security finding, or missing execution evidence.
+Shared contracts live in `common/securityAudit`; acquisition, assembly and
+qualification tools live here; the Meteor receiver and administrator downloads
+live in `server/securityAudit`; deployment procedures live in
+`deploy/security-audit`.
 
-The normative design is the
-[durable redesign plan](../../../docs-developer/security-audit-durable-redesign-plan.md).
-Completed work and exact evidence coordinates are recorded in the
-[status ledger](../../../docs-developer/security-audit-durable-redesign-status.md).
-Operational production guidance is in
-[the deployment guide](../../../docs/deployment/security-audit.md), and the
-current non-production release is in the
-[staging2 operating record](../../../deploy/security-audit/staging2-v2-operations.md).
+Use the [operator guide](../../../docs/deployment/security-audit.md) for
+deployment, the
+[durable redesign plan](../../../docs-developer/security-audit-durable-redesign-plan.md)
+for normative contracts and the
+[status ledger](../../../docs-developer/security-audit-durable-redesign-status.md)
+for exact tested releases and current gates.
 
 ## Current catalog ownership
 
 Catalog versions are append-only files under
 `common/securityAudit/catalogs/`. `common/securityAudit/catalogRegistry.ts`
-parses their exact bytes, pins their golden digests and keeps all released
-versions readable.
+parses their exact bytes, pins their golden digests and keeps released versions
+readable.
 
-- V1 is the separately owned scheduled-producer selection.
+- V1 remains the separately owned scheduled-producer selection.
 - V2 is the accepted integrated-authentication catalog retained for historical
-  report decoding.
-- V3 changes exactly the fifteen approved reproducible closeout evidence
-  contracts. Its full profile still contains the same seventy control IDs.
-- The staging2 receiver selects V3 explicitly in `server/serverComposition.ts`.
-  Receiver selection does not change the scheduled producer selection or
-  reinterpret a historical report.
+  reports.
+- V3 changes exactly the fifteen approved reproducible-closeout evidence
+  contracts while preserving the same seventy control IDs.
+- The qualified receiver selects V3 explicitly in `server/serverComposition.ts`.
+  Receiver selection does not change the scheduled producer or reinterpret a
+  historical report.
 
-On 2026-11-27 staging2 accepted a V3 report containing 70 PASS and zero
-FAIL/ERROR/NA. Its exact source, image, report, readback and archive coordinates
-are in the status ledger. Production has not inherited that staging2 result; its
-coordinated cutover remains separately authorized work.
+The November 27 staging2 qualification accepted one V3 report with 70 PASS and
+zero FAIL/ERROR/NA. Its source, image, readback and archive coordinates are in
+the status ledger. Staging and production require their own release evidence;
+the staging2 report cannot be relabeled for another target.
 
-## Data flow and owners
+## Data flow
 
-1. Acquisition modules under `authentication/`, `external/`, `internal/` and
-   `repository/` create bounded observations. Credentials and raw learner data
-   are never report fields.
-2. Producer owners validate their complete catalog-owned section and write one
-   canonical `MoFaCTSSecurityAuditProducerArtifactV1` file. The shared file
-   owner is `core/producerFilesV2.mjs`.
-3. `core/assembleV2.mjs` validates exact profile membership and creates the
-   canonical signed-report payload. It does not acquire evidence or infer an
-   identity omitted by a producer.
-4. `qualification/composeVerificationBundle.mjs` joins the exact clean source,
-   executed Meteor cases and expected sealed runtime registry into a
+1. Producers under `authentication/`, `external/`, `internal/` and `repository/`
+   evaluate bounded observations and emit their exact catalog-owned controls.
+2. `core/producerFilesV2.mjs` validates complete canonical producer files.
+   `core/assembleV2.mjs` joins them with the report window and independently
+   verified scanner, application and image identities.
+3. `qualification/composeVerificationBundle.mjs` joins exact clean source,
+   executed Meteor cases and the expected sealed runtime registry into a
    `VerificationBundleV1` carried by the image.
-5. Image/release observers under `qualification/` independently bind the
-   source snapshot, published Linux/amd64 manifest, running configuration,
-   protected release receipt and deployed registry.
-6. `qualification/reproducibleCloseoutV3.mjs` replaces exactly the fifteen V3
-   evidence rows in the five already reviewed artifacts. It rejects a missing
-   producer, any non-passing unchanged row, duplicate/missing control or a
-   report other than exactly seventy unique controls.
-7. `upload-report-v2.mjs` sends one bounded request to the selected receiver.
-   The server validates the HMAC, exact selected catalog and canonical report
-   before storage. Administrator list/get/download read the stored bytes back.
-8. `encrypt-report-v2.mjs` creates the operator-held public-key archive. The
-   acceptance path independently compares receiver readback and an in-memory
-   archive decryption with the writer bytes before deleting temporary plaintext.
+4. Image/release observers under `qualification/` independently bind the source
+   snapshot, published Linux/amd64 manifest, running image, protected release
+   receipt and deployed registry.
+5. `qualification/reproducibleCloseoutV3.mjs` replaces exactly the fifteen V3
+   evidence rows in the five reviewed producer artifacts. It rejects incomplete
+   producers, non-passing unchanged rows, duplicate/missing controls and any
+   result other than exactly seventy unique controls.
+6. `report/uploadV2.mjs` sends one bounded signed request. The receiver validates
+   the signature, target, time, catalog, digest and replay constraints before
+   storage. Administrator list/get/download reads the stored bytes back.
+7. `report/reportCrypto.mjs` creates the operator-held public-key archive. Final
+   acceptance compares independent receiver readback and in-memory archive
+   decryption with the writer bytes before temporary plaintext is removed.
 
 The report status is evidence evaluation, not transport status. A security
 `FAIL` is a finding; an `ERROR` means required evidence or execution is absent.
 Successful upload or encryption alone never changes either result.
 
-## Registration and runtime proof
+## Code owners
 
-The maintained application surface inventory is the typed registration system
-under `server/securitySurfaces`, not a parallel JSON manifest. The lint-owned
-`checkRegistrationBypasses.mjs` rejects application-owned method, publication,
-HTTP, Accounts/OAuth and collection-rule registrations outside their approved
-owners. The sealed runtime registry supplies the deployed inventory and its
-required verification IDs. `VerificationBundleV1` must close over that exact
-inventory before a release can be accepted.
+| Concern | Source |
+| --- | --- |
+| Catalogs, profiles and evidence shapes | [catalogs](../../common/securityAudit/catalogs), [catalogRegistry.ts](../../common/securityAudit/catalogRegistry.ts), [evidenceContracts.ts](../../common/securityAudit/evidenceContracts.ts) |
+| Verification cases and expected outcomes | [verificationCatalog.ts](../../common/securityAudit/verificationCatalog.ts), [authorizationOutcomes.ts](../../common/securityAudit/authorizationOutcomes.ts) |
+| Canonical reports and producer validation | [reportV2.ts](../../common/securityAudit/reportV2.ts), [producerArtifact.ts](../../common/securityAudit/producerArtifact.ts), [core](core) |
+| Acquisition and evaluation | [external](external), [internal](internal), [composite](composite), [authentication](authentication), [repository](repository) |
+| Source, registry, release and image proof | [qualification](qualification), [server surface bindings](../../server/securitySurfaces) |
+| Encryption, upload, readback and completion | [report](report) and the root command wrappers |
+| Receiver, storage and administrator downloads | [server audit runtime](../../server/securityAudit), [HTTP bindings](../../server/http/securityAudits.ts) |
+| Host observations and release receipt | [deployment audit files](../../../deploy/security-audit) |
 
-Historical catalog fixtures and witnesses are compatibility tests only. They
-are not another policy owner, producer, receiver selection or current report.
+The maintained surface inventory is the typed registration system under
+`server/securitySurfaces`, not a parallel JSON manifest. The lint-owned
+`checkRegistrationBypasses.mjs` rejects registrations outside approved owners.
+The sealed runtime registry supplies deployed inventory and verification IDs;
+the verification bundle must close over that exact inventory.
 
-## Maintainer commands
+## Maintainer verification
 
-Run commands from `mofacts/` with the repository-pinned Node/npm/Meteor tools:
+Run from `mofacts/` with the repository-pinned tools:
 
 ```text
 npm run typecheck
@@ -92,18 +93,16 @@ npm run security:surfaces
 npm run security:test:source
 npm run security:test:phase0
 npm run security:test:capture
-```
-
-The complete Linux source gate is:
-
-```text
 node --test scripts/security-audit/source-security-v2.test.mjs
 ```
 
-Windows may skip Linux-only file-mode/firewall fixtures; a matching supported
-Linux result must account for every required case. A source test is not a
-substitute for the authorized Meteor integration suite, canonical Compose image
-qualification, deployed readback or a production audit.
+Use the [standard Linux executor](../../../deploy/security-audit/operator-security-checks.md)
+for repository Security jobs and the
+[isolated Meteor worker](../../../deploy/meteor-integration/README.md) for
+authorized installed-runtime verification. Windows-only and Linux-only results
+may be combined only when every required case is named and passed. Source tests
+do not substitute for Meteor, immutable-image qualification, deployed readback
+or a production audit.
 
 The explicit report commands remain unscheduled building blocks:
 
@@ -119,52 +118,47 @@ node scripts/security-audit/encrypt-report-v2.mjs <report.json> <encrypted-repor
 node scripts/security-audit/assert-execution-complete-v2.mjs <report.json>
 ```
 
-Do not run those commands by inventing missing arguments, alternate targets,
-credentials or evidence. Follow the matching procedure under
-`deploy/security-audit` and the plan's authorization boundary.
+Do not invent missing arguments, targets, credentials or evidence. Follow the
+matching procedure under `deploy/security-audit`.
 
-## Adding or changing a control
+## Add or revise a control
 
-1. Decide whether the existing control and evidence contract can express the
-   property. If its meaning, severity or required evidence changes, append a
-   catalog version; never edit released catalog bytes.
-2. Add the evidence-contract validator in `common/securityAudit` and keep
-   acquisition separate from evaluation.
-3. Add the control to exactly one producer and one section/profile. Catalog
-   parsing must reject duplicates, unknown references and incomplete profiles.
-4. Declare deterministic verification cases in
-   `common/securityAudit/verificationCatalog.ts`. Bind each case to the real
-   registered surface that owns the behavior; do not create synthetic runtime
-   surfaces only to satisfy coverage.
-5. Add positive baselines, expected denials, malformed-input behavior, side
-   effects and cleanup checks at the owning boundary. A timeout or unrelated
-   error is not authorization evidence.
-6. Update the typed registration descriptor and its owning Meteor/HTTP/package
-   integration test when the protected surface changes.
-7. Run typecheck, lint, the complete source gate and the supported Meteor suite
-   when its contracts are affected. Compose a new exact-source verification
-   bundle; never reuse proof from a different commit.
-8. Coordinate the receiver before activating an incompatible producer catalog.
+1. Identify the property, producer, profile, severity and evidence contract.
+   Keep existing IDs for unchanged properties; never edit released catalog bytes.
+2. Add the evidence validator in `common/securityAudit` and keep acquisition
+   separate from evaluation.
+3. Add the control to exactly one producer and section/profile. Catalog parsing
+   must reject duplicates, unknown references and incomplete profiles.
+4. Declare deterministic cases in `verificationCatalog.ts` and bind each case to
+   the real registered surface that owns the behavior. Do not invent synthetic
+   runtime surfaces to satisfy coverage.
+5. Test positive baselines, expected denials, malformed input, side effects and
+   cleanup at the owning boundary. A timeout or unrelated exception is not
+   authorization evidence.
+6. Update the typed registration descriptor and owning Meteor/HTTP/package test
+   when a protected surface changes.
+7. Run typecheck, lint, the complete source gate and supported Meteor suite when
+   affected. Compose a new exact-source bundle; never reuse proof from another
+   commit.
+8. Coordinate receiver activation before an incompatible producer catalog.
    Verify upload, independent readback, archive round trip and rollback as one
    release unit.
-9. Record the exact commit, source snapshot, bundle, image, receipt, report and
-   archive digests in the status ledger. Keep staging and production claims
-   separate.
+9. Record exact source, snapshot, bundle, image, receipt, report and archive
+   digests in the status ledger. Keep staging2, staging and production separate.
 
 ## Storage, privacy and recovery
 
-Producer directories contain only the exact expected canonical files. Shared
-readers reject symlinks, multiple links, non-files, changed files, invalid UTF-8,
+Producer directories contain only expected canonical files. Shared readers
+reject symlinks, multiple links, non-files, changed files, invalid UTF-8,
 duplicate JSON keys, noncanonical encodings and oversized input. Existing output
 files are never overwritten.
 
-The upload secret, signing material, provider credentials, reset links and
-offline private key remain in their approved protected stores. Retained public
-evidence is sanitized. Temporary plaintext report/readback files are removed
-only after remote-byte and archive-byte equality pass; the encrypted artifact,
-receipts and rollback records remain. Failed attempts are recorded honestly and
-are never relabeled as accepted reports.
+Upload secrets, signing material, provider credentials, reset links and the
+offline private key stay in approved protected stores. Retained public evidence
+is sanitized. Remove temporary plaintext only after remote-byte and archive-byte
+equality pass; retain the encrypted artifact, receipts and rollback records.
+Failed attempts remain failed evidence and are never relabeled as accepted.
 
 GitHub billing is unavailable. Repository Security checks use the documented
-operator Linux executor. Hosted, operator, Meteor, image, staging2 and production
-evidence are distinct and must not be substituted for one another.
+operator Linux executor. Hosted, operator, Meteor, image, staging2, staging and
+production evidence remain distinct.

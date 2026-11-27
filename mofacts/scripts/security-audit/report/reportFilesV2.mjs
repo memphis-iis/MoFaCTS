@@ -6,8 +6,8 @@ import { canonicalAuditJson } from '../../../common/securityAudit/canonicalRepor
 import { contentDigest, proofRecord } from '../../../common/securityAudit/proofFields.ts';
 import { AUDIT_V2_MAX_BODY_BYTES } from '../../../server/securityAudit/securityAuditIngestionV2.ts';
 import { realDirectory } from '../qualification/collectCiEvidence.mjs';
-import { decryptReportEnvelope, encryptReportBuffer } from '../report-crypto.mjs';
-import { readAuditFileV2, parseAuditFileV2 } from './producerFilesV2.mjs';
+import { decryptReportEnvelope, encryptReportBuffer } from './reportCrypto.mjs';
+import { readAuditFileV2, parseAuditFileV2 } from '../core/producerFilesV2.mjs';
 
 const maxKeyBytes = 65536;
 const maxEncryptedBytes = Math.ceil(AUDIT_V2_MAX_BODY_BYTES / 3) * 4 + 2 * maxKeyBytes + 16384;

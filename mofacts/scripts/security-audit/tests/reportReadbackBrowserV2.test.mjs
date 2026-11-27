@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import vm from 'node:vm';
 import test from 'node:test';
-import { acquireAuditReportReadbackV2 } from '../core/reportReadbackBrowserV2.mjs';
+import { acquireAuditReportReadbackV2 } from '../report/reportReadbackBrowserV2.mjs';
 import { errorReport } from './fixtures/v2Fixtures.mjs';
 import { finalizeAuditReport } from '../../../common/securityAudit/reportV2.ts';
 import { canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';

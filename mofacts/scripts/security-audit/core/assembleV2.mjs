@@ -4,7 +4,7 @@ import { auditSectionStatus, finalizeAuditReport, parseSecurityAuditReportV2 } f
 
 // Named recovery boundary: a missing/invalid slot invalidates that producer's
 // entire catalog-owned subset. It cannot repair an already assembled report.
-export async function assembleAuditReportV2({ artifacts, acceptedCatalog = ACTIVE_AUDIT_CATALOG, ...envelope }) {
+export async function assembleAuditReportV2({ artifacts, ...envelope }, acceptedCatalog = ACTIVE_AUDIT_CATALOG) {
   const catalog = await readAuditCatalog(acceptedCatalog, 'ingestion', acceptedCatalog);
   const producers = expectedAuditProducers(catalog, envelope.reportType);
   if (!Array.isArray(artifacts) || artifacts.length > producers.length * 2

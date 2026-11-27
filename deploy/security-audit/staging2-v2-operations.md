@@ -149,6 +149,30 @@ and HTML hashes matched. The separate sealed three-image synthetic trial also
 verified positive existing V1 and V2 records; do not confuse these two datasets.
 Both fixture attempts' four accounts, role assignments and seven rows are absent.
 
+## Provider sign-in evidence
+
+Use the approved Google and Microsoft test accounts in a regular Chrome tab.
+The operator handles the provider prompts in their own browser.
+
+1. Open the [staging2 sign-in page](https://staging2.optimallearning.org/auth/login).
+   Choose Google and confirm that the browser returns to staging2 and MoFaCTS
+   displays an authenticated session.
+2. Sign out of MoFaCTS and repeat with Microsoft.
+3. Record the provider outcomes and test times with the observed staging2
+   release. A passing observation requires the signed-in return to staging2.
+   Use only a sanitized outcome or error summary in the evidence record.
+
+For `401 invalid_client`, inspect the outgoing client identifier and check
+whether the private staging2 settings contain both `google.clientId` and
+`google.secret`. Verify a Google Auth Platform Web client has the exact
+`https://staging2.optimallearning.org/_oauth/google` callback before installing
+its pair. Verify the corrected authorization request before asking the operator
+to retry. [Google OAuth Web client configuration](https://developers.google.com/identity/protocols/oauth2/web-server#creatingcred)
+
+For `Username already exists [403]` after returning from the provider, use the
+existing MoFaCTS account's established sign-in method. Do not create an
+unnecessary second identity or weaken account linking to obtain a passing test.
+
 ## Current acceptance boundary
 
 The historical 22-PASS/one-UDP-ERROR exposure result and the separate 22-control

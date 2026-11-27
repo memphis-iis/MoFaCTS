@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { Tdfs } from '../../common/Collections';
 import { Meteor } from 'meteor/meteor';
 import { createAccessMethods } from './accessMethods';
+import { ProlificStudies } from '../lib/prolificCollections';
 
 describe('accessor identity query authorization', () => {
   it('omits the retired assignable-lesson method from the live Meteor registry', () => {
@@ -251,6 +252,25 @@ describe('lesson access bindings', () => {
       assert.equal((await lessons.findOne({ _id: lesson }))?.ownerId, recipient);
     } finally {
       await lessons.deleteOne({ _id: lesson });
+      await Meteor.users.rawCollection().deleteOne({ _id: recipient });
+    }
+  });
+
+  it('rejects transfer of a Prolific-bound lesson at the installed method', async () => {
+    const lesson = randomUUID(), owner = randomUUID(), recipient = randomUUID();
+    const handlers = (Meteor as any).server.method_handlers;
+    try {
+      await Tdfs.insertAsync({ _id: lesson, ownerId: owner, content: { fileName: 'test.json', tdfs: { tutor: { unit: [{}] } } }, tdfRevision: 1 });
+      await Meteor.users.rawCollection().insertOne({ _id: recipient });
+      await ProlificStudies.insertAsync({ rootTdfId: lesson, ownerId: owner, studyId: randomUUID() });
+
+      await assert.rejects(handlers.transferDataOwnership.call({ userId: owner }, lesson, recipient), { error: 'prolific-study-bound' });
+      const saved = await Tdfs.findOneAsync(lesson);
+      assert.equal(saved?.ownerId, owner);
+      assert.equal(saved?.tdfRevision, 1);
+    } finally {
+      await ProlificStudies.removeAsync({ rootTdfId: lesson });
+      await Tdfs.removeAsync({ _id: lesson });
       await Meteor.users.rawCollection().deleteOne({ _id: recipient });
     }
   });

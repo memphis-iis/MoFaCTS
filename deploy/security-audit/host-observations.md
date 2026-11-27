@@ -23,10 +23,12 @@ path, descriptor, environment identity or arbitrary command is accepted.
 
 Each command is time- and byte-bounded. Only declared scalar facts and fixed
 unavailable categories enter canonical output; raw commands, records, identifiers,
-settings, credentials and error text do not. `host-mongo-connectivity.js` reads
-through the same bounded `find`/replica observations as V1; query failure does not
-prove authentication bypass. Authentication input is not printed. Exact role
-inspection reuses `host-mongo-roles.js`; an explicitly absent helper is not logged
+settings, credentials and error text do not. `host-mongo-connectivity.js` checks
+the lesson collection's `find` privilege with a filter that matches no records
+and closes the cursor in the same batch. The command outcome and replica-set
+match are recorded as separate observations. Transport and query errors remain
+unavailable evidence. Exact role inspection reuses `host-mongo-roles.js`.
+An explicitly absent helper is not logged
 into. Redis probes use PING and the application container's existing Redis route.
 No account provisioning, setting mutation or remediation is performed.
 

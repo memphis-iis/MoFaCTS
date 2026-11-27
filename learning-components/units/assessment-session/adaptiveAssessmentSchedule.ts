@@ -20,12 +20,15 @@ export function applyAdaptiveAssessmentTemplateSchedule(options: {
   }
 
   const clusters = options.schedule.map((item) => {
-    const clusterIndex = Number(item.clusterIndex);
-    if (!Number.isInteger(clusterIndex)) {
+    const value = item.clusterIndex;
+    const clusterIndex = typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value.trim()))
+      ? Number(value)
+      : NaN;
+    if (!Number.isSafeInteger(clusterIndex) || clusterIndex < 0) {
       const unitName = typeof options.unit.unitname === 'string' ? options.unit.unitname : '<unnamed>';
       throw new Error(`Adaptive assessment template for unit "${unitName}" produced an invalid cluster index`);
     }
-    return String(clusterIndex);
+    return `${clusterIndex}-${clusterIndex}`;
   });
 
   options.unit.assessmentsession.clusterlist = clusters.join(' ');

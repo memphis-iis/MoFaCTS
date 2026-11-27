@@ -5,8 +5,8 @@ import { writeExternalProducerFilesV2 } from '../external/producerFilesV2.mjs';
 import { writeHostProducerFilesV2 } from '../internal/producerFilesV2.mjs';
 import { writeAuditMetadataV2 } from './metadataV2.mjs';
 import { runAssemblyCommandV2 } from '../assemble-report-v2.mjs';
-import { encryptAuditReportFileV2, assertAuditExecutionCompleteFileV2 } from './reportFilesV2.mjs';
-import { uploadAuditReportFileV2 } from './uploadV2.mjs';
+import { encryptAuditReportFileV2, assertAuditExecutionCompleteFileV2 } from '../report/reportFilesV2.mjs';
+import { uploadAuditReportFileV2 } from '../report/uploadV2.mjs';
 import { parseSecurityAuditReportV2 } from '../../../common/securityAudit/reportV2.ts';
 import { parseAuditFileV2, readAuditFileV2, writeAuditFileV2 } from './producerFilesV2.mjs';
 

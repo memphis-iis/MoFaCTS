@@ -13,7 +13,10 @@ function probe(change = {}, behavior = {}) {
   const database = {
     auth() { authentications++; if (behavior.authThrows) throw Error('synthetic-private-marker'); return { ok: behavior.auth === false ? 0 : 1 }; },
     runCommand(command) {
-      reads++; assert.deepEqual(JSON.parse(JSON.stringify(command)), { find: 'tdfs', filter: {}, limit: 1 });
+      reads++;
+      assert.deepEqual(JSON.parse(JSON.stringify(command)), {
+        find: 'tdfs', filter: { _id: { $in: [] } }, projection: { _id: 1 }, limit: 1, singleBatch: true,
+      });
       if (behavior.queryThrows) throw Object.assign(Error('synthetic-private-marker'), { code: behavior.queryThrows });
       return behavior.reply ?? { ok: 0, code: 13 };
     },
@@ -26,14 +29,15 @@ function probe(change = {}, behavior = {}) {
   assert.equal(output.includes('synthetic-private-marker'), false);
   return { output: JSON.parse(output), exit, reads, authentications };
 }
-test('V2 Mongo acquisition distinguishes a demonstrated anonymous read from denial and missing evidence', () => {
+test('V2 Mongo acquisition distinguishes anonymous find authorization from denial without returning data', () => {
   for (const behavior of [{ reply: { ok: 0, code: 13 } }, { queryThrows: 13 }]) {
     const result = probe({}, behavior);
     assert.deepEqual(result.output, { state: 'observed', value: false }); assert.equal(result.exit, 0);
   }
-  assert.deepEqual(probe({}, { reply: { ok: 1, cursor: { firstBatch: ['synthetic-private-marker'] } } }).output,
+  assert.deepEqual(probe({}, { reply: { ok: 1, cursor: { firstBatch: [] } } }).output,
     { state: 'observed', value: true });
-  for (const behavior of [{ queryThrows: 6 }, { reply: { ok: 0, code: 6 } }]) {
+  for (const behavior of [{ queryThrows: 6 }, { reply: { ok: 0, code: 6 } },
+    { reply: { ok: 1 } }, { reply: { ok: 1, cursor: { firstBatch: ['synthetic-private-marker'] } } }]) {
     assert.deepEqual(probe({}, behavior).output, { state: 'unavailable', reason: 'query-failed' });
     assert.equal(probe({}, behavior).exit, 70);
   }
@@ -47,7 +51,7 @@ test('V2 Mongo acquisition requires authentication and preserves an observed rep
   assert.deepEqual(probe({ ...credentials, operation: 'replica' }, { hello: { ok: 1, setName: 'other' } }).output,
     { state: 'observed', value: false });
   assert.equal(probe({ ...credentials, operation: 'replica' }, { hello: { ok: 0 } }).exit, 70);
-  const connected = probe({ ...credentials, operation: 'authenticated' }, { reply: { ok: 1 } });
+  const connected = probe({ ...credentials, operation: 'authenticated' }, { reply: { ok: 1, cursor: { firstBatch: [] } } });
   assert.equal(connected.authentications, 1); assert.deepEqual(connected.output, { state: 'observed', value: true });
 });
 test('V2 Mongo acquisition rejects invalid inputs without querying or disclosing input', () => {

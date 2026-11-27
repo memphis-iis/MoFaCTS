@@ -28,6 +28,9 @@ import { collectLessonFamilyRefs, createLessonFamilyResolver } from '../lib/tdfL
 import { createStimulusKey } from '../../../learning-components/runtime/historyStimulusIdentity';
 import { normalizeClusterKC } from '../../../learning-components/runtime/sharedModelPracticeIdentity';
 import type { ConditionStateWrite } from '../lib/conditionAllocation';
+import { DEFAULT_COURSE_TIMEZONE } from '../../common/courseAssignments.contracts';
+import { legacyLessonReportingDeadline, reportingTimestamp, type ClassReportingTiming } from '../../common/lib/courseReportingTime';
+import type { getClassPerformanceByTdfWorkflow } from '../lib/classPerformance';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -82,13 +85,7 @@ type AnalyticsMethodsDeps = {
   resolveAssignedRootTdfIdsForUser: (userId: string) => Promise<string[]>;
   allocateNextEventId: () => number;
   syncUsernameCaches: (userId: string, nextUsername: string, previousUsername?: string) => void;
-  getClassPerformanceByTdfWorkflow: (
-    classId: string,
-    tdfId: string,
-    date: number | false,
-    deps: any,
-    assignmentContext?: { assignmentId?: string | null; dueAt?: Date | number | string | null }
-  ) => Promise<unknown>;
+  getClassPerformanceByTdfWorkflow: typeof getClassPerformanceByTdfWorkflow;
   insertSparcHistoryBatch?: (records: readonly (UnknownRecord & { _id: string; userId: string })[]) => Promise<readonly UnknownRecord[]>;
 };
 
@@ -1046,9 +1043,12 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
     if (typeof classId !== 'string' || !classId || typeof tdfId !== 'string' || !tdfId) {
       throw new Meteor.Error(400, 'Select a course and an assigned lesson');
     }
+    if (date !== false && (typeof date !== 'number' || reportingTimestamp(date) === null)) {
+      throw new Meteor.Error(400, 'Invalid report cutoff');
+    }
     const course = (await deps.Courses.find(
       { _id: classId },
-      { fields: { teacherUserId: 1 } }
+      { fields: { teacherUserId: 1, timezone: 1 } }
     ).fetchAsync())[0];
     if (!course) {
       throw new Meteor.Error(404, 'Course not found');
@@ -1067,7 +1067,14 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
       { fields: { _id: 1, dueAt: 1 } }
     );
     if (!assignment) throw new Meteor.Error(403, 'This lesson is not assigned to the selected course');
-    return deps.getClassPerformanceByTdfWorkflow(classId, tdfId, date, {
+    const timezone = course.timezone || DEFAULT_COURSE_TIMEZONE;
+    let assignmentDueAt = reportingTimestamp(assignment.dueAt);
+    if (assignmentDueAt === null) {
+      const lesson = await deps.Tdfs.findOneAsync({ _id: tdfId }, { fields: { 'content.tdfs.tutor.setspec.duedate': 1 } });
+      assignmentDueAt = legacyLessonReportingDeadline(lesson?.content?.tdfs?.tutor?.setspec?.duedate, timezone);
+    }
+    const timing: ClassReportingTiming = { assignmentDueAt, cutoffAt: date === false ? assignmentDueAt : date, timezone };
+    const [met, notMet] = await deps.getClassPerformanceByTdfWorkflow(classId, tdfId, timing.cutoffAt, {
       serverConsole: deps.serverConsole,
       Sections: deps.Sections,
       SectionUserMap: deps.SectionUserMap,
@@ -1076,7 +1083,8 @@ export function createAnalyticsMethodRegistration(deps: AnalyticsMethodsDeps) {
         { _id: { $in: userIds } },
         { fields: { _id: 1, username: 1, dueDateExceptions: 1 } }
       ).fetchAsync(),
-    }, { assignmentId: String(assignment._id), dueAt: assignment.dueAt ?? null });
+    }, { assignmentId: String(assignment._id) });
+    return [met, notMet, timing] as const;
   }
 
   async function getStudentPerformanceByIdAndTDFIdFromHistory(userId: string, TDFId: string, returnRows: number | null = null) {

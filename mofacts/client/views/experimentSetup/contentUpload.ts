@@ -1598,7 +1598,9 @@ Template.contentUpload.events({
         text: contentText('content.ownershipTransferred', { owner: newOwner.displayIdentifier || newOwner.username || 'new owner' }),
       };
     }, {
-      getErrorMessage: (error: any) => contentText('content.transferOwnershipError', { error: uploadErrorText(error) }),
+      getErrorMessage: (error: any) => error?.error === 'prolific-study-bound'
+        ? contentText('content.prolificStudyBound')
+        : contentText('content.transferOwnershipError', { error: uploadErrorText(error) }),
       onFailure: (error: any) => clientConsole(1, '[ACCESS] Transfer ownership failed:', error),
     });
   },

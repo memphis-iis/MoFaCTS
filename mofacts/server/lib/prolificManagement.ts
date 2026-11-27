@@ -3,12 +3,14 @@ import { prolificId, prolificAmount, prolificCompletionUrl } from '../../common/
 import { prolificRequest, prolificPage, ProlificApiError } from './prolificApi';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './prolificCollections';
 import { createProlificTestSetup } from './prolificTestSetup';
+import type { saveProlificStudyBinding } from './prolificStudyBinding';
 
 type Deps = {
   resolveExperimentTargetFamily: (target: string) => Promise<{ root: any } | null>;
   Tdfs: any; encrypt: (value: string) => string; decrypt: (value: string) => string;
   progress: (participation: any) => Promise<{ state: any; tdfId: string }>;
   audit: (action: string, actor: string | null, target: string | null, details?: any) => Promise<void>;
+  saveStudyBinding: typeof saveProlificStudyBinding;
   request?: typeof prolificRequest;
   testExperiment?: Pick<Parameters<typeof createProlificTestSetup>[0], 'inspect' | 'configure' | 'baseUrl'>;
 };
@@ -98,9 +100,8 @@ export function createProlificManagementService(deps: Deps, db = stores) {
     const balance = await request(c.token, `workspaces/${workspaceId}/balance/`);
     if (!['USD', 'GBP'].includes(balance?.currency_code)) throw new Error('prolific.invalidConfiguration');
     const reminderText = text(input?.reminderText, 4500);
-    const existing = await db.studies.findOneAsync({ studyId });
-    if (existing && (existing.ownerId !== ownerId || existing.rootTdfId !== rootTdfId || existing.accountId !== c.accountId || existing.projectId !== projectId || existing.workspaceId !== workspaceId)) throw new Error('prolific.identityConflict');
-    await db.studies.upsertAsync({ studyId, ownerId, rootTdfId }, { $set: { workspaceId, projectId, accountId: c.accountId, currency: balance.currency_code, reminderText, updatedAt: new Date() } });
+    await deps.saveStudyBinding({ studyId, ownerId, rootTdfId, workspaceId, projectId, accountId: c.accountId,
+      currency: balance.currency_code, reminderText, updatedAt: new Date() }, root.tdfRevision ?? 0);
     await deps.audit('prolific.study.linked', ownerId, null);
     return { linked: true };
   }

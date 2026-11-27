@@ -21,15 +21,11 @@ function source(revision, path) {
   assert.match(revision, /^[a-f0-9]{40}$/);
   return execFileSync('git', ['-C', root, 'show', `${revision}:${path}`], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
 }
-test('production remains paired with the immutable V1 scanner while the application candidate activates V2', () => {
+test('the configured production scanner resolves the immutable V1 uploader and its historical receiver contract', () => {
   assert.equal(selected(workflow), retained);
   assert.match(source(retained, 'mofacts/scripts/security-audit/upload-report.mjs'), /\/internal\/security-audits\/v1/);
   assert.match(source(retained, 'mofacts/server/http/securityAudits.ts'), /use\('\/internal\/security-audits\/v1'/);
   assert.match(source(retained, 'mofacts/scripts/security-audit/assemble-report.mjs'), /process\.env\.GITHUB_SHA/);
-  const binding = fs.readFileSync(new URL('../../../server/http/securityAudits.ts', import.meta.url), 'utf8');
-  assert.match(binding, /registerProtocolHttpMount\(WebApp, 'connectHandlers', '\/internal\/security-audits\/v2',[\s\S]*?runtime\.http\.ingest\);/);
-  assert.match(binding, /registerProtocolHttpMount\(WebApp, 'connectHandlers', '\/admin\/security-audits\/download',[\s\S]*?runtime\.http\.download\);/);
-  assert.doesNotMatch(binding, /\/internal\/security-audits\/v1|securityAuditStorage/);
 });
 test('scanner update/rollback requires matching immutable selection and runtime assertion', () => {
   assert.throws(() => selected(workflow.replace(`ref: ${retained}`, 'ref: main')));

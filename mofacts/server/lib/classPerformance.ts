@@ -1,5 +1,6 @@
 import type { DueDateException } from '../../common/courseAssignments.contracts';
 import { operationalHistorySelector } from '../../common/historyEnvelope';
+import { reportingTimestamp } from '../../common/lib/courseReportingTime';
 
 type ClassPerformanceEntry = {
   userId: string;
@@ -78,9 +79,11 @@ function buildUserPerformanceMetaById(
       ? exceptions.find((item) => item.assignmentId === assignmentId && item.courseId === classId)
       : null;
     if (exceptionEntry) {
-      const rawDate = new Date(exceptionEntry.date).getTime();
-      exceptionRawDate = rawDate;
-      exception = new Date(exceptionEntry.date).toLocaleDateString();
+      const rawDate = reportingTimestamp(exceptionEntry.date);
+      if (rawDate !== null) {
+        exceptionRawDate = rawDate;
+        exception = new Date(rawDate).toISOString();
+      }
     }
 
     metaByUserId.set(userId, {
@@ -159,11 +162,11 @@ async function aggregateHistoryStatsByUser(
 export async function getClassPerformanceByTdfWorkflow(
   classId: string,
   tdfId: string,
-  date: number | false,
+  cutoffDate: number | null,
   deps: GetClassPerformanceByTdfDeps,
-  assignmentContext?: { assignmentId?: string | null; dueAt?: Date | number | string | null }
-) {
-  deps.serverConsole('getClassPerformanceByTDF', classId, tdfId, date);
+  assignmentContext?: { assignmentId?: string | null }
+): Promise<[before: ClassPerformanceEntry[], atOrAfter: ClassPerformanceEntry[]]> {
+  deps.serverConsole('getClassPerformanceByTDF', classId, tdfId, cutoffDate);
 
   const sections = await deps.Sections.find({ courseId: classId }).fetchAsync();
   const sectionIds = sections.map((section) => section._id);
@@ -178,8 +181,6 @@ export async function getClassPerformanceByTdfWorkflow(
 
   const performanceMet: ClassPerformanceEntry[] = [];
   const performanceNotMet: ClassPerformanceEntry[] = [];
-  const assignmentDueDate = assignmentContext?.dueAt ? new Date(assignmentContext.dueAt).getTime() : NaN;
-  const cutoffDate = date || (Number.isFinite(assignmentDueDate) ? assignmentDueDate : new Date().getTime());
   if (enrolledUserIds.length === 0) {
     return [performanceMet, performanceNotMet];
   }
@@ -192,7 +193,7 @@ export async function getClassPerformanceByTdfWorkflow(
   const users = await deps.findUsersByIds(enrolledUserIds);
   const userMetaById = buildUserPerformanceMetaById(users, classId, assignmentContext?.assignmentId || null);
   const allStatsByUserId = await aggregateHistoryStatsByUser(baseMatch, deps);
-  const baseMetStatsByUserId = await aggregateHistoryStatsByUser(baseMatch, deps, {
+  const baseMetStatsByUserId = cutoffDate === null ? allStatsByUserId : await aggregateHistoryStatsByUser(baseMatch, deps, {
     $expr: {
       $lt: [
         { $ifNull: ['$recordedServerTime', 0] },
@@ -200,7 +201,7 @@ export async function getClassPerformanceByTdfWorkflow(
       ]
     }
   });
-  const extraExceptionClauses = enrolledUserIds
+  const extraExceptionClauses = cutoffDate === null ? [] : enrolledUserIds
     .map((userId) => {
       const exceptionRawDate = userMetaById.get(userId)?.exceptionRawDate;
       if (exceptionRawDate === false || !Number.isFinite(Number(exceptionRawDate)) || Number(exceptionRawDate) <= cutoffDate) {

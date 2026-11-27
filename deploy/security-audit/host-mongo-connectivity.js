@@ -29,8 +29,11 @@
       value = hello.setName === input.replicaSet;
     } else {
       try {
-        const reply = db.getSiblingDB(input.database).runCommand({ find: 'tdfs', filter: {}, limit: 1 });
-        if (reply?.ok === 1) value = true;
+        // The find privilege is checked on this collection. The empty match list keeps the result free of records.
+        const reply = db.getSiblingDB(input.database).runCommand({
+          find: 'tdfs', filter: { _id: { $in: [] } }, projection: { _id: 1 }, limit: 1, singleBatch: true,
+        });
+        if (reply?.ok === 1 && Array.isArray(reply.cursor?.firstBatch) && reply.cursor.firstBatch.length === 0) value = true;
         else if (input.operation === 'unauthenticated' && reply?.code === 13) value = false;
         else throw Error();
       } catch (error) {

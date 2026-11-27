@@ -95,7 +95,13 @@ function fixture(options = {}) {
 }
 
 test('V2 image bridge verifies classic/containerd graph identity, restrictions and cleanup before accepting counts', async () => {
-  const f = fixture(); assert.deepEqual(await f.observe(), good);
+  const f = fixture();
+  const previousMask = process.umask(0o077);
+  try {
+    assert.deepEqual(await f.observe(), good);
+  } finally {
+    process.umask(previousMask);
+  }
   assert.equal(f.identities.length, 2); assert.equal(f.removed(), true);
   const create = f.calls.find(row => row.args[3] === 'create');
   for (const [flag, value] of [['--pull', 'never'], ['--network', 'none'], ['--platform', 'linux/amd64'], ['--user', '65534:65534'],

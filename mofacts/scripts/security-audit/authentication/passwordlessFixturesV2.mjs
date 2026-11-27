@@ -21,6 +21,7 @@ function scope(input) {
   if (typeof input.adminUserId !== 'string' || !input.adminUserId || !Number.isSafeInteger(input.startedAt)
       || input.startedAt < 0 || !Number.isSafeInteger(input.historyNow) || input.historyNow < input.startedAt
       || input.historyNow > input.startedAt + 3600000) invalid();
+  if (input.foreignActor === null) return null;
   const actor = parseFixtureActorV2(input.foreignActor, input.namespace);
   if (actor.alias !== 'learnerB' || actor.userId === input.adminUserId) invalid();
   return actor;
@@ -28,7 +29,8 @@ function scope(input) {
 export function passwordlessFixturePlanV2(input) {
   const actor = scope(input), n = input.namespace;
   const participant = { userId: `${n}-participant`, username: `AUDIT_${n.slice(-12).toUpperCase()}` };
-  const roots = ['a', 'b'].map((side, index) => ({ _id: index === 0 ? `${n}-lesson` : `${n}-other-lesson`, ownerId: input.adminUserId,
+  const sides = actor ? ['a', 'b'] : ['a'];
+  const roots = sides.map((side, index) => ({ _id: index === 0 ? `${n}-lesson` : `${n}-other-lesson`, ownerId: input.adminUserId,
     tdfAvailability: 'available', content: { fileName: `${n}-${side}.json`, tdfs: { tutor: {
       setspec: { lessonname: `Synthetic audit ${side}`, experimentTarget: `${n}-target-${side}`, userselect: 'false' },
       unit: [{ unitname: 'Synthetic return', instructions: 'Synthetic audit qualification' }],
@@ -36,14 +38,17 @@ export function passwordlessFixturePlanV2(input) {
   const user = { _id: participant.userId, username: participant.username, createdAt: new Date(input.historyNow),
     profile: { createdBy: input.adminUserId } };
   const progress = [{ _id: `${n}-passwordless-progress`, userId: participant.userId, TDFId: roots[0]._id,
-    experimentState: { currentUnitNumber: 0, lastUnitCompleted: -1, lastActionTimeStamp: input.historyNow } },
-  { _id: `${n}-progress-learnerB`, userId: actor.userId, TDFId: roots[0]._id }];
-  const history = createFixtureHistoryV2({ namespace: n, userId: actor.userId, alias: 'learnerB', now: input.historyNow });
+    experimentState: { currentUnitNumber: 0, lastUnitCompleted: -1, lastActionTimeStamp: input.historyNow } }];
+  let history = null;
+  if (actor) {
+    progress.push({ _id: `${n}-progress-learnerB`, userId: actor.userId, TDFId: roots[0]._id });
+    history = createFixtureHistoryV2({ namespace: n, userId: actor.userId, alias: 'learnerB', now: input.historyNow });
+  }
   return { participant, roots, user, progress, history, foreignActor: actor };
 }
 function records(plan) {
   return [['users', [plan.user]], [collectionMongoName('Tdfs'), plan.roots],
-    [collectionMongoName('GlobalExperimentStates'), plan.progress], [collectionMongoName('Histories'), [plan.history]]];
+    [collectionMongoName('GlobalExperimentStates'), plan.progress], [collectionMongoName('Histories'), plan.history ? [plan.history] : []]];
 }
 function selector(name, row) {
   if (name === 'users') return { _id: row._id, username: row.username, 'profile.createdBy': row.profile.createdBy, createdAt: row.createdAt };
@@ -58,7 +63,7 @@ async function requireExistingOwner(input, name, row) {
 }
 export async function requireUnusedPasswordlessFixtureV2(input) {
   const plan = passwordlessFixturePlanV2(input);
-  if (!await requireOwnedFixtureActorV2(input, plan.foreignActor)) invalid();
+  if (plan.foreignActor && !await requireOwnedFixtureActorV2(input, plan.foreignActor)) invalid();
   for (const [name, rows] of records(plan)) for (const row of rows) {
     if (await input.database.collection(name).findOne({ _id: row._id })) invalid();
   }
@@ -69,19 +74,22 @@ export async function requireUnusedPasswordlessFixtureV2(input) {
 }
 export async function seedPasswordlessFixtureV2(input) {
   const plan = await requireUnusedPasswordlessFixtureV2(input);
-  const verified = await input.database.collection('users').updateOne({ _id: plan.foreignActor.userId,
-    username: plan.foreignActor.username, 'profile.createdBy': input.adminUserId }, { $set: { 'emails.0.verified': true } });
-  if (verified.matchedCount !== 1) invalid();
-  for (const [name, rows] of records(plan)) for (const row of rows) await input.database.collection(name).insertOne(row);
-  return { state: 'fixture-passwordless-seeded', participant: plan.participant,
-    values: { 'lesson.progress': plan.roots[0]._id, 'progress.learnerB': plan.progress[1]._id,
+  const values = { 'lesson.progress': plan.roots[0]._id, 'passwordless.experimentTarget': `${input.namespace}-target-a`,
+    'passwordless.participantId': plan.participant.username, 'passwordless.ownProgress': plan.progress[0]._id };
+  if (plan.foreignActor) {
+    const verified = await input.database.collection('users').updateOne({ _id: plan.foreignActor.userId,
+      username: plan.foreignActor.username, 'profile.createdBy': input.adminUserId }, { $set: { 'emails.0.verified': true } });
+    if (verified.matchedCount !== 1) invalid();
+    Object.assign(values, { 'progress.learnerB': plan.progress[1]._id,
       'performance.learnerB': { numCorrect: 1, numIncorrect: 0, stimsIntroduced: 1, practiceDuration: 750, totalStimCount: 0 },
-      'passwordless.experimentTarget': `${input.namespace}-target-a`, 'passwordless.otherExperimentTarget': `${input.namespace}-target-b`,
-      'passwordless.participantId': plan.participant.username, 'passwordless.ownProgress': plan.progress[0]._id } };
+      'passwordless.otherExperimentTarget': `${input.namespace}-target-b` });
+  }
+  for (const [name, rows] of records(plan)) for (const row of rows) await input.database.collection(name).insertOne(row);
+  return { state: 'fixture-passwordless-seeded', participant: plan.participant, values };
 }
 export async function inspectPasswordlessFixtureV2(input) {
   const plan = passwordlessFixturePlanV2(input);
-  await requireOwnedFixtureActorV2(input, plan.foreignActor);
+  if (plan.foreignActor) await requireOwnedFixtureActorV2(input, plan.foreignActor);
   let present = 0;
   let participantPresent = false;
   for (const [name, rows] of records(plan)) for (const row of rows) if (await requireExistingOwner(input, name, row)) {

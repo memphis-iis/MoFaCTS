@@ -30,11 +30,12 @@ GitHub billing is unavailable. The four repository Security jobs use the
 Its exact-commit result is operator evidence, not a GitHub check or release
 qualification. The optional GitHub Security workflow is manual-only.
 
-Staging2 runs the accepted V2 application revision `1c72734b` with its matching
-protected release receipt and raw-measurement host auditor. Live ingestion,
-admin downloads, 29 selected authorization cases and paired rollback/restoration
-passed. See the exact image/receipt identities and evidence limits in the
-[staging2 operating baseline](../../deploy/security-audit/staging2-v2-operations.md).
+The latest accepted staging2 V2 application recorded in the audit ledger is
+`e9d14a25`. The catalog v2 Full report uses a separately pinned writer and the
+exact deployed application source for registry verification. Its live evidence,
+signed storage, independent download and archive verification are tracked in
+the [staging2 operating procedure](../../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification)
+and [control register](../../docs-developer/security-audit-staging2-control-evidence.md).
 The [operator exposure workflow](../../deploy/security-audit/operator-exposure-v2.md)
 composes the same V2 producers, assembler, encryption, uploader and final
 assertion without GitHub scheduling or new server access.
@@ -69,8 +70,9 @@ output and incomplete evidence remain ERROR. The workflow encrypts and submits
 the report before its final completeness assertion; accepted storage does not
 turn an ERROR report green. UDP silence alone is not clearance. The accepted
 staging2 exposure baseline contains 22 PASS and one evidence-incomplete UDP
-ERROR. The 29 selected authorization cases prove their one selected control;
-the other 21 authentication protocol controls remain Phase 2 work.
+ERROR. The separate Phase 2 authentication run passed all 22 controls on its
+recorded release. The latest Full report requires evidence for the current
+staging2 release. See the [audit ledger](../../docs-developer/security-audit-durable-redesign-status.md).
 
 ## Private access and retention
 

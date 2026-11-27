@@ -6,6 +6,7 @@ import { ReactiveVar } from 'meteor/reactive-var';
 import { Tracker } from 'meteor/tracker';
 import { Session } from 'meteor/session';
 import { ServiceConfiguration } from 'meteor/service-configuration';
+import { isOAuthCredentialValue } from '../../../common/oauthConfiguration';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import { meteorCallAsync, clientConsole } from '../..';
 import { sessionCleanUp } from '../../lib/sessionUtils';
@@ -624,6 +625,13 @@ Template.signIn.events({
 
   'click #signInButtonOAuth': async function(event: any, template: any) {
     event.preventDefault();
+    const googleConfig = ServiceConfiguration.configurations.findOne({ service: 'google' });
+    if (!googleConfig || !('clientId' in googleConfig) || !isOAuthCredentialValue(googleConfig.clientId)) {
+      const message = template.oauthConfigSub.ready() ? 'auth.googleSignInUnavailable' : 'auth.oauthConfigLoading';
+      showInlineSignInError(authText(message), { serverErrorScope: 'provider' }, template);
+      focusFirstSignInError(template);
+      return;
+    }
     $('#signInButton').prop('disabled', true);
 
     // CRITICAL: Set logging in flag and hide container immediately to prevent flash
@@ -637,18 +645,6 @@ Template.signIn.events({
     clientConsole(2, '[GOOGLE-LOGIN] Google Login Button Clicked');
     clientConsole(2, '[GOOGLE-LOGIN] Current loginMode:', Session.get('loginMode'));
     clientConsole(2, '[GOOGLE-LOGIN] Existing session present:', !!Meteor.userId());
-
-    // Check if OAuth service configuration is ready
-    const googleConfig = ServiceConfiguration.configurations.findOne({service: 'google'});
-    if (!googleConfig) {
-      clientConsole(1, '[GOOGLE-LOGIN] ERROR: OAuth service configuration not ready yet!');
-      restoreVisibleSignInScreen(template);
-      showInlineSignInError(authText('auth.oauthConfigLoading'), {}, template);
-      $('#signInButton').prop('disabled', false);
-      focusFirstSignInError(template);
-      return;
-    }
-    clientConsole(2, '[GOOGLE-LOGIN] OAuth config found:', !!googleConfig);
 
     // Set the login mode to google
     Session.set('loginMode', 'google');

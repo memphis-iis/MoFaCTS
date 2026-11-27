@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { AUDIT_VERIFICATIONS } from '../../../common/securityAudit/verificationCatalog.ts';
 import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
-import { AUDIT_SECTION_IDS, AUTHENTICATION_QUALIFICATION_CATALOG, profileControls } from '../../../common/securityAudit/catalogRegistry.ts';
+import { AUDIT_CATALOG_V2, AUDIT_SECTION_IDS, AUTHENTICATION_QUALIFICATION_CATALOG, profileControls } from '../../../common/securityAudit/catalogRegistry.ts';
 import { finalizeAuditReport } from '../../../common/securityAudit/reportV2.ts';
 import { requireMatchingSourceVerification } from '../../../common/securityAudit/verificationBundle.ts';
 import { composeNativeVerificationBundle, writeCapturedVerificationBundle } from '../qualification/composeVerificationBundle.mjs';
@@ -19,10 +19,10 @@ import { carryImageVerificationBundle, validateBuildVerificationBundle } from '.
 import { compareRuntimeVerification } from '../qualification/compareRuntimeVerification.mjs';
 import { projectExpectedRegistry } from '../qualification/registryProjection.mjs';
 import { observeStaging2Registry } from '../qualification/observeStaging2Registry.mjs';
-import { bindStaging2ReleaseRegistry, bindStaging2ReportReadback } from '../qualification/bindStaging2ReleaseRegistry.mjs';
+import { assembleStaging2FullReport, bindStaging2ReleaseRegistry, bindStaging2ReportReadback } from '../qualification/bindStaging2ReleaseRegistry.mjs';
 import { projectReleaseReceiptV2 } from '../qualification/releaseRecordStore.mjs';
 import { writeAuditFileV2 } from '../core/producerFilesV2.mjs';
-import { retainPinnedAuditArchiveV2 } from '../core/reportFilesV2.mjs';
+import { retainPinnedAuditArchiveV2 } from '../report/reportFilesV2.mjs';
 import { envelope } from './fixtures/v2Fixtures.mjs';
 
 const hash = data => createHash('sha256').update(data).digest('hex');
@@ -314,6 +314,118 @@ test('binds the verified registry and report readback to the staged image and ex
   ]) {
     await assert.rejects(bindStaging2ReportReadback(await pair(name, { ...payload, ...change })), /release identity do not match/);
   }
+
+  const reportToolRevision = 'd'.repeat(40);
+  const toolRoot = path.resolve(fileURLToPath(new URL('../../../../', import.meta.url)));
+  const applicationCheckout = path.join(directory, 'deployed-application');
+  const appProof = path.join(applicationCheckout, 'mofacts/scripts/security-audit/qualification/verificationCatalogProof.mjs');
+  const historicalDigest = '8'.repeat(64);
+  const historicalBundle = { ...observation.verificationBundle.bundle, verificationCatalogSha256: historicalDigest,
+    executions: observation.verificationBundle.bundle.executions.slice(1) };
+  const historicalBundleBytes = Buffer.from(canonicalAuditJson(historicalBundle));
+  const deployedInput = { ...input, bundleBytes: historicalBundleBytes, acceptance: {
+    ...input.acceptance, registry: { ...registry, bundleDigestSha256: hash(historicalBundleBytes),
+      verificationCatalogSha256: historicalDigest, verificationCount: historicalBundle.executions.length },
+  } };
+  await fs.mkdir(path.dirname(appProof), { recursive: true });
+  await fs.writeFile(appProof, `export const digestVerificationCatalog = () => '${historicalDigest}';
+    export const requiredMeteorVerificationIds = ${JSON.stringify(historicalBundle.executions.map(row => row.verificationId))};`);
+  function sourceOptions(revision = reportToolRevision, status = '', top = toolRoot, appRevision = buildIdentity.baseCommit) {
+    return {
+      env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, GIT_DIR: 'foreign',
+        AUDIT_REPORT_INGEST_SECRET: 'test-only signing value' },
+      command: async (program, args, _maximum, environment) => {
+        assert.equal(program, 'git');
+        assert.deepEqual(args.slice(0, 2), ['--no-optional-locks', '-C']);
+        assert.ok(args[2] === toolRoot || args[2] === applicationCheckout);
+        const deployed = args[2] === applicationCheckout;
+        assert.equal(environment.GIT_DIR, undefined);
+        assert.equal(environment.AUDIT_REPORT_INGEST_SECRET, undefined);
+        const verb = args.slice(3).join(' ');
+        if (verb === 'rev-parse --show-toplevel') return Buffer.from((deployed ? applicationCheckout : top) + '\n');
+        if (verb === 'rev-parse --verify HEAD') return Buffer.from((deployed ? appRevision : revision) + '\n');
+        assert.equal(verb, 'status --porcelain=v1 --untracked-files=all');
+        return Buffer.from(deployed ? '' : status);
+      },
+    };
+  }
+
+  const metadataPath = path.join(directory, 'metadata.json');
+  const artifactDirectory = path.join(directory, 'producers');
+  const stageReportPath = path.join(directory, 'staging2-full.json');
+  await fs.mkdir(artifactDirectory);
+  const metadata = Object.fromEntries(['reportId', 'reportType', 'startedAt', 'completedAt',
+    'deployedApplicationRevision', 'deployedImageDigest', 'toolVersions'].map(key => [key, payload[key]]));
+  await writeAuditFileV2(metadataPath, metadata);
+  const producer = {
+    artifactSchema: 'MoFaCTSSecurityAuditProducerArtifactV1', producerId: 'repository', sectionId: 'repository',
+    controls: sections.repository.controls.map(({ controlId, status, evidence }) =>
+      controlId === 'repository.dependencies-application-runtime.low'
+        ? { controlId, status: 'FAIL', evidence: { summary: 'Synthetic retained finding.',
+          metrics: { evaluatedCount: 1, findingCount: 1 } } }
+        : { controlId, status, evidence }),
+  };
+  await writeAuditFileV2(path.join(artifactDirectory, 'repository.json'), producer);
+  const stageInputs = { releaseEvidence: deployedInput, metadataPath, artifactDirectory, reportToolRevision,
+    applicationCheckout, outputPath: stageReportPath };
+  for (const invalidSource of [
+    sourceOptions('e'.repeat(40)), sourceOptions(reportToolRevision, ' M mofacts/scripts/security-audit/work.mjs\n'),
+    sourceOptions(reportToolRevision, '? local-source.mjs\n'), sourceOptions(reportToolRevision, '', directory),
+    sourceOptions(reportToolRevision, '', toolRoot, reportToolRevision),
+  ]) {
+    await assert.rejects(assembleStaging2FullReport(stageInputs, invalidSource), /reviewed clean checkout/);
+    await assert.rejects(fs.stat(stageReportPath), { code: 'ENOENT' });
+  }
+  let observations = 0;
+  const clean = sourceOptions();
+  const changed = sourceOptions('e'.repeat(40));
+  await assert.rejects(assembleStaging2FullReport(stageInputs, { ...clean, command: (...args) => {
+    if (args[1][2] === toolRoot) observations++;
+    return (observations <= 3 ? clean : changed).command(...args);
+  } }), /reviewed clean checkout/);
+  await assert.rejects(fs.stat(stageReportPath), { code: 'ENOENT' });
+
+  for (const [name, invalidMetadata, message] of [
+    ['external target', { ...metadata, target: 'https://audit.example' }, /unexpected or missing fields/],
+    ['unverified scanner', { ...metadata, scannerSourceRevision: reportToolRevision }, /unexpected or missing fields/],
+    ['wrong application', { ...metadata, deployedApplicationRevision: { state: 'observed', value: reportToolRevision } },
+      /release identity do not match/],
+    ['wrong platform image', { ...metadata, deployedImageDigest: { state: 'observed',
+      value: 'ppavlikmemphis/mofacts-staging2@' + publication.digest } }, /release identity do not match/],
+    ['earlier run', { ...metadata, startedAt: '2026-11-24T09:59:59.000Z' }, /started before the accepted staging2 deployment/],
+    ['exposure', { ...metadata, reportType: 'exposure' }, /release identity do not match/],
+  ]) {
+    const badMetadata = path.join(directory, name + '.json');
+    await writeAuditFileV2(badMetadata, invalidMetadata);
+    await assert.rejects(assembleStaging2FullReport({ ...stageInputs, metadataPath: badMetadata }, clean), message);
+    await assert.rejects(fs.stat(stageReportPath), { code: 'ENOENT' });
+  }
+
+  await assert.rejects(assembleStaging2FullReport({ ...stageInputs, releaseEvidence: input }, clean), /bundle identity mismatch/);
+  await assert.rejects(fs.stat(stageReportPath), { code: 'ENOENT' });
+  const staged = await assembleStaging2FullReport(stageInputs, clean);
+  assert.equal(staged.catalogVersion, 2);
+  assert.equal(staged.catalogDigestSha256, AUDIT_CATALOG_V2.catalogDigestSha256);
+  assert.equal(staged.scannerSourceRevision, reportToolRevision);
+  assert.equal(staged.deployedApplicationRevision.value, buildIdentity.baseCommit);
+  assert.equal(staged.deployedImageDigest.value, platformImage);
+  assert.equal(staged.counts.fail, 1);
+  assert.equal(staged.counts.error, 69);
+  await assert.rejects(assembleStaging2FullReport(stageInputs, clean), { code: 'EEXIST' });
+
+  const stagedCopy = path.join(directory, 'staging2-full-receiver.json');
+  await fs.copyFile(stageReportPath, stagedCopy);
+  const stagedReadback = { releaseEvidence: deployedInput, reportPath: stageReportPath, readbackPath: stagedCopy };
+  await assert.rejects(bindStaging2ReportReadback(stagedReadback), /bundle identity mismatch/);
+  await assert.rejects(bindStaging2ReportReadback({ ...stagedReadback, reportToolRevision }, clean), /supplied together/);
+  const pinnedReadback = { ...stagedReadback, reportToolRevision, applicationCheckout };
+  await assert.rejects(bindStaging2ReportReadback(pinnedReadback, sourceOptions('e'.repeat(40))), /reviewed clean checkout/);
+  await assert.rejects(bindStaging2ReportReadback({ ...pinnedReadback, reportPath: matched.reportPath, readbackPath: matched.readbackPath }, clean),
+    /release identity do not match/);
+  const stagedBinding = await bindStaging2ReportReadback(pinnedReadback, clean);
+  assert.equal(stagedBinding.scannerSourceRevision, reportToolRevision);
+  assert.equal(stagedBinding.recordDigestSha256, binding.recordDigestSha256);
+  assert.equal(stagedBinding.executionComplete, false);
 
   const keyPair = generateKeyPairSync('rsa', { modulusLength: 3072 });
   const expectedPublicKeySha256 = hash(keyPair.publicKey.export({ type: 'spki', format: 'der' }));
