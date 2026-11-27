@@ -14,6 +14,13 @@ import { createSurfaceInventorySeal, RegistryObservationError, type StartupSurfa
 
 type HasVerification = { verification: { verificationId: string } };
 const verificationId = (row: HasVerification) => row.verification.verificationId;
+const meteorVerificationIdsBySurface = new Map<string, readonly string[]>();
+for (const row of AUDIT_VERIFICATIONS) {
+  if (row.kind !== 'integrationTest' || row.lane !== 'meteor') continue;
+  meteorVerificationIdsBySurface.set(row.surfaceId,
+    Object.freeze([...(meteorVerificationIdsBySurface.get(row.surfaceId) ?? []), row.verificationId]));
+}
+const meteorVerificationIds = (surfaceId: string) => meteorVerificationIdsBySurface.get(surfaceId) ?? [];
 
 function requireOwnerCoverage(registered: readonly string[], expected: readonly { verificationId: string }[], reason: string) {
   const actualIds = new Set(registered);
@@ -55,14 +62,14 @@ function collectRegisteredSurfaces(): StartupSurface[] {
 
   return [
     ...methods.surfaces.map(row => ({ surfaceId: row.surfaceId, owner: 'application-method',
-      policy: row.policy, dataEgress: row.dataEgress, verificationIds: [verificationId(row)] })),
+      policy: row.policy, dataEgress: row.dataEgress, verificationIds: meteorVerificationIds(row.surfaceId) })),
     ...uploads.surfaces.map(row => ({ surfaceId: row.surfaceId, owner: row.owner,
       policy: row.policy, dataEgress: row.dataEgress, verificationIds: [verificationId(row)], transport: { name: row.name } })),
     ...auth.surfaces.map(row => ({ surfaceId: row.surfaceId, owner: 'framework-accounts',
-      policy: row.policy, dataEgress: row.dataEgress, verificationIds: [verificationId(row)], transport: { packagePins: row.packagePins } })),
+      policy: row.policy, dataEgress: row.dataEgress, verificationIds: meteorVerificationIds(row.surfaceId), transport: { packagePins: row.packagePins } })),
     ...named.map(row => ({ surfaceId: row.surfaceId, owner: 'named-publication',
       policy: row.policy.kind === 'sparc-lesson' ? { kind: row.policy.kind } : row.policy,
-      dataEgress: row.dataEgress, verificationIds: [verificationId(row)] })),
+      dataEgress: row.dataEgress, verificationIds: meteorVerificationIds(row.surfaceId) })),
     ...defaults.map(row => ({ surfaceId: row.surfaceId, owner: 'default-publication',
       policy: row.policy, dataEgress: row.surfaceId === DEFAULT_PUBLICATION_VERIFICATIONS.roles.surfaceId
         ? 'current-role-assignment-projection' : 'current-account-projection', verificationIds: [verificationId(row)] })),

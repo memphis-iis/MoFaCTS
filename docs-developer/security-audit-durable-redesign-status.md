@@ -2029,7 +2029,29 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 107 total, 106 consumed, 0 reserved, 0 generally available, and 1 for the earlier `/health` batch only.**
+**Current allowance: 112 total, 107 consumed, 0 reserved, 4 generally available,
+and 1 separately restricted to the earlier `/health` batch.**
+
+On 2026-11-27 the operator authorized up to five additional Meteor integration
+invocations for final audit closure (slots 108-112), including necessary retries.
+Slot 108 was consumed on exact committed V3 closeout source
+`f7d1206b03f3005dd55418466b87fde266d99cf7` in retained local Linux job
+`/var/tmp/mofacts-integration.V3F7D1206B`. Preparation checked 248.5 GiB free on
+C:, reused existing tool image
+`mofacts-local/integration:268faf92061051fe12b56b5b2c3dfd92dbd8cf9355eff4e454930c1321e42474`
+and completed without invoking Meteor. The actual suite passed 1,165 server
+tests with 15 pending and 1,256 Chromium tests with seven pending; it had zero
+test or hook failures and cleaned all transient resources. The qualification
+receipt nevertheless failed closed after execution because the seven new V3
+proof IDs named synthetic qualification surfaces that were not present in the
+installed startup registry. Retained run SHA-256
+`e66890c1cfdbb43569a5feab39b0fbefdb4fffe3f755e50c19b052bf87c87a25`,
+startup-registry SHA-256
+`4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63`,
+and log SHA-256
+`7b4f45cc5274bba189f77ede13847350e4563dbe6ebac5b69574aead51b9accc`.
+The failed receipt is not qualification evidence. Four slots remain available
+for the corrected exact source and any necessary retries.
 
 Slot 107 passed on exact receiver candidate `946af9ac415b105f1ed7c1fe0c0cf3f73f0410e8` on November 25, 17:05:04–17:07:11 UTC. Server 1,160 passed and 15 pending. Chromium 1,256 passed and seven pending. Zero test or hook failures. The server receiver case ID `de861bceccf65ec6bda886fb03891dee72036aceed922bcfd6c462f6249e468c` passed in the receipt-bound run data. The existing 6 GiB/two-CPU worker checked 266.9 GiB free on C: and 13.7 GiB available guest memory and reused its pinned tool image. Cleanup verified exit 0, absence of job-labelled containers, volumes and network, and removal of generated dependencies and Meteor build state. Retained job `/var/tmp/mofacts-integration.egvE7ZsC`, native receipt SHA-256 `1a1d86ac2c56cb0b93a911973cc6726bc13db9d5d5c06743afb575aecd0f56c2` and startup registry SHA-256 `4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63`. The verified source bundle is in `tmp/mofacts-qualified-build-jhqeIp/verification-bundle.json` under the retained job.
 

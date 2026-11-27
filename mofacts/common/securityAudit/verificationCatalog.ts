@@ -154,31 +154,40 @@ export const AUTHENTICATION_SESSION_VERIFICATIONS = Object.freeze([
 // Approved 2026-11-27. These exact-revision Meteor cases replace the circular
 // requirement for a second operator to reacquire eleven black-box observations.
 // A final staging smoke observation remains a separate required input.
-const reproducibleAuthenticationTest = (verificationId: string, suite: string, ...cases: [string, ...string[]]) =>
+const reproducibleAuthenticationTest = <const VerificationId extends string, const SurfaceId extends string>(
+  verificationId: VerificationId, surfaceId: SurfaceId, suite: string, ...cases: [string, ...string[]]
+) =>
   Object.freeze({ verificationId, kind: 'integrationTest' as const, lane: 'meteor' as const,
-    surfaceId: `qualification:${verificationId}` as const, suite, cases: Object.freeze(cases),
+    surfaceId, suite, cases: Object.freeze(cases),
     expectedOutcome: 'pass' as const, mutation: 'none' as const });
 const passwordTimingSuite = 'password timing defense';
 const serverAuthSuite = 'server auth and session methods';
 const progressPrivacySuite = 'approved progress-privacy selection on the registered Meteor publication';
 const progressDdpCase = 'resumes a passwordless study session and scopes progress on its real DDP connection';
 export const REPRODUCIBLE_AUTHENTICATION_VERIFICATIONS = Object.freeze({
-  enumeration: reproducibleAuthenticationTest('reproducible.authn.enumeration', passwordTimingSuite,
+  enumeration: reproducibleAuthenticationTest('reproducible.authn.enumeration',
+    'framework:accounts-password:password-login', passwordTimingSuite,
     'equalizes unknown, bcrypt, and Argon2 failures with the missing verifier work',
     'holds failed password responses to an outcome-independent target'),
-  timing: reproducibleAuthenticationTest('reproducible.authn.timing', passwordTimingSuite,
+  timing: reproducibleAuthenticationTest('reproducible.authn.timing',
+    'framework:accounts-password:password-login', passwordTimingSuite,
     'holds failed password responses to an outcome-independent target',
     'does not delay successful password logins or non-password login methods',
     'reports rather than masking work that exceeds the selected envelope'),
-  reset: reproducibleAuthenticationTest('reproducible.authn.reset-and-session-revocation', serverAuthSuite,
+  reset: reproducibleAuthenticationTest('reproducible.authn.reset-and-session-revocation',
+    'method:resetPasswordWithToken', serverAuthSuite,
     'rejects an unused aged reset token and verifies current reset, replay denial and stored-session revocation'),
-  authorization: reproducibleAuthenticationTest('reproducible.authn.authorization', progressPrivacySuite,
+  authorization: reproducibleAuthenticationTest('reproducible.authn.authorization',
+    'publication:userExperimentState', progressPrivacySuite,
     progressDdpCase),
-  modifiedTarget: reproducibleAuthenticationTest('reproducible.authn.passwordless-modified-target', serverAuthSuite,
+  modifiedTarget: reproducibleAuthenticationTest('reproducible.authn.passwordless-modified-target',
+    'method:provisionExperimentUser', serverAuthSuite,
     'retains the recorded experiment binding when a progress-backed participant tries another target'),
-  passwordlessContainment: reproducibleAuthenticationTest('reproducible.authn.passwordless-containment', progressPrivacySuite,
+  passwordlessContainment: reproducibleAuthenticationTest('reproducible.authn.passwordless-containment',
+    'publication:userExperimentState', progressPrivacySuite,
     progressDdpCase),
-  throttling: reproducibleAuthenticationTest('reproducible.authn.throttling', serverAuthSuite,
+  throttling: reproducibleAuthenticationTest('reproducible.authn.throttling',
+    'framework:accounts-password:password-login', serverAuthSuite,
     'acknowledges unknown verification recipients and binds public account limits',
     'binds password login connection, identifier and IP throttle policies'),
 });
