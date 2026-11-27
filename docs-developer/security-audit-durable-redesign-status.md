@@ -89,14 +89,18 @@ Use the evidence entries below for individual completed bindings. These are the 
 
 The reconciled checklist has 52 completed top-level items and two open groups. Registration migration and the installed source checks are complete. The remaining groups cover linking the exact release to its protected scanner and fixture evidence, and qualifying the complete matched run on staging2. Count checklist rows as work groups, since their sizes differ.
 
-The accepted staging2 application is `e9d14a25`. Use slot 108 and the exact-source and image evidence tied to that release. Use the [control register](security-audit-staging2-control-evidence.md) to select the next unchecked staging2 observation and verify which completed results apply. Counts in the dated milestones below describe those checkpoints. The two open groups share one live Full report gate. See the [closeout blockers](#staging2-closeout-blockers) for the report dependencies. Earlier browser evidence retains its recorded release and scope.
+The accepted staging2 application is `8e3a0a48`. Use slot 113 and the
+accepted release evidence for this commit. Use the
+[control register](security-audit-staging2-control-evidence.md) to select the
+next unchecked staging2 observation and verify which retained results apply.
+The two open groups share one live Full report gate. See the
+[closeout blockers](#staging2-closeout-blockers) for the report dependencies.
 
-The November 26 remediation verifies three lockfile repairs on the replacement
-source. Corrected source `8e3a0a48` passed the operator Security jobs, isolated
-mail composition, a canonical Compose build and full-image startup with zero
-high or critical Trivy findings. Slot 113 passed for that exact commit. The
-fourth repair still needs the proof-bearing image and accepted staging2 receipt.
-See the [remediation checklist](security-audit-staging2-control-evidence.md#findings-retained-for-remediation).
+All four [remediation findings](security-audit-staging2-control-evidence.md#findings-retained-for-remediation)
+are verified on the accepted replacement. Both runtime lock audits are clean.
+Trivy found zero high and zero critical vulnerabilities on the published
+Linux/amd64 manifest. Earlier browser evidence retains its recorded release
+and scope.
 
 Run `npm run security:surfaces` from `mofacts/` for source registration ownership. Runtime inventories and their classified policies come from the sealed application registry. The historical manual manifest is retained in Git at `2982f477` for interpreting the comparisons below.
 
@@ -296,7 +300,7 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   - [x] Retire the manifest and inference command. The final comparison against slot 105's `4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63` inventory confirmed all 198 methods, 21 publications, eight app-owned mounts, four middleware entries, 19 export classifications and 22 presentation routes. The additional Meteor runtime-config mount retains its explicit framework classification. The disabled class download has an installed descriptor with no egress. The retained production projection still matches `1fec1fc446a3f370cb43cbaaa8a4e26a804c9c21689489b045f857fd35d73046`. Local lint and the existing `security:surfaces` command now use the same registration-ownership check as the operator and workflow lanes. Full typecheck, lint, the standalone ownership command and the pinned Linux source-security V2 suite passed (473 passed, four skips, zero failures). No Meteor slot was used. Exact-candidate installed and full staging2 acceptance are tracked separately.
   - [x] Keep the checker local to each parsed source file by disabling automatic ambient package type discovery. The unchanged lint contract still covers 272 entries. Correct the stale V2 method fixture so a submitted method without a descriptor is tested as a rejection. The expanded V2 suite passed on the native Linux checkout with 468 passing, four environment-specific skips and zero failures. Its real checker comparison finished in 43 seconds across discovery and validation. Typecheck and lint passed. Both corrections concern source tooling and test evidence, so slot 103 remains the installed test for d9a01967.
 - [ ] Qualify the complete matched image and scanner on staging2, including login, ordinary learner behavior and enabled providers. The earlier condition-index cutover covered that specific change only.
-  - The live receiver, image identity, ordinary learner session and registry acceptance are complete for `e9d14a25` as recorded below. The remaining environment evidence is the matching protected fixture and enabled-provider results, independent complete 70-control report and receiver copy, and the saved archive round trip on the key owner's workstation. The prior 22-control report covers its original authentication scope.
+  - The live receiver, image identity, ordinary learner session and registry acceptance are complete for `8e3a0a48`. The remaining environment evidence is the matching protected fixture and enabled-provider results, independent complete 70-control report and receiver copy, and the saved archive round trip on the key owner's workstation. Earlier releases and the prior 22-control report retain their original scope.
   - Candidate review at `cc2429e5` confirmed that current source shares one active catalog selection between report receipt and the scanner. The earlier staging2 v2 branch at `26197f91` predates the current application changes. Reuse its accepted historical results within their recorded scope. Proposed sequence for operator review: qualify a receiver-only v2 candidate from current source in isolation, then use separately collected full report evidence for the coordinated staging2 qualification. Preserve the 70-control acceptance gate. Request a fresh Meteor invocation when an exact candidate is ready for it.
   - [x] Phil approved receiver-first testing. Select the receiver's accepted catalog in its composition and use that same catalog for signed ingestion, persistence and latest-report selection. The normal application and scanner still use catalog v1. The isolated v2 receiver fixture proves the selected-v2 behavior with synthetic reports, including retained catalog v1 readback. Full typecheck, full lint and 73 focused Linux source tests passed.
   - [x] Verify exact candidate `946af9ac415b105f1ed7c1fe0c0cf3f73f0410e8` with the existing pinned Docker tool image. All 35 focused receiver and report source tests passed from the candidate's tracked bytes in a disposable network-disabled container using temporary memory storage. Checked that the container was removed. The existing tool image remains reusable for Meteor.
@@ -334,7 +338,9 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   - [x] Assemble and independently parse the unsigned 70-control staging2 review. Tool `b38039d8d9ca3ccc733b821c0315f25672ff880e` accepted the 14 retained inputs and one new TLS observation. It recorded 49 passes, four findings and 17 execution errors for unavailable observations on `e9d14a25`. Report `/var/tmp/mofacts-full-review.1aZZUDhK/review-with-verified-tls/report.json` is protected on the Linux worker with SHA-256 `50c266bbbd411c88cde1874bd147c9bce65b5a5faedafad9792f922a4468a9d3`. The retained provenance preserves the original observation times. The staging2 receiver count for this release and catalog v2 was zero Full reports. The review remains offline and unsigned.
   - [x] Verify unused reset-link expiry on the accepted staging2 release. Worker `63e902cb` matched all five catalog cases. The fresh link changed the disposable account's password and its new password worked. The other account's unused link was rejected after its real one-hour lifetime and its original password still worked. Independently verified both disposable accounts and reset records were removed, the administrator signed out, the temporary containers and authentication lease were absent and the same application remained healthy. Retained receipt SHA-256 `e7c97e5045e1319611ed94043b057209728a50e9947ebe4594e096b7e8cd6157`, completed `2026-11-27T00:17:49.447Z`. All 32 focused tool tests and full lint passed.
   - [x] Reassemble and read back the unsigned review with the expiry observation. The accepted release `e9d14a25` now has 50 passes, four findings and 16 controls awaiting evidence. Protected review `/var/tmp/mofacts-full-review.1aZZUDhK/review-with-verified-expiry/report.json` has SHA-256 `20c83ccff0c73579ad1b38bfd9da703451b0a58918b18c20bab3549e9bc78a3d`. Only the expiry control changed in the 70-row review.
-  - [ ] Qualify the live Full report. Supply the protected writer JSON for all 70 catalog v2 controls and its stored report ID. Match the scanner to the separately reviewed tool commit and the deployed application to `e9d14a25b21eaece8cea377c787052e7896d0bfe` and the independently observed Linux/amd64 platform image above. Require a start at or after `2026-11-26T21:53:15.59940657Z`. Keep the actual findings and require zero execution errors. In Security Audits, download JSON from the Recent 90-day history row with the matching report digest for the independent readback. Verify the writer and receiver copies and the saved encrypted archive before closing Phase 3.
+  - [x] Accept the remediation release `8e3a0a484d146ce85b9733d6065a9d2806296e82` on staging2. It started at `2026-11-27T02:38:41.183140486Z` under tag `ppavlikmemphis/mofacts-staging2:audit-8e3a0a48-20261127023003`. The immutable registry index is `sha256:faaf371c69504e1def8f7f2c9d9dba490565b4575debb62a352799d9cbe54b1a`, Linux/amd64 manifest `sha256:749aaaa2c86113aa081aa0f58a4e09dd8a86867dcbbad07e7f7834fed9e700aa`, and configuration `sha256:b61d06b6862ac91601fccff3b06e60ac094c40d6701c0c8912d7b3082fa5c06e`. Exact slot 113, canonical Compose build, private Change Streams startup, published Trivy scan, public HTTPS 200, ordinary learner reload, session cleanup, admin Security Audits and the installed 248-case registry comparison passed. The first CSP check hashed the field value alone. Hashing the complete field line matched the previous receipt, and the proxy files passed the unchanged-state check. The embedded bundle SHA-256 is `e072f7436ddda43bb2b896a47d41bac5ae07590eeb27f89a9ef5e5cf8e081fbc`. Independent host readback matched workstation authority `1c06f0004c5c598b7449098ab5558d3421e76313e0e518282625aabf50535030`. Verified the previous image, proxy and other services after finalization. Protected evidence `audit-8e3a0a48-20261127023003` also contains the ordinary learner's own-settings baseline and the scoped inventory showing zero matching Full reports.
+  - [x] Verify the ordinary-account settings restriction on `8e3a0a48`. The ordinary learner read its own settings. One disposable participant signed in to its assigned study using the normal progress-backed account flow and received `experiment-account-restricted` for its own account settings. The catalog evaluator passed. The protected receipt `study-settings-control.json` in `audit-8e3a0a48-20261127023003` has SHA-256 `7606977d9e4e3cb7dc200b2def47b7d5ce31367d02ac9f0237f5c00fa9d6fdc6`. Independently verified namespace absence, session sign-out, lease release, temporary fixture file removal, and the same healthy application. The fixture request now uses the existing canonical JSON encoder after two write-free preflight failures; both earlier windows were verified empty and closed.
+  - [ ] Qualify the live Full report. Supply the protected writer JSON for all 70 catalog v2 controls and its stored report ID. Match the scanner to the separately reviewed tool commit and the deployed application to `8e3a0a484d146ce85b9733d6065a9d2806296e82` and its independently observed Linux/amd64 platform image. Require a start at or after `2026-11-27T02:38:41.183140486Z`. Keep the actual findings and require zero execution errors. In Security Audits, download JSON from the Recent 90-day history row with the matching report digest for the independent readback. Verify the writer and receiver copies and the saved encrypted archive before closing Phase 3.
 
 ## Phase 4 closure and maintainer handoff (2026-11-26)
 
@@ -349,17 +355,16 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
 
 ### Staging2 closeout blockers
 
-Phase 3 and Phase 4 remain open under the existing acceptance criteria. On
-November 26 at 22:37 UTC, staging2 returned healthy on the verified image
-reference with the same `21:53:15.59940657Z` application start. The approved
-tool revision reread the protected 70-row review and its final execution check
-rejected the 17 missing measurements. The live reset-expiry observation then
-closed one control. Use the [current control register](security-audit-staging2-control-evidence.md)
-for the outstanding observations and remediation owners.
+Phase 3 and Phase 4 remain open under the existing acceptance criteria. The
+[current control register](security-audit-staging2-control-evidence.md) now has
+55 verified observations, zero open repair findings and 15 controls that need
+evidence. The signed Full report still needs one qualification window on the
+accepted `8e3a0a48` release with independent receiver and archive verification.
+The earlier unsigned review preserves the previous release's measurements.
 
 | Open requirement | Why it remains open |
 | --- | --- |
-| Authentication | The November 18 authentication qualification passed all 22 controls in its earlier window. The current deployment has evidence for ordinary sign-in, selected passwordless behavior and unused reset-link expiry. The remaining comparison, single-use and replay, session, authorization, and throttling cases lack matching live outcomes and their required positive baselines. |
+| Authentication | The November 18 qualification passed all 22 controls in its earlier window. Retained evidence covers ordinary sign-in, selected passwordless behavior and unused reset-link expiry. The new release also passed the study-session settings restriction. Eleven comparison, reset, session, authorization and throttling controls still need their required matching outcomes. |
 | Public TCP | The evaluator requires a complete result for all 65,535 TCP ports on each public address. HTTP, HTTPS and host firewall evidence cover parts of that requirement. The retained packet has no complete outside-network result for this release. |
 | Public UDP | The prior external observation was inconclusive for all seven selected endpoints. Host listener, publication and firewall results establish the host policy. The catalog also needs conclusive external observations. |
 | MongoDB access | The runtime proves authentication is configured. Automatic approval review blocked the direct credential-free data read, and the retained packet has no observed denial of that operation. |
@@ -369,8 +374,8 @@ Use the [exact list of outstanding controls](security-audit-staging2-control-evi
 for the next evidence intake. The protected results must identify the target,
 application revision, platform image and actual observation times. The
 [operator runbook](../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification)
-owns assembly and independent readback. The current review is unsigned and
-retains execution errors for the outstanding observations.
+owns assembly and independent readback. The earlier unsigned review identifies
+its original release and retained execution errors.
 
 ## Phase 3 HTTP characterization started (2026-11-18)
 

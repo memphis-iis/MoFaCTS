@@ -1,17 +1,21 @@
 # Staging2 catalog v2 control evidence
 
-Reviewed November 25–26, 2026 for the accepted staging2 deployment. The application source is
-`e9d14a25b21eaece8cea377c787052e7896d0bfe`, and its deployed Linux/amd64 image is
-`ppavlikmemphis/mofacts-staging2@sha256:6699dc3fac40d9ca84564c265aa9cd587eb2628f50268f1ed79c1e7879079887`.
-The next Full report uses the current application start `2026-11-26T21:53:15.59940657Z`, after the accepted image was restored following Google owner enrollment.
+The accepted staging2 source is `8e3a0a484d146ce85b9733d6065a9d2806296e82`.
+Its deployed Linux/amd64 image is
+`ppavlikmemphis/mofacts-staging2@sha256:749aaaa2c86113aa081aa0f58a4e09dd8a86867dcbbad07e7f7834fed9e700aa`.
+The next Full report uses the current application start
+`2026-11-27T02:38:41.183140486Z`. The register combines retained November
+25–26 observations on `e9d14a25` with the verified repairs and study-session
+settings check on `8e3a0a48`.
+Each observation retains its own image and measurement window.
 
 | Section | Passed | Findings | Needs evidence |
 | --- | ---: | ---: | ---: |
 | External | 9 | 0 | 3 |
-| Authentication | 10 | 0 | 12 |
+| Authentication | 11 | 0 | 11 |
 | Host | 10 | 0 | 1 |
-| Repository and image | 21 | 4 | 0 |
-| **Total** | **50** | **4** | **16** |
+| Repository and image | 25 | 0 | 0 |
+| **Total** | **55** | **0** | **15** |
 
 Use this register as the current checklist for staging2 control observations.
 Start with unchecked rows marked **Needs evidence**. For each control, reuse
@@ -64,7 +68,7 @@ synthetic integration results retain their original scope.
 | [x] Pass | `authentication.passwordless.sealed-target-binding` | The authenticated participant was bound to the assigned sealed study target. |
 | [ ] Needs evidence | `authentication.passwordless.modified-target-rejected` | Needs the changed-target outcome from the live fixture with the valid login and alternate-target baselines required by the catalog. |
 | [ ] Needs evidence | `authentication.passwordless.admin-denied` | Needs the matching passwordless denial and successful administrator baseline on the same release. |
-| [ ] Needs evidence | `authentication.passwordless.ordinary-account-denied` | Needs the study-session restriction outcome alongside the positive ordinary-account baseline. |
+| [x] Pass | `authentication.passwordless.ordinary-account-denied` | On `8e3a0a48`, the ordinary learner read its own settings. A synthetic participant signed in to its own study and received `experiment-account-restricted` for its own settings. The catalog evaluator passed. Verified sign-out and fixture removal. |
 | [x] Pass | `authentication.passwordless.assigned-experiment-allowed` | The study session received the full assigned lesson, including its unit list. |
 | [ ] Needs evidence | `authentication.passwordless.cross-user-method-denied` | Needs the approved live fixture’s cross-user method restriction with its authorized positive baseline. |
 | [ ] Needs evidence | `authentication.passwordless.cross-user-publication-contained` | Needs the live fixture’s bounded publication result against a known other-user synthetic record and its positive baseline. |
@@ -92,8 +96,8 @@ synthetic integration results retain their original scope.
 | Status | Catalog ID | Observation or evidence still required |
 | --- | --- | --- |
 | [x] Pass | `repository.git-history-secrets` | Gitleaks found zero findings in 1,139 commits reachable from the exact clean source revision. The redacted scanner used the repository-pinned release. |
-| [x] Finding | `repository.dependencies-application-runtime.low` | The application runtime audit found 2 affected low-severity package records. |
-| [x] Finding | `repository.dependencies-application-runtime.medium` | The application runtime audit found 2 affected moderate-severity package records. |
+| [x] Pass | `repository.dependencies-application-runtime.low` | The exact `8e3a0a48` runtime lock audit found zero affected low-severity packages. The preceding release had two. |
+| [x] Pass | `repository.dependencies-application-runtime.medium` | The exact `8e3a0a48` runtime lock audit found zero affected moderate-severity packages. The preceding release had two. |
 | [x] Pass | `repository.dependencies-application-runtime.high` | The application runtime audit found zero affected high-severity package records. |
 | [x] Pass | `repository.dependencies-application-runtime.critical` | The application runtime audit found zero affected critical-severity package records. |
 | [x] Pass | `repository.dependencies-application-development.info` | Application lockfile comparison showed zero confirmed info-severity build exposures. The development group has 24 maintenance advisory packages. |
@@ -102,7 +106,7 @@ synthetic integration results retain their original scope.
 | [x] Pass | `repository.dependencies-application-development.high` | Application lockfile comparison showed zero confirmed high-severity build exposures. |
 | [x] Pass | `repository.dependencies-application-development.critical` | Application lockfile comparison showed zero confirmed critical-severity build exposures. |
 | [x] Pass | `repository.dependencies-sidecar-mongo-runtime.low` | The mongo sidecar runtime audit found zero affected low-severity package records. |
-| [x] Finding | `repository.dependencies-sidecar-mongo-runtime.medium` | The mongo sidecar runtime audit found 2 affected moderate-severity package records. |
+| [x] Pass | `repository.dependencies-sidecar-mongo-runtime.medium` | The exact `8e3a0a48` sidecar runtime lock audit found zero affected moderate-severity packages. The preceding release had two. |
 | [x] Pass | `repository.dependencies-sidecar-mongo-runtime.high` | The mongo sidecar runtime audit found zero affected high-severity package records. |
 | [x] Pass | `repository.dependencies-sidecar-mongo-runtime.critical` | The mongo sidecar runtime audit found zero affected critical-severity package records. |
 | [x] Pass | `repository.dependencies-sidecar-mongo-development.info` | Mongo sidecar lockfile comparison showed zero confirmed info-severity build exposures. The development group has 0 maintenance advisory packages. |
@@ -113,8 +117,8 @@ synthetic integration results retain their original scope.
 | [x] Pass | `repository.security-surface-contract` | Reused the accepted image and runtime registry binding. The clean exact checkout passed the ownership checker, and all 248 required installed cases matched. |
 | [x] Pass | `repository.sensitive-logging` | The registered source classifier found zero flagged files across 223 server source files. |
 | [x] Pass | `repository.source-security-tests` | The approved paired verifier matched all 478 required cases on the same commit and pinned runtime. The unfiltered Linux transcript recorded 474 passes. The Windows transcript passed exactly the four matched Windows-only cases. |
-| [x] Finding | `repository.runtime-image-vulnerabilities.high` | The pinned Trivy scan of the verified Linux/amd64 release manifest reported four high-severity findings. |
-| [x] Pass | `repository.runtime-image-vulnerabilities.critical` | The same pinned Trivy scan reported zero critical findings on the verified Linux/amd64 release manifest. |
+| [x] Pass | `repository.runtime-image-vulnerabilities.high` | Trivy 0.69.3 found zero high-severity vulnerabilities on the published immutable `8e3a0a48` Linux/amd64 manifest. The accepted staging2 receipt matches that manifest. The preceding manifest had four. |
+| [x] Pass | `repository.runtime-image-vulnerabilities.critical` | The same exact release scan found zero critical vulnerabilities. |
 | [x] Pass | `repository.client-bundle-canaries` | The exact staging2 platform image had 498 files across `web.browser` and `web.browser.legacy`. None contained the approved synthetic server-only encryption value from `mofacts/settings.ci.json`. |
 
 ## Retained evidence
@@ -141,6 +145,17 @@ independently confirmed namespace and lock removal. The deployed image remained
 healthy and matched its original identity. Earlier setup attempts stopped before
 creating any fixture account or data. Their recovery receipts show empty
 namespaces and released locks.
+
+The `study-settings-control.json` receipt in `audit-8e3a0a48-20261127023003`
+records the ordinary learner baseline, successful study sign-in and the
+study-session settings restriction from `02:58:17Z` through `02:58:38Z` on
+November 27 UTC. The catalog passed the control. Independent checks confirmed
+namespace absence, lease and temporary file removal, and the same healthy
+application. The earlier two fixture preparations stopped before writing
+records because the browser request used noncanonical JSON. Both empty
+namespaces were verified and the windows closed before the corrected attempt.
+The passing receipt SHA-256 is
+`7606977d9e4e3cb7dc200b2def47b7d5ce31367d02ac9f0237f5c00fa9d6fdc6`.
 
 The separate `ordinary-login-disclosure.json` receipt adds the verified learner
 sign-in to the same five browser channels. All five passed against the synthetic
@@ -308,7 +323,7 @@ belong to the affected component's next release.
 
 | Repair | Finding | Priority | Owner | Acceptance condition |
 | --- | --- | --- | --- | --- |
-| [ ] Open | `repository.runtime-image-vulnerabilities.high` | High | Release maintainer | The pinned image scanner finds zero high-severity vulnerabilities on the replacement Linux/amd64 manifest and the release receipt matches that manifest. |
+| [x] Verified | `repository.runtime-image-vulnerabilities.high` | High | Release maintainer | Trivy 0.69.3 found zero high-severity vulnerabilities on the published replacement Linux/amd64 manifest. Independent readback matched the accepted staging2 receipt. |
 | [x] Verified | `repository.dependencies-application-runtime.medium` | Moderate | Application dependency maintainer | The exact replacement app lockfile reports zero moderate-severity affected package records. |
 | [x] Verified | `repository.dependencies-sidecar-mongo-runtime.medium` | Moderate | Mongo sidecar maintainer | The exact replacement sidecar lockfile reports zero moderate-severity affected package records. |
 | [x] Verified | `repository.dependencies-application-runtime.low` | Low | Application dependency maintainer | The exact replacement app lockfile reports zero low-severity affected package records. |
@@ -341,7 +356,16 @@ and Trivy 0.69.3 found zero high and zero critical vulnerabilities. The
 protected scan and health receipts have SHA-256
 `99904f6f64a68049388aa9a266f47fc541aa343311dc6516e310c54cd453ce0c` and
 `7e3a9e0dde4c70434553f124d20142b4c0534bfa9fe335cb0877ccf46d07b065`.
-The isolated containers and network were removed. The image remains a local
-validation build. The fourth item stays open pending exact-source Meteor
-verification, the release build and an accepted staging2 receipt for the
-scanned platform manifest.
+The isolated containers and network were removed. That image was a local
+validation build.
+
+Slot 113 passed on the same clean commit. The canonical release build embedded
+the proof bundle for all 248 cases. Its published Linux/amd64 manifest matches
+the active staging2 receipt and the workstation authority SHA-256
+`1c06f0004c5c598b7449098ab5558d3421e76313e0e518282625aabf50535030`.
+Trivy 0.69.3 scanned that published manifest directly and found zero high and
+zero critical vulnerabilities. The report SHA-256 is
+`0c130cff61163c1a5fe98268556baec3189aefe108b70a8865774e9d81a08fb0`.
+Public health, the same enforced CSP, normal learner sign-in and reload, admin
+Security Audits and the installed registry comparison passed. Evidence retained
+in `audit-8e3a0a48-20261127023003` includes the previous release authority.
