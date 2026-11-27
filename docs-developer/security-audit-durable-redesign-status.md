@@ -94,9 +94,8 @@ The accepted staging2 application is `e9d14a25`. Use slot 108 and the exact-sour
 The November 26 remediation verifies three lockfile repairs on the replacement
 source. Corrected source `8e3a0a48` passed the operator Security jobs, isolated
 mail composition, a canonical Compose build and full-image startup with zero
-high or critical Trivy findings. The fourth repair needs a fresh authorized
-Meteor result for that exact commit and its accepted staging2 release receipt.
-Both staging2 Meteor slots were consumed by earlier candidate revisions.
+high or critical Trivy findings. Slot 113 passed for that exact commit. The
+fourth repair still needs the proof-bearing image and accepted staging2 receipt.
 See the [remediation checklist](security-audit-staging2-control-evidence.md#findings-retained-for-remediation).
 
 Run `npm run security:surfaces` from `mofacts/` for source registration ownership. Runtime inventories and their classified policies come from the sealed application registry. The historical manual manifest is retained in Git at `2982f477` for interpreting the comparisons below.
@@ -2074,7 +2073,16 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 112 total, 111 consumed, 0 reserved, 0 available for the staging2 release, and 1 for the earlier `/health` batch only.**
+**Current allowance: 113 total, 112 consumed, 0 reserved, 0 available for the staging2 release, and 1 for the earlier `/health` batch only.**
+
+Slot 113 passed for exact source `8e3a0a484d146ce85b9733d6065a9d2806296e82`
+from 02:25:38 to 02:27:46 UTC on November 27 (November 26 local). The operator
+authorized it by continuing after the request for one fresh run of this commit.
+The isolated 6 GiB/two-CPU Linux worker reused the dependency image. It recorded
+1,161 server passes and 1,256 Chromium passes, 15 and seven pending respectively,
+and zero test or hook failures. Worker cleanup completed. The retained receipt
+`/var/tmp/mofacts-integration.cMFkOXtc/results/native-verification.json` has SHA-256
+`1d9b3bc04c62d26fd689f1abbc71054c6489845b41d0fa7e82c6636e720bf3ea`.
 
 Slot 112 passed for exact staging2 remediation source `461dc2a5ed1ef88454df49e986fe7a7171158c31` from 01:13:16 to 01:15:22 UTC on November 27 (November 26 local). The isolated 6 GiB/two-CPU worker reused the prior dependency image and recorded 1,161 server passes and 1,256 Chromium passes, 15 and seven pending respectively, and zero test or hook failures. Verified cleanup completed. The retained receipt `/var/tmp/mofacts-integration.jb8ErRZ3/results/native-verification.json` has SHA-256 `b9bd8c3c6a009cb34b54b91ac62aa152802d081589db7a67749e50f23ddb9131`. The separate operator Security gate passed all four jobs. The source test now checks the exact manifest and lock, replacing the stale inline command assertion that failed on slot 111's commit.
 
