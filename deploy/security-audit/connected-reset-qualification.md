@@ -119,6 +119,12 @@ artifact, scheduled mail and alert acceptance remain separate unfinished gates.
 
 ## Fresh reset first-use evidence
 
+The fixture owner uses MoFaCTS' `signUpUser` flow and confirms the existing
+signup and verification settings before opening the mail window. MoFaCTS
+intentionally disables Meteor's built-in client signup. Include the imported
+`mofacts/server/securityAudit/securityAuditIngestionV2.ts` module in the reviewed
+worker source packet and verify the import under its pinned runtime.
+
 The explicit `first-use` worker scope opens one verified disposable account and
 uses its fresh reset once. It confirms that the new password works and requires
 verified cleanup before releasing the lease. Its receipt records the live

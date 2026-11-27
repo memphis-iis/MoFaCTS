@@ -386,6 +386,21 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   evidence. The 55 earlier observations retain their recorded scope. The
   shared control register remains the list of open IDs. The next input is
   eligible live evidence or an explicit change to the acceptance scope.
+- [x] Measure fresh reset first use on the repaired `8e3a0a48` image.
+  Worker `171de588` used the deployed MoFaCTS signup route and the existing
+  Gmail connection. Email verification, original login, fresh reset and
+  login with the new password passed. An authenticated scoped observation
+  confirmed the server marked the reset link used. The disposable account,
+  reset state, browser sessions, temporary worker and mail lease were
+  removed. The same deployment remained healthy. Initial setup omitted a
+  required source module. Two subsequent native signup attempts hit
+  MoFaCTS' disabled built-in signup route and were independently recovered
+  before the supported `signUpUser` run. The protected
+  `first-use-live-receipt.json` has SHA-256
+  `3d3d9638a55fa9fa9da4c3294353b9a8d200cf93439faf2ecdb30a1a1a699c86`.
+  This covers the positive baseline and consumed state. The catalog still
+  requires the direct negative outcomes. The register remains at 55
+  recorded passes and 15 controls awaiting evidence.
 - [ ] Open the agreed staging2 qualification window and accept the complete
   Full report. No audit timer was present during preflight. The scheduled Full
   run, live Gmail carriage, independent readback, archive verification, and
@@ -414,6 +429,16 @@ application revision, platform image and actual observation times. The
 [operator runbook](../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification)
 owns assembly and independent readback. The earlier unsigned review identifies
 its original release and retained execution errors.
+
+Resume this gate when a new receipt arrives or the acceptance methodology is
+explicitly approved. A completed evidence review remains checked off. The
+current catalog requires independent live evidence for the outstanding
+controls. A proposed defensive measurement profile would use actual
+configuration and permitted operations. It would measure approved ingress
+rules, host listeners and allowed web service readiness, owned normal account
+flows and scoped server-state checks, and private database configuration and
+authenticated access. Its controls would state those properties explicitly.
+The catalog v2 direct observations remain open under the existing plan.
 
 ## Phase 3 HTTP characterization started (2026-11-18)
 
