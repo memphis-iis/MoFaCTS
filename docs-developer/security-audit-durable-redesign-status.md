@@ -2029,7 +2029,7 @@ boundaries. It supersedes earlier per-batch publication questions, source-only
 continuation limits and exhausted historical counters. Preserve those dated
 records as provenance. The written plan and this sole queue track the remaining work; the app Goal was cleared by the user on 2026-11-11 and is not recreated.
 
-**Current allowance: 112 total, 107 consumed, 0 reserved, 4 generally available,
+**Current allowance: 112 total, 107 consumed, 1 reserved, 3 generally available,
 and 1 separately restricted to the earlier `/health` batch.**
 
 On 2026-11-27 the operator authorized up to five additional Meteor integration
@@ -2052,6 +2052,15 @@ and log SHA-256
 `7b4f45cc5274bba189f77ede13847350e4563dbe6ebac5b69574aead51b9accc`.
 The failed receipt is not qualification evidence. Four slots remain available
 for the corrected exact source and any necessary retries.
+
+Slot 109 is reserved for the published correction that binds each reproducible
+authentication proof to its real installed framework, method or publication
+surface and projects every Meteor proof owned by that surface into the startup
+inventory. The correction passed full TypeScript and lint checks. The focused
+receipt-composition checks passed; the Windows source suite passed 186 checks
+and reached only its six Linux-only firewall fixtures, which Windows attempted
+against the unrelated default WSL distribution. The exact slot 109 revision is
+the commit containing this reservation record.
 
 Slot 107 passed on exact receiver candidate `946af9ac415b105f1ed7c1fe0c0cf3f73f0410e8` on November 25, 17:05:04–17:07:11 UTC. Server 1,160 passed and 15 pending. Chromium 1,256 passed and seven pending. Zero test or hook failures. The server receiver case ID `de861bceccf65ec6bda886fb03891dee72036aceed922bcfd6c462f6249e468c` passed in the receipt-bound run data. The existing 6 GiB/two-CPU worker checked 266.9 GiB free on C: and 13.7 GiB available guest memory and reused its pinned tool image. Cleanup verified exit 0, absence of job-labelled containers, volumes and network, and removal of generated dependencies and Meteor build state. Retained job `/var/tmp/mofacts-integration.egvE7ZsC`, native receipt SHA-256 `1a1d86ac2c56cb0b93a911973cc6726bc13db9d5d5c06743afb575aecd0f56c2` and startup registry SHA-256 `4b5166a10a00a09e383571a550945947d36e595fa19c7a3b1290b2cf9dfd8f63`. The verified source bundle is in `tmp/mofacts-qualified-build-jhqeIp/verification-bundle.json` under the retained job.
 
