@@ -13,10 +13,19 @@ The next Full report uses the current application start `2026-11-26T21:53:15.599
 | Repository and image | 21 | 4 | 0 |
 | **Total** | **50** | **4** | **16** |
 
-The existing Phase III gate still requires one matched catalog v2 Full report,
-independent receiver readback and saved archive verification. These individual
-observations are recorded against the existing catalog. The historical authentication
-qualification and synthetic integration results retain their original scope.
+Use this register as the current checklist for staging2 control observations.
+Start with unchecked rows marked **Needs evidence**. For each control, reuse
+the accepted observation while the target, image, catalog and relevant inputs
+match the evidence requirements. Record the changed input before rerunning an
+affected check. After verifying a new outcome, update its existing row and
+retain the receipt, source and actual observation window with the evidence.
+
+A checked row has a verified observation. Track each finding's repair in the
+[remediation checklist](#findings-retained-for-remediation) until its acceptance
+condition is verified.
+The Phase III gate requires one matched catalog v2 Full report, independent
+receiver readback and saved archive verification. Historical authentication and
+synthetic integration results retain their original scope.
 
 ## External controls
 
@@ -83,8 +92,8 @@ qualification and synthetic integration results retain their original scope.
 | Status | Catalog ID | Observation or evidence still required |
 | --- | --- | --- |
 | [x] Pass | `repository.git-history-secrets` | Gitleaks found zero findings in 1,139 commits reachable from the exact clean source revision. The redacted scanner used the repository-pinned release. |
-| [ ] Finding | `repository.dependencies-application-runtime.low` | The application runtime audit found 2 affected low-severity package records. |
-| [ ] Finding | `repository.dependencies-application-runtime.medium` | The application runtime audit found 2 affected moderate-severity package records. |
+| [x] Finding | `repository.dependencies-application-runtime.low` | The application runtime audit found 2 affected low-severity package records. |
+| [x] Finding | `repository.dependencies-application-runtime.medium` | The application runtime audit found 2 affected moderate-severity package records. |
 | [x] Pass | `repository.dependencies-application-runtime.high` | The application runtime audit found zero affected high-severity package records. |
 | [x] Pass | `repository.dependencies-application-runtime.critical` | The application runtime audit found zero affected critical-severity package records. |
 | [x] Pass | `repository.dependencies-application-development.info` | Application lockfile comparison showed zero confirmed info-severity build exposures. The development group has 24 maintenance advisory packages. |
@@ -93,7 +102,7 @@ qualification and synthetic integration results retain their original scope.
 | [x] Pass | `repository.dependencies-application-development.high` | Application lockfile comparison showed zero confirmed high-severity build exposures. |
 | [x] Pass | `repository.dependencies-application-development.critical` | Application lockfile comparison showed zero confirmed critical-severity build exposures. |
 | [x] Pass | `repository.dependencies-sidecar-mongo-runtime.low` | The mongo sidecar runtime audit found zero affected low-severity package records. |
-| [ ] Finding | `repository.dependencies-sidecar-mongo-runtime.medium` | The mongo sidecar runtime audit found 2 affected moderate-severity package records. |
+| [x] Finding | `repository.dependencies-sidecar-mongo-runtime.medium` | The mongo sidecar runtime audit found 2 affected moderate-severity package records. |
 | [x] Pass | `repository.dependencies-sidecar-mongo-runtime.high` | The mongo sidecar runtime audit found zero affected high-severity package records. |
 | [x] Pass | `repository.dependencies-sidecar-mongo-runtime.critical` | The mongo sidecar runtime audit found zero affected critical-severity package records. |
 | [x] Pass | `repository.dependencies-sidecar-mongo-development.info` | Mongo sidecar lockfile comparison showed zero confirmed info-severity build exposures. The development group has 0 maintenance advisory packages. |
@@ -104,7 +113,7 @@ qualification and synthetic integration results retain their original scope.
 | [x] Pass | `repository.security-surface-contract` | Reused the accepted image and runtime registry binding. The clean exact checkout passed the ownership checker, and all 248 required installed cases matched. |
 | [x] Pass | `repository.sensitive-logging` | The registered source classifier found zero flagged files across 223 server source files. |
 | [x] Pass | `repository.source-security-tests` | The approved paired verifier matched all 478 required cases on the same commit and pinned runtime. The unfiltered Linux transcript recorded 474 passes. The Windows transcript passed exactly the four matched Windows-only cases. |
-| [ ] Finding | `repository.runtime-image-vulnerabilities.high` | The pinned Trivy scan of the verified Linux/amd64 release manifest reported four high-severity findings. |
+| [x] Finding | `repository.runtime-image-vulnerabilities.high` | The pinned Trivy scan of the verified Linux/amd64 release manifest reported four high-severity findings. |
 | [x] Pass | `repository.runtime-image-vulnerabilities.critical` | The same pinned Trivy scan reported zero critical findings on the verified Linux/amd64 release manifest. |
 | [x] Pass | `repository.client-bundle-canaries` | The exact staging2 platform image had 498 files across `web.browser` and `web.browser.legacy`. None contained the approved synthetic server-only encryption value from `mofacts/settings.ci.json`. |
 
@@ -297,9 +306,9 @@ Repository ownership follows the [project code owner](../.github/CODEOWNERS).
 These priorities use the catalog severity. Remediation and verification
 belong to the affected component's next release.
 
-| Finding | Priority | Owner | Acceptance condition |
-| --- | --- | --- | --- |
-| `repository.runtime-image-vulnerabilities.high` | High | Release maintainer | The pinned image scanner finds zero high-severity vulnerabilities on the replacement Linux/amd64 manifest and the release receipt matches that manifest. |
-| `repository.dependencies-application-runtime.medium` | Moderate | Application dependency maintainer | The reviewed runtime dependency audit for the exact replacement app lockfile reports zero moderate-severity affected package records. |
-| `repository.dependencies-sidecar-mongo-runtime.medium` | Moderate | Mongo sidecar maintainer | The reviewed runtime dependency audit for the exact replacement sidecar lockfile reports zero moderate-severity affected package records. |
-| `repository.dependencies-application-runtime.low` | Low | Application dependency maintainer | The reviewed runtime dependency audit for the exact replacement app lockfile reports zero low-severity affected package records. |
+| Repair | Finding | Priority | Owner | Acceptance condition |
+| --- | --- | --- | --- | --- |
+| [ ] Open | `repository.runtime-image-vulnerabilities.high` | High | Release maintainer | The pinned image scanner finds zero high-severity vulnerabilities on the replacement Linux/amd64 manifest and the release receipt matches that manifest. |
+| [ ] Open | `repository.dependencies-application-runtime.medium` | Moderate | Application dependency maintainer | The reviewed runtime dependency audit for the exact replacement app lockfile reports zero moderate-severity affected package records. |
+| [ ] Open | `repository.dependencies-sidecar-mongo-runtime.medium` | Moderate | Mongo sidecar maintainer | The reviewed runtime dependency audit for the exact replacement sidecar lockfile reports zero moderate-severity affected package records. |
+| [ ] Open | `repository.dependencies-application-runtime.low` | Low | Application dependency maintainer | The reviewed runtime dependency audit for the exact replacement app lockfile reports zero low-severity affected package records. |
