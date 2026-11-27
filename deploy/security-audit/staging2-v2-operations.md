@@ -1,8 +1,58 @@
-# Staging2 V2 operating baseline
+# Staging2 security-audit operating baseline
 
 The current staging2 application release and rollback revision are recorded in
 the [audit status](../../docs-developer/security-audit-durable-redesign-status.md).
-The image and receipt coordinates below describe the November 11 baseline.
+The image and receipt coordinates in the first section are current. The later
+V2 sections preserve the November 11 activation and rollback history.
+
+## Current V3 receiver qualification (2026-11-27)
+
+Staging2 runs exact source
+`41e02b2ed3b66256331e930c4dd02e1b1e3e7141` with the V3 receiver selected
+explicitly in the server composition. The separately owned scheduled producer
+selection remains unchanged. V1, V2 and V3 report catalogs remain readable; new
+staging2 ingestion accepts V3 only.
+
+Published tag:
+`ppavlikmemphis/mofacts-staging2:audit-v3-41e02b2e-20261127`.
+Registry root:
+`sha256:3515794a3335ab5f11400903c22f2cfa5a7e403968c478700eff5a4162c96fed`.
+Linux/amd64 manifest:
+`sha256:a7c8ca34cab60e3edef2d33e65fb2629b8452794b6faba4bbc2ca4381d8f27cf`.
+Configuration:
+`sha256:27b3d52e68c006ed8c34ea2fc558e7c5878fc13ccd839edb903727d4cf9dfdcd`.
+The accepted source snapshot is
+`cbe3a8d1f8f6ef2bc6d26aa4c8bf75507b9f8761bbe7971526f5cb4f8dc460f7`;
+the embedded 255-case verification bundle is
+`741a6ae2b65dca1585c12ae9b47b4100978e06d316fbe21dcf66154c314aad9b`.
+
+The running container became ready at
+`2026-11-27T21:43:12.56899507Z`. HTTPS health, protected administrator login,
+the exact runtime inventory, public image mapping, installed V2 receipt and the
+current host acquisition all matched. The root-private rollback directory is
+`/etc/mofacts/rollback-41e02b2e-20261127`; it retains the previous environment,
+receipt and image observation. Do not replace that recovery set with inferred
+coordinates.
+
+The accepted report ID is
+`staging2-reproducible-closeout-41e02b2e-20261127`. It has 70 PASS, zero
+FAIL/ERROR/NA and no execution errors. Report digest:
+`6a828baa6226304209035569b6db32f0332d17298de4bf38b518861cbca94227`;
+writer/readback bytes SHA-256:
+`9935a18a5c66ad1f8ce43a6dc6b7fdb63b4a469ba69b9fef756d094d073cf1ef`;
+encrypted archive SHA-256:
+`30a92de92e489cfb19eba5663bef9d5331b122f17b65f1179f5bcc041eb22097`.
+The receiver returned HTTP 201, independent administrator readback matched the
+writer bytes and catalog, and workstation in-memory decryption matched the same
+bytes. Temporary plaintext source/readback files were removed only after those
+comparisons passed. The encrypted archive and receipts remain in the protected
+release-evidence store.
+
+The earlier V3 attempt from `e89e10eb` was rejected before storage because the
+running receiver still selected V2. Preserve its protected diagnostic evidence
+as a failed attempt; it is not an accepted report or rollback authority.
+
+## Historical V2 activation baseline (2026-11-11)
 
 On 2026-11-11 the clean Meteor-accepted application revision
 `1c72734b3f03f9c3b95bbbbab1bd1e1a0ce07140` was accepted on staging2.
@@ -99,25 +149,16 @@ and HTML hashes matched. The separate sealed three-image synthetic trial also
 verified positive existing V1 and V2 records; do not confuse these two datasets.
 Both fixture attempts' four accounts, role assignments and seven rows are absent.
 
-## Remaining evidence limits
+## Current acceptance boundary
 
-The accepted exposure report has 22 PASS and one UDP ERROR. All seven selected
-external UDP results were inconclusive; the scanner does not treat silence as
-closure even with safe host measurements. This establishes neither an exposure
-finding nor complete UDP clearance. Keep that limitation visible.
+The historical 22-PASS/one-UDP-ERROR exposure result and the separate 22-control
+authentication result remain valid only in their original scopes. They are not
+the current completion claim. The 2026-11-27 V3 report supersedes the fifteen
+formerly open evidence requirements through the approved reproducible contracts
+and closes all seventy controls for the exact staging2 release recorded above.
 
-The separate Phase 2 run completed all 22 authentication controls. The hosted
-workflow still acquires only selected authorization. For the coordinated Phase 3
-rehearsal, the protected operator driver can call
-`assembleIntegratedStaging2AuditV2` with the independently observed revision
-and platform image, the full report envelope, and the existing scoped phase
-executors. The function takes its authentication evidence directly from those
-executors in the same process. Leave the authentication slot in the producer
-directory empty. The active producer catalog must match catalog v2 before the
-function starts a phase.
-
-Keep the accepted staging2 release in service while preparing the complete
-producer and protected driver. Rehearse the catalog switch with the complete
-four-section report, independent image and registry observations, signed storage
-and readback in one qualification window. Production still uses its pinned V1
-scanner and receiver. Its cutover has a separate approval and release record.
+This is staging2 acceptance only. Production retains its separately coordinated
+receiver/scanner/host selection and has not been changed by this procedure. The
+final production cutover must use its own exact image, receipt, host observation,
+report, readback, archive and rollback record under explicit production
+authorization. Never present the staging2 report as production evidence.
