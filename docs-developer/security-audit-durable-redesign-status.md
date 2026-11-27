@@ -325,6 +325,8 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   - [x] Resolve Full report writer compatibility. On November 26, Phil approved a separately pinned catalog v2 tool for the existing staging2 application. The [assembler and readback verifier](../mofacts/scripts/security-audit/qualification/bindStaging2ReleaseRegistry.mjs) confirm the reviewed tool revision and use the deployed source checkout to verify the original registry case catalog. Source tests cover independently pinned revisions, staged catalog selection, missing evidence, retained findings and rejection of mismatched tool, app, image and report identities. Full lint and 473 Linux V2 source tests passed, with seven environment-dependent skips and zero failures.
   - [x] Verify the public staging2 TLS cipher control. At 22:12 UTC on November 26, named HTTPS handshakes found six accepted cipher suites and zero weak suites across TLS 1.2 and 1.3 on the sole public address. The installed image graph verifier matched the accepted Linux/amd64 configuration and confirmed the restored app start. The protected TLS observation receipt SHA-256 is `1eff22f8425a1b396692bf4eb240528e927b2d006a012e1e1ff597fce01cdb13`.
   - [x] Assemble and independently parse the unsigned 70-control staging2 review. Tool `b38039d8d9ca3ccc733b821c0315f25672ff880e` accepted the 14 retained inputs and one new TLS observation. It recorded 49 passes, four findings and 17 execution errors for unavailable observations on `e9d14a25`. Report `/var/tmp/mofacts-full-review.1aZZUDhK/review-with-verified-tls/report.json` is protected on the Linux worker with SHA-256 `50c266bbbd411c88cde1874bd147c9bce65b5a5faedafad9792f922a4468a9d3`. The retained provenance preserves the original observation times. The staging2 receiver count for this release and catalog v2 was zero Full reports. The review remains offline and unsigned.
+  - [x] Verify unused reset-link expiry on the accepted staging2 release. Worker `63e902cb` matched all five catalog cases. The fresh link changed the disposable account's password and its new password worked. The other account's unused link was rejected after its real one-hour lifetime and its original password still worked. Independently verified both disposable accounts and reset records were removed, the administrator signed out, the temporary containers and authentication lease were absent and the same application remained healthy. Retained receipt SHA-256 `e7c97e5045e1319611ed94043b057209728a50e9947ebe4594e096b7e8cd6157`, completed `2026-11-27T00:17:49.447Z`. All 32 focused tool tests and full lint passed.
+  - [x] Reassemble and read back the unsigned review with the expiry observation. The accepted release `e9d14a25` now has 50 passes, four findings and 16 controls awaiting evidence. Protected review `/var/tmp/mofacts-full-review.1aZZUDhK/review-with-verified-expiry/report.json` has SHA-256 `20c83ccff0c73579ad1b38bfd9da703451b0a58918b18c20bab3549e9bc78a3d`. Only the expiry control changed in the 70-row review.
   - [ ] Qualify the live Full report. Supply the protected writer JSON for all 70 catalog v2 controls and its stored report ID. Match the scanner to the separately reviewed tool commit and the deployed application to `e9d14a25b21eaece8cea377c787052e7896d0bfe` and the independently observed Linux/amd64 platform image above. Require a start at or after `2026-11-26T21:53:15.59940657Z`. Keep the actual findings and require zero execution errors. In Security Audits, download JSON from the Recent 90-day history row with the matching report digest for the independent readback. Verify the writer and receiver copies and the saved encrypted archive before closing Phase 3.
 
 ## Phase 4 closure and maintainer handoff (2026-11-26)
@@ -336,7 +338,7 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
 - [x] Record an owner, priority and acceptance condition for each of the four retained findings in the [per-control register](security-audit-staging2-control-evidence.md#findings-retained-for-remediation).
 - [x] Verify the source and handoff. Full typecheck and lint passed. Pinned Linux Node V2 source tests recorded 479 passes and seven environment-dependent skips. The retained compatibility and release checks recorded 152 passes and one environment-dependent skip. All four immutable scanner-selection checks and three direct Node token, HMAC and identity tests passed. The Meteor allowance remains available for its recorded scope.
 - [x] Verify the offline review procedure with the pinned tool. Installed its locked dependencies in the isolated checkout and removed the generated dependencies after assembly. Verified the host receipt against the accepted release authority and used a canonical copy for metadata generation. The original capture remains available. The [operator runbook](../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification) records the setup and distinguishes the review from live qualification.
-- [ ] Complete the final evidence record after Phase 3's live Full report gate. It requires the remaining 17 measurements, signed ingestion, independent receiver download and saved archive verification. P1-D9 assigns final production acceptance to a separately authorized coordinated cutover.
+- [ ] Complete the final evidence record after Phase 3's live Full report gate. It requires the remaining 16 measurements, signed ingestion, independent receiver download and saved archive verification. P1-D9 assigns final production acceptance to a separately authorized coordinated cutover.
 
 ### Staging2 closeout blockers
 
@@ -344,12 +346,13 @@ Phase 3 and Phase 4 remain open under the existing acceptance criteria. On
 November 26 at 22:37 UTC, staging2 returned healthy on the verified image
 reference with the same `21:53:15.59940657Z` application start. The approved
 tool revision reread the protected 70-row review and its final execution check
-rejected the 17 missing measurements. The four measured findings retain their
-current remediation owners.
+rejected the 17 missing measurements. The live reset-expiry observation then
+closed one control, leaving 16. The four measured findings retain their current
+remediation owners.
 
 | Open requirement | Why it remains open |
 | --- | --- |
-| 13 authentication controls | The November 18 authentication qualification passed all 22 controls in its earlier window. The current deployment has evidence for ordinary sign-in and selected passwordless behavior. The remaining comparison, reset and session, authorization, and throttling cases lack matching live outcomes and their required positive baselines. |
+| 12 authentication controls | The November 18 authentication qualification passed all 22 controls in its earlier window. The current deployment has evidence for ordinary sign-in, selected passwordless behavior and unused reset-link expiry. The remaining comparison, single-use and replay, session, authorization, and throttling cases lack matching live outcomes and their required positive baselines. |
 | 2 public TCP controls | The evaluator requires a complete result for all 65,535 TCP ports on each public address. HTTP, HTTPS and host firewall evidence cover parts of that requirement. The retained packet has no complete outside-network result for this release. |
 | 1 public UDP control | The prior external observation was inconclusive for all seven selected endpoints. Host listener, publication and firewall results establish the host policy. The catalog also needs conclusive external observations. |
 | 1 MongoDB access control | The runtime proves authentication is configured. Automatic approval review blocked the direct credential-free data read, and the retained packet has no observed denial of that operation. |
@@ -360,7 +363,7 @@ for the next evidence intake. The protected results must identify the target,
 application revision, platform image and actual observation times. The
 [operator runbook](../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification)
 owns assembly and independent readback. The current review is unsigned and
-retains its 17 execution errors.
+retains its 16 execution errors.
 
 ## Phase 3 HTTP characterization started (2026-11-18)
 

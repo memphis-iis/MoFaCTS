@@ -8,10 +8,10 @@ The next Full report uses the current application start `2026-11-26T21:53:15.599
 | Section | Passed | Findings | Needs evidence |
 | --- | ---: | ---: | ---: |
 | External | 9 | 0 | 3 |
-| Authentication | 9 | 0 | 13 |
+| Authentication | 10 | 0 | 12 |
 | Host | 10 | 0 | 1 |
 | Repository and image | 21 | 4 | 0 |
-| **Total** | **49** | **4** | **17** |
+| **Total** | **50** | **4** | **16** |
 
 The existing Phase III gate still requires one matched catalog v2 Full report,
 independent receiver readback and saved archive verification. These individual
@@ -41,7 +41,7 @@ qualification and synthetic integration results retain their original scope.
 | --- | --- | --- |
 | [ ] Needs evidence | `authentication.enumeration` | Needs the paired outcomes for known and unknown test identities across login and reset, with the required successful baselines. |
 | [ ] Needs evidence | `authentication.timing` | Needs the catalog’s complete paired latency samples for known and unknown test identities. The ordinary sign-in established session lifetime only. |
-| [ ] Needs evidence | `authentication.reset-token.expired-rejected` | Needs a matching-release reset fixture for expiry rejection, successful current-token baseline and preservation of the prior password. |
+| [x] Pass | `authentication.reset-token.expired-rejected` | A fresh link changed the first disposable account's password. The second account's unused link was rejected after its one-hour lifetime and its original password still worked. All five catalog cases and independent cleanup passed. |
 | [ ] Needs evidence | `authentication.reset-token.current-single-use` | Needs the matching-release owned reset workflow’s first-use success and one-time-use evidence. |
 | [ ] Needs evidence | `authentication.reset-token.replay-rejected` | Needs evidence of used-token rejection with a successful first use in the same qualified fixture window. |
 | [ ] Needs evidence | `authentication.session-revocation` | Ordinary logout cleared the synthetic learner’s browser session. The control still needs server-side invalidation evidence for old sessions after both logout and password reset. |
@@ -253,10 +253,20 @@ Pinned tool `b38039d8d9ca3ccc733b821c0315f25672ff880e` assembled and read back t
 revised unsigned review in `/var/tmp/mofacts-full-review.1aZZUDhK/review-with-verified-tls`.
 The report SHA-256 is `50c266bbbd411c88cde1874bd147c9bce65b5a5faedafad9792f922a4468a9d3`. Its 70 rows
 hold 49 passes, four findings and 17 execution errors for outstanding observations.
-The receiver had zero catalog v2 Full reports for the restored release at the
-metadata check. Live qualification still requires the 17 observations in the
-tables above, signed ingestion, independent receiver readback and verified saved
-archive.
+The scoped worker at `63e902cb` completed all five expiry cases on `e9d14a25`.
+It verified ordinary first use of a fresh link, rejection of a separately owned
+unused link after one hour and successful sign-in with the second account's
+original password. Both test accounts and reset records were removed, the
+administrator signed out, and independent readback confirmed no remaining
+worker, lease or temporary application files. The protected receipt has SHA-256
+`e7c97e5045e1319611ed94043b057209728a50e9947ebe4594e096b7e8cd6157`.
+
+The unsigned review in `/var/tmp/mofacts-full-review.1aZZUDhK/review-with-verified-expiry` now holds 50 passes, four findings and 16
+execution errors. Its SHA-256 is
+`20c83ccff0c73579ad1b38bfd9da703451b0a58918b18c20bab3549e9bc78a3d`. The receiver had zero catalog v2 Full reports for the
+restored release at the last metadata check. Live qualification still requires
+the 16 observations above, signed ingestion, independent receiver readback and
+verified saved archive.
 
 The exact catalog v2 policy set was unavailable at the installed host path.
 The review used temporary root-private copies of the exact source policies and
