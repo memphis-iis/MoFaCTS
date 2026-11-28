@@ -1,7 +1,7 @@
 # Meteor email in MoFaCTS
 
-This directory contains the server-only `email@3.2.0` source from
-[Meteor 3.5.4](https://github.com/meteor/meteor/tree/dc46cfaa8f3d0bb455a9414c95883bba6756919b/packages/email).
+This directory contains the server-only `email@3.2.1` source from
+[Meteor 3.6.1](https://github.com/meteor/meteor/tree/eaf134973529396b660078b705b9fa50a4747fd5/packages/email).
 MoFaCTS retains the upstream MIT license, package name, exports, type
 declarations and tests.
 

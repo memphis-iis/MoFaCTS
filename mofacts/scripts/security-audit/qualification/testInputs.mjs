@@ -13,7 +13,7 @@ export const TEST_INPUTS = Object.freeze([
   ['.github/workflows/production-security-audit.yml', 'file'],
   ['.github/workflows/staging2-audit-access.yml', 'file'],
   ['.github/workflows/staging2-security-audit-v2.yml', 'file'],
-  ['.github/workflows/meteor-35-change-streams-qualification.yml', 'file'],
+  ['.github/workflows/meteor-change-streams-qualification.yml', 'file'],
   ['AGENTS.md', 'file'],
   ['examples', 'directory'], ['mofacts/tests', 'directory'],
   ['deploy/docker-compose.yml', 'file'],

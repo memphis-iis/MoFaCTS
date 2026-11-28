@@ -28,7 +28,7 @@ test('CI run references reject line terminators instead of accepting a partial n
 });
 
 test('Phase 0: pinned Node imports the shared erasable TS and JSON contract without a generated twin', () => {
-  assert.equal(process.version, 'v24.22.1');
+  assert.equal(process.version, 'v26.13.1');
   assert.deepEqual(parseWorkstationReleaseRecord(fixture), fixture);
   assert.deepEqual(evaluateReleaseIdentity(fixture), { status: 'PASS' });
 });

@@ -17,14 +17,14 @@ function validateMeteorTestModules(packageJson, appRoot, fileExists = existsSync
 // Local packages shadow Atmosphere resolutions even when the versions file looks
 // correct, so check both manifests and the package discovery boundary.
 function validateMeteorRuntimeContract(appRoot, readText = file => readFileSync(file, 'utf8'), fileExists = existsSync) {
-  if (readText(path.join(appRoot, '.meteor/release')).trim() !== 'METEOR@3.5.4') {
-    throw new Error('Meteor qualification requires the supported METEOR@3.5.4 release');
+  if (readText(path.join(appRoot, '.meteor/release')).trim() !== 'METEOR@3.6.1') {
+    throw new Error('Meteor qualification requires the supported METEOR@3.6.1 release');
   }
   const lines = filename => new Set(readText(path.join(appRoot, filename)).split(/\r?\n/)
     .map(line => line.replace(/#.*/, '').trim()).filter(Boolean));
   const direct = lines('.meteor/packages');
   const resolved = lines('.meteor/versions');
-  for (const [name, version] of [['ddp-server', '3.5.0'], ['rspack', '1.3.1']]) {
+  for (const [name, version] of [['ddp-server', '3.6.1'], ['rspack', '1.4.0']]) {
     if (!direct.has(`${name}@${version}`) || !resolved.has(`${name}@${version}`)) {
       throw new Error(`Meteor qualification requires official ${name}@${version} in both package manifests`);
     }

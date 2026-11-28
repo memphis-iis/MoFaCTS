@@ -1,7 +1,7 @@
 import { expect } from 'chai';
-import { applyDdpContainment, inspectMeteor35RuntimeMode } from './ddpContainment';
+import { applyDdpContainment, inspectMeteorRuntimeMode } from './ddpContainment';
 
-describe('Meteor 3.5 DDP containment', function() {
+describe('supported Meteor DDP containment', function() {
   const containedEnv = {
     DDP_TRANSPORT: 'sockjs',
     METEOR_REACTIVITY_ORDER: 'changeStreams',
@@ -40,7 +40,7 @@ describe('Meteor 3.5 DDP containment', function() {
 
   it('rejects polling and mixed driver orders', function() {
     for (const reactivityOrder of ['polling', 'changeStreams,polling', 'changeStreams,oplog,polling']) {
-      const result = inspectMeteor35RuntimeMode({
+      const result = inspectMeteorRuntimeMode({
         ...containedEnv,
         METEOR_REACTIVITY_ORDER: reactivityOrder,
       });
@@ -53,7 +53,7 @@ describe('Meteor 3.5 DDP containment', function() {
   });
 
   it('rejects the obsolete Change Streams enablement gate', function() {
-    const result = inspectMeteor35RuntimeMode({
+    const result = inspectMeteorRuntimeMode({
       ...containedEnv,
       MOFACTS_CHANGE_STREAMS_ENABLED: 'true',
     });
@@ -65,7 +65,7 @@ describe('Meteor 3.5 DDP containment', function() {
   });
 
   it('rejects an invalid qualification gate value', function() {
-    const result = inspectMeteor35RuntimeMode({
+    const result = inspectMeteorRuntimeMode({
       ...containedEnv,
       MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'yes',
     });

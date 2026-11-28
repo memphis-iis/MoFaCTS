@@ -260,7 +260,7 @@ async function syntheticCapture(t, change = () => {}, dirty = true) {
     { name: 'mofacts/', type: '5', mode: 0o755 },
     { name: 'mofacts/source.ts', content: 'synthetic dirty source\r\n' },
     { name: 'mofacts/.meteor/', type: '5', mode: 0o755 },
-    { name: 'mofacts/.meteor/release', content: 'METEOR@3.5.4\n' },
+    { name: 'mofacts/.meteor/release', content: 'METEOR@3.6.1\n' },
     { name: 'learning-components/', type: '5', mode: 0o755 },
     { name: 'packages/', type: '5', mode: 0o755 },
     { name: 'Dockerfile', content: recipe },
@@ -328,7 +328,7 @@ test('Compose build carries only a digest-bound proof and cleans it after a fail
   const { captured, calls, dependencies, repositoryRoot } = await syntheticCapture(t, state => {
     if (fail && state.phase === 'build') throw Error('Synthetic proof build failed');
   }, false);
-  const profile = { mode: 'production', meteorRelease: 'METEOR@3.5.4' };
+  const profile = { mode: 'production', meteorRelease: 'METEOR@3.6.1' };
   const input = path.join(repositoryRoot, 'proof.json');
   const proof = canonicalAuditJson({
     schema: 'VerificationBundleV1', variant: 'source-evidence', buildIdentity: captured.identity,

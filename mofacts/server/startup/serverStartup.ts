@@ -320,14 +320,14 @@ function throwOAuthExistingAccountError(existingUser: Meteor.User, attemptedProv
 
 export async function runServerStartup(deps: RunServerStartupDeps) {
   await cleanupAbandonedExternalSortRuns();
-  const meteor35Mode = applyDdpContainment(
+  const runtimeMode = applyDdpContainment(
     (Meteor as unknown as { server?: { options: { disconnectGracePeriod?: number } } }).server,
     process.env,
   );
   deps.serverConsole(
-    `[DDP] ${meteor35Mode.transport} transport with disconnect grace period 0; ` +
-    `Mongo reactivity ${meteor35Mode.reactivityOrder}` +
-    (meteor35Mode.qualificationMode
+    `[DDP] ${runtimeMode.transport} transport with disconnect grace period 0; ` +
+    `Mongo reactivity ${runtimeMode.reactivityOrder}` +
+    (runtimeMode.qualificationMode
       ? ' (isolated Change Streams qualification)'
       : ' (Change Streams required)'),
   );
@@ -567,6 +567,8 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   (Accounts as any).config({
     forbidClientAccountCreation: true,
     loginExpirationInDays: 30,
+    emailVerificationTokenExpirationInDays: 3,
+    useHttpOnlyCookies: false,
     ambiguousErrorMessages: true,
     argon2Enabled: deps.isArgon2Enabled(),
   });

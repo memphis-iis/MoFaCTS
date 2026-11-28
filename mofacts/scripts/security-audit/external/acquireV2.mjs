@@ -63,7 +63,7 @@ function boundedSocketProbe(socket, resolve, reject) {
 // A handshake-only observer sends no HTTP request, application data or credential.
 // Certificate verification still runs; its result is measured separately from
 // protocol negotiation. Normal HTTP/WSS probes retain certificate enforcement.
-// Node ownership: https://nodejs.org/download/release/v24.22.1/docs/api/tls.html
+// Node ownership: https://nodejs.org/download/release/v26.13.1/docs/api/tls.html
 function handshake({ address, hostname, protocol }) {
   return new Promise((resolve, reject) => {
     const socket = tls.connect({ host: address, port: 443, servername: net.isIP(hostname) ? undefined : hostname,

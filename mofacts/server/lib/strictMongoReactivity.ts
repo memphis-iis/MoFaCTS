@@ -78,7 +78,7 @@ function assertChangeStreamsOnlyOrder(configuredOrder: string[]) {
 }
 
 /**
- * Makes Meteor's internal observer selection fail closed. Meteor 3.5 normally
+ * Makes Meteor's internal observer selection fail closed. Meteor normally
  * creates a PollingObserveDriver if no configured driver can serve a cursor;
  * this wrapper throws before that fallback point.
  */

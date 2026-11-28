@@ -53,7 +53,7 @@ legacy handshake only in a new credential-free observer context; no global
 cipher setting, application TLS rule, HTTP/WSS certificate check or CSP changes.
 The observer sends no application data and records only acceptance, certificate
 verification and expiry. This follows the pinned
-[Node TLS behavior](https://nodejs.org/download/release/v24.22.1/docs/api/tls.html#openssl-security-level).
+[Node TLS behavior](https://nodejs.org/download/release/v26.13.1/docs/api/tls.html#openssl-security-level).
 Both completed modern-protocol results contribute certificate evidence; an
 unavailable legacy observation does not erase independent modern certificate
 measurements. A missing modern result never becomes invented validity data.

@@ -63,7 +63,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
   }
 }
 
-describe('Meteor 3.5 stable Change Streams qualification', function() {
+describe('supported Meteor Change Streams qualification', function() {
   this.timeout(15_000);
 
   let scope = '';

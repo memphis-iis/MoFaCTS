@@ -7,8 +7,8 @@ This guide covers the public contributor baseline for MoFaCTS.
 - Git and PowerShell
 - Docker Desktop using Linux containers, with Docker Compose 2.24.4 or newer
 
-The container supplies Meteor `3.5.4`, Node `24.22.1` (Undici `7.30.1`) and
-npm `11.19.1`. Do not install or run Meteor on the Windows host for this workflow.
+The container supplies Meteor `3.6.1`, Node `26.13.1` (Undici `8.12.4`) and
+npm `11.20.0`. Do not install or run Meteor on the Windows host for this workflow.
 
 ## First Local Run
 
@@ -75,19 +75,20 @@ The full TypeScript check is the required TypeScript verification path for app c
 
 ### Pinned Meteor toolchain and package installation
 
-Meteor `3.5.4` owns the official DDP and Rspack Meteor packages. Application
+Meteor `3.6.1` owns the official DDP and Rspack Meteor packages. Application
 dependencies, including `@meteorjs/rspack`, are installed from the application
-lockfile with `npm ci`; Meteor installs its own package dependencies when
-`meteor update --npm` compiles plugins. There are no local DDP or Rspack package
-copies or separate package-dependency installer to run.
+lockfile with `npm ci`. The required Rspack 2 packages are explicitly pinned and
+automatic dependency installation is disabled; `meteor update --npm` verifies
+the locked graph while compiling plugins. There are no local DDP or Rspack
+package copies or separate package-dependency installer to run.
 
-CI installs Meteor `3.5.4` directly and asserts Meteor's Node, npm and built-in
+CI installs Meteor `3.6.1` directly and asserts Meteor's Node, npm and built-in
 Undici versions alongside the host toolchain. Docker retains the digest-pinned
-Meteor `3.5` image only to bootstrap the official CLI: in the application
-directory the CLI selects `METEOR@3.5.4` from `.meteor/release`. The builder
-asserts the resulting `3.5.4` / `24.22.1` / `11.19.1` / `7.30.1` versions before
+Meteor `3.6` image only to bootstrap the official CLI: in the application
+directory the CLI selects `METEOR@3.6.1` from `.meteor/release`. The builder
+asserts the resulting `3.6.1` / `26.13.1` / `11.20.0` / `8.12.4` versions before
 installing dependencies, and uses that selected Node binary for compiler child
-processes. The dependency and runtime stages use the pinned Node `24.22.1`
+processes. The dependency and runtime stages use the pinned Node `26.13.1`
 Alpine image. See [the build context notes](../deploy/README.md#build-context).
 
 After plugin compilation, CI checks the entire captured input tree. Docker

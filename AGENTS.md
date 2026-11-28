@@ -127,6 +127,10 @@ The CI runner cleans transient test-generated `meteortesting:*` resolutions from
   staging2 image/configuration and verify health, ordinary login/learning and
   the behavior affected by the release. Run provider or specialized browser
   checks when their corresponding boundary changed.
+- Promote the identical tested image digest to regular staging next. Preserve
+  its prior image/configuration and repeat readiness, HTTPS, login, ordinary
+  learner operation, changed-feature, image-identity and receipt checks there.
+  A rebuild or source change returns the candidate to the staging2 gate.
 - Promote the identical tested image digest to production only with explicit
   production-release authorization. Never rebuild a separate production image,
   patch the live server or substitute a newer unqualified commit.

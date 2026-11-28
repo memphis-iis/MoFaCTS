@@ -126,7 +126,7 @@ if [[ "$action" == prepare ]]; then
     --mount "type=bind,src=$workspace/test-context,dst=/capture/test-context" \
     --mount "type=volume,src=$name-tools,dst=/home/mofacts-test/.meteor" \
     --workdir /capture/test-context/mofacts "$image" bash -euc \
-    'test "$(node --version)" = v24.22.1; test "$(npm --version)" = 11.19.1; npm ci; meteor update --npm' > "$job/results/dependency-setup.log" 2>&1
+    'test "$(node --version)" = v26.13.1; test "$(npm --version)" = 11.20.0; npm ci; meteor update --npm' > "$job/results/dependency-setup.log" 2>&1
   coordinator node "$capture" verify-tests --builder default --workspace "$workspace" > "$job/results/source-before.json"
   docker pull mongo:8.0.34 > "$job/results/mongo-pull.log" 2>&1
   docker image inspect mongo:8.0.34 --format '{{.Id}}' > "$job/results/mongo-image-id"

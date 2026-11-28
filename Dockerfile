@@ -11,7 +11,7 @@ FROM source_inputs AS source_capture
 
 # Observe exact inputs before any npm/Meteor transformation. The existing pinned
 # Node image is also used by dependency/runtime stages. No tests run here.
-FROM node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS source_observation
+FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS source_observation
 ARG MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256=
 ARG MOFACTS_SOURCE_REVISION=unknown
 ARG MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES=
@@ -28,7 +28,7 @@ RUN --mount=type=secret,id=mofacts_verification_bundle node /captured-source/mof
 # This digest-pinned image bootstraps the Meteor CLI. From the application
 # directory, the CLI springboards to the exact release in .meteor/release;
 # assert that toolchain below rather than using the bootstrap release to build.
-FROM geoffreybooth/meteor-base:3.5@sha256:58b203caa2c3dc963774117cbf45534d4533ddd77b220e075107da3f3600a083 AS meteor_builder
+FROM geoffreybooth/meteor-base:3.6@sha256:e28bce299f859a5fa6f7ead6936e34f253c255c7b0131e3251ab9c79f9773d75 AS meteor_builder
 ENV METEOR_ALLOW_SUPERUSER=1
 ENV APP_SOURCE_FOLDER=/opt/mofacts
 
@@ -61,14 +61,14 @@ RUN echo "[Function] Clean Meteor local cache" && \
 RUN cd $APP_SOURCE_FOLDER && \
     echo "[Function] Select project Meteor toolchain" && \
     sha256sum .meteor/release .meteor/packages .meteor/versions package.json package-lock.json > /tmp/mofacts-toolchain.sha256 && \
-    test "$(tr -d '\r' < .meteor/release)" = "METEOR@3.5.4" && \
-    test "$(meteor --version)" = "Meteor 3.5.4" && \
-    test "$(meteor node --version)" = "v24.22.1" && \
-    test "$(meteor npm --version)" = "11.19.1" && \
-    test "$(meteor node -p 'process.versions.undici')" = "7.30.1" && \
+    test "$(tr -d '\r' < .meteor/release)" = "METEOR@3.6.1" && \
+    test "$(meteor --version)" = "Meteor 3.6.1" && \
+    test "$(meteor node --version)" = "v26.13.1" && \
+    test "$(meteor npm --version)" = "11.20.0" && \
+    test "$(meteor node -p 'process.versions.undici')" = "8.12.4" && \
     NODE_BIN="$(meteor node -p 'process.execPath')" && \
     echo "[Function] Link Meteor node binary for /usr/bin/env node" && \
-    test "$("$NODE_BIN" --version)" = "v24.22.1" && \
+    test "$("$NODE_BIN" --version)" = "v26.13.1" && \
     ln -sf "$NODE_BIN" /usr/local/bin/node
 
 # Function: install app npm dependencies used by Meteor build.
@@ -104,17 +104,17 @@ RUN cd $APP_SOURCE_FOLDER && \
     exit 1
 
 
-# Use the exact Node release bundled by Meteor 3.5.4.
-FROM node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS bundle_deps_builder
+# Use the exact Node release bundled by Meteor 3.6.1.
+FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS bundle_deps_builder
 
 ENV APP_BUNDLE_FOLDER /opt/bundle
 ENV SCRIPTS_FOLDER /docker
 ARG ALPINE_PRIMARY_MIRROR=https://dl-cdn.alpinelinux.org/alpine
 ARG ALPINE_FALLBACK_MIRROR=https://dl-2.alpinelinux.org/alpine
 
-RUN test "$(node --version)" = "v24.22.1" && \
-    test "$(npm --version)" = "11.19.1" && \
-    test "$(node -p 'process.versions.undici')" = "7.30.1"
+RUN test "$(node --version)" = "v26.13.1" && \
+    test "$(npm --version)" = "11.20.0" && \
+    test "$(node -p 'process.versions.undici')" = "8.12.4"
 
 # Function: install OS build dependencies for native module compilation.
 # These stay in this intermediate image and are excluded from final runtime image.
@@ -155,7 +155,7 @@ RUN bash $SCRIPTS_FOLDER/build-meteor-npm-dependencies.sh && \
 
 # Start another Docker stage, so that the final image doesn't contain the layer with the build dependencies
 # See previous FROM line; this must match
-FROM node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS runtime
+FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS runtime
 
 ARG MOFACTS_SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision=$MOFACTS_SOURCE_REVISION
@@ -186,10 +186,10 @@ COPY --from=bundle_deps_builder $SCRIPTS_FOLDER $SCRIPTS_FOLDER/
 COPY --from=bundle_deps_builder $APP_BUNDLE_FOLDER/bundle $APP_BUNDLE_FOLDER/bundle/
 
 # Function: verify the bundle/runtime toolchain before removing npm.
-RUN test "$(cat "$APP_BUNDLE_FOLDER/bundle/.node_version.txt")" = "v24.22.1" && \
-    test "$(node --version)" = "v24.22.1" && \
-    test "$(npm --version)" = "11.19.1" && \
-    test "$(node -p 'process.versions.undici')" = "7.30.1"
+RUN test "$(cat "$APP_BUNDLE_FOLDER/bundle/.node_version.txt")" = "v26.13.1" && \
+    test "$(node --version)" = "v26.13.1" && \
+    test "$(npm --version)" = "11.20.0" && \
+    test "$(node -p 'process.versions.undici')" = "8.12.4"
 
 # Function: remove platform-specific binaries not needed in linux container runtime.
 RUN rm -rf $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules/@swc/core-darwin* \

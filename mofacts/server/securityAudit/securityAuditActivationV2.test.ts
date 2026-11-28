@@ -72,7 +72,7 @@ describe('activated V2 audit application boundaries', function() {
     expect((await fetch(`${origin}/internal/security-audits/v2`, { ...options,
       method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' })).status).to.equal(415);
     // Unregistered POSTs reach Meteor's default method response, not a V1
-    // authentication/parser path. WebApp is Express-backed in Meteor 3.5.
+    // authentication/parser path. WebApp is Express-backed in supported Meteor.
     const retired = await fetch(`${origin}/internal/security-audits/v1`, { ...options,
       method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     expect(retired.status).to.equal(405);

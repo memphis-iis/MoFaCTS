@@ -15,13 +15,13 @@ ENV HOME=/home/mofacts-test
 ENV PATH=/home/mofacts-test/.meteor:$PATH
 USER 2000:2000
 WORKDIR /opt/toolchain
-RUN curl --fail --silent --show-error 'https://install.meteor.com/?release=3.5.4' --output /tmp/install-meteor.sh && \
+RUN curl --fail --silent --show-error 'https://install.meteor.com/?release=3.6.1' --output /tmp/install-meteor.sh && \
     sh /tmp/install-meteor.sh && rm /tmp/install-meteor.sh && \
-    test "$(cat .meteor/release)" = 'METEOR@3.5.4' && \
-    test "$(meteor --version)" = 'Meteor 3.5.4' && \
-    test "$(meteor node --version)" = 'v24.22.1' && \
-    test "$(meteor npm --version)" = '11.19.1' && \
-    test "$(meteor node -p 'process.versions.undici')" = '7.30.1' && \
+    test "$(cat .meteor/release)" = 'METEOR@3.6.1' && \
+    test "$(meteor --version)" = 'Meteor 3.6.1' && \
+    test "$(meteor node --version)" = 'v26.13.1' && \
+    test "$(meteor npm --version)" = '11.20.0' && \
+    test "$(meteor node -p 'process.versions.undici')" = '8.12.4' && \
     meteor node -p 'process.execPath' > /tmp/mofacts-node-bin
 USER root
 ENV HOME=/root

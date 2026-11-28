@@ -7,7 +7,7 @@ This folder contains executable deployment examples and scripts for MoFaCTS. Hum
 - `docker-compose.yml`: canonical Self-Hosted MoFaCTS app, authenticated MongoDB, and Redis runtime.
 - `docker-compose.local.yml`: local supporting-service overrides, including the
   MongoDB host port used by the source watcher.
-- `docker-compose.change-streams-qualification.yml`: test-only stable-3.5.4
+- `docker-compose.change-streams-qualification.yml`: test-only stable-3.6.1
   Change Streams recovery qualification override; it is not part of the
   production path.
 - `.env.self-hosted.example`: shareable self-hosted environment template. Copy it to ignored `.env.self-hosted`.
@@ -36,17 +36,18 @@ deployment does not execute it or copy learner records.
 
 Run Docker Compose from this folder.
 
-The current toolchain is Meteor `3.5.4`, Node `24.22.1`, npm `11.19.1` and
-built-in Undici `7.30.1`. The Dockerfile keeps the existing digest-pinned
-`geoffreybooth/meteor-base:3.5` image only as a CLI bootstrap because that image
-does not provide a `3.5.4` tag. In the application directory the official CLI
+The current toolchain is Meteor `3.6.1`, Node `26.13.1`, npm `11.20.0` and
+built-in Undici `8.12.4`. The Dockerfile uses the digest-pinned
+`geoffreybooth/meteor-base:3.6` image only as a CLI bootstrap. In the application directory the official CLI
 selects the project's exact `.meteor/release`, and the build asserts all four
 versions before compiling. Compiler child processes use that selected Meteor
 Node binary. Dependency and runtime stages use the digest-pinned
-`node:24.22.1-alpine` image.
+`node:26.13.1-alpine` image.
 
-The official release owns DDP and Rspack; there are no local copies or separate
-Rspack dependency-installation step. Application manifests and Meteor's release,
+The official release owns DDP and Rspack; there are no local copies. The required
+Rspack 2 npm packages are explicitly pinned and automatic dependency installation
+is disabled, so `meteor update --npm` verifies rather than rewrites the graph.
+Application manifests and Meteor's release,
 package and version files remain checksum-protected through compilation and
 bundle creation. The upstream accounts-password package now provides bcrypt
 `6.0.0` and argon2 `0.44.0`, so the image verifies those dependencies without
@@ -177,8 +178,8 @@ Compose command unless the qualification gate passes and the production change
 is separately authorized.
 
 The opt-in client/server regression matrix is exercised by the manually
-triggered `Meteor 3.5.4 Change Streams qualification` GitHub Actions workflow.
-That workflow installs stable Meteor 3.5.4, starts a disposable MongoDB 8
+triggered `Meteor 3.6.1 Change Streams qualification` GitHub Actions workflow.
+That workflow installs stable Meteor 3.6.1, starts a disposable MongoDB 8
 one-member replica set, selects the qualification overlay's exact environment
 contract, and runs the existing supported Linux Meteor/Playwright test path.
 It is intentionally separate from ordinary CI because its purpose is to
@@ -267,7 +268,7 @@ This workflow is local verification, not production release confidence.
 
 ## Security Notes
 
-- Meteor 3.5.4 reads MongoDB's default consistency settings. After primary
+- Meteor 3.6.1 reads MongoDB's default consistency settings. After primary
   election, the replica-set initializer idempotently grants the configured app
   user the admin-scoped `mofactsReadDefaultConcern` role. Its only privilege is
   `getDefaultRWConcern` on the cluster resource; it has no inherited roles and

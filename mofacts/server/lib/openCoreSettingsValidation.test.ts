@@ -113,7 +113,7 @@ describe('open-core settings validation', function() {
     expect(result.issues.map((issue) => issue.path)).to.include('public.packages.accounts.clientStorage');
   });
 
-  it('requires the contained Meteor 3.5 transport and reactivity settings', function() {
+  it('requires the contained Meteor transport and reactivity settings', function() {
     const result = validateOpenCoreSettings(completeSettings, {
       ...completeEnv,
       METEOR_REACTIVITY_ORDER: 'polling',

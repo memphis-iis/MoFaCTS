@@ -51,8 +51,8 @@ This inventory classifies the self-hosted configuration surface used by applicat
 | `MOFACTS_MONGO_REPLICA_SET_MEMBER` | required, deployment file | initial replica-set member | initial `rs.initiate` configuration; later expansion remains explicit |
 | `MONGO_REPLICA_SET_KEYFILE_HOST_PATH` | required, deployment secret path | self-hosted MongoDB replica set | read-only source for internal member-authentication key |
 | `MOFACTS_SELF_HOSTED` | required, private-server | self-hosted production | settings validation and readiness |
-| `METEOR_REACTIVITY_ORDER` | required, runtime behavior | Meteor 3.5 reactivity owner | Must be `changeStreams`; polling and all alternate reactive drivers are prohibited |
-| `DDP_TRANSPORT` | required, runtime behavior | Meteor 3.5 contained base | DDP transport selection; must be `sockjs` |
+| `METEOR_REACTIVITY_ORDER` | required, runtime behavior | supported Meteor reactivity owner | Must be `changeStreams`; polling and all alternate reactive drivers are prohibited |
+| `DDP_TRANSPORT` | required, runtime behavior | supported contained Meteor base | DDP transport selection; must be `sockjs` |
 | `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD` | required, deployment secret | MongoDB bootstrap | Compose MongoDB init |
 | `MOFACTS_MONGO_APP_DATABASE`, `MOFACTS_MONGO_APP_USERNAME`, `MOFACTS_MONGO_APP_PASSWORD` | required, deployment secret | MongoDB app user bootstrap | Mongo init script and Compose |
 | `MOFACTS_REDIS_PASSWORD` | required, private-server, secret | self-hosted Redis | Compose Redis `requirepass`, authenticated healthcheck, and application URL construction |

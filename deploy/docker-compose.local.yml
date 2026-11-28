@@ -3,7 +3,7 @@ services:
   # Linux source watcher, never a generated production bundle or host Meteor.
   mofacts: !override
     container_name: mofacts
-    image: geoffreybooth/meteor-base:3.5@sha256:58b203caa2c3dc963774117cbf45534d4533ddd77b220e075107da3f3600a083
+    image: geoffreybooth/meteor-base:3.6@sha256:e28bce299f859a5fa6f7ead6936e34f253c255c7b0131e3251ab9c79f9773d75
     init: true
     working_dir: /workspace/mofacts
     command: ["bash", "/workspace/deploy/hotfix/watch-linux.sh"]

@@ -20,9 +20,9 @@ evidence, not proof that an identifier is concealed.
 `authentication/comparisonV2.mjs` separates transient wire-response capture,
 evaluation and evidence projection. Native login denial must use the exact
 reviewed Meteor credential-rejection code/reasons; unrelated errors cannot prove
-denial. The source is Meteor 3.5.4's official
-[accounts server](https://github.com/meteor/meteor/blob/release/METEOR%403.5.4/packages/accounts-base/accounts_server.js)
-and [password server](https://github.com/meteor/meteor/blob/release/METEOR%403.5.4/packages/accounts-password/password_server.js).
+denial. The source is Meteor 3.6.1's official
+[accounts server](https://github.com/meteor/meteor/blob/release/METEOR%403.6.1/packages/accounts-base/accounts_server.js)
+and [password server](https://github.com/meteor/meteor/blob/release/METEOR%403.6.1/packages/accounts-password/password_server.js).
 Reset responses must be bounded primitive records with an explicit successful
 generic response. Compare full bounded public values in memory, retaining only
 pair IDs, outcome categories, durations and equality. Never retain message text,

@@ -27,7 +27,7 @@ function requireQualificationMode() {
   ) {
     throw new Meteor.Error(
       'qualification-disabled',
-      'Meteor 3.5 Change Streams qualification mode is not active',
+      'Meteor Change Streams qualification mode is not active',
     );
   }
 }
@@ -287,7 +287,7 @@ const describeChangeStreamsQualification = (
   ? describe
   : describe.skip;
 
-describeChangeStreamsQualification('Meteor 3.5 real publication qualification', function() {
+describeChangeStreamsQualification('Meteor real publication qualification', function() {
   this.timeout(30_000);
 
   it('observes the real exact-id server verbosity setting through initial and changed states', async function() {

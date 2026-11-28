@@ -16,10 +16,12 @@ function rspackClientOutputContract(Meteor) {
     // window["meteor/..."] globals.
     externalsType: 'commonjs2',
     output: {
-      library: CLIENT_LIBRARY_NAME,
+      library: {
+        name: CLIENT_LIBRARY_NAME,
+        type: 'global',
+      },
       // Workers inherit this output contract. globalThis owns the exported
       // library in both the page and worker without referencing window there.
-      libraryTarget: 'global',
       globalObject: 'globalThis',
     },
   };

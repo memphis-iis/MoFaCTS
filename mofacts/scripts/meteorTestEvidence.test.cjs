@@ -203,8 +203,8 @@ test('wrapper records complete child output, rejects missing evidence and cleans
     for (const name of ['client-test-entry.js', 'server-test-entry.js', ...expected.server, ...expected.client]) {
       fs.writeFileSync(path.join(app, name), '');
     }
-    fs.writeFileSync(path.join(app, '.meteor/release'), 'METEOR@3.5.4\n');
-    const versions = 'ddp-server@3.5.0\nrspack@1.3.1\n';
+    fs.writeFileSync(path.join(app, '.meteor/release'), 'METEOR@3.6.1\n');
+    const versions = 'ddp-server@3.6.1\nrspack@1.4.0\n';
     fs.writeFileSync(path.join(app, '.meteor/packages'), versions);
     fs.writeFileSync(path.join(app, '.meteor/versions'), versions);
     fs.writeFileSync(path.join(root, 'settings.ci.json'), '{}');

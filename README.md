@@ -58,7 +58,7 @@ the configured local admin, and stores ignored credentials under
 `deploy/local-hotfix/`. See [First Local
 Run](docs/development.md#first-local-run).
 
-The supported local runtime baseline is Node.js `24.22.1`, npm `11.19.1`, and Meteor `3.5.4`. See [SUPPORT.md](SUPPORT.md) for the current support policy.
+The supported local runtime baseline is Node.js `26.13.1`, npm `11.20.0`, and Meteor `3.6.1`. See [SUPPORT.md](SUPPORT.md) for the current support policy.
 
 ## Documentation
 

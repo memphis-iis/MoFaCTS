@@ -5,7 +5,7 @@ import { digestVerificationBundle, parseVerificationBundle, requireMatchingSourc
 import { createVerificationBundleLoader } from '../../../server/securitySurfaces/verificationBundle.ts';
 import { auditDigest } from '../../../common/securityAudit/canonicalReport.ts';
 
-const profile = { mode: 'production', meteorRelease: 'METEOR@3.5.4' };
+const profile = { mode: 'production', meteorRelease: 'METEOR@3.6.1' };
 const profileSha256 = await auditDigest(profile);
 
 const buildIdentity = {

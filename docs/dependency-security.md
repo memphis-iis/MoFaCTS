@@ -24,8 +24,8 @@ audits its installed server bundle at the high threshold.
 
 ## Current maintenance findings
 
-The current source baseline is Meteor `3.5.4`, Node `24.22.1` and npm
-`11.19.1`. Node's bundled Undici is `7.30.1`, which fixes
+The current source baseline is Meteor `3.6.1`, Node `26.13.1` and npm
+`11.20.0`. Node's bundled Undici is `8.12.4`, which fixes
 [`GHSA-xjj6-f33q-929c`](https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c)
 in server `fetch()`. An npm override does not replace that built-in copy:
 verify `process.versions.undici` as well as the ordinary dependency tree.
@@ -40,18 +40,30 @@ dependencies reduced the application's full-tree audit from 33 to 25 findings:
 and no high/critical findings. The Mongo sidecar lockfile has no findings after
 updating its SDK and affected transitive dependencies.
 
-The high development findings in that snapshot were under the pinned Rspack 1.7.12
+The high development findings in that snapshot were under the then-pinned Rspack 1.7.12
 toolchain: `@rspack/dev-server`, `webpack-dev-server`, `chokidar`,
 `http-proxy-middleware`, `micromatch`, `braces`, `selfsigned`, and `node-forge`.
 The underlying [braces advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
 and [node-forge advisory](https://github.com/advisories/GHSA-86w9-cpqp-85rv)
-list no patched releases. Do not force Rspack 2 or incompatible transitive
-majors into this pinned toolchain to change an audit result. A toolchain upgrade
-needs its own Meteor build, browser, and watcher qualification.
+list no patched releases. At that time, forcing Rspack 2 or incompatible
+transitive majors into Meteor 3.5 would not have been a maintainable repair.
+The current supported Meteor 3.6.1 release owns Rspack 2 and is qualified through
+the normal build, browser, and watcher gates.
 
 That audit snapshot also included bundled `pbkdf2` and the `sprintf-js` paths
 used by TensorFlow/WebGazer and Remarkable/Deep Chat. Those historical counts
 are not a current dependency audit or evidence of deployed runtime exposure.
+
+The current lockfile has zero advisories in both the complete and production
+dependency graphs. Its narrow `test-exclude` override upgrades only that test
+tool's `glob` and `minimatch` path; remove the override when `test-exclude`
+itself declares patched versions. This result is a source dependency property,
+not evidence that an older deployed image has changed.
+
+npm install scripts are fail-closed. The project pins approval for the reviewed
+`@swc/core` install script and explicitly denies the informational `core-js` and
+`svelte-preprocess` scripts. A new dependency install script must be reviewed
+and recorded before `npm ci` can proceed.
 
 ## Bundled browser dependencies
 

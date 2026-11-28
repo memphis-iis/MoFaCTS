@@ -16,10 +16,10 @@ if [ ! -f "$SERVER_DIR/package.json" ]; then
   exit 1
 fi
 
-test "$(cat "$OUTPUT_ROOT/bundle/.node_version.txt")" = "v24.22.1"
-test "$(node --version)" = "v24.22.1"
-test "$(npm --version)" = "11.19.1"
-test "$(node -p 'process.versions.undici')" = "7.30.1"
+test "$(cat "$OUTPUT_ROOT/bundle/.node_version.txt")" = "v26.13.1"
+test "$(node --version)" = "v26.13.1"
+test "$(npm --version)" = "11.20.0"
+test "$(node -p 'process.versions.undici')" = "8.12.4"
 
 cd "$SERVER_DIR"
 

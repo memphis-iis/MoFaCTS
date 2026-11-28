@@ -33,7 +33,7 @@ Required environment:
 - `METEOR_REACTIVITY_ORDER`: must be `changeStreams`. MoFaCTS rejects polling
   and all alternate reactive observer drivers. Incompatible reactive cursors
   must be redesigned or made explicitly non-reactive.
-- `DDP_TRANSPORT`: must be `sockjs` for the contained Meteor 3.5 base.
+- `DDP_TRANSPORT`: must be `sockjs` for the contained supported Meteor base.
 - `MOFACTS_REDIS_PASSWORD`: URL-safe random Redis credential of at least 32
   characters. Compose uses it to require Redis authentication and construct the
   private application `REDIS_URL`; do not maintain a second password in the URL.

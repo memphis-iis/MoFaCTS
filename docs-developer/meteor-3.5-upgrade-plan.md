@@ -1293,7 +1293,7 @@ scenarios, not prerequisites. No beta or release-branch artifact is used.
    logs/APM, MongoDB stream/operation evidence, and behavior tests rather than
    production code that reaches into private observer-driver fields.
    The manually triggered
-   `.github/workflows/meteor-35-change-streams-qualification.yml` workflow is
+   `.github/workflows/meteor-change-streams-qualification.yml` workflow is
    the repository-owned execution path for the opt-in client/server observer
    and write-fence matrix. It uses stable Meteor 3.5 and a disposable MongoDB 8
    replica set; it never installs the beta or touches a protected database.

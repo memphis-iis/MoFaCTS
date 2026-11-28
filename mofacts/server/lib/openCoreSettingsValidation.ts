@@ -1,5 +1,5 @@
 import { URL } from 'url';
-import { inspectMeteor35RuntimeMode } from './ddpContainment';
+import { inspectMeteorRuntimeMode } from './ddpContainment';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -137,8 +137,8 @@ function validateMongoUrl(issues: SettingsValidationIssue[], env: NodeJS.Process
   }
 }
 
-function validateMeteor35Containment(issues: SettingsValidationIssue[], env: NodeJS.ProcessEnv) {
-  const containment = inspectMeteor35RuntimeMode(env);
+function validateMeteorContainment(issues: SettingsValidationIssue[], env: NodeJS.ProcessEnv) {
+  const containment = inspectMeteorRuntimeMode(env);
   for (const issue of containment.issues) {
     addIssue(issues, issue.path, issue.message);
   }
@@ -247,7 +247,7 @@ export function validateOpenCoreSettings(
   validateOptionalProvider(issues, 'microsoft', settings.microsoft);
   validateMemphisSaml(issues, settings);
   validateMongoUrl(issues, env);
-  validateMeteor35Containment(issues, env);
+  validateMeteorContainment(issues, env);
   validateAccountsClientStorage(issues, settings);
   validateRedis(issues, settings, env);
 

@@ -4,21 +4,21 @@ type MeteorServerWithOptions = {
   };
 };
 
-export type Meteor35RuntimeMode = {
+export type MeteorRuntimeMode = {
   qualificationMode: boolean;
   reactivityOrder: 'changeStreams';
   transport: 'sockjs';
 };
 
-export type Meteor35ContainmentIssue = {
+export type MeteorContainmentIssue = {
   path: string;
   message: string;
 };
 
-export function inspectMeteor35RuntimeMode(
+export function inspectMeteorRuntimeMode(
   env: NodeJS.ProcessEnv = process.env,
-): { mode?: Meteor35RuntimeMode; issues: Meteor35ContainmentIssue[] } {
-  const issues: Meteor35ContainmentIssue[] = [];
+): { mode?: MeteorRuntimeMode; issues: MeteorContainmentIssue[] } {
+  const issues: MeteorContainmentIssue[] = [];
   const qualificationSetting = env.MOFACTS_CHANGE_STREAMS_QUALIFICATION;
   const qualificationMode = qualificationSetting === 'true';
 
@@ -45,7 +45,7 @@ export function inspectMeteor35RuntimeMode(
   if (env.DDP_TRANSPORT !== 'sockjs') {
     issues.push({
       path: 'DDP_TRANSPORT',
-      message: 'must be sockjs for the Meteor 3.5 qualification boundary',
+      message: 'must be sockjs for the supported Meteor qualification boundary',
     });
   }
 
@@ -67,7 +67,7 @@ export function applyDdpContainment(
   meteorServer: MeteorServerWithOptions | undefined,
   env: NodeJS.ProcessEnv = process.env,
 ) {
-  const result = inspectMeteor35RuntimeMode(env);
+  const result = inspectMeteorRuntimeMode(env);
   if (!result.mode) {
     throw new Error(result.issues.map((issue) => `${issue.path} ${issue.message}`).join('; '));
   }

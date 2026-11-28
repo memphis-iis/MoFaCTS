@@ -3,11 +3,11 @@ set -euo pipefail
 cd /workspace/mofacts
 
 # The bootstrap image supplies the CLI; the application selects the release.
-test "$(tr -d '\r' < .meteor/release)" = 'METEOR@3.5.4'
-test "$(meteor --version)" = 'Meteor 3.5.4'
-test "$(meteor node --version)" = 'v24.22.1'
-test "$(meteor npm --version)" = '11.19.1'
-test "$(meteor node -p 'process.versions.undici')" = '7.30.1'
+test "$(tr -d '\r' < .meteor/release)" = 'METEOR@3.6.1'
+test "$(meteor --version)" = 'Meteor 3.6.1'
+test "$(meteor node --version)" = 'v26.13.1'
+test "$(meteor npm --version)" = '11.20.0'
+test "$(meteor node -p 'process.versions.undici')" = '8.12.4'
 node_bin="$(meteor node -p 'process.execPath')"
 ln -sf "$node_bin" /usr/local/bin/node
 

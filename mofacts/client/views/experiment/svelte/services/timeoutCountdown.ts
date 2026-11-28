@@ -20,17 +20,19 @@ export interface DisplayTimeoutSnapshot {
   shouldAutoAdvance: boolean;
 }
 
+type IntervalHandle = number | ReturnType<typeof setInterval>;
+
 interface TimeoutCountdownControllerOptions {
   now?: () => number;
-  setIntervalFn?: (callback: () => void, delayMs: number) => ReturnType<typeof setInterval>;
-  clearIntervalFn?: (handle: ReturnType<typeof setInterval>) => void;
+  setIntervalFn?: (callback: () => void, delayMs: number) => IntervalHandle;
+  clearIntervalFn?: (handle: IntervalHandle) => void;
   onUpdate?: (snapshot: TimeoutCountdownSnapshot) => void;
 }
 
 interface DisplayTimeoutControllerOptions {
   now?: () => number;
-  setIntervalFn?: (callback: () => void, delayMs: number) => ReturnType<typeof setInterval>;
-  clearIntervalFn?: (handle: ReturnType<typeof setInterval>) => void;
+  setIntervalFn?: (callback: () => void, delayMs: number) => IntervalHandle;
+  clearIntervalFn?: (handle: IntervalHandle) => void;
   onTick?: () => void;
 }
 
@@ -217,7 +219,7 @@ export function createTimeoutCountdownController(options: TimeoutCountdownContro
   const setIntervalFn = options.setIntervalFn || setInterval;
   const clearIntervalFn = options.clearIntervalFn || clearInterval;
   const onUpdate = options.onUpdate || (() => undefined);
-  let intervalHandle: ReturnType<typeof setInterval> | null = null;
+  let intervalHandle: IntervalHandle | null = null;
   let snapshot: TimeoutCountdownSnapshot = {
     modeState: 'none',
     progress: 0,
@@ -413,7 +415,7 @@ export function createDisplayTimeoutController(options: DisplayTimeoutController
   const setIntervalFn = options.setIntervalFn || setInterval;
   const clearIntervalFn = options.clearIntervalFn || clearInterval;
   const onTick = options.onTick || (() => undefined);
-  let intervalHandle: ReturnType<typeof setInterval> | null = null;
+  let intervalHandle: IntervalHandle | null = null;
   let mountMs = now();
   let nowMs = mountMs;
   let autoAdvanced = false;

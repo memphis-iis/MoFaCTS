@@ -75,9 +75,9 @@ test('qualifies the official security release without local package shadowing', 
 
 function runtimeFixture(changes = {}, localPackage = null) {
   const inputs = {
-    release: 'METEOR@3.5.4\n',
-    packages: 'ddp-server@3.5.0\nrspack@1.3.1\n',
-    versions: 'ddp-server@3.5.0\nrspack@1.3.1\n',
+    release: 'METEOR@3.6.1\n',
+    packages: 'ddp-server@3.6.1\nrspack@1.4.0\n',
+    versions: 'ddp-server@3.6.1\nrspack@1.4.0\n',
     ...changes,
   };
   return () => validateMeteorRuntimeContract('/app', file => inputs[path.basename(file)],
@@ -86,10 +86,10 @@ function runtimeFixture(changes = {}, localPackage = null) {
 
 test('accepts official packages and rejects an older release or resolution', () => {
   assert.doesNotThrow(runtimeFixture());
-  assert.throws(runtimeFixture({ release: 'METEOR@3.5\n' }), /supported METEOR@3\.5\.4/);
+  assert.throws(runtimeFixture({ release: 'METEOR@3.5\n' }), /supported METEOR@3\.6\.1/);
   for (const name of ['packages', 'versions']) {
-    assert.throws(runtimeFixture({ [name]: 'ddp-server@3.3.0\nrspack@1.3.1\n' }), /official ddp-server@3\.5\.0/);
-    assert.throws(runtimeFixture({ [name]: 'ddp-server@3.5.0\nrspack@1.1.1\n' }), /official rspack@1\.3\.1/);
+    assert.throws(runtimeFixture({ [name]: 'ddp-server@3.3.0\nrspack@1.4.0\n' }), /official ddp-server@3\.6\.1/);
+    assert.throws(runtimeFixture({ [name]: 'ddp-server@3.6.1\nrspack@1.1.1\n' }), /official rspack@1\.4\.0/);
   }
 });
 
@@ -132,8 +132,10 @@ test('emits injected client bundles with a browser-owned library target', () => 
   const expectedOutput = {
     externalsType: 'commonjs2',
     output: {
-      library: CLIENT_LIBRARY_NAME,
-      libraryTarget: 'global',
+      library: {
+        name: CLIENT_LIBRARY_NAME,
+        type: 'global',
+      },
       globalObject: 'globalThis',
     },
   };
@@ -187,7 +189,7 @@ test('requires explicit acknowledgments for both coordinated recovery actions', 
     'utf8',
   );
   const workflow = fs.readFileSync(
-    path.resolve(appRoot, '../.github/workflows/meteor-35-change-streams-qualification.yml'),
+    path.resolve(appRoot, '../.github/workflows/meteor-change-streams-qualification.yml'),
     'utf8',
   );
 
@@ -255,7 +257,7 @@ test('enforces one Linux Docker source watcher on localhost', () => {
   assert.match(manager, /assert-change-streams\.sh/);
   assert.match(manager, /Get-HotfixDevClientBundleState/);
   assert.doesNotMatch(manager, /JobObject|__supervise|mt-os\.windows|MOFACTS_NATIVE_MONGO_URL|Start-Process/);
-  assert.match(watcher, /test "\$\(meteor --version\)" = 'Meteor 3\.5\.4'/);
+  assert.match(watcher, /test "\$\(meteor --version\)" = 'Meteor 3\.6\.1'/);
   assert.match(watcher, /meteor npm ci/);
   assert.match(watcher, /sha256sum package-lock\.json/);
   assert.match(watcher, /exec meteor run --port 3200/);
