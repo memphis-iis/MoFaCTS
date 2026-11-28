@@ -5,7 +5,32 @@ the [audit status](../../docs-developer/security-audit-durable-redesign-status.m
 The image and receipt coordinates in the first section are current. The later
 V2 sections preserve the November 11 activation and rollback history.
 
-## Current V3 receiver qualification (2026-11-27)
+## Current combined-release qualification (2026-11-28)
+
+Staging2 runs exact source
+`248858525c0cd78d67a9c257c1584bc868c2cf90`. This is the single image that
+passed exact-source Meteor verification and regular-staging/staging2 acceptance,
+then was promoted by manifest to production without rebuilding. Staging2
+registry root:
+`sha256:4e158fce2124c0cc0696577527be8ef263fde16b16c01e2791545fa44e9dff95`;
+Linux/amd64 manifest:
+`sha256:bcd91bc9939136aaa8f23e737c2e641b50df188f28fc08228a3dfe9a0aa24993`;
+configuration:
+`sha256:3b7f985bdc409a3882818aa724b6574caffaca59c478781d947faea5a7f44798`.
+
+The receipt, host acquisition, public/browser acceptance and the signed Full
+report passed. Report
+`staging2-reproducible-closeout-24885852-proof-20261128` contains 70 PASS and
+zero FAIL/ERROR/NA. Report digest:
+`3964b09c7e28547c3bb852119629728d1518e04648b98cec7efb6c8db78236c3`;
+writer/readback SHA-256:
+`35ea370b9d6a7415e4c995e133b6006be586af0d545ddc78e339956eaeb1edb3`;
+encrypted archive SHA-256:
+`3adb10b13ae2403e3de4291689ea8a3e6966dc4624d73090db1db0e353407be4`.
+The earlier receiver/image/report coordinates below remain dated rollback and
+audit history; they are not the current release or an open acceptance queue.
+
+## Historical V3 receiver qualification (2026-11-27)
 
 Staging2 runs exact source
 `41e02b2ed3b66256331e930c4dd02e1b1e3e7141` with the V3 receiver selected

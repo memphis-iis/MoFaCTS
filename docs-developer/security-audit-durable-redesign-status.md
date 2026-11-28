@@ -1,20 +1,80 @@
 # Security Audit Durable Redesign Status
 
-Current staging2 audit qualification: `41e02b2ed3b66256331e930c4dd02e1b1e3e7141`.
-The running public image is
-`ppavlikmemphis/mofacts-staging2@sha256:3515794a3335ab5f11400903c22f2cfa5a7e403968c478700eff5a4162c96fed`;
-its Linux/amd64 manifest is
-`sha256:a7c8ca34cab60e3edef2d33e65fb2629b8452794b6faba4bbc2ca4381d8f27cf`.
-The previous environment, image inspection and receipt are retained in the
-root-private staging2 rollback directory. The older `dac554f2` and
-`b319e0d4` checkpoints below remain historical evidence, not the current
-deployment identity. Production remains outside this staging2 acceptance.
+Current accepted source: `248858525c0cd78d67a9c257c1584bc868c2cf90`.
+The single qualified image was built once, accepted on staging2, and promoted
+unchanged to production. Registry root:
+`sha256:4e158fce2124c0cc0696577527be8ef263fde16b16c01e2791545fa44e9dff95`;
+Linux/amd64 manifest:
+`sha256:bcd91bc9939136aaa8f23e737c2e641b50df188f28fc08228a3dfe9a0aa24993`;
+configuration:
+`sha256:3b7f985bdc409a3882818aa724b6574caffaca59c478781d947faea5a7f44798`.
+Staging2 and production retain separate rollback directories, release records,
+host observations and signed reports. Earlier deployment identities below are
+historical evidence, not current work.
 
 **Checklist interpretation:** the current completion sections at the top of
 this file supersede unchecked tasks inside older dated checkpoints. Those rows
 are preserved to show what was unknown at that time; they are not a queue to
-repeat. The only current open project gate is the explicitly production-only
-P1-D9 coordinated cutover/acceptance recorded below.
+repeat. Phase 0 and all Phase 1-4 deliverables and exit gates are complete for
+the exact release above. Routine recurring audits and future release
+qualification are operations, not unfinished redesign phases.
+
+## Phase 1-4 coordinated closure (completed 2026-11-28)
+
+- [x] Qualify the exact combined release. Meteor slot 118 passed with 1,167
+  server and 1,258 Chromium cases, zero failures and zero hook failures. The
+  proof-bearing source, image registry graph and embedded verification bundle
+  were checked before staging.
+- [x] Accept the same immutable image on regular staging and staging2 before
+  production promotion. Staging2 receipt comparison, host acquisition and
+  browser acceptance passed. Its signed report
+  `staging2-reproducible-closeout-24885852-proof-20261128` contains 70 PASS and
+  zero FAIL/ERROR/NA. Report digest:
+  `3964b09c7e28547c3bb852119629728d1518e04648b98cec7efb6c8db78236c3`;
+  writer/readback bytes SHA-256:
+  `35ea370b9d6a7415e4c995e133b6006be586af0d545ddc78e339956eaeb1edb3`;
+  encrypted archive SHA-256:
+  `3adb10b13ae2403e3de4291689ea8a3e6966dc4624d73090db1db0e353407be4`.
+- [x] Complete P1-04 and P1-D9 through the authorized production cutover.
+  Production started the promoted image at `2026-11-28T01:29:26.019971169Z`.
+  The authoritative record digest is
+  `9c7817aab3b9c74ba9eb89ae8e38259547242528f980f2bd4972f1bf43310a77`;
+  its V2 host receipt matched the running source/configuration/platform. The
+  root-private rollback set is `/etc/mofacts/rollback-24885852-proof-20261128`.
+  The first combined remote start command timed out while the app was being
+  recreated; the immediate bounded Compose continuation completed, and the
+  final app, dependencies and receipt were healthy. No failure was hidden or
+  accepted as success.
+- [x] Pass production application acceptance. Deployment Readiness passed at
+  `2026-11-28T01:32:12.182Z`; administrator Google sign-in, a representative
+  practice save, reload/resume, history export and dynamic media passed. Public
+  and loopback health and the enforced CSP passed. MongoDB, Redis and MCP
+  sibling services were not replaced.
+- [x] Pass production host and public-network acceptance. The installed host
+  acquisition at `2026-11-28T01:39:38.000Z` reported the exact matching receipt,
+  root-only protected inputs, expected firewall/listener/Docker/Apache state,
+  authenticated private MongoDB/Redis service and rejected unauthenticated
+  access. A complete 1-65535 TCP scan found only ports 80 and 443 open. Targeted
+  UDP probes returned `open|filtered`; the V3 network contract therefore used
+  the combined cloud/host firewall, listener and Docker-publication evidence
+  rather than misreporting UDP silence as conclusive.
+- [x] Accept and independently read back the production Full report.
+  `production-reproducible-closeout-24885852-proof-20261128` contains 70 PASS,
+  zero FAIL/ERROR/NA and no findings or execution errors. Catalog V3 digest:
+  `38812fb9bd06a62634db20d69295cd46f82d417e3edc525ded0758bfa77fca12`;
+  report digest:
+  `830c52a7224c5922244e6b585f1fb510b0ebe5f4f800981a9c14487a0e5cc76c`;
+  writer/receiver/download bytes SHA-256:
+  `e101cc9e14980f809be00d783fc575449871e65ae212a2da7b5c1ab74b2fea09`;
+  encrypted archive SHA-256:
+  `c0297b7c7799f811e6462147c26443b883e677525712d5eaa7ef28d1488b2de9`.
+  Administrator list/get/download, saved archive bytes and in-memory decryption
+  all matched. Temporary plaintext report/export files were removed only after
+  those comparisons passed. The retained encryption public-key fingerprint is
+  `97333d673b88ae8ef32adea7a7bc45514d9adb387bc2ce7c984d61a9a528c17c`.
+- [x] Close the redesign without erasing history. The older unchecked boxes
+  below remain dated observations of work that was pending then. They do not
+  reopen Phase 1, 2, 3 or 4 and must not be executed again as a backlog.
 
 
 
@@ -90,8 +150,8 @@ P1-D9 coordinated cutover/acceptance recorded below.
 Phase 2 staging2 deliverables and acceptance are complete. The complete
 four-section staging2 report is now recorded in the V3 closeout below.
 Unattended scheduling is optional operational work, not an acceptance gap. The
-coordinated production cutover remains separate; the Phase 1 production
-recording gate (P1-04) remains with that production window.
+later coordinated production window completed P1-04 and P1-D9; its independent
+production evidence is recorded in the current closure section above.
 
 ## Reproducible closure contract for the final 15 staging2 controls (approved 2026-11-27)
 
@@ -164,10 +224,10 @@ recording gate (P1-04) remains with that production window.
   It was rejected before storage because the then-running receiver selected V2;
   it is not relabeled as an accepted report. The corrected receiver is commit
   `41e02b2e` and the accepted report is the distinct ID and digest above.
-- [x] Record remaining scope honestly. Phase 3 and Phase 4 are complete for the
-  exact staging2 release. P1-D9's coordinated production cutover/acceptance is
-  the sole remaining project gate and still requires separate production
-  authorization; no staging2 result is evidence about production exposure or data.
+- [x] Record remaining scope honestly. Phase 3 and Phase 4 first completed for
+  the exact staging2 release. P1-D9 then completed in the separately authorized
+  2026-11-28 production window with independent production evidence recorded in
+  the current closure section; no staging2 result was relabeled as production.
 
 ## Phase 3 reconciliation (completed 2026-11-27)
 
@@ -444,7 +504,12 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
   - [x] Reassemble and read back the unsigned review with the expiry observation. The accepted release `e9d14a25` now has 50 passes, four findings and 16 controls awaiting evidence. Protected review `/var/tmp/mofacts-full-review.1aZZUDhK/review-with-verified-expiry/report.json` has SHA-256 `20c83ccff0c73579ad1b38bfd9da703451b0a58918b18c20bab3549e9bc78a3d`. Only the expiry control changed in the 70-row review.
   - [x] Accept the remediation release `8e3a0a484d146ce85b9733d6065a9d2806296e82` on staging2. It started at `2026-11-27T02:38:41.183140486Z` under tag `ppavlikmemphis/mofacts-staging2:audit-8e3a0a48-20261127023003`. The immutable registry index is `sha256:faaf371c69504e1def8f7f2c9d9dba490565b4575debb62a352799d9cbe54b1a`, Linux/amd64 manifest `sha256:749aaaa2c86113aa081aa0f58a4e09dd8a86867dcbbad07e7f7834fed9e700aa`, and configuration `sha256:b61d06b6862ac91601fccff3b06e60ac094c40d6701c0c8912d7b3082fa5c06e`. Exact slot 113, canonical Compose build, private Change Streams startup, published Trivy scan, public HTTPS 200, ordinary learner reload, session cleanup, admin Security Audits and the installed 248-case registry comparison passed. The first CSP check hashed the field value alone. Hashing the complete field line matched the previous receipt, and the proxy files passed the unchanged-state check. The embedded bundle SHA-256 is `e072f7436ddda43bb2b896a47d41bac5ae07590eeb27f89a9ef5e5cf8e081fbc`. Independent host readback matched workstation authority `1c06f0004c5c598b7449098ab5558d3421e76313e0e518282625aabf50535030`. Verified the previous image, proxy and other services after finalization. Protected evidence `audit-8e3a0a48-20261127023003` also contains the ordinary learner's own-settings baseline and the scoped inventory showing zero matching Full reports.
   - [x] Verify the ordinary-account settings restriction on `8e3a0a48`. The ordinary learner read its own settings. One disposable participant signed in to its assigned study using the normal progress-backed account flow and received `experiment-account-restricted` for its own account settings. The catalog evaluator passed. The protected receipt `study-settings-control.json` in `audit-8e3a0a48-20261127023003` has SHA-256 `7606977d9e4e3cb7dc200b2def47b7d5ce31367d02ac9f0237f5c00fa9d6fdc6`. Independently verified namespace absence, session sign-out, lease release, temporary fixture file removal, and the same healthy application. The fixture request now uses the existing canonical JSON encoder after two write-free preflight failures; both earlier windows were verified empty and closed.
-  - [ ] Qualify the live Full report. Supply the protected writer JSON for all 70 catalog v2 controls and its stored report ID. Match the scanner to the separately reviewed tool commit and the deployed application to `8e3a0a484d146ce85b9733d6065a9d2806296e82` and its independently observed Linux/amd64 platform image. Require a start at or after `2026-11-27T02:38:41.183140486Z`. Keep the actual findings and require zero execution errors. In Security Audits, download JSON from the Recent 90-day history row with the matching report digest for the independent readback. Verify the writer and receiver copies and the saved encrypted archive before closing Phase 3.
+  - [x] Qualify the live Full report. The earlier `8e3a0a48` requirement was
+    superseded by the exact combined `24885852` release and completed first on
+    staging2, then independently on production. Both 70-control reports were
+    signed, ingested, downloaded, byte-compared and archive-verified. Exact
+    report coordinates are in the current closure section at the top of this
+    file; do not repeat this historical gate.
 
 ## Phase 4 closure and maintainer handoff (2026-11-26)
 
@@ -455,7 +520,10 @@ After slot 80, the contract lists 200 methods and 21 publications. The five veri
 - [x] Record an owner, priority and acceptance condition for each of the four retained findings in the [per-control register](security-audit-staging2-control-evidence.md#findings-retained-for-remediation).
 - [x] Verify the source and handoff. Full typecheck and lint passed. Pinned Linux Node V2 source tests recorded 479 passes and seven environment-dependent skips. The retained compatibility and release checks recorded 152 passes and one environment-dependent skip. All four immutable scanner-selection checks and three direct Node token, HMAC and identity tests passed. The Meteor allowance remains available for its recorded scope.
 - [x] Verify the offline review procedure with the pinned tool. Installed its locked dependencies in the isolated checkout and removed the generated dependencies after assembly. Verified the host receipt against the accepted release authority and used a canonical copy for metadata generation. The original capture remains available. The [operator runbook](../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification) records the setup and distinguishes the review from live qualification.
-- [ ] Complete the final evidence record after Phase 3's live Full report gate. It requires the [outstanding observations](security-audit-staging2-control-evidence.md), signed ingestion, independent receiver download and saved archive verification. P1-D9 assigns final production acceptance to a separately authorized coordinated cutover.
+- [x] Complete the final evidence record after Phase 3's live Full report gate.
+  The staging2 and production report IDs, report digests, exact writer/readback
+  hashes, encrypted archive hashes and acceptance boundaries are recorded in
+  the current closure section. P1-D9 production acceptance is complete.
 
 ### Staging2 closeout preparation (2026-11-27)
 
@@ -2852,7 +2920,7 @@ that actually needs another check.
 | P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [x] Candidate 70/23 catalog and direct shared imports pass pinned Windows/Linux Node and actual Meteor server parity, including the fixed digest. This completes the source contract, not V2 cutover. |
 | P1-02 | Active/append-only catalog and evidence-contract registries | [x] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators pass mutation tests and shared-runtime checks. Initial catalog remains unreleased until coordinated cutover; released entries/validators are append-only. |
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
-| P1-04 | Integrated build identity/host-release comparison | [ ] Integrated staging2 release/receiver identity and rollback passed. The permanent post-acceptance hook source now composes actual running configuration, immutable registry mapping and the existing authority/history/receipt owner; its focused tests pass. Phil selected standard verified recording on 2026-11-12. The canonical procedure now checks the pinned project-local runtime before deployment and uses the verified owner after participant acceptance; old engine-reference assignment/direct authority overwrite are removed. Syntax, actual local preflight and existing-record compatibility pass. Unrelated procedure edits are preserved. Read-only production graph/final-container verification now passes under the approved ten-minute observation and matches the existing P1-D2 baseline. The standard recorder explicitly uses the measured remote budget; defaults/bounds elsewhere remain unchanged. Live post-deployment production recording/cutover is still unexecuted, so this item stays open. Approved P1-D9 defers that operational gate to the final coordinated production window while source/staging work proceeds; no record backfill or production write is authorized. |
+| P1-04 | Integrated build identity/host-release comparison | [x] Completed in the authorized 2026-11-28 production window. The exact clean `24885852` candidate passed Meteor and staging acceptance, was promoted without rebuilding, and production independently matched its registry root, Linux/amd64 manifest, configuration, revision label, V2 receipt and authoritative record. Record digest `9c7817aab3b9c74ba9eb89ae8e38259547242528f980f2bd4972f1bf43310a77`; rollback set `/etc/mofacts/rollback-24885852-proof-20261128`. Readiness, participant smoke, host acquisition and the production Full report passed. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. The later live V2 application/host/receipt qualification and rollback/restoration close P1-14; staging2 now runs the accepted V2 pair. Reuse that proof instead of repeating the earlier V1-restoration checkpoint. |
 | P1-07 | Exact assembly and independent server validation | [x] Both profiles assemble in catalog order, and missing or malformed producers yield complete ERROR results for their controls. The server checks the signature and report independently before storage. Node mutation checks and the real-Mongo HTTP Meteor case passed on 603c1233. Workflow wiring and live acceptance are tracked in P1-08 and P1-14. |
@@ -2865,7 +2933,7 @@ that actually needs another check.
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [x] Live paired V2 application/receipt/host qualification passes on 2026-11-11: actual signed report ingestion, admin UI/get/JSON+HTML downloads, V1 rollback exclusion and restored V2 matching hashes. Audit storage remained unchanged, both fixture attempts independently absent, all eleven host controls PASS and receipt MATCH. No SSH/sudo/ACL grant changed. Exposure report truthfully retains one UDP evidence-incomplete ERROR. See live evidence below; the separate sealed P1-16 trial supplies positive V1 and V2 record coverage. |
 | P1-15 | Exact host install/rollback procedure and hashes | [x] Reviewed nine-file cohort, pinned source/controller/baseline hashes, bounded root controller and independent recovery documented/tested. Actual staging2 installation and exact restoration passed; Phase 0 production baseline is retained. No production installation is implied. |
 | P1-16 | Previous-production-image qualification with V2 records | [x] Full sealed staging2 candidate/previous/candidate trial passes on 2026-11-11 using candidate 1c72734b and the selected immutable previous production image. All three phases verify real DDP/admin access, list/latest/get/downloads, other-generation exclusion and unchanged V1/V2 bytes. Candidate/restored download hashes match. Independent cleanup and unchanged original MoFaCTS/JEDM services pass. Exact evidence: phase1-20261105/rollback-roundtrip-1c72734b/attempt1, independent readback SHA-256 8a03c93db239d44081002a478d486361940a5beb6537f9c60b3da2317594fe70. P1-14 still owns live V2 ingestion/cutover. |
-| P1-17 | Updated operator documentation | [x] Current public guide, code-local README, operator Linux repository/exposure procedures, staging2 baseline, standard release-record owner and production cutover/rollback guidance are reconciled. Remove superseded inert/V1-restored claims; preserve immutable historical production setup and dated proof in the ledger. Wiki guidance carries the actual workflow result and DNS limitation. Production execution and complete scanner evidence remain explicitly unverified, not documentation work silently reopened. |
+| P1-17 | Updated operator documentation | [x] Current public guide, code-local README, operator Linux repository/exposure procedures, staging2 baseline, standard release-record owner and production cutover/rollback guidance are reconciled. Superseded inert/V1-restored claims remain only as dated history. The authorized production execution, accepted Full report and exact current release are recorded at the top of this ledger. |
 
 ### Release identity hook and candidate preparation (2026-11-11)
 

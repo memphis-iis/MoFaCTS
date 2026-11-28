@@ -3,10 +3,13 @@
 This opt-in tooling implements the approved storage arrangement. It has local
 filesystem/parser tests and hosted Linux permission fixtures that passed in
 [CI at `936a64aa`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41465187050).
-The staging2 live rehearsal completed on 2026-11-04 as described below; no
-production command-sheet hook has run. This storage/receipt tooling does not acquire or
-authenticate complete test evidence, prove OCI registry mappings, qualify a
-release, or close Phase 0. See the [audit status](../../docs-developer/security-audit-durable-redesign-status.md).
+The staging2 rehearsal history is described below. The standard production hook
+ran successfully for the exact accepted 2026-11-28 release: it observed the
+running image, verified the immutable registry graph, wrote the authoritative
+record through the existing atomic owner, installed the V2 receipt and read it
+back as MATCH. This storage/receipt tooling still does not itself acquire or
+authenticate test evidence or qualify source; those gates precede recording.
+See the [audit status](../../docs-developer/security-audit-durable-redesign-status.md).
 
 ## Authority and stored data
 
@@ -47,10 +50,14 @@ bounds remain unchanged. No production authority or receipt was written.
 See the [read-only observation acceptance](production-image-observation.md).
 
 The operator approved making this the standard production recording path on
-2026-11-12. The canonical `mofacts_config/deploy production.txt` now checks the
+2026-11-12. The canonical `mofacts_config/deploy production.txt` checks the
 pinned runtime and existing SSH trust file before its first deployment/config
-update. After the unchanged readiness/participant checks, it writes the six-field
-candidate to a new private evidence directory and calls
+update. It now consumes the accepted staging release record and publication
+observation, promotes that exact immutable graph into the production repository
+without rebuilding, saves a root-private rollback unit, and keeps the receipt
+overlay in every production Compose invocation. After readiness/participant
+checks, it writes the six-field candidate to a new private evidence directory
+and calls
 `deploy/record-deployment-release.ps1`. Direct overwrite of the authority and the
 native-engine-reference-as-config assignment are removed from that recording
 block. There is no optional or silent replacement recording branch.
@@ -78,9 +85,10 @@ readback. Windows tests additionally prove correct runtime selection, wrong-vers
 rejection and the participant-acceptance guard. The actual canonical local
 preflight and existing local production-record format pass. Only the intentional
 integration hunks are staged/published; unrelated operator edits are preserved.
-Live execution of the new SSH/recording composition against production remains
-unexecuted and requires production authorization. Standard recording is an
-operational identity/acceptance record, not source/CI/release qualification.
+Authorized live execution passed on 2026-11-28 for source `24885852`; the
+authoritative record digest, receipt comparison and rollback directory are in
+the status ledger. Standard recording is an operational identity/acceptance
+record, not source/CI/release qualification.
 Source-only generic builds and application startup retain their existing behavior.
 See P1-04 in the current checklist.
 

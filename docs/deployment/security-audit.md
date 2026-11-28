@@ -5,22 +5,38 @@ exposure and repository security. Audit findings do not stop services, change
 permissions/firewalls, deploy code or alter real accounts. Backup/recovery and
 application availability remain separate responsibilities.
 
-## Production reconciliation observed 2026-11-15
+## Current accepted production baseline (2026-11-28)
 
-The November 14 production release now presents the V2 receiver, but its
-restricted host command still emits V1 and its GitHub scanner remains pinned
-to V1. The earlier production-V1 pairing statements below describe the prior
-baseline, not the current live pairing. The scheduled audit is not operational.
-See the [verified finding and offline cutover packet](../../deploy/security-audit/production-operator-cutover.md).
-The observed MongoDB role FAIL comes from the obsolete single-role expectation;
-bounded metadata checks confirmed the current approved app/Sidecar role policy.
-No production permission, configuration, mail transport or schedule changed.
+Production runs exact source `248858525c0cd78d67a9c257c1584bc868c2cf90`
+from the same immutable image accepted on staging2; production promotion did not
+rebuild it. Registry root:
+`sha256:4e158fce2124c0cc0696577527be8ef263fde16b16c01e2791545fa44e9dff95`;
+Linux/amd64 manifest:
+`sha256:bcd91bc9939136aaa8f23e737c2e641b50df188f28fc08228a3dfe9a0aa24993`;
+configuration:
+`sha256:3b7f985bdc409a3882818aa724b6574caffaca59c478781d947faea5a7f44798`.
+The credential-free release receipt is mounted read-only, its host comparison
+matches, and the previous production unit is retained under the root-private
+rollback set named in the audit ledger.
+
+Deployment Readiness, administrator sign-in, practice save/reload, history
+export and media delivery passed. The installed host collector, full public TCP
+inventory and effective network evidence passed. Targeted UDP probes remained
+inconclusive (`open|filtered`), so the V3 evaluator used the combined cloud/host
+firewall, listener and Docker-publication evidence instead of treating silence
+as proof. Production report
+`production-reproducible-closeout-24885852-proof-20261128` contains 70 PASS,
+zero FAIL/ERROR/NA and no findings or execution errors. Its report digest is
+`830c52a7224c5922244e6b585f1fb510b0ebe5f4f800981a9c14487a0e5cc76c`;
+administrator readback and encrypted-archive verification are recorded in the
+[audit ledger](../../docs-developer/security-audit-durable-redesign-status.md).
 
 ## Current execution and deployment
 
-The target scheduler/scanner host is **staging2**, independent of the operator's
-desktop. Original staging is excluded. Read-only host inventory is complete;
-no recurring audit timer or cloud mail-handoff service is installed. The
+The qualification/scanner host is **staging2**, independent of the operator's
+desktop. Regular staging remains a release-acceptance step, not the audit host.
+Read-only host inventory is complete; no recurring audit timer or cloud
+mail-handoff service is required for the accepted manual qualification. The
 [staging2 unattended design](../../deploy/security-audit/staging2-unattended-design.md)
 records measured prerequisites, the connected-Gmail boundary and required
 independent missed-run detection. This is planned architecture, not acceptance.
@@ -30,24 +46,22 @@ GitHub billing is unavailable. The four repository Security jobs use the
 Its exact-commit result is operator evidence, not a GitHub check or release
 qualification. The optional GitHub Security workflow is manual-only.
 
-The latest accepted staging2 V2 application recorded in the audit ledger is
-`e9d14a25`. The catalog v2 Full report uses a separately pinned writer and the
-exact deployed application source for registry verification. Its live evidence,
-signed storage, independent download and archive verification are tracked in
+The latest accepted staging2/production application source is `24885852`; the
+active signed receiver accepts catalog V3. Its live evidence, signed storage,
+independent download and archive verification are tracked in
 the [staging2 operating procedure](../../deploy/security-audit/staging2-v2-operations.md#catalog-v2-full-report-qualification)
 and [control register](../../docs-developer/security-audit-staging2-control-evidence.md).
 The [operator exposure workflow](../../deploy/security-audit/operator-exposure-v2.md)
 composes the same V2 producers, assembler, encryption, uploader and final
 assertion without GitHub scheduling or new server access.
 
-Production's scanner still selects V1 although its receiver is now V2. Its
-workflow selects `09f0c32fc2af6d220c699dd805133df3c0507c2e`; publishing V2 source
-neither upgrades production nor authorizes scanning it. The configured daily
-06:00 UTC exposure/weekly Monday full schedule does not prove execution while
-GitHub is locked. The existing V1 setup is preserved in its
-[immutable operating guide](https://github.com/memphis-iis/MoFaCTS/blob/09f0c32fc2af6d220c699dd805133df3c0507c2e/docs/deployment/security-audit.md).
-Reconcile the entire host/scanner/receiver unit at the complete cutover. Production execution,
-credential changes and cutover require their own explicit authorization.
+The accepted production Full report was assembled with catalog V3 and ingested
+through the active signed receiver. GitHub billing remains unavailable, so
+optional hosted scheduling is not evidence and is not a prerequisite for this
+accepted release. Future
+releases repeat exact-source verification, staging2 acceptance, immutable image
+promotion, production acceptance and a fresh production report; they do not
+reopen the completed redesign phases.
 
 ## Reports and evidence semantics
 

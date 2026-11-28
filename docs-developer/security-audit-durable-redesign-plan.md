@@ -1,21 +1,27 @@
 # Security Audit Durable Redesign Plan
 
-Phase 0 decisions/characterization completed 2026-11-05, including the approved
-installed-production auditor source observation and recoverable source baseline.
-This completes Phase 0 only; operational qualification and Phases 1-4 remain.
+Phase 0 decisions/characterization completed 2026-11-05. The authorized
+coordinated production cutover on 2026-11-28 completed the remaining Phase 1-4
+deliverables and exit gates for exact source
+`248858525c0cd78d67a9c257c1584bc868c2cf90`. Exact current evidence is in the
+status ledger; older open statements in this plan describe the design-time
+state and are not an execution queue.
 
 Status reconciled 2026-11-05: Phase 0 contracts/characterization, protected-source
 Compose CI, staging2 evidence joining and protected receipt/history installation,
 staging2 acceptance, and AWS two-version recovery have recorded results. Use the
 [active completion worklist](security-audit-durable-redesign-status.md#phase-0-completion-worklist-active-2026-11-05)
-for exact boundaries and remaining work. Complete release/audit qualification
-is still unqualified; the Phase 1-4 redesign cutovers have not started.
+for the historical boundaries. Complete release/audit qualification is accepted
+for the exact 2026-11-28 release. Future releases must repeat the release
+qualification and acceptance workflow without reopening the completed redesign.
 
 Original source review: 2026-09-06. That foundation-only date does not describe the later CI, Docker and staging2 execution in the current checklist.
 
 Original audit baseline: `main` at `fa8dc09156500bb0458de3028a9e0ee11e4ae5c7`. Workflow/compatibility review baseline: `main` at `74f0e68dc1bb353747d4bf49f0bb27eb72a43f4d`, with unrelated CI/test-harness working-tree changes preserved. Progress and evidence belong in [`security-audit-durable-redesign-status.md`](security-audit-durable-redesign-status.md).
 
-This document is the developer implementation plan for making the MoFaCTS security-audit system maintainable, efficient, and resistant to false-green results. It does not claim that any phase has been implemented, tested, deployed, or verified in production.
+This document preserves the developer design and implementation sequence for the
+MoFaCTS security-audit system. Completion claims and exact production evidence
+belong only in the status ledger.
 
 The Phase 1 entry inventory is complete and recorded in the status worklist. Reuse that accepted baseline for unchanged inputs and refresh affected paths or control membership when source changes require it.
 
@@ -24,9 +30,11 @@ Concrete Phase 0 contract ownership and test limitations are now recorded in [Ph
 The canonical production procedure is `C:\dev\mofacts_config\deploy production.txt`,
 verified present during this reconciliation. The older `deploy and build.txt`
 name in foundation tracing is historical. The private PowerShell command sheet
-owns workstation construction/publication and remote Compose deployment; CI
-provides verification evidence rather than becoming the production publisher.
-Staging2 execution does not establish production qualification-hook integration.
+owns remote Compose deployment and manifest promotion. The candidate is built
+once through the supported release workflow, qualified on staging2, and promoted
+unchanged to production; production must not rebuild it. CI provides verification
+evidence rather than becoming the production publisher. The completed
+2026-11-28 hook integration is recorded in the status ledger.
 
 The current operator-facing behavior and protected-environment setup remain documented in [`docs/deployment/security-audit.md`](../docs/deployment/security-audit.md). That file is the operational source of truth. This plan owns target architecture, implementation sequencing, verification gates, and eventual cleanup; it must not duplicate secrets or environment-specific operator commands.
 
@@ -235,6 +243,11 @@ or that complete audit/production acceptance follows from source tests.
 
 #### P1-D9: one final production cutover (approved 2026-11-12)
 
+**Completed 2026-11-28.** The paragraphs below preserve the approved sequencing
+and pre-execution boundary. The exact promoted image, production acceptance,
+release receipt, rollback unit and 70-control report are recorded in the current
+status ledger.
+
 The remaining Phase 1 source/staging identity work now has a successful read-only
 production graph observation. Its last live recorder/cutover gate would require
 an actual accepted production release; the older authority must not be backfilled
@@ -357,7 +370,12 @@ verification catalog + protected fixture bindings + deployed inventory
 
 ### 2.1 Confirmed release workflow and source limits
 
-The workstation origin and command sheet are operator-confirmed. The following are static source observations, not evidence of a current production deployment:
+The workstation origin and command sheet are operator-confirmed. The following
+table is the original design-time baseline. It does not describe the current
+promotion standard: the accepted implementation now builds once, qualifies the
+exact image on staging2, promotes the same registry graph to production, keeps
+the receipt overlay attached and saves a complete rollback unit. See AGENTS.md,
+the current status ledger and the private command sheet for the active procedure.
 
 | Source | Actual behavior | Integration constraint |
 | --- | --- | --- |
