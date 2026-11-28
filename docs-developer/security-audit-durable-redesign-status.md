@@ -1,23 +1,81 @@
 # Security Audit Durable Redesign Status
 
-Current accepted source: `248858525c0cd78d67a9c257c1584bc868c2cf90`.
-The single qualified image was built once, accepted on staging2, and promoted
-unchanged to production. Registry root:
+Current production source remains
+`248858525c0cd78d67a9c257c1584bc868c2cf90`. Its single qualified image was
+built once, accepted on staging2 and regular staging, and promoted unchanged to
+production. Registry root:
 `sha256:4e158fce2124c0cc0696577527be8ef263fde16b16c01e2791545fa44e9dff95`;
 Linux/amd64 manifest:
 `sha256:bcd91bc9939136aaa8f23e737c2e641b50df188f28fc08228a3dfe9a0aa24993`;
 configuration:
 `sha256:3b7f985bdc409a3882818aa724b6574caffaca59c478781d947faea5a7f44798`.
 Staging2 and production retain separate rollback directories, release records,
-host observations and signed reports. Earlier deployment identities below are
+host observations and signed reports.
+
+The current Meteor 3.6.1 dependency-maintenance candidate is exact source
+`567bde11f65784d5acbca7c40370145a23ca1796`. It has passed source, Meteor,
+immutable-image, staging2 and regular-staging qualification. Its registry root is
+`sha256:180b97152e27acc4084c821ddd13389cf93912d2f97d0ad719aeabd867d43528`;
+Linux/amd64 manifest
+`sha256:6017667299f53299083ec0fac251c7a3fb7e683634042f7624bda61d451decd3`;
+configuration
+`sha256:7883176aa5d6b8f365d350169cddf85218f822191ede9217d605e1bd3be734a9`.
+Production remains on the prior accepted image until a separate production
+promotion is explicitly authorized. Earlier deployment identities below are
 historical evidence, not current work.
 
 **Checklist interpretation:** the current completion sections at the top of
 this file supersede unchecked tasks inside older dated checkpoints. Those rows
 are preserved to show what was unknown at that time; they are not a queue to
-repeat. Phase 0 and all Phase 1-4 deliverables and exit gates are complete for
-the exact release above. Routine recurring audits and future release
-qualification are operations, not unfinished redesign phases.
+repeat. Phase 0 and all Phase 1-4 deliverables and exit gates remain complete
+under the accepted production release. Routine recurring audits and later
+release qualification are operations, not unfinished redesign phases.
+
+## Meteor 3.6.1 dependency-maintenance release (staging qualified 2026-11-28)
+
+- [x] Freeze and publish exact source
+  `567bde11f65784d5acbca7c40370145a23ca1796`. It aligns Meteor 3.6.1,
+  Node 26.13.1, npm 11.20.0, Undici 8.12.4, the release-owned Rspack 2 toolchain
+  and the official DDP packages. The complete and production npm audits both
+  contain zero advisories. Install-script review, typecheck, lint, 691 source
+  security cases, 153 Phase 0 cases, capture contracts and the four operator
+  Security checks passed.
+- [x] Run one fresh supported Meteor integration on the isolated 6 GiB/two-CPU
+  Linux worker. It completed from `2026-11-28T12:39:56Z` to `12:42:05Z` with
+  1,167 server and 1,258 Chromium passes, zero failures and zero hook failures;
+  15 server and seven browser cases retained their expected pending state. The
+  extracted 255-execution bundle SHA-256 is
+  `aa66e53d2d185575b3088fdc57215a09f1854cfca733831c70b8cd6d6d2f0871`.
+- [x] Build the canonical image once without cache and publish its immutable
+  graph. Registry root, Linux manifest and configuration are the three current
+  maintenance coordinates above; the embedded revision is exact. No separate
+  regular-staging image was rebuilt.
+- [x] Accept the image on staging2. The first deployment attempt discovered that
+  a host-side release helper incorrectly assumed `node` was installed and rolled
+  back cleanly. The corrected supported invocation then replaced only the app.
+  MongoDB and Redis retained their container identities. HTTPS/CSP, Google
+  administrator sign-in, lesson submission, reload/resume, logout and the host
+  receipt passed. Report
+  `staging2-reproducible-closeout-567bde11-meteor361-20261128` contains 70 PASS
+  and zero FAIL/ERROR/NA. Report digest:
+  `51a75f3695184c41ae9a3032852eb38287854ba9e975f6442f1e14ead35eba2e`;
+  exact writer/receiver bytes:
+  `166eac9f70b12be06c261eb025e679f43f32c567febec67aa2a352877ccf980e`;
+  encrypted archive:
+  `7fffb003432697ad1d03361676cbce0d9c799d4585e615bd54d479055de65fb1`.
+  Independent authenticated readback and in-memory offline-key decryption
+  matched before the two temporary plaintext copies were removed.
+- [x] Promote the identical registry graph to regular staging under tag
+  `staging-20261128134200Z-567bde11`. Only the app container changed; MongoDB and
+  Redis remained byte-for-byte the same running containers. Health, HTTPS/CSP,
+  absent `x_mtok`, retired upload endpoint 410, Google sign-in, administrator
+  role, a real lesson response, reload/resume, explicit save/return, logout and
+  fatal startup-log scan passed. The previous environment and image remain in
+  `/var/www/mofacts-staging/rollback-567bde11-meteor361-20261128`.
+- [ ] Promote this exact digest to production and repeat production acceptance.
+  This is the only open item in this maintenance release. It is an operational
+  release boundary requiring explicit production authorization; it does not
+  reopen any completed Phase 1-4 redesign item.
 
 ## Phase 1-4 coordinated closure (completed 2026-11-28)
 

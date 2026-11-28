@@ -5,7 +5,36 @@ the [audit status](../../docs-developer/security-audit-durable-redesign-status.m
 The image and receipt coordinates in the first section are current. The later
 V2 sections preserve the November 11 activation and rollback history.
 
-## Current combined-release qualification (2026-11-28)
+## Current Meteor 3.6.1 maintenance qualification (2026-11-28)
+
+Staging2 runs exact source
+`567bde11f65784d5acbca7c40370145a23ca1796` under tag
+`ppavlikmemphis/mofacts-staging2:release-567bde11-20261128-meteor361`.
+It is the single canonical image that passed the fresh supported Meteor run,
+staging2 acceptance and regular-staging promotion without rebuilding. Registry
+root:
+`sha256:180b97152e27acc4084c821ddd13389cf93912d2f97d0ad719aeabd867d43528`;
+Linux/amd64 manifest:
+`sha256:6017667299f53299083ec0fac251c7a3fb7e683634042f7624bda61d451decd3`;
+configuration:
+`sha256:7883176aa5d6b8f365d350169cddf85218f822191ede9217d605e1bd3be734a9`.
+
+Receipt, restricted host acquisition, HTTPS/CSP, Google administrator sign-in,
+lesson submission, reload/resume and logout passed. Report
+`staging2-reproducible-closeout-567bde11-meteor361-20261128` contains 70 PASS
+and zero FAIL/ERROR/NA. Report digest:
+`51a75f3695184c41ae9a3032852eb38287854ba9e975f6442f1e14ead35eba2e`;
+writer/receiver bytes SHA-256:
+`166eac9f70b12be06c261eb025e679f43f32c567febec67aa2a352877ccf980e`;
+encrypted archive SHA-256:
+`7fffb003432697ad1d03361676cbce0d9c799d4585e615bd54d479055de65fb1`.
+The administrator readback and in-memory offline-key decryption matched before
+temporary plaintext removal. The accepted workstation release-record SHA-256 is
+`c8e5dd06513a48a0445add07f66f1ad6b01a6de498c0ef1f69d3766d7c11449c`.
+The root-protected rollback set is
+`/etc/mofacts/rollback-567bde11-meteor361-20261128`.
+
+## Prior combined-release qualification (2026-11-28)
 
 Staging2 runs exact source
 `248858525c0cd78d67a9c257c1584bc868c2cf90`. This is the single image that
@@ -110,7 +139,7 @@ record and history are written by `qualification/releaseRecordStore.mjs write-v2
 only after real readiness/participant acceptance and independent running-image
 and registry mapping checks. See [the release owner](release-records.md).
 Current record SHA-256 is
-`c2d6e598ee57d3bf9c3ed4811e9a40c2cedad38d3f475db1c761fd055730fb71`.
+`c8e5dd06513a48a0445add07f66f1ad6b01a6de498c0ef1f69d3766d7c11449c`.
 It is an accepted operational baseline, without a fabricated ReleaseQualification.
 The four public image fields in the Desktop staging2 profile match the host;
 the exact previous credential-bearing profile stays in its approved Desktop

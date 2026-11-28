@@ -60,6 +60,16 @@ tool's `glob` and `minimatch` path; remove the override when `test-exclude`
 itself declares patched versions. This result is a source dependency property,
 not evidence that an older deployed image has changed.
 
+### 2026-11-28 deployment qualification
+
+Exact source `567bde11f65784d5acbca7c40370145a23ca1796` passed the supported Meteor
+integration, canonical image build, staging2 acceptance and regular-staging
+acceptance. Both staging environments run the same immutable registry root
+`sha256:180b97152e27acc4084c821ddd13389cf93912d2f97d0ad719aeabd867d43528`;
+the image was not rebuilt between environments. Production remains on its prior
+accepted image until this exact digest receives explicit production-release
+authorization and passes the production acceptance procedure.
+
 npm install scripts are fail-closed. The project pins approval for the reviewed
 `@swc/core` install script and explicitly denies the informational `core-js` and
 `svelte-preprocess` scripts. A new dependency install script must be reviewed
