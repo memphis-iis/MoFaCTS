@@ -35,7 +35,9 @@ bash control/worker.sh run "$job" "$commit" --authorize-one-meteor-run
 The image uses the digest-pinned official Playwright 1.60.0 Ubuntu 24.04 image
 matching the application lockfile. The official Meteor installer selects the
 repository-pinned release, as in CI. Exact Meteor/Node/npm assertions precede
-application dependency installation. The ordinary Meteor bootstrap image uses
+application dependency installation. The image also asserts `jq` 1.7 for the
+host-policy security contracts exercised by the standard operator gate. The
+ordinary Meteor bootstrap image uses
 Ubuntu 26.04, unsupported by this locked browser release; it is not the test OS.
 The vendor documents the image contents and version-matching requirement in its
 [Docker guide](https://playwright.dev/docs/docker).

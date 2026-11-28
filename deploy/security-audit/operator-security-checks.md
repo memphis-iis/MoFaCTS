@@ -6,8 +6,8 @@ Actions session, paid plan, AWS service or always-on server is required.
 The optional GitHub Security workflow is manual-only; it is not the standard
 gate and should not be dispatched while the organization is locked.
 
-Use Linux with the Node/npm versions in `mofacts/package.json`, Git and the
-existing Docker engine. The same gitleaks image as the workflow,
+Use Linux with the Node/npm versions in `mofacts/package.json`, Git, `jq` 1.7
+and the existing Docker engine. The same gitleaks image as the workflow,
 `ghcr.io/gitleaks/gitleaks:v8.30.1`, must already be available. The runner never
 pulls or installs a missing scanner. A missing tool is a failed check, not a
 passing scan. Acquire missing tools only under the project's dependency rules.

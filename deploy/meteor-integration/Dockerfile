@@ -4,7 +4,8 @@ FROM mcr.microsoft.com/playwright:v1.60.0-noble@sha256:9bd26ad900bb5e0f4dee75839
 ENV HUSKY=0 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY --from=docker_cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker_cli /usr/local/libexec/docker/cli-plugins/ /usr/local/libexec/docker/cli-plugins/
-RUN apt-get update && apt-get install --yes --no-install-recommends build-essential python3 && \
+RUN apt-get update && apt-get install --yes --no-install-recommends build-essential jq python3 && \
+    test "$(jq --version)" = jq-1.7 && \
     rm -rf /var/lib/apt/lists/* && \
     useradd --uid 2000 --create-home --shell /bin/bash mofacts-test && \
     mkdir -p /opt/toolchain/.meteor && chown -R 2000:2000 /opt/toolchain
