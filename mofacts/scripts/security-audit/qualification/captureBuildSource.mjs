@@ -397,7 +397,20 @@ export async function buildCapturedSource(workspace, builder, envFile, dependenc
   const baseline = JSON.parse(await invoke([...compose, 'config', '--format', 'json']));
   if (baseline.services.mofacts.build.args?.MOFACTS_SOURCE_REVISION !== checked.identity.baseCommit) invalidSnapshot();
   let proofDirectory;
+  let proofParent;
+  let removeProofParent = false;
   let bundleDigestSha256;
+  const removeProofCarrier = async () => {
+    if (!proofDirectory) return;
+    await fs.rm(path.join(proofDirectory, 'bundle.json'), { force: true });
+    await fs.rm(path.join(proofDirectory, 'compose.json'), { force: true });
+    await fs.rmdir(proofDirectory);
+    proofDirectory = undefined;
+    if (removeProofParent) {
+      await fs.rmdir(proofParent);
+      removeProofParent = false;
+    }
+  };
   try {
     let expectedBuildSecrets;
     let expectedSecrets;
@@ -411,7 +424,21 @@ export async function buildCapturedSource(workspace, builder, envFile, dependenc
         || (baseBuild.secrets ?? []).some(secret => (secret.target ?? secret.source) === verificationSecret)) {
         invalidSnapshot();
       }
-      proofDirectory = await fs.mkdtemp(path.join(checked.root, 'verification-'));
+      // Compose 5 delegates builds to Bake, which requires an explicit host
+      // filesystem entitlement for secrets outside the build context. Keep the
+      // proof carrier in the captured tree's already ignored local-build area
+      // instead: it cannot enter the context and needs no broader entitlement.
+      proofParent = path.join(checked.candidate, 'deploy/local-build');
+      const parent = await fs.lstat(proofParent).catch(error => {
+        if (error.code !== 'ENOENT') throw error;
+        return undefined;
+      });
+      if (parent !== undefined && (!parent.isDirectory() || parent.isSymbolicLink())) invalidSnapshot();
+      if (parent === undefined) {
+        await fs.mkdir(proofParent, { mode: 0o700 });
+        removeProofParent = true;
+      }
+      proofDirectory = await fs.mkdtemp(path.join(proofParent, 'verification-'));
       const file = path.join(proofDirectory, 'bundle.json');
       const override = path.join(proofDirectory, 'compose.json');
       await fs.writeFile(file, proofBytes, { flag: 'wx', mode: 0o600 });
@@ -443,15 +470,12 @@ export async function buildCapturedSource(workspace, builder, envFile, dependenc
     await invoke([...qualified, 'build', '--builder', builder, '--no-cache', 'mofacts'], {
       timeout: 60 * 60 * 1000, consume: async (stream) => { for await (const chunk of stream) void chunk; },
     });
+    await removeProofCarrier();
     if ((await inspectSnapshotTree(checked.candidate)).digestSha256 !== checked.receipt.localTreeDigestSha256) invalidSnapshot();
     return bundleDigestSha256 === undefined ? { state: 'built-unqualified', identity: checked.identity }
       : { state: 'built-unqualified', identity: checked.identity, bundleDigestSha256 };
   } finally {
-    if (proofDirectory) {
-      await fs.rm(path.join(proofDirectory, 'bundle.json'), { force: true });
-      await fs.rm(path.join(proofDirectory, 'compose.json'), { force: true });
-      await fs.rmdir(proofDirectory);
-    }
+    await removeProofCarrier();
   }
 }
 

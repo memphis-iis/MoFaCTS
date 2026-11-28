@@ -343,10 +343,14 @@ test('Compose build carries only a digest-bound proof and cleans it after a fail
   const result = await build();
   assert.equal(result.state, 'built-unqualified');
   assert.equal(result.bundleDigestSha256, sha256(proof));
-  assert.ok(calls.at(-1).some(arg => path.basename(arg) === 'compose.json'));
+  const proofOverride = calls.at(-1).find(arg => path.basename(arg) === 'compose.json');
+  assert.ok(proofOverride);
+  assert.equal(path.dirname(path.dirname(proofOverride)), path.join(captured.workspace, 'context/deploy/local-build'));
+  assert.equal(await fs.lstat(path.join(captured.workspace, 'context/deploy/local-build')).then(() => true, () => false), false);
   assert.equal((await fs.readdir(captured.workspace)).some(name => name.startsWith('verification-')), false);
   fail = true;
   await assert.rejects(build(), /Synthetic proof build failed/);
+  assert.equal(await fs.lstat(path.join(captured.workspace, 'context/deploy/local-build')).then(() => true, () => false), false);
   assert.equal((await fs.readdir(captured.workspace)).some(name => name.startsWith('verification-')), false);
   assert.equal(await fs.readFile(input, 'utf8'), proof);
 });
