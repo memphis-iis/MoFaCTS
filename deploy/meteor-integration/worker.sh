@@ -80,7 +80,8 @@ printf '%s\n' "$guest_available" > "$job/results/$action-linux-free-bytes"
 (( guest_available >= 10 * 1024 ** 3 )) || { echo 'Meteor worker requires 10 GiB free in the job filesystem' >&2; exit 1; }
 if grep -qi microsoft /proc/sys/kernel/osrelease; then
   mountpoint -q /mnt/c || { echo 'Cannot measure C: at /mnt/c' >&2; exit 1; }
-  [[ "$(findmnt -n -o SOURCE --mountpoint /mnt/c | cut -c1-2 | tr A-Z a-z)" == c: ]] || { echo 'Expected C: mounted at /mnt/c' >&2; exit 1; }
+  c_drive_sources=$(findmnt -n -o SOURCE --mountpoint /mnt/c | cut -c1-2 | tr A-Z a-z | sort -u)
+  [[ "$c_drive_sources" == c: ]] || { echo 'Expected C: mounted at /mnt/c' >&2; exit 1; }
   available=$(df -B1 --output=avail /mnt/c | tail -1)
   printf '%s\n' "$available" > "$job/results/$action-c-free-bytes"
   (( available >= 20 * 1024 ** 3 )) || { echo 'Meteor worker requires 20 GiB free on C:' >&2; exit 1; }

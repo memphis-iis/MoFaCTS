@@ -45,6 +45,16 @@ cat > "$root/bin/df" <<'MOCK'
 #!/usr/bin/env bash
 if [[ "${LOW_C:-0}" == 1 && "${*: -1}" == /mnt/c ]]; then echo 2048; else /usr/bin/df "$@"; fi
 MOCK
+cat > "$root/bin/findmnt" <<'MOCK'
+#!/usr/bin/env bash
+if [[ "${BAD_C_SOURCE:-0}" == 1 ]]; then
+  printf 'D:\\\n'
+else
+  # WSL can report the same mounted drive more than once. The worker must
+  # normalize identical records without accepting a different drive.
+  printf 'C:\\\nC:\\\n'
+fi
+MOCK
 chmod +x "$root/bin/"*
 git init -q "$root/source"
 mkdir -p "$root/source/mofacts/.meteor"
@@ -75,6 +85,9 @@ if grep -qi microsoft /proc/sys/kernel/osrelease; then
   new_job
   if LOW_C=1 bash "$worker" prepare "$job" "$commit"; then exit 1; fi
   [[ "$(cat "$job/results/prepare-c-free-bytes")" == 2048 && ! -e "$job/build" && ! -e "$job/invoked" ]]
+  new_job
+  if BAD_C_SOURCE=1 bash "$worker" prepare "$job" "$commit"; then exit 1; fi
+  [[ ! -e "$job/build" && ! -e "$job/invoked" ]]
 fi
 for expected in 0 39; do
   new_job
